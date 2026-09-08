@@ -1,11 +1,11 @@
 {
   "c_abi": [
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_jacobian_action_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_1_p_jacobian_action_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_jacobian_action_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_1_p_jacobian_action_element_3d_soa_diagnostics"
     },
     {
@@ -25,19 +25,19 @@
       "name": "navier_stokes_form_1_p_residual_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_residual_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_1_p_residual_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_residual_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_1_p_residual_element_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_jacobian_action_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_1_u_jacobian_action_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_jacobian_action_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_1_u_jacobian_action_element_3d_soa_diagnostics"
     },
     {
@@ -57,11 +57,11 @@
       "name": "navier_stokes_form_1_u_residual_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_residual_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_1_u_residual_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_residual_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_1_u_residual_element_3d_soa_diagnostics"
     },
     {
@@ -81,19 +81,19 @@
       "name": "navier_stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_jacobian_action_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_p_u_jacobian_action_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_jacobian_action_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_p_u_jacobian_action_element_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_residual_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_p_u_residual_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_residual_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_p_u_residual_element_3d_soa_diagnostics"
     },
     {
@@ -113,19 +113,19 @@
       "name": "navier_stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_jacobian_action_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_p_jacobian_action_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_jacobian_action_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_p_jacobian_action_element_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_residual_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_p_residual_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_residual_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_p_residual_element_3d_soa_diagnostics"
     },
     {
@@ -145,19 +145,19 @@
       "name": "navier_stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_jacobian_action_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_u_jacobian_action_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_jacobian_action_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_u_jacobian_action_element_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_residual_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_u_residual_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_residual_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_u_residual_element_3d_soa_diagnostics"
     },
     {
@@ -177,11 +177,11 @@
       "name": "navier_stokes_jacobian_action_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_jacobian_action_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_jacobian_action_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_jacobian_action_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_jacobian_action_element_3d_soa_diagnostics"
     },
     {
@@ -201,11 +201,11 @@
       "name": "navier_stokes_residual_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_residual_element_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_residual_element_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_residual_element_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "navier_stokes_residual_element_3d_soa_diagnostics"
     }
   ],

@@ -65,7 +65,7 @@ extern "C" int laplace_apply_2d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_apply_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int laplace_apply_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -124,7 +124,7 @@ extern "C" int laplace_apply_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_apply_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int laplace_apply_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -329,7 +329,7 @@ extern "C" int laplace_gradient_2d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_gradient_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int laplace_gradient_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -388,7 +388,7 @@ extern "C" int laplace_gradient_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_gradient_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int laplace_gradient_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -621,10 +621,10 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_hex8_matrix_assembly_va
 extern "C" int laplace_hex8_matrix_assembly_variant_count();
 
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_objective_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_objective_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int laplace_objective_steps_2d_affine_mesh_soa(
         const smesh::ElemType element_type,

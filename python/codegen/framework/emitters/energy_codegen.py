@@ -136,33 +136,33 @@ def _sfem_packed_thread_scratch_header_source():
             "",
             "template <typename T>",
             "struct ThreadScratchBuffer {",
-            "    T *data{nullptr};",
-            "    size_t capacity{0};",
+            "  T *data{nullptr};",
+            "  size_t capacity{0};",
             "",
-            "    ~ThreadScratchBuffer() { std::free(data); }",
+            "  ~ThreadScratchBuffer() { std::free(data); }",
             "",
-            "    T *ensure(const size_t size) {",
-            "        if (capacity < size) {",
-            "            std::free(data);",
-            "            data = static_cast<T *>(std::calloc(size, sizeof(T)));",
-            "            capacity = data ? size : 0;",
-            "        }",
-            "        return data;",
+            "  T *ensure(const size_t size) {",
+            "    if (capacity < size) {",
+            "      std::free(data);",
+            "      data = static_cast<T *>(std::calloc(size, sizeof(T)));",
+            "      capacity = data ? size : 0;",
             "    }",
+            "    return data;",
+            "  }",
             "};",
             "",
             "template <typename T>",
             "SFEM_INLINE T *thread_scratch(const int slot, const size_t size) {",
-            "    static thread_local ThreadScratchBuffer<T> buffers[4];",
-            "    return buffers[slot].ensure(size);",
+            "  static thread_local ThreadScratchBuffer<T> buffers[4];",
+            "  return buffers[slot].ensure(size);",
             "}",
             "",
             "template <typename T>",
             "SFEM_INLINE void prealloc_thread_scratch(const int slot, const size_t size) {",
             "#pragma omp parallel",
-            "    {",
-            "        (void)thread_scratch<T>(slot, size);",
-            "    }",
+            "  {",
+            "    (void)thread_scratch<T>(slot, size);",
+            "  }",
             "}",
             "",
             "}  // namespace codegen",
@@ -250,7 +250,7 @@ def _sfem_soa_affine_geometry_stream_lines(
                     "%ss_t b%s_data[VS];" % (indent, stream),
                     "%sconst s_t *const b%s = ageom_stream<s_t, %s, VS>("
                     % (indent, stream, geometry_scalar_type),
-                    "%s        ne, %s + evb, b%s_data, std::is_same<%s, s_t>());"
+                    "%s    ne, %s + evb, b%s_data, std::is_same<%s, s_t>());"
                     % (indent, abi_geometry_name(stream), stream, geometry_scalar_type),
                 ]
             )
@@ -265,40 +265,40 @@ def _affine_geometry_stream_helper_lines(source_builder):
         "",
         "template <typename s_t, typename g_t, int VS>",
         "%s const s_t *ageom_stream(" % inline_qualifier,
-        "        const int,",
-        "        const g_t *const RSTR source,",
-        "        s_t *const RSTR,",
-        "        std::true_type) {",
-        "    return source;",
+        "    const int,",
+        "    const g_t *const RSTR source,",
+        "    s_t *const RSTR,",
+        "    std::true_type) {",
+        "  return source;",
         "}",
         "",
         "template <typename s_t, typename g_t, int VS>",
         "%s const s_t *ageom_stream(" % inline_qualifier,
-        "        const int ne,",
-        "        const g_t *const RSTR source,",
-        "        s_t *const RSTR converted,",
-        "        std::false_type) {",
+        "    const int ne,",
+        "    const g_t *const RSTR source,",
+        "    s_t *const RSTR converted,",
+        "    std::false_type) {",
     ]
     if _emits_vector_lane_loop(source_builder):
-        lines.extend("    %s" % line for line in source_builder.simd_lines())
+        lines.extend("  %s" % line for line in source_builder.simd_lines())
         lines.extend(
             [
-                "    for (int lane = 0; lane < ne; ++lane) {",
-                "        converted[lane] = s_t(source[lane]);",
-                "    }",
+                "  for (int lane = 0; lane < ne; ++lane) {",
+                "    converted[lane] = s_t(source[lane]);",
+                "  }",
             ]
         )
     else:
         index = _work_item_index(source_builder)
         lines.extend(
             [
-                "    (void)ne;",
-                "    converted[%s] = s_t(source[%s]);" % (index, index),
+                "  (void)ne;",
+                "  converted[%s] = s_t(source[%s]);" % (index, index),
             ]
         )
     lines.extend(
         [
-            "    return converted;",
+            "  return converted;",
             "}",
             "",
             "} // namespace codegen",
@@ -334,7 +334,7 @@ def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
     lines = [
         "%s{" % indent,
         *(
-            "%s    %s" % (indent, line)
+            "%s  %s" % (indent, line)
             for line in render_kernel_ast_lines(
                 "scatter_loop_header",
                 (
@@ -352,7 +352,7 @@ def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
     ]
     if atomic_pragma is not None:
         lines.extend(
-            "%s        %s" % (indent, line)
+            "%s    %s" % (indent, line)
             for line in render_kernel_ast_lines(
                 "scatter_add",
                 (
@@ -371,12 +371,12 @@ def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
             source_builder.scatter_add_lines(
                 "%s[%s]" % (pointer, node_expr % "scatter"),
                 value_expr % "scatter",
-                "%s        " % indent,
+                "%s    " % indent,
             )
         )
     lines.extend(
         [
-            "%s    }" % indent,
+            "%s  }" % indent,
             "%s}" % indent,
         ]
     )
@@ -1021,24 +1021,24 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     lines.extend(
         [
             ") {",
-            "    static_assert(NQ > 0, \"NQ must be positive\");",
-            "    static_assert(NS > 0, \"NS must be positive\");",
-            "    static_assert(VS > 0, \"VS must be positive\");",
-            "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-            "    static constexpr int NDOFS = NC * NS;",
+            "  static_assert(NQ > 0, \"NQ must be positive\");",
+            "  static_assert(NS > 0, \"NS must be positive\");",
+            "  static_assert(VS > 0, \"VS must be positive\");",
+            "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+            "  static constexpr int NDOFS = NC * NS;",
         ]
     )
     if use_tensor_product_reference:
         lines.extend(
             [
-                "    static constexpr int NQ1 = integer_root(NQ, %d);"
+                "  static constexpr int NQ1 = integer_root(NQ, %d);"
                 % quadrature_rule.dim,
-                "    static constexpr int NS1 = integer_root(NS, %d);"
+                "  static constexpr int NS1 = integer_root(NS, %d);"
                 % quadrature_rule.dim,
-                "    static_assert(ipow(NQ1, %d) == NQ, \"NQ must be tensor-product compatible\");"
+                "  static_assert(ipow(NQ1, %d) == NQ, \"NQ must be tensor-product compatible\");"
                 % quadrature_rule.dim,
-                "    static_assert(ipow(NS1, %d) == NS, \"NS must be tensor-product compatible\");"
+                "  static_assert(ipow(NS1, %d) == NS, \"NS must be tensor-product compatible\");"
                 % quadrature_rule.dim,
             ]
         )
@@ -1051,7 +1051,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
             use_tensor_product_reference,
             use_reference_gradient_vectors,
             "",
-            "    ",
+            "  ",
             emit_tensor_product_static_constants=False,
         )
     )
@@ -1117,8 +1117,8 @@ def _sfem_soa_block_signature_lines(name, params, source_builder):
     lines.extend(
         [
             ") {",
-            '    static_assert(NQ > 0, \"NQ must be positive\");',
-            '    static_assert(VS > 0, \"VS must be positive\");',
+            '  static_assert(NQ > 0, \"NQ must be positive\");',
+            '  static_assert(VS > 0, \"VS must be positive\");',
         ]
     )
     return lines
@@ -1289,35 +1289,35 @@ def _sfem_soa_weak_form_block_function(
     lines = _sfem_soa_block_signature_lines(shared.name, params, source_builder)
     if not use_stream_arrays:
         lines.append(
-            '    static_assert(NS == %d, \"NS does not match generated expression\");'
+            '  static_assert(NS == %d, \"NS does not match generated expression\");'
             % n_nodes
         )
     if shared.use_tensor_product_reference:
         if use_stream_arrays:
             lines.extend(
                 [
-                    "    static constexpr int NQ1 = integer_root(NQ, %d);"
+                    "  static constexpr int NQ1 = integer_root(NQ, %d);"
                     % quadrature_rule.dim,
-                    "    static constexpr int NS1 = integer_root(NS, %d);"
+                    "  static constexpr int NS1 = integer_root(NS, %d);"
                     % quadrature_rule.dim,
-                    '    static_assert(ipow(NQ1, %d) == NQ, \"NQ must be tensor-product compatible\");'
+                    '  static_assert(ipow(NQ1, %d) == NQ, \"NQ must be tensor-product compatible\");'
                     % quadrature_rule.dim,
-                    '    static_assert(ipow(NS1, %d) == NS, \"NS must be tensor-product compatible\");'
+                    '  static_assert(ipow(NS1, %d) == NS, \"NS must be tensor-product compatible\");'
                     % quadrature_rule.dim,
                 ]
             )
         else:
             lines.extend(
                 [
-                    "    static constexpr int NQ1 = %d;"
+                    "  static constexpr int NQ1 = %d;"
                     % quadrature_rule.tensor_product_n_qp_1d,
-                    "    static constexpr int NS1 = %d;"
+                    "  static constexpr int NS1 = %d;"
                     % quadrature_rule.tensor_product_n_shape_1d,
                 ]
             )
     if not use_stream_arrays and shared.uses_current:
         lines.append(
-            "    const s_t *const weak_u_streams[NS * %d] = {%s};"
+            "  const s_t *const weak_u_streams[NS * %d] = {%s};"
             % (
                 n_field_components,
                 ", ".join(
@@ -1331,7 +1331,7 @@ def _sfem_soa_weak_form_block_function(
         )
     if not use_stream_arrays and shared.uses_direction:
         lines.append(
-            "    const s_t *const weak_h_streams[NS * %d] = {%s};"
+            "  const s_t *const weak_h_streams[NS * %d] = {%s};"
             % (
                 n_field_components,
                 ", ".join(
@@ -1345,7 +1345,7 @@ def _sfem_soa_weak_form_block_function(
         )
     if not use_stream_arrays and writes_per_shape(form):
         lines.append(
-            "    s_t *const weak_out_streams[NS * %d] = {%s};"
+            "  s_t *const weak_out_streams[NS * %d] = {%s};"
             % (
                 dim,
                 ", ".join(
@@ -1418,10 +1418,10 @@ def _sfem_soa_pointwise_block_function(
     n_field_components = form_n_field_components(form, dim)
     """The per-point kernel: a form with no lowered weak form.
 
-    Takes one quadrature index and one weight, gathers every input into a local
-    array, and evaluates the expression graph.  Stream arrays and an omitted
-    reference basis are weak-form-only, so neither appears here.
-    """
+  Takes one quadrature index and one weight, gathers every input into a local
+  array, and evaluates the expression graph.  Stream arrays and an omitted
+  reference basis are weak-form-only, so neither appears here.
+  """
     source_builder = shared.source_builder
     work_item = shared.work_item
 
@@ -1451,22 +1451,22 @@ def _sfem_soa_pointwise_block_function(
 
     lines = _sfem_soa_block_signature_lines(shared.name, params, source_builder)
     lines.append(
-        '    static_assert(NS == %d, \"NS does not match generated expression\");'
+        '  static_assert(NS == %d, \"NS does not match generated expression\");'
         % n_nodes
     )
     if shared.use_tensor_product_reference:
         lines.extend(
             [
-                "    static constexpr int NQ1 = %d;"
+                "  static constexpr int NQ1 = %d;"
                 % quadrature_rule.tensor_product_n_qp_1d,
-                "    static constexpr int NS1 = %d;"
+                "  static constexpr int NS1 = %d;"
                 % quadrature_rule.tensor_product_n_shape_1d,
             ]
         )
-        lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "    "))
+        lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "  "))
 
-    lines.extend(_work_item_loop_lines(source_builder, "    "))
-    lines.append("        s_t u[NS * %d];" % dim)
+    lines.extend(_work_item_loop_lines(source_builder, "  "))
+    lines.append("    s_t u[NS * %d];" % dim)
     for array_input in array_inputs:
         if array_input.is_reference_qp_shape:
             array_decl = "%s %s[NS * %d];" % (
@@ -1480,13 +1480,13 @@ def _sfem_soa_pointwise_block_function(
                 array_input.name,
                 array_input.local_size,
             )
-        lines.append("        %s" % array_decl)
+        lines.append("    %s" % array_decl)
     if form.has_direction:
-        lines.append("        s_t du[NS * %d];" % dim)
+        lines.append("    s_t du[NS * %d];" % dim)
 
     for array_input in shared.element_inputs:
         for i, stream in enumerate(_soa_array_stream_names(array_input)):
-            lines.append("        %s[%d] = %s[%s];" % (array_input.name, i, stream, work_item))
+            lines.append("    %s[%d] = %s[%s];" % (array_input.name, i, stream, work_item))
 
     if shared.use_tensor_product_reference:
         _append_tensor_product_reference_gradient_lines(
@@ -1500,7 +1500,7 @@ def _sfem_soa_pointwise_block_function(
             for component in range(array_input.components):
                 local_idx = shape * array_input.components + component
                 lines.append(
-                    "        %s[%d] = %s[q * NS + %d];"
+                    "    %s[%d] = %s[q * NS + %d];"
                     % (
                         array_input.name,
                         local_idx,
@@ -1515,7 +1515,7 @@ def _sfem_soa_pointwise_block_function(
                 for component in range(array_input.components):
                     local_idx = shape * array_input.components + component
                     lines.append(
-                        "        %s[%d] = %s[(q * NS + %d) * %d + %d];"
+                        "    %s[%d] = %s[(q * NS + %d) * %d + %d];"
                         % (
                             array_input.name,
                             local_idx,
@@ -1530,15 +1530,15 @@ def _sfem_soa_pointwise_block_function(
         for d in range(dim):
             idx = node * dim + d
             component = _component_name(d)
-            lines.append("        u[%d] = u%s%d[%s];" % (idx, component, node, work_item))
+            lines.append("    u[%d] = u%s%d[%s];" % (idx, component, node, work_item))
             if form.has_direction:
-                lines.append("        du[%d] = h%s%d[%s];" % (idx, component, node, work_item))
+                lines.append("    du[%d] = h%s%d[%s];" % (idx, component, node, work_item))
 
     output_count = len(form.expression_graph.evaluation_plan.outputs)
-    lines.append("        s_t element_vector[%d];" % max(1, output_count))
+    lines.append("    s_t element_vector[%d];" % max(1, output_count))
     _append_sfem_soa_statement_lines(lines, form.expression_graph, "element_vector")
     _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item)
-    lines.extend(["    }", "}"])
+    lines.extend(["  }", "}"])
     # The signature is a tree; the body is not yet.  Splitting the
     # finished list at its opening brace is deliberately the least
     # invasive way to get this kernel onto the IR spine: the body
@@ -1647,62 +1647,62 @@ def _append_sfem_soa_tensor_weak_form_lines(
     block_extent = "NQ * %d * VS" % (dim * dim)
 
     if uses_current:
-        lines.append("    s_t gu_ref_q[%s];" % block_extent)
+        lines.append("  s_t gu_ref_q[%s];" % block_extent)
     if uses_direction:
-        lines.append("    s_t grad_h_ref_q[%s];" % block_extent)
+        lines.append("  s_t grad_h_ref_q[%s];" % block_extent)
     if writes_per_shape(form):
-        lines.append("    s_t loperand_q[%s];" % block_extent)
+        lines.append("  s_t loperand_q[%s];" % block_extent)
 
     for row in range(n_field_components):
         output_offset = "%d * NQ * %d * VS" % (row, dim)
         if uses_current:
             lines.append(
-                "    tensor_gradient<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, %s, %d, &gu_ref_q[%s]);"
+                "  tensor_gradient<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, %s, %d, &gu_ref_q[%s]);"
                 % (dim, n_field_components, u_streams, row, output_offset)
             )
         if uses_direction:
             lines.append(
-                "    tensor_gradient<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
+                "  tensor_gradient<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
                 % (dim, n_field_components, h_streams, row, output_offset)
             )
 
-    lines.append("    for (int q = 0; q < NQ; ++q) {")
-    lines.extend(_tensor_product_q_index_lines(dim, "        "))
+    lines.append("  for (int q = 0; q < NQ; ++q) {")
+    lines.extend(_tensor_product_q_index_lines(dim, "    "))
     lines.append(
-        "        const s_t qw = %s;"
+        "    const s_t qw = %s;"
         % _tensor_product_quadrature_weight_expr(dim)
     )
-    lines.extend(_work_item_loop_lines(source_builder, "        "))
+    lines.extend(_work_item_loop_lines(source_builder, "    "))
     lines.extend(
         [
-            "            const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
+            "      const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
         ]
     )
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = adj%d[goff];"
+            "      const s_t %s = adj%d[goff];"
             % (_work_item_name(source_builder, "adj", component), component)
         )
     lines.append(
-        "            const s_t %s = det0[goff];"
+        "      const s_t %s = det0[goff];"
         % _work_item_name(source_builder, "det", 0)
     )
     if uses_current:
-        lines.append("            s_t gu_ref[%d];" % (n_field_components * dim))
+        lines.append("      s_t gu_ref[%d];" % (n_field_components * dim))
         for row in range(n_field_components):
             for col in range(dim):
                 component = row * dim + col
                 lines.append(
-                    "            gu_ref[%d] = gu_ref_q[((%d * NQ + q) * %d + %d) * VS + %s];"
+                    "      gu_ref[%d] = gu_ref_q[((%d * NQ + q) * %d + %d) * VS + %s];"
                     % (component, row, dim, col, work_item)
                 )
     if uses_direction:
-        lines.append("            s_t grad_h_ref[%d];" % (n_field_components * dim))
+        lines.append("      s_t grad_h_ref[%d];" % (n_field_components * dim))
         for row in range(n_field_components):
             for col in range(dim):
                 component = row * dim + col
                 lines.append(
-                    "            grad_h_ref[%d] = grad_h_ref_q[((%d * NQ + q) * %d + %d) * VS + %s];"
+                    "      grad_h_ref[%d] = grad_h_ref_q[((%d * NQ + q) * %d + %d) * VS + %s];"
                     % (component, row, dim, col, work_item)
                 )
 
@@ -1711,15 +1711,15 @@ def _append_sfem_soa_tensor_weak_form_lines(
 
     if uses_current:
         lines.append(
-            "            s_t gu[%d];" % (weak_form.n_field_components * dim)
+            "      s_t gu[%d];" % (weak_form.n_field_components * dim)
         )
     if uses_direction:
         lines.append(
-            "            s_t trial_grad[%d];" % (weak_form.n_field_components * dim)
+            "      s_t trial_grad[%d];" % (weak_form.n_field_components * dim)
         )
 
     lines.append(
-        "            const s_t idet = s_t(1) / %s;"
+        "      const s_t idet = s_t(1) / %s;"
         % geometry_value("det", 0)
     )
     for row in range(weak_form.n_field_components):
@@ -1734,7 +1734,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "            gu[%d] = (%s) * idet;"
+                    "      gu[%d] = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
             if uses_direction:
@@ -1747,7 +1747,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "            trial_grad[%d] = (%s) * idet;"
+                    "      trial_grad[%d] = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
 
@@ -1763,7 +1763,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
             deformation_gradient_substitutions,
             work_item,
             geometry_value,
-            ["        }", "    }"],
+            ["    }", "  }"],
         )
         return
 
@@ -1776,7 +1776,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
             for i in range(weak_form.n_field_components * dim)
         ),
     )
-    lines.append("            s_t loperand[%d];" % (n_field_components * dim))
+    lines.append("      s_t loperand[%d];" % (n_field_components * dim))
     _append_transformed_loperand_lines(
         lines,
         material,
@@ -1787,13 +1787,13 @@ def _append_sfem_soa_tensor_weak_form_lines(
     for row in range(n_field_components):
         for col in range(dim):
             lines.append(
-                "            loperand_q[((%d * NQ + q) * %d + %d) * VS + %s] = loperand[%d];"
+                "      loperand_q[((%d * NQ + q) * %d + %d) * VS + %s] = loperand[%d];"
                 % (row, dim, col, work_item, row * dim + col)
             )
-    lines.extend(["        }", "    }"])
+    lines.extend(["    }", "  }"])
     for row in range(n_field_components):
         lines.append(
-            "    tensor_test<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, &loperand_q[%d * NQ * %d * VS], %s, %d);"
+            "  tensor_test<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, &loperand_q[%d * NQ * %d * VS], %s, %d);"
             % (dim, n_field_components, row, dim, out_streams, row)
         )
 
@@ -1859,7 +1859,7 @@ def _metric_scatter_lines(dim, metric, plan, bindings, n_field_components,
     """A 1- or 2-form: one contribution per shape, scattered."""
     output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
     return [
-        "            %s[%d * %d + 0][%s] += %s;"
+        "      %s[%d * %d + 0][%s] += %s;"
         % (
             output_streams,
             shape,
@@ -1885,7 +1885,7 @@ def _metric_value_lines(dim, metric, plan, bindings, n_field_components,
         gradient[d] * plan.outputs[d + 1] for d in range(dim)
     )
     return [
-        "            value[%s] += %s;"
+        "      value[%s] += %s;"
         % (work_item, _sfem_ccode(energy.xreplace(bindings)))
     ]
 
@@ -1920,20 +1920,20 @@ def _append_constant_p1_metric_weak_form_lines(
     bindings, n_field_components, work_item = _metric_plan_bindings(
         form, dim, source_builder, use_stream_arrays
     )
-    lines.extend(_work_item_loop_lines(source_builder, "        "))
+    lines.extend(_work_item_loop_lines(source_builder, "    "))
     # A constant-P1 simplex has one quadrature point, so the offset is just the
     # work item: `q` is zero and the stride term vanishes.
     lines.append(
-        "            const ptrdiff_t goff = %s;" % work_item
+        "      const ptrdiff_t goff = %s;" % work_item
     )
     for index in range(metric.metric_components):
         lines.append(
-            "            const s_t %s = geom_metric%d[goff];"
+            "      const s_t %s = geom_metric%d[goff];"
             % (_work_item_name(source_builder, "geom_metric", index), index)
         )
     for symbol, expression in plan.temporaries:
         lines.append(
-            "            const s_t %s = %s;"
+            "      const s_t %s = %s;"
             % (symbol, _sfem_ccode(expression.xreplace(bindings)))
         )
     lines.extend(
@@ -1942,7 +1942,7 @@ def _append_constant_p1_metric_weak_form_lines(
             work_item, use_stream_arrays,
         )
     )
-    lines.append("        }")
+    lines.append("    }")
 
 
 def _append_constant_p1_sfem_soa_weak_form_lines(
@@ -1984,17 +1984,17 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     # loop has a single trip.  No strategy test is wanted here -- a
     # higher-order simplex never arrives, so a branch would describe a
     # case that cannot happen.
-    lines.append("        { const int q = 0;  // constant-P1 simplex")
-    lines.append("            const s_t qw = q_weight[q];")
-    lines.extend(_work_item_loop_lines(source_builder, "            "))
-    lines.append("            const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
+    lines.append("    { const int q = 0;  // constant-P1 simplex")
+    lines.append("      const s_t qw = q_weight[q];")
+    lines.extend(_work_item_loop_lines(source_builder, "      "))
+    lines.append("      const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = adj%d[goff];"
+            "      const s_t %s = adj%d[goff];"
             % (geometry_value("adj", component), component)
         )
     lines.append(
-        "            const s_t %s = det0[goff];"
+        "      const s_t %s = det0[goff];"
         % geometry_value("det", 0)
     )
     for row in range(n_field_components):
@@ -2002,7 +2002,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
             idx = row * dim + col
             if uses_current:
                 lines.append(
-                    "            const s_t gu_ref%d = %s;"
+                    "      const s_t gu_ref%d = %s;"
                     % (
                         idx,
                         _constant_p1_field_gradient_expr(
@@ -2015,7 +2015,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                 )
             if uses_direction:
                 lines.append(
-                    "            const s_t grad_h_ref%d = %s;"
+                    "      const s_t grad_h_ref%d = %s;"
                     % (
                         idx,
                         _constant_p1_field_gradient_expr(
@@ -2027,7 +2027,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     )
                 )
     lines.append(
-        "            const s_t idet = s_t(1) / %s;"
+        "      const s_t idet = s_t(1) / %s;"
         % geometry_value("det", 0)
     )
     for row in range(weak_form.n_field_components):
@@ -2042,7 +2042,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "            const s_t gu%d = (%s) * idet;"
+                    "      const s_t gu%d = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
             if uses_direction:
@@ -2055,7 +2055,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "            const s_t trial_grad%d = (%s) * idet;"
+                    "      const s_t trial_grad%d = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
 
@@ -2067,7 +2067,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
             deformation_gradient_substitutions,
             work_item,
             geometry_value,
-            ["            }", "        }"],
+            ["      }", "    }"],
         )
         return
 
@@ -2100,7 +2100,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                 terms.append(_scaled_cpp_term(factor, "loperand%d" % (row * dim + col)))
             if terms:
                 lines.append(
-                    "            %s[%d * %d + %d][%s] %s %s;"
+                    "      %s[%d * %d + %d][%s] %s %s;"
                     % (
                         output_streams,
                         shape,
@@ -2111,7 +2111,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                         _sum_cpp_terms(terms),
                     )
                 )
-    lines.extend(["            }", "        }"])
+    lines.extend(["      }", "    }"])
 
 
 def _append_sfem_soa_weak_form_lines(
@@ -2194,64 +2194,64 @@ def _append_sfem_soa_weak_form_lines(
         scalar_temporaries=True,
     )
 
-    lines.append("        for (int q = 0; q < NQ; ++q) {")
-    lines.append("            const s_t qw = q_weight[q];")
+    lines.append("    for (int q = 0; q < NQ; ++q) {")
+    lines.append("      const s_t qw = q_weight[q];")
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
-                lines.append("            s_t gu_ref%d_values[VS];" % idx)
+                lines.append("      s_t gu_ref%d_values[VS];" % idx)
             if uses_direction:
-                lines.append("            s_t grad_h_ref%d_values[VS];" % idx)
+                lines.append("      s_t grad_h_ref%d_values[VS];" % idx)
     if writes_per_shape(form):
         for component in range(n_field_components * dim):
-            lines.append("            s_t loperand%d_values[VS];" % component)
+            lines.append("      s_t loperand%d_values[VS];" % component)
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
-            lines.extend(_work_item_loop_lines(source_builder, "            "))
+            lines.extend(_work_item_loop_lines(source_builder, "      "))
             if uses_current:
-                lines.append("                gu_ref%d_values[%s] = s_t(0);" % (idx, work_item))
+                lines.append("        gu_ref%d_values[%s] = s_t(0);" % (idx, work_item))
             if uses_direction:
-                lines.append("                grad_h_ref%d_values[%s] = s_t(0);" % (idx, work_item))
-            lines.append("            }")
-    lines.append("            for (int shape = 0; shape < NS; ++shape) {")
+                lines.append("        grad_h_ref%d_values[%s] = s_t(0);" % (idx, work_item))
+            lines.append("      }")
+    lines.append("      for (int shape = 0; shape < NS; ++shape) {")
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
-            lines.extend(_work_item_loop_lines(source_builder, "                "))
+            lines.extend(_work_item_loop_lines(source_builder, "        "))
             if uses_current:
                 lines.append(
-                    "                    gu_ref%d_values[%s] += %s * %s;"
+                    "          gu_ref%d_values[%s] += %s * %s;"
                     % (idx, work_item, field_value("u", row), reference_gradient(col))
                 )
             if uses_direction:
                 lines.append(
-                    "                    grad_h_ref%d_values[%s] += %s * %s;"
+                    "          grad_h_ref%d_values[%s] += %s * %s;"
                     % (idx, work_item, field_value("h", row), reference_gradient(col))
                 )
-            lines.append("                }")
-    lines.append("            }")
-    lines.extend(_work_item_loop_lines(source_builder, "            "))
-    lines.append("            const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
+            lines.append("        }")
+    lines.append("      }")
+    lines.extend(_work_item_loop_lines(source_builder, "      "))
+    lines.append("      const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = adj%d[goff];"
+            "      const s_t %s = adj%d[goff];"
             % (geometry_value("adj", component), component)
         )
     lines.append(
-        "            const s_t %s = det0[goff];"
+        "      const s_t %s = det0[goff];"
         % geometry_value("det", 0)
     )
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
-                lines.append("            const s_t gu_ref%d = gu_ref%d_values[%s];" % (idx, idx, work_item))
+                lines.append("      const s_t gu_ref%d = gu_ref%d_values[%s];" % (idx, idx, work_item))
             if uses_direction:
-                lines.append("            const s_t grad_h_ref%d = grad_h_ref%d_values[%s];" % (idx, idx, work_item))
+                lines.append("      const s_t grad_h_ref%d = grad_h_ref%d_values[%s];" % (idx, idx, work_item))
     lines.append(
-        "        const s_t idet = s_t(1) / %s;"
+        "    const s_t idet = s_t(1) / %s;"
         % geometry_value("det", 0)
     )
     for row in range(weak_form.n_field_components):
@@ -2266,7 +2266,7 @@ def _append_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "        const s_t gu%d = (%s) * idet;"
+                    "    const s_t gu%d = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
             if uses_direction:
@@ -2279,7 +2279,7 @@ def _append_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "        const s_t trial_grad%d = (%s) * idet;"
+                    "    const s_t trial_grad%d = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
 
@@ -2291,7 +2291,7 @@ def _append_sfem_soa_weak_form_lines(
             deformation_gradient_substitutions,
             work_item,
             geometry_value,
-            ["            }", "        }"],
+            ["      }", "    }"],
         )
         return
 
@@ -2314,9 +2314,9 @@ def _append_sfem_soa_weak_form_lines(
         scalar_temporaries=True,
     )
     for component in range(n_field_components * dim):
-        lines.append("            loperand%d_values[%s] = loperand%d;" % (component, work_item, component))
-    lines.append("            }")
-    lines.append("            for (int shape = 0; shape < NS; ++shape) {")
+        lines.append("      loperand%d_values[%s] = loperand%d;" % (component, work_item, component))
+    lines.append("      }")
+    lines.append("      for (int shape = 0; shape < NS; ++shape) {")
     for row in range(n_field_components):
         terms = [
             "loperand%d_values[%s] * %s" % (row * dim + col, work_item, reference_gradient(col))
@@ -2324,13 +2324,13 @@ def _append_sfem_soa_weak_form_lines(
         ]
         op = "+=" if form.output_mode == "accumulate" else "="
         output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
-        lines.extend(_work_item_loop_lines(source_builder, "                "))
+        lines.extend(_work_item_loop_lines(source_builder, "        "))
         lines.append(
-            "                    %s[shape * %d + %d][%s] %s %s;"
+            "          %s[shape * %d + %d][%s] %s %s;"
             % (output_streams, n_field_components, row, work_item, op, " + ".join(terms))
         )
-        lines.append("                }")
-    lines.extend(["            }", "        }"])
+        lines.append("        }")
+    lines.extend(["      }", "    }"])
 
 
 def _append_transformed_loperand_lines(
@@ -2353,7 +2353,7 @@ def _append_transformed_loperand_lines(
         material_names = ["const s_t material%d =" % i for i in range(n_material)]
     else:
         material_names = ["material[%d] =" % i for i in range(n_material)]
-        lines.append("        s_t material[%d];" % n_material)
+        lines.append("    s_t material[%d];" % n_material)
     _append_cse_array_assignments(lines, material_exprs, material_names, temporary_prefix)
     for row in range(n_field_components):
         for col in range(dim):
@@ -2369,12 +2369,12 @@ def _append_transformed_loperand_lines(
             ]
             if scalar_temporaries:
                 lines.append(
-                    "        const s_t loperand%d = qw * (%s);"
+                    "    const s_t loperand%d = qw * (%s);"
                     % (row * dim + col, " + ".join(terms))
                 )
             else:
                 lines.append(
-                    "        loperand[%d] = qw * (%s);"
+                    "    loperand[%d] = qw * (%s);"
                     % (row * dim + col, " + ".join(terms))
                 )
 
@@ -2490,12 +2490,12 @@ def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix,
     )
     temps = _prune_dead_cse_intermediates(temps, reduced)
     for symbol, expression in temps:
-        lines.append("        const s_t %s = %s;" % (symbol, _sfem_ccode(expression)))
+        lines.append("    const s_t %s = %s;" % (symbol, _sfem_ccode(expression)))
     for target, expression in zip(targets, reduced):
         if scale is not None:
-            lines.append("        %s %s * (%s);" % (target, scale, _sfem_ccode(expression)))
+            lines.append("    %s %s * (%s);" % (target, scale, _sfem_ccode(expression)))
         else:
-            lines.append("        %s %s;" % (target, _sfem_ccode(expression)))
+            lines.append("    %s %s;" % (target, _sfem_ccode(expression)))
 
 
 def _form_dependencies(form):
@@ -2535,9 +2535,9 @@ def _append_sfem_soa_statement_lines(lines, expression_graph, output_name):
     for statement in expression_graph.evaluation_plan.statements:
         expression = _sfem_ccode(statement.expression)
         if statement.kind == "intermediate":
-            lines.append("        const s_t %s = %s;" % (statement.target, expression))
+            lines.append("    const s_t %s = %s;" % (statement.target, expression))
         else:
-            lines.append("        %s[%d] = %s;" % (output_name, output_index, expression))
+            lines.append("    %s[%d] = %s;" % (output_name, output_index, expression))
             output_index += 1
 
 
@@ -2804,7 +2804,7 @@ def _append_tensor_product_reference_gradient_lines(lines, name, quadrature_rule
                 for axis in range(quadrature_rule.dim)
             ]
             lines.append(
-                "        %s[%d] = %s;"
+                "    %s[%d] = %s;"
                 % (name, shape * quadrature_rule.dim + component, " * ".join(factors))
             )
 
@@ -2828,7 +2828,7 @@ def _sfem_soa_isoparametric_geometry_lines(
     lines = isoparametric_adjugate_stream_array_lines(
         dim_name="ND",
         dim=dim,
-        indent="            ",
+        indent="      ",
         stream_array_name=stream_array_name,
         adjugate_streams=tuple(
             "badj%d" % component
@@ -2837,22 +2837,22 @@ def _sfem_soa_isoparametric_geometry_lines(
     )
     for row in range(dim):
         for col in range(dim):
-            lines.append("            s_t J%d%d_values[VS];" % (row, col))
+            lines.append("      s_t J%d%d_values[VS];" % (row, col))
     for row in range(dim):
         for col in range(dim):
-            lines.extend(_work_item_loop_lines(source_builder, "            "))
+            lines.extend(_work_item_loop_lines(source_builder, "      "))
             lines.extend(
                 [
-                    "                J%d%d_values[%s] = s_t(0);" % (row, col, work_item),
-                    "            }",
+                    "        J%d%d_values[%s] = s_t(0);" % (row, col, work_item),
+                    "      }",
                 ]
             )
-    lines.append("            for (int shape = 0; shape < NS; ++shape) {")
+    lines.append("      for (int shape = 0; shape < NS; ++shape) {")
     if use_tensor_product_reference:
-        lines.extend(_tensor_product_shape_index_lines(quadrature_rule, "                "))
+        lines.extend(_tensor_product_shape_index_lines(quadrature_rule, "        "))
     for col in range(dim):
         lines.append(
-            "                const s_t g%d = %s;"
+            "        const s_t g%d = %s;"
             % (
                 col,
                 _sfem_soa_isoparametric_reference_gradient_expr(
@@ -2869,31 +2869,31 @@ def _sfem_soa_isoparametric_geometry_lines(
         for col in range(dim):
             lines.extend(
                 [
-                    *_work_item_loop_lines(source_builder, "                "),
-                    "                    J%d%d_values[%s] += %s[shape * %d + %d][%s] * g%d;"
+                    *_work_item_loop_lines(source_builder, "        "),
+                    "          J%d%d_values[%s] += %s[shape * %d + %d][%s] * g%d;"
                     % (row, col, work_item, coordinate_streams, dim, row, work_item, col),
-                    "                }",
+                    "        }",
                 ]
             )
-    lines.append("            }")
-    lines.extend(_work_item_loop_lines(source_builder, "            "))
+    lines.append("      }")
+    lines.extend(_work_item_loop_lines(source_builder, "      "))
     for row in range(dim):
         for col in range(dim):
             lines.append(
-                "                const s_t J%d%d = J%d%d_values[%s];"
+                "        const s_t J%d%d = J%d%d_values[%s];"
                 % (row, col, row, col, work_item)
             )
     output_index = "q * VS + %s" % work_item if q_major else work_item
     lines.extend(
         isoparametric_adjugate_call_lines(
             dim=dim,
-            indent="                ",
+            indent="        ",
             index=output_index,
             stream_array_name=stream_array_name,
             determinant_stream="bdet0",
         )
     )
-    lines.append("            }")
+    lines.append("      }")
     return lines
 
 
@@ -2931,7 +2931,7 @@ def _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item):
     output_count = len(form.expression_graph.evaluation_plan.outputs)
     if output_count == 1:
         op = "+=" if form.output_mode == "accumulate" else "="
-        lines.append("        value[%s] %s element_vector[0];" % (work_item, op))
+        lines.append("    value[%s] %s element_vector[0];" % (work_item, op))
         return
 
     if output_count != dim * n_nodes:
@@ -2945,7 +2945,7 @@ def _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item):
             stream = "out%s%d" % (_component_name(d), node)
             idx = node * dim + d
             op = "+=" if form.output_mode == "accumulate" else "="
-            lines.append("        %s[%s] %s element_vector[%d];" % (stream, work_item, op, idx))
+            lines.append("    %s[%s] %s element_vector[%d];" % (stream, work_item, op, idx))
 
 
 def _sfem_soa_operator_source(
@@ -3258,79 +3258,79 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
     lines.extend(
         [
             ") {",
-            "    (void)nnodes;",
+            "  (void)nnodes;",
             "",
             *source_builder.parallel_for_lines(),
-            "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
-            "        const idx_t ev0 = elements[0][element];",
-            "        const idx_t ev1 = elements[1][element];",
-            "        const idx_t ev2 = elements[2][element];",
-            "        const idx_t ev3 = elements[3][element];",
+            "  for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            "    const idx_t ev0 = elements[0][element];",
+            "    const idx_t ev1 = elements[1][element];",
+            "    const idx_t ev2 = elements[2][element];",
+            "    const idx_t ev3 = elements[3][element];",
             "",
-            "        const s_t ux0 = %s[ev0 * %s];" % (vx, stride_name),
-            "        const s_t ux1 = %s[ev1 * %s];" % (vx, stride_name),
-            "        const s_t ux2 = %s[ev2 * %s];" % (vx, stride_name),
-            "        const s_t ux3 = %s[ev3 * %s];" % (vx, stride_name),
-            "        const s_t uy0 = %s[ev0 * %s];" % (vy, stride_name),
-            "        const s_t uy1 = %s[ev1 * %s];" % (vy, stride_name),
-            "        const s_t uy2 = %s[ev2 * %s];" % (vy, stride_name),
-            "        const s_t uy3 = %s[ev3 * %s];" % (vy, stride_name),
-            "        const s_t uz0 = %s[ev0 * %s];" % (vz, stride_name),
-            "        const s_t uz1 = %s[ev1 * %s];" % (vz, stride_name),
-            "        const s_t uz2 = %s[ev2 * %s];" % (vz, stride_name),
-            "        const s_t uz3 = %s[ev3 * %s];" % (vz, stride_name),
+            "    const s_t ux0 = %s[ev0 * %s];" % (vx, stride_name),
+            "    const s_t ux1 = %s[ev1 * %s];" % (vx, stride_name),
+            "    const s_t ux2 = %s[ev2 * %s];" % (vx, stride_name),
+            "    const s_t ux3 = %s[ev3 * %s];" % (vx, stride_name),
+            "    const s_t uy0 = %s[ev0 * %s];" % (vy, stride_name),
+            "    const s_t uy1 = %s[ev1 * %s];" % (vy, stride_name),
+            "    const s_t uy2 = %s[ev2 * %s];" % (vy, stride_name),
+            "    const s_t uy3 = %s[ev3 * %s];" % (vy, stride_name),
+            "    const s_t uz0 = %s[ev0 * %s];" % (vz, stride_name),
+            "    const s_t uz1 = %s[ev1 * %s];" % (vz, stride_name),
+            "    const s_t uz2 = %s[ev2 * %s];" % (vz, stride_name),
+            "    const s_t uz3 = %s[ev3 * %s];" % (vz, stride_name),
             "",
-            "        const g_t *const RSTR adjugate = g_adj_aos + element * 9;",
+            "    const g_t *const RSTR adjugate = g_adj_aos + element * 9;",
         ]
     )
     for component in range(9):
         lines.append(
-            "        const s_t a%d = s_t(adjugate[%d]);"
+            "    const s_t a%d = s_t(adjugate[%d]);"
             % (component, component)
         )
     lines.extend(
         [
-            "        const s_t inv_det = s_t(1) / s_t(g_det0[element]);",
+            "    const s_t inv_det = s_t(1) / s_t(g_det0[element]);",
             "",
-            "        const s_t x1 = ux0 - ux1;",
-            "        const s_t x2 = ux0 - ux2;",
-            "        const s_t x3 = ux0 - ux3;",
-            "        const s_t x4 = uy0 - uy1;",
-            "        const s_t x5 = uy0 - uy2;",
-            "        const s_t x6 = uy0 - uy3;",
-            "        const s_t x7 = uz0 - uz1;",
-            "        const s_t x8 = uz0 - uz2;",
-            "        const s_t x9 = uz0 - uz3;",
+            "    const s_t x1 = ux0 - ux1;",
+            "    const s_t x2 = ux0 - ux2;",
+            "    const s_t x3 = ux0 - ux3;",
+            "    const s_t x4 = uy0 - uy1;",
+            "    const s_t x5 = uy0 - uy2;",
+            "    const s_t x6 = uy0 - uy3;",
+            "    const s_t x7 = uz0 - uz1;",
+            "    const s_t x8 = uz0 - uz2;",
+            "    const s_t x9 = uz0 - uz3;",
             "",
-            "        s_t p0 = inv_det * (-a0 * x1 - a3 * x2 - a6 * x3);",
-            "        s_t p1 = inv_det * (-a1 * x1 - a4 * x2 - a7 * x3);",
-            "        s_t p2 = inv_det * (-a2 * x1 - a5 * x2 - a8 * x3);",
-            "        s_t p3 = inv_det * (-a0 * x4 - a3 * x5 - a6 * x6);",
-            "        s_t p4 = inv_det * (-a1 * x4 - a4 * x5 - a7 * x6);",
-            "        s_t p5 = inv_det * (-a2 * x4 - a5 * x5 - a8 * x6);",
-            "        s_t p6 = inv_det * (-a0 * x7 - a3 * x8 - a6 * x9);",
-            "        s_t p7 = inv_det * (-a1 * x7 - a4 * x8 - a7 * x9);",
-            "        s_t p8 = inv_det * (-a2 * x7 - a5 * x8 - a8 * x9);",
+            "    s_t p0 = inv_det * (-a0 * x1 - a3 * x2 - a6 * x3);",
+            "    s_t p1 = inv_det * (-a1 * x1 - a4 * x2 - a7 * x3);",
+            "    s_t p2 = inv_det * (-a2 * x1 - a5 * x2 - a8 * x3);",
+            "    s_t p3 = inv_det * (-a0 * x4 - a3 * x5 - a6 * x6);",
+            "    s_t p4 = inv_det * (-a1 * x4 - a4 * x5 - a7 * x6);",
+            "    s_t p5 = inv_det * (-a2 * x4 - a5 * x5 - a8 * x6);",
+            "    s_t p6 = inv_det * (-a0 * x7 - a3 * x8 - a6 * x9);",
+            "    s_t p7 = inv_det * (-a1 * x7 - a4 * x8 - a7 * x9);",
+            "    s_t p8 = inv_det * (-a2 * x7 - a5 * x8 - a8 * x9);",
             "",
-            "        const s_t m0 = (s_t(1) / s_t(6)) * mu;",
-            "        const s_t m1 = m0 * (p1 + p3);",
-            "        const s_t m2 = m0 * (p2 + p6);",
-            "        const s_t m3 = s_t(2) * mu;",
-            "        const s_t m4 = lmbda * (p0 + p4 + p8);",
-            "        const s_t m5 = (s_t(1) / s_t(6)) * p0 * m3 + (s_t(1) / s_t(6)) * m4;",
-            "        const s_t m6 = m0 * (p5 + p7);",
-            "        const s_t m7 = (s_t(1) / s_t(6)) * p4 * m3 + (s_t(1) / s_t(6)) * m4;",
-            "        const s_t m8 = (s_t(1) / s_t(6)) * p8 * m3 + (s_t(1) / s_t(6)) * m4;",
+            "    const s_t m0 = (s_t(1) / s_t(6)) * mu;",
+            "    const s_t m1 = m0 * (p1 + p3);",
+            "    const s_t m2 = m0 * (p2 + p6);",
+            "    const s_t m3 = s_t(2) * mu;",
+            "    const s_t m4 = lmbda * (p0 + p4 + p8);",
+            "    const s_t m5 = (s_t(1) / s_t(6)) * p0 * m3 + (s_t(1) / s_t(6)) * m4;",
+            "    const s_t m6 = m0 * (p5 + p7);",
+            "    const s_t m7 = (s_t(1) / s_t(6)) * p4 * m3 + (s_t(1) / s_t(6)) * m4;",
+            "    const s_t m8 = (s_t(1) / s_t(6)) * p8 * m3 + (s_t(1) / s_t(6)) * m4;",
             "",
-            "        const s_t q0 = a0 * m5 + a1 * m1 + a2 * m2;",
-            "        const s_t q1 = a3 * m5 + a4 * m1 + a5 * m2;",
-            "        const s_t q2 = a6 * m5 + a7 * m1 + a8 * m2;",
-            "        const s_t q3 = a0 * m1 + a1 * m7 + a2 * m6;",
-            "        const s_t q4 = a3 * m1 + a4 * m7 + a5 * m6;",
-            "        const s_t q5 = a6 * m1 + a7 * m7 + a8 * m6;",
-            "        const s_t q6 = a0 * m2 + a1 * m6 + a2 * m8;",
-            "        const s_t q7 = a3 * m2 + a4 * m6 + a5 * m8;",
-            "        const s_t q8 = a6 * m2 + a7 * m6 + a8 * m8;",
+            "    const s_t q0 = a0 * m5 + a1 * m1 + a2 * m2;",
+            "    const s_t q1 = a3 * m5 + a4 * m1 + a5 * m2;",
+            "    const s_t q2 = a6 * m5 + a7 * m1 + a8 * m2;",
+            "    const s_t q3 = a0 * m1 + a1 * m7 + a2 * m6;",
+            "    const s_t q4 = a3 * m1 + a4 * m7 + a5 * m6;",
+            "    const s_t q5 = a6 * m1 + a7 * m7 + a8 * m6;",
+            "    const s_t q6 = a0 * m2 + a1 * m6 + a2 * m8;",
+            "    const s_t q7 = a3 * m2 + a4 * m6 + a5 * m8;",
+            "    const s_t q8 = a6 * m2 + a7 * m6 + a8 * m8;",
             "",
         ]
     )
@@ -3351,15 +3351,15 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
     for out, ev, value in scatter_values:
         lines.extend(
             [
-                "        #pragma omp atomic update",
-                "        %s[%s * out_stride] += %s;" % (out, ev, value),
+                "    #pragma omp atomic update",
+                "    %s[%s * out_stride] += %s;" % (out, ev, value),
             ]
         )
     lines.extend(
         [
-            "    }",
+            "  }",
             "",
-            "    return SFEM_SUCCESS;",
+            "  return SFEM_SUCCESS;",
             "}",
             "",
             "} // namespace codegen",
@@ -3379,7 +3379,7 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
         lines.extend(
             [
                 ") {",
-                "    return sfem::codegen::%s<%s, geom_t>(%s);"
+                "  return sfem::codegen::%s<%s, geom_t>(%s);"
                 % (implementation_name, scalar_type, ", ".join(wrapper_args)),
                 "}",
                 "",
@@ -3401,41 +3401,41 @@ def _expanded_simplex_metric_packed_value_body(plan):
     )
 
     scale = _sfem_ccode(plan.scale)
-    lines = ["            for (ptrdiff_t element = e_start; element < e_end; ++element) {"]
+    lines = ["      for (ptrdiff_t element = e_start; element < e_end; ++element) {"]
     lines.extend(
-        "                const uint16_t ev%d = elements[%d][element];" % (shape, shape)
+        "        const uint16_t ev%d = elements[%d][element];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "                const s_t x%d = pk_u_base[ev%d];" % (shape, shape)
+        "        const s_t x%d = pk_u_base[ev%d];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "                const s_t h%d = pk_h[ev%d];" % (shape, shape)
+        "        const s_t h%d = pk_h[ev%d];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     for component in range(symmetric_metric_component_count(plan.dim)):
         value = "s_t(g_met%d[element])" % component
         if scale != "1":
             value = "%s * %s" % (scale, value)
-        lines.append("                const s_t fff%d = %s;" % (component, value))
-    lines.append("                for (int step = 0; step < nsteps; ++step) {")
-    lines.append("                    const s_t alpha = steps[step];")
+        lines.append("        const s_t fff%d = %s;" % (component, value))
+    lines.append("        for (int step = 0; step < nsteps; ++step) {")
+    lines.append("          const s_t alpha = steps[step];")
     lines.extend(
-        "                    const s_t u%d = x%d + alpha * h%d;" % (shape, shape, shape)
+        "          const s_t u%d = x%d + alpha * h%d;" % (shape, shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "                    const s_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        "          const s_t %s = %s;" % (symbol, _sfem_ccode(expression))
         for symbol, expression in plan.kernel.temporaries
     )
     (energy,) = plan.kernel.outputs
     lines.extend(
         [
-            "                    value[(ptrdiff_t)step * nelements + element] = %s;"
+            "          value[(ptrdiff_t)step * nelements + element] = %s;"
             % _sfem_ccode(energy),
-            "                }",
-            "            }",
+            "        }",
+            "      }",
             "",
         ]
     )
@@ -3495,63 +3495,63 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         lines.extend(
             [
                 'extern "C" int %s(' % public_name,
-                "        const ptrdiff_t n_packs,",
-                "        const ptrdiff_t n_elements_per_pack,",
-                "        const ptrdiff_t nelements,",
-                "        const ptrdiff_t nnodes,",
-                "        const ptrdiff_t max_nodes_per_pack,",
-                "        uint16_t **const RSTR elements,",
-                "        const ptrdiff_t *const RSTR owned_nodes_ptr,",
-                "        const ptrdiff_t *const RSTR n_shared_nodes,",
-                "        const ptrdiff_t *const RSTR ghost_ptr,",
-                "        const idx_t *const RSTR ghost_idx,",
+                "    const ptrdiff_t n_packs,",
+                "    const ptrdiff_t n_elements_per_pack,",
+                "    const ptrdiff_t nelements,",
+                "    const ptrdiff_t nnodes,",
+                "    const ptrdiff_t max_nodes_per_pack,",
+                "    uint16_t **const RSTR elements,",
+                "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
+                "    const ptrdiff_t *const RSTR n_shared_nodes,",
+                "    const ptrdiff_t *const RSTR ghost_ptr,",
+                "    const idx_t *const RSTR ghost_idx,",
             ]
         )
         if is_affine:
             for array_input in _packed_affine_geometry_inputs(dim, metric):
                 for stream in _soa_array_stream_names(array_input):
                     lines.append(
-                        "        const geom_t *const RSTR %s," % abi_geometry_name(stream)
+                        "    const geom_t *const RSTR %s," % abi_geometry_name(stream)
                     )
         else:
-            lines.append("        const geom_t *const *const RSTR points,")
+            lines.append("    const geom_t *const *const RSTR points,")
         lines.extend(
-            "        const %s %s," % (scalar_type, parameter)
+            "    const %s %s," % (scalar_type, parameter)
             for parameter in material_parameter_names
         )
-        lines.append("        const ptrdiff_t u_stride,")
+        lines.append("    const ptrdiff_t u_stride,")
         for d in range(n_field_components):
             lines.append(
-                "        const %s *const RSTR u%s,"
+                "    const %s *const RSTR u%s,"
                 % (scalar_type, _component_name(d))
             )
-        lines.append("        const ptrdiff_t h_stride,")
+        lines.append("    const ptrdiff_t h_stride,")
         for d in range(n_field_components):
             lines.append(
-                "        const %s *const RSTR h%s,"
+                "    const %s *const RSTR h%s,"
                 % (scalar_type, _component_name(d))
             )
         lines.extend(
             [
-                "        const int nsteps,",
-                "        const %s *const RSTR steps," % scalar_type,
-                "        %s *const RSTR value" % scalar_type,
+                "    const int nsteps,",
+                "    const %s *const RSTR steps," % scalar_type,
+                "    %s *const RSTR value" % scalar_type,
                 ") {",
-                "    using s_t = %s;" % scalar_type,
-                "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-                "    static constexpr int NQ = %d;" % n_qp,
-                "    static constexpr int NS = %d;" % n_nodes,
-                "    static constexpr int VS = %d;" % vector_size,
-                "    (void)nnodes;",
-                "    (void)n_shared_nodes;",
+                "  using s_t = %s;" % scalar_type,
+                "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+                "  static constexpr int NQ = %d;" % n_qp,
+                "  static constexpr int NS = %d;" % n_nodes,
+                "  static constexpr int VS = %d;" % vector_size,
+                "  (void)nnodes;",
+                "  (void)n_shared_nodes;",
                 "",
             ]
         )
         if not is_affine:
             for d in range(dim):
                 lines.append(
-                    "    const geom_t *const RSTR %s = points[%d];"
+                    "  const geom_t *const RSTR %s = points[%d];"
                     % (_component_name(d), d)
                 )
             lines.extend(
@@ -3560,7 +3560,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                     "coordinate_elements",
                     "elements",
                     stream_shape_order,
-                    "    ",
+                    "  ",
                 )
             )
         lines.extend(
@@ -3577,9 +3577,9 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         if use_tensor_product_reference:
             lines.extend(
                 [
-                    "    static constexpr int NQ1 = %d;"
+                    "  static constexpr int NQ1 = %d;"
                     % quadrature_rule.tensor_product_n_qp_1d,
-                    "    static constexpr int NS1 = %d;"
+                    "  static constexpr int NS1 = %d;"
                     % quadrature_rule.tensor_product_n_shape_1d,
                 ]
             )
@@ -3587,30 +3587,30 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             [
                 "",
                 "#pragma omp parallel",
-                "    {",
+                "  {",
             ]
         )
         if not is_affine:
             lines.append(
-                "        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
+                "    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
             )
         lines.extend(
             [
-                "        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);",
-                "        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);",
+                "    s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);",
+                "    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);",
                 "",
                 "#pragma omp for schedule(static)",
-                "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
-                "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
-                "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
-                "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
-                "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-                "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
+                "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+                "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
+                "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+                "      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+                "      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+                "      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
             ]
         )
         if not is_affine:
             lines.append(
-                "            const geom_t *const coordinate_components[ND] = {%s};"
+                "      const geom_t *const coordinate_components[ND] = {%s};"
                 % ", ".join(_component_name(d) for d in range(dim))
             )
         # Two loops, because the counts differ: the mesh has ND
@@ -3620,71 +3620,71 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         if not is_affine:
             lines.extend(
                 [
-                    "            for (int d = 0; d < ND; ++d) {",
-                    "                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
-                    "                const geom_t *const RSTR coordinate_component = coordinate_components[d];",
-                    "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                    "                    const idx_t node = owned_nodes_ptr[pack] + k;",
-                    "                    pk_coordinate[k] = s_t(coordinate_component[node]);",
-                    "                }",
-                    "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                    "                    const idx_t node = ghosts[k];",
-                    "                    pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);",
-                    "                }",
-                    "            }",
+                    "      for (int d = 0; d < ND; ++d) {",
+                    "        s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
+                    "        const geom_t *const RSTR coordinate_component = coordinate_components[d];",
+                    "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                    "          const idx_t node = owned_nodes_ptr[pack] + k;",
+                    "          pk_coordinate[k] = s_t(coordinate_component[node]);",
+                    "        }",
+                    "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                    "          const idx_t node = ghosts[k];",
+                    "          pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);",
+                    "        }",
+                    "      }",
                 ]
             )
         lines.extend(
             [
-                "            const s_t *const u_components[NC] = {%s};"
+                "      const s_t *const u_components[NC] = {%s};"
                 % ", ".join("u%s" % _component_name(d) for d in range(n_field_components)),
-                "            const s_t *const h_components[NC] = {%s};"
+                "      const s_t *const h_components[NC] = {%s};"
                 % ", ".join("h%s" % _component_name(d) for d in range(n_field_components)),
-                "            for (int d = 0; d < NC; ++d) {",
-                "                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;",
-                "                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;",
-                "                const s_t *const RSTR u_component = u_components[d];",
-                "                const s_t *const RSTR h_component = h_components[d];",
-                "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                "                    const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                    pk_u_base_component[k] = u_component[node * u_stride];",
-                "                    pk_h_component[k] = h_component[node * h_stride];",
-                "                }",
-                "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                    const idx_t node = ghosts[k];",
-                "                    pk_u_base_component[n_contiguous + k] = u_component[node * u_stride];",
-                "                    pk_h_component[n_contiguous + k] = h_component[node * h_stride];",
-                "                }",
-                "            }",
+                "      for (int d = 0; d < NC; ++d) {",
+                "        s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;",
+                "        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;",
+                "        const s_t *const RSTR u_component = u_components[d];",
+                "        const s_t *const RSTR h_component = h_components[d];",
+                "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "          const idx_t node = owned_nodes_ptr[pack] + k;",
+                "          pk_u_base_component[k] = u_component[node * u_stride];",
+                "          pk_h_component[k] = h_component[node * h_stride];",
+                "        }",
+                "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "          const idx_t node = ghosts[k];",
+                "          pk_u_base_component[n_contiguous + k] = u_component[node * u_stride];",
+                "          pk_h_component[n_contiguous + k] = h_component[node * h_stride];",
+                "        }",
+                "      }",
             ]
         )
         lines.append("")
         element_loop_start = len(lines)
         lines.extend(
             [
-                "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
-                "                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
-                "                s_t bu_data[NS * NC][VS];",
-                "                s_t bu_base_data[NS * NC][VS];",
-                "                s_t bh_data[NS * NC][VS];",
-                "                s_t bvalue[VS];",
+                "      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
+                "        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
+                "        s_t bu_data[NS * NC][VS];",
+                "        s_t bu_base_data[NS * NC][VS];",
+                "        s_t bh_data[NS * NC][VS];",
+                "        s_t bvalue[VS];",
             ]
         )
         if not is_affine:
-            lines.append("                s_t bcoordinate_data[NS * ND][VS];")
+            lines.append("        s_t bcoordinate_data[NS * ND][VS];")
             for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                lines.append("                s_t b%s[NQ * VS];" % stream)
+                lines.append("        s_t b%s[NQ * VS];" % stream)
             lines.extend(
                 [
-                    "                s_t bdet0[NQ * VS];",
-                    "                s_t *badj_streams[ND * ND] = {%s};"
+                    "        s_t bdet0[NQ * VS];",
+                    "        s_t *badj_streams[ND * ND] = {%s};"
                     % ", ".join("badj%d" % i for i in range(dim * dim)),
                 ]
             )
         lines.extend(
             [
                 "",
-                "                const s_t *bu_streams[NS * NC] = {%s};"
+                "        const s_t *bu_streams[NS * NC] = {%s};"
                 % ", ".join(
                     "bu_data[%d]" % stream
                     for stream in streams_in_shape_order(
@@ -3694,9 +3694,9 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                     )
                 ),
                 "",
-                "                for (int shape = 0; shape < NS; ++shape) {",
-                "                    const uint16_t *const RSTR element_shape = elements[shape];",
-                *([] if is_affine or identity_stream_shape_order else ["                    const uint16_t *const RSTR coordinate_shape = coordinate_elements[shape];"]),
+                "        for (int shape = 0; shape < NS; ++shape) {",
+                "          const uint16_t *const RSTR element_shape = elements[shape];",
+                *([] if is_affine or identity_stream_shape_order else ["          const uint16_t *const RSTR coordinate_shape = coordinate_elements[shape];"]),
             ]
         )
                 # The coordinates carry one component per spatial direction and
@@ -3713,31 +3713,31 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             )
             lines.extend(
                 [
-                    "                    for (int d = 0; d < ND; ++d) {",
+                    "          for (int d = 0; d < ND; ++d) {",
                     *source_builder.simd_lines(),
-                    "                        for (int lane = 0; lane < ne; ++lane) {",
-                    "                            const uint16_t %s = %s[evb + lane];"
+                    "            for (int lane = 0; lane < ne; ++lane) {",
+                    "              const uint16_t %s = %s[evb + lane];"
                     % (
                         coordinate_node,
                         "element_shape" if identity_stream_shape_order else "coordinate_shape",
                     ),
-                    "                            bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + %s];"
+                    "              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + %s];"
                     % coordinate_node,
-                    "                        }",
-                    "                    }",
+                    "            }",
+                    "          }",
                 ]
             )
         lines.extend(
             [
-                "                    for (int d = 0; d < NC; ++d) {",
+                "          for (int d = 0; d < NC; ++d) {",
                 *source_builder.simd_lines(),
-                "                        for (int lane = 0; lane < ne; ++lane) {",
-                "                            const uint16_t packed_node = element_shape[evb + lane];",
-                "                            bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];",
-                "                            bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];",
-                "                        }",
-                "                    }",
-                "                }",
+                "            for (int lane = 0; lane < ne; ++lane) {",
+                "              const uint16_t packed_node = element_shape[evb + lane];",
+                "              bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];",
+                "              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];",
+                "            }",
+                "          }",
+                "        }",
                 "",
             ]
         )
@@ -3746,7 +3746,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 _sfem_soa_affine_geometry_stream_lines(
                     source_builder,
                     _packed_affine_geometry_inputs(dim, metric),
-                    "                ",
+                    "        ",
                     geometry_scalar_type="geom_t",
                 )
             )
@@ -3769,7 +3769,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 )
             )
         else:
-            lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "                ")])
+            lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
             geometry_lines = _sfem_soa_isoparametric_geometry_lines(
                 dim,
                 n_nodes,
@@ -3782,8 +3782,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 source_builder=source_builder,
                 coordinate_streams="bcoordinate_data",
             )
-            lines.extend("    %s" % line if line else line for line in geometry_lines)
-            lines.append("                }")
+            lines.extend("  %s" % line if line else line for line in geometry_lines)
+            lines.append("        }")
         call_args = ["ne", "0" if is_affine else "VS"]
         if is_affine:
             call_args.extend(
@@ -3816,30 +3816,30 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         lines.extend(
             [
                 "",
-                "                for (int step = 0; step < nsteps; ++step) {",
-                "                    const s_t alpha = steps[step];",
-                "                    for (int shape = 0; shape < NS; ++shape) {",
-                "                        for (int d = 0; d < NC; ++d) {",
+                "        for (int step = 0; step < nsteps; ++step) {",
+                "          const s_t alpha = steps[step];",
+                "          for (int shape = 0; shape < NS; ++shape) {",
+                "            for (int d = 0; d < NC; ++d) {",
                 *source_builder.simd_lines(),
-                "                            for (int lane = 0; lane < ne; ++lane) {",
-                "                                bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];",
-                "                            }",
-                "                        }",
-                "                    }",
+                "              for (int lane = 0; lane < ne; ++lane) {",
+                "                bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];",
+                "              }",
+                "            }",
+                "          }",
                 *source_builder.simd_lines(),
-                "                    for (int lane = 0; lane < ne; ++lane) {",
-                "                        bvalue[lane] = s_t(0);",
-                "                    }",
+                "          for (int lane = 0; lane < ne; ++lane) {",
+                "            bvalue[lane] = s_t(0);",
+                "          }",
                 "",
-                "                    %s<s_t, NQ, NS, VS>(%s);"
+                "          %s<s_t, NQ, NS, VS>(%s);"
                 % (block_name, ", ".join(call_args)),
                 "",
                 *source_builder.simd_lines(),
-                "                    for (int lane = 0; lane < ne; ++lane) {",
-                "                        value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];",
-                "                    }",
-                "                }",
-                "            }",
+                "          for (int lane = 0; lane < ne; ++lane) {",
+                "            value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];",
+                "          }",
+                "        }",
+                "      }",
             ]
         )
         expanded_body = _PACKED_VALUE_BODY_BY_EXPANDED[expanded_value_plan is not None](
@@ -3851,9 +3851,9 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             lines[element_loop_start:] = expanded_body
         lines.extend(
             [
-                "        }",
                 "    }",
-                "    return SFEM_SUCCESS;",
+                "  }",
+                "  return SFEM_SUCCESS;",
                 "}",
                 "",
             ]
@@ -3966,12 +3966,12 @@ def _append_mesh_operator_stream_arrays(
                     "bu_data",
                     dim,
                     stream_shape_order,
-                    "        ",
+                    "    ",
                 )
             )
         elif uses_current:
             lines.append(
-                "        const s_t *const bu_streams[NS * %d] = {%s};"
+                "    const s_t *const bu_streams[NS * %d] = {%s};"
                 % (
                     dim,
                     ", ".join(
@@ -3993,12 +3993,12 @@ def _append_mesh_operator_stream_arrays(
                         "bh_data",
                         dim,
                         stream_shape_order,
-                        "        ",
+                        "    ",
                     )
                 )
             else:
                 lines.append(
-                    "        const s_t *const bh_streams[NS * %d] = {%s};"
+                    "    const s_t *const bh_streams[NS * %d] = {%s};"
                     % (
                         dim,
                         ", ".join(
@@ -4020,12 +4020,12 @@ def _append_mesh_operator_stream_arrays(
                         "bout_data",
                         dim,
                         stream_shape_order,
-                        "        ",
+                        "    ",
                     )
                 )
             else:
                 lines.append(
-                    "        s_t *const bout_streams[NS * %d] = {%s};"
+                    "    s_t *const bout_streams[NS * %d] = {%s};"
                     % (
                         dim,
                         ", ".join(
@@ -4059,26 +4059,26 @@ def _append_mesh_operator_scalar_output(
     """
     n_field_components = form_n_field_components(form, dim)
     if not writes_per_shape(form):
-        lines.extend(_work_item_loop_lines(source_builder, "        "))
-        lines.append("            value[evb + %s] += bvalue[%s];" % (work_item, work_item))
-        lines.append("        }")
+        lines.extend(_work_item_loop_lines(source_builder, "    "))
+        lines.append("      value[evb + %s] += bvalue[%s];" % (work_item, work_item))
+        lines.append("    }")
     else:
         if compact_stream_buffers:
-            lines.append("        s_t *const out_components[NC] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)))
+            lines.append("    s_t *const out_components[NC] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)))
             lines.extend(
                 [
                     "",
-                    "        for (int shape = 0; shape < NS; ++shape) {",
-                    "            for (int d = 0; d < NC; ++d) {",
+                    "    for (int shape = 0; shape < NS; ++shape) {",
+                    "      for (int d = 0; d < NC; ++d) {",
                     *_scatter_add_lines(
                         source_builder,
                         "out_components[d]",
                         "ev[shape * VS + %s] * out_stride",
                         "bout_data[shape * NC + d][%s]",
-                        "                ",
+                        "        ",
                     ),
-                    "            }",
-                    "        }",
+                    "      }",
+                    "    }",
                 ]
             )
         else:
@@ -4092,7 +4092,7 @@ def _append_mesh_operator_scalar_output(
                                 "out%s" % component,
                                 "ev[%d * VS + %%s] * out_stride" % shape,
                                 "bout%s%d[%%s]" % (component, shape),
-                                "        ",
+                                "    ",
                             )
                         )
                         + [""]
@@ -4119,20 +4119,20 @@ def _append_mesh_operator_compact_buffers(
     """
     if compact_stream_buffers:
         if uses_current:
-            lines.append("        s_t bu_data[NS * NC][VS];")
+            lines.append("    s_t bu_data[NS * NC][VS];")
         if uses_direction:
-            lines.append("        s_t bh_data[NS * NC][VS];")
+            lines.append("    s_t bh_data[NS * NC][VS];")
         if writes_per_shape(form):
-            lines.append("        s_t bout_data[NS * NC][VS];")
+            lines.append("    s_t bout_data[NS * NC][VS];")
         else:
-            lines.append("        s_t bvalue[VS];")
+            lines.append("    s_t bvalue[VS];")
         if compact_coordinate_buffers:
-            lines.append("        s_t bcoordinate_data[NS * ND][VS];")
+            lines.append("    s_t bcoordinate_data[NS * ND][VS];")
     elif compact_coordinate_buffers:
-        lines.append("        s_t bcoordinate_data[NS * ND][VS];")
+        lines.append("    s_t bcoordinate_data[NS * ND][VS];")
     elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
-            lines.append("        s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s[VS];" % stream)
 
 
 def _append_mesh_operator_isoparametric_flux(
@@ -4193,9 +4193,9 @@ def _append_mesh_operator_isoparametric_flux(
             )
         )
     elif geometry_mode == "isoparametric" and form.weak_form is not None:
-        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
+        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
         if use_tensor_product_geometry:
-            lines.extend(_tensor_product_q_index_lines(dim, "            "))
+            lines.extend(_tensor_product_q_index_lines(dim, "      "))
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
                 dim,
@@ -4210,7 +4210,7 @@ def _append_mesh_operator_isoparametric_flux(
                 coordinate_streams=coordinate_streams_name,
             )
         )
-        lines.append("        }")
+        lines.append("    }")
     elif geometry_mode == "isoparametric":
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
@@ -4231,7 +4231,7 @@ def _append_mesh_operator_isoparametric_flux(
             _sfem_soa_affine_geometry_stream_lines(
                 source_builder,
                 element_inputs,
-                "        ",
+                "    ",
             )
         )
 
@@ -4283,9 +4283,9 @@ def _append_mesh_operator_stream_buffer_views(
     n_field_components = form_n_field_components(form, dim)
     if compact_stream_buffers:
         if uses_current:
-            lines.append("        const s_t *const u_components[NC] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(n_field_components)))
+            lines.append("    const s_t *const u_components[NC] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(n_field_components)))
         if uses_direction:
-            lines.append("        const s_t *const h_components[NC] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(n_field_components)))
+            lines.append("    const s_t *const h_components[NC] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(n_field_components)))
         lines.extend(
             [
                 "",
@@ -4293,49 +4293,49 @@ def _append_mesh_operator_stream_buffer_views(
         )
         lines.extend(
             [
-                "        for (int shape = 0; shape < NS; ++shape) {",
-                "            for (int d = 0; d < NC; ++d) {",
-                *_work_item_loop_lines(source_builder, "                "),
-                "                    const idx_t node = ev[shape * VS + %s];" % work_item,
+                "    for (int shape = 0; shape < NS; ++shape) {",
+                "      for (int d = 0; d < NC; ++d) {",
+                *_work_item_loop_lines(source_builder, "        "),
+                "          const idx_t node = ev[shape * VS + %s];" % work_item,
             ]
         )
         if uses_current:
-            lines.append("                    bu_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item)
+            lines.append("          bu_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item)
         if uses_direction:
-            lines.append("                    bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item)
-        lines.extend(["                }", "            }", "        }"])
+            lines.append("          bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item)
+        lines.extend(["        }", "      }", "    }"])
         if not writes_per_shape(form):
-            lines.extend(_work_item_loop_lines(source_builder, "        "))
-            lines.extend(["            bvalue[%s] = s_t(0);" % work_item, "        }"])
+            lines.extend(_work_item_loop_lines(source_builder, "    "))
+            lines.extend(["      bvalue[%s] = s_t(0);" % work_item, "    }"])
         else:
             lines.extend(
                 [
-                    "        for (int stream = 0; stream < NS * NC; ++stream) {",
-                    *_work_item_loop_lines(source_builder, "            "),
-                    "                bout_data[stream][%s] = s_t(0);" % work_item,
-                    "            }",
-                    "        }",
+                    "    for (int stream = 0; stream < NS * NC; ++stream) {",
+                    *_work_item_loop_lines(source_builder, "      "),
+                    "        bout_data[stream][%s] = s_t(0);" % work_item,
+                    "      }",
+                    "    }",
                 ]
             )
     else:
         lines.extend([""])
-        lines.extend(_work_item_loop_lines(source_builder, "        "))
+        lines.extend(_work_item_loop_lines(source_builder, "    "))
         for shape in range(n_nodes):
             for d in range(dim):
                 component = _component_name(d)
                 if uses_current:
                     lines.append(
-                        "            bu%s%d[%s] = u%s[ev[%d * VS + %s] * u_stride];"
+                        "      bu%s%d[%s] = u%s[ev[%d * VS + %s] * u_stride];"
                         % (component, shape, work_item, component, shape, work_item)
                     )
                 if uses_direction:
                     lines.append(
-                        "            bh%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
+                        "      bh%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
                         % (component, shape, work_item, component, shape, work_item)
                     )
         for stream in _output_stream_names(form, n_field_components, n_nodes):
-            lines.append("            b%s[%s] = s_t(0);" % (stream, work_item))
-        lines.append("        }")
+            lines.append("      b%s[%s] = s_t(0);" % (stream, work_item))
+        lines.append("    }")
 
 
 def _append_mesh_operator_isoparametric_jacobian(
@@ -4354,37 +4354,37 @@ def _append_mesh_operator_isoparametric_jacobian(
     """
     if geometry_mode == "isoparametric":
         if compact_coordinate_buffers:
-            lines.append("        const g_t *const coordinate_components[ND] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
+            lines.append("    const g_t *const coordinate_components[ND] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
             lines.extend(
                 [
                     "",
-                    "        for (int shape = 0; shape < NS; ++shape) {",
-                    *([] if identity_stream_shape_order else ["            const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
-                    "            for (int d = 0; d < ND; ++d) {",
-                    *_work_item_loop_lines(source_builder, "                "),
-                    "                    bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
+                    "    for (int shape = 0; shape < NS; ++shape) {",
+                    *([] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
+                    "      for (int d = 0; d < ND; ++d) {",
+                    *_work_item_loop_lines(source_builder, "        "),
+                    "          bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
                     % (
                         work_item,
                         "ev[shape * VS + %s]" % work_item
                         if identity_stream_shape_order
                         else "coordinate_element_shape[evb + %s]" % work_item,
                     ),
-                    "                }",
-                    "            }",
                     "        }",
+                    "      }",
+                    "    }",
                 ]
             )
         else:
             lines.extend([""])
-            lines.extend(_work_item_loop_lines(source_builder, "        "))
+            lines.extend(_work_item_loop_lines(source_builder, "    "))
             for shape in range(n_nodes):
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "            b%s[%s] = %s[ev[%d * VS + %s]];"
+                        "      b%s[%s] = %s[ev[%d * VS + %s]];"
                         % (stream, work_item, _component_name(d), shape, work_item)
                     )
-            lines.append("        }")
+            lines.append("    }")
 
 
 def _append_mesh_operator_packed_entry_points(
@@ -4490,17 +4490,17 @@ def _expanded_simplex_metric_body(plan, source_builder):
     dim = plan.dim
     scale = _sfem_ccode(plan.scale)
     scatter = _target_scatter_add_lines(source_builder)
-    lines = ["    (void)nnodes;", ""]
+    lines = ["  (void)nnodes;", ""]
     lines.extend(_target_parallel_element_loop_lines(source_builder))
     lines.append(
-        "    for (ptrdiff_t element = 0; element < nelements; ++element) {"
+        "  for (ptrdiff_t element = 0; element < nelements; ++element) {"
     )
     lines.extend(
-        "        const idx_t ev%d = elements[%d][element];" % (shape, shape)
+        "    const idx_t ev%d = elements[%d][element];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "        const s_t u%d = %sx[ev%d * %s_stride];"
+        "    const s_t u%d = %sx[ev%d * %s_stride];"
         % (shape, plan.input_prefix, shape, plan.input_prefix)
         for shape in range(plan.n_shape)
     )
@@ -4508,19 +4508,19 @@ def _expanded_simplex_metric_body(plan, source_builder):
         value = "s_t(g_met%d[element])" % component
         if scale != "1":
             value = "%s * %s" % (scale, value)
-        lines.append("        const s_t fff%d = %s;" % (component, value))
+        lines.append("    const s_t fff%d = %s;" % (component, value))
     lines.extend(
-        "        const s_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        "    const s_t %s = %s;" % (symbol, _sfem_ccode(expression))
         for symbol, expression in plan.kernel.temporaries
     )
     for shape, expression in enumerate(plan.kernel.outputs):
         lines.append(
-            "        const s_t e%d = %s;" % (shape, _sfem_ccode(expression))
+            "    const s_t e%d = %s;" % (shape, _sfem_ccode(expression))
         )
         lines.extend(
-            scatter("outx[ev%d * out_stride]" % shape, "e%d" % shape, "        ")
+            scatter("outx[ev%d * out_stride]" % shape, "e%d" % shape, "    ")
         )
-    lines.extend(["    }", "", "    return SFEM_SUCCESS;"])
+    lines.extend(["  }", "", "  return SFEM_SUCCESS;"])
     return lines
 
 
@@ -4541,7 +4541,7 @@ def _target_parallel_element_loop_lines(source_builder):
     target = getattr(source_builder, "target", None)
     if target is None or not hasattr(target, "parallel_element_loop_lines"):
         return []
-    return ["    %s" % line for line in target.parallel_element_loop_lines("static")]
+    return ["  %s" % line for line in target.parallel_element_loop_lines("static")]
 
 
 def _target_scatter_add_lines(source_builder):
@@ -4677,18 +4677,18 @@ def _sfem_soa_mesh_operator_function(
     lines.extend(
         [
             ") {",
-            "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-            "    static constexpr int NQ = %d;" % n_qp,
-            "    static constexpr int NS = %d;" % n_nodes,
-            "    static constexpr int VS = %d;" % effective_vector_size,
-            "    (void)nnodes;",
+            "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+            "  static constexpr int NQ = %d;" % n_qp,
+            "  static constexpr int NS = %d;" % n_nodes,
+            "  static constexpr int VS = %d;" % effective_vector_size,
+            "  (void)nnodes;",
         ]
     )
     if geometry_mode == "isoparametric":
         for d in range(dim):
             lines.append(
-                "    const g_t *const RSTR %s = points[%d];"
+                "  const g_t *const RSTR %s = points[%d];"
                 % (_component_name(d), d)
             )
         if compact_coordinate_buffers:
@@ -4698,7 +4698,7 @@ def _sfem_soa_mesh_operator_function(
                     "coordinate_elements",
                     "elements",
                     stream_shape_order,
-                    "    ",
+                    "  ",
                 )
             )
     reference_prefix = "%s_" % geometry_mode
@@ -4719,16 +4719,16 @@ def _sfem_soa_mesh_operator_function(
     if use_tensor_product_reference:
         lines.extend(
             [
-                "    static constexpr int NQ1 = %d;"
+                "  static constexpr int NQ1 = %d;"
                 % quadrature_rule.tensor_product_n_qp_1d,
-                "    static constexpr int NS1 = %d;"
+                "  static constexpr int NS1 = %d;"
                 % quadrature_rule.tensor_product_n_shape_1d,
             ]
         )
     lines.append("")
     lines.extend(source_builder.parallel_for_lines())
     lines.extend(source_builder.mesh_loop_lines())
-    lines.append("        idx_t ev[VS * NS];")
+    lines.append("    idx_t ev[VS * NS];")
 
     compact_stream_buffers = use_stream_arrays
     _append_mesh_operator_compact_buffers(
@@ -4746,26 +4746,26 @@ def _sfem_soa_mesh_operator_function(
         for array_input in element_inputs:
             for stream in _soa_array_stream_names(array_input):
                 extent = "NQ * VS" if form.weak_form is not None else "VS"
-                lines.append("        s_t b%s[%s];" % (stream, extent))
+                lines.append("    s_t b%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
         if uses_current:
             for stream in _field_stream_names("u", n_field_components, n_nodes):
-                lines.append("        s_t b%s[VS];" % stream)
+                lines.append("    s_t b%s[VS];" % stream)
         if uses_direction:
             for stream in _field_stream_names("h", n_field_components, n_nodes):
-                lines.append("        s_t b%s[VS];" % stream)
+                lines.append("    s_t b%s[VS];" % stream)
         for stream in _output_stream_names(form, n_field_components, n_nodes):
-            lines.append("        s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s[VS];" % stream)
 
     lines.extend(
         [
             "",
-            "        for (int element_node = 0; element_node < NS; ++element_node) {",
-            "            const idx_t *const RSTR element_shape = elements[element_node];",
-            *_work_item_loop_lines(source_builder, "            "),
-            "                ev[element_node * VS + %s] = element_shape[evb + %s];" % (work_item, work_item),
-            "            }",
-            "        }",
+            "    for (int element_node = 0; element_node < NS; ++element_node) {",
+            "      const idx_t *const RSTR element_shape = elements[element_node];",
+            *_work_item_loop_lines(source_builder, "      "),
+            "        ev[element_node * VS + %s] = element_shape[evb + %s];" % (work_item, work_item),
+            "      }",
+            "    }",
         ]
     )
 
@@ -4805,11 +4805,11 @@ def _sfem_soa_mesh_operator_function(
     )
 
     if form.weak_form is None:
-        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
+        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
         if use_tensor_product_reference:
-            lines.extend(_tensor_product_q_index_lines(dim, "            "))
+            lines.extend(_tensor_product_q_index_lines(dim, "      "))
             lines.append(
-                "            const s_t tensor_q_weight = %s;"
+                "      const s_t tensor_q_weight = %s;"
                 % _tensor_product_quadrature_weight_expr(dim, tensor_weight_name)
             )
 
@@ -4884,7 +4884,7 @@ def _sfem_soa_mesh_operator_function(
         if uses_direction:
             call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("h", n_field_components, n_nodes))
         call_args.extend(_BLOCK_FMT % stream for stream in _output_stream_names(form, n_field_components, n_nodes))
-    call_indent = "        " if form.weak_form is not None else "            "
+    call_indent = "    " if form.weak_form is not None else "      "
     lines.extend(
         [
             "",
@@ -4893,7 +4893,7 @@ def _sfem_soa_mesh_operator_function(
         ]
     )
     if form.weak_form is None:
-        lines.append("        }")
+        lines.append("    }")
     lines.append("")
 
     _append_mesh_operator_scalar_output(
@@ -4908,7 +4908,7 @@ def _sfem_soa_mesh_operator_function(
 
     lines.extend(
         [
-            "    }",
+            "  }",
             "",
             *source_builder.success_return_lines(),
             "}",
@@ -5029,31 +5029,31 @@ def _expanded_simplex_metric_packed_body(plan, uses_current, uses_direction):
     if (prefix == "u") != bool(uses_current) or (prefix == "h") != bool(uses_direction):
         return None
     lines = [
-        "            for (ptrdiff_t element = e_start; element < e_end; ++element) {",
+        "      for (ptrdiff_t element = e_start; element < e_end; ++element) {",
     ]
     lines.extend(
-        "                const uint16_t ev%d = elements[%d][element];" % (shape, shape)
+        "        const uint16_t ev%d = elements[%d][element];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "                const s_t u%d = pk_%s[ev%d];" % (shape, prefix, shape)
+        "        const s_t u%d = pk_%s[ev%d];" % (shape, prefix, shape)
         for shape in range(plan.n_shape)
     )
     for component in range(symmetric_metric_component_count(plan.dim)):
         value = "s_t(g_met%d[element])" % component
         if scale != "1":
             value = "%s * %s" % (scale, value)
-        lines.append("                const s_t fff%d = %s;" % (component, value))
+        lines.append("        const s_t fff%d = %s;" % (component, value))
     lines.extend(
-        "                const s_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        "        const s_t %s = %s;" % (symbol, _sfem_ccode(expression))
         for symbol, expression in plan.kernel.temporaries
     )
     for shape, expression in enumerate(plan.kernel.outputs):
         lines.append(
-            "                const s_t e%d = %s;" % (shape, _sfem_ccode(expression))
+            "        const s_t e%d = %s;" % (shape, _sfem_ccode(expression))
         )
-        lines.append("                pk_out[ev%d] += e%d;" % (shape, shape))
-    lines.extend(["            }", ""])
+        lines.append("        pk_out[ev%d] += e%d;" % (shape, shape))
+    lines.extend(["      }", ""])
     return lines
 
 
@@ -5142,79 +5142,79 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 [
                     'extern "C" int %s(' % public_name,
-                    "        const ptrdiff_t n_packs,",
-                    "        const ptrdiff_t n_elements_per_pack,",
-                    "        const ptrdiff_t nelements,",
-                    "        const ptrdiff_t nnodes,",
-                    "        const ptrdiff_t max_nodes_per_pack,",
-                    "        uint16_t **const RSTR elements,",
-                    "        const ptrdiff_t *const RSTR owned_nodes_ptr,",
-                    "        const ptrdiff_t *const RSTR n_shared_nodes,",
-                    "        const ptrdiff_t *const RSTR ghost_ptr,",
-                    "        const idx_t *const RSTR ghost_idx,",
+                    "    const ptrdiff_t n_packs,",
+                    "    const ptrdiff_t n_elements_per_pack,",
+                    "    const ptrdiff_t nelements,",
+                    "    const ptrdiff_t nnodes,",
+                    "    const ptrdiff_t max_nodes_per_pack,",
+                    "    uint16_t **const RSTR elements,",
+                    "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
+                    "    const ptrdiff_t *const RSTR n_shared_nodes,",
+                    "    const ptrdiff_t *const RSTR ghost_ptr,",
+                    "    const idx_t *const RSTR ghost_idx,",
                 ]
             )
             if two_pass:
                 lines.extend(
                     [
-                        "        const ptrdiff_t n_ghost_entries,",
-                        "        const ptrdiff_t n_ghost_reduce_rows,",
-                        "        const ptrdiff_t *const RSTR ghost_reduce_ptr,",
-                        "        const ptrdiff_t *const RSTR ghost_reduce_idx,",
-                        "        const idx_t *const RSTR ghost_reduce_dest,",
-                        "        %s *const RSTR ghost_buf," % scalar_type,
+                        "    const ptrdiff_t n_ghost_entries,",
+                        "    const ptrdiff_t n_ghost_reduce_rows,",
+                        "    const ptrdiff_t *const RSTR ghost_reduce_ptr,",
+                        "    const ptrdiff_t *const RSTR ghost_reduce_idx,",
+                        "    const idx_t *const RSTR ghost_reduce_dest,",
+                        "    %s *const RSTR ghost_buf," % scalar_type,
                     ]
                 )
             if is_affine:
                 for array_input in _packed_affine_geometry_inputs(dim, metric):
                     for stream in _soa_array_stream_names(array_input):
                         lines.append(
-                            "        const geom_t *const RSTR %s," % abi_geometry_name(stream)
+                            "    const geom_t *const RSTR %s," % abi_geometry_name(stream)
                         )
             else:
-                lines.append("        const geom_t *const *const RSTR points,")
+                lines.append("    const geom_t *const *const RSTR points,")
             lines.extend(
-                "        const %s %s," % (scalar_type, parameter)
+                "    const %s %s," % (scalar_type, parameter)
                 for parameter in material_parameter_names
             )
             if uses_current:
-                lines.append("        const ptrdiff_t u_stride,")
+                lines.append("    const ptrdiff_t u_stride,")
                 for d in range(n_field_components):
                     lines.append(
-                        "        const %s *const RSTR u%s,"
+                        "    const %s *const RSTR u%s,"
                         % (scalar_type, _component_name(d))
                     )
             if uses_direction:
-                lines.append("        const ptrdiff_t h_stride,")
+                lines.append("    const ptrdiff_t h_stride,")
                 for d in range(n_field_components):
                     lines.append(
-                        "        const %s *const RSTR h%s,"
+                        "    const %s *const RSTR h%s,"
                         % (scalar_type, _component_name(d))
                     )
-            lines.append("        const ptrdiff_t out_stride,")
+            lines.append("    const ptrdiff_t out_stride,")
             for d in range(n_field_components):
                 comma = "," if d + 1 < n_field_components else ""
                 lines.append(
-                    "        %s *const RSTR out%s%s"
+                    "    %s *const RSTR out%s%s"
                     % (scalar_type, _component_name(d), comma)
                 )
             lines.extend(
                 [
                     ") {",
-                    "    using s_t = %s;" % scalar_type,
-                    "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-                    "    static constexpr int NQ = %d;" % n_qp,
-                    "    static constexpr int NS = %d;" % n_nodes,
-                    "    static constexpr int VS = %d;" % vector_size,
-                    "    (void)nnodes;",
+                    "  using s_t = %s;" % scalar_type,
+                    "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+                    "  static constexpr int NQ = %d;" % n_qp,
+                    "  static constexpr int NS = %d;" % n_nodes,
+                    "  static constexpr int VS = %d;" % vector_size,
+                    "  (void)nnodes;",
                     "",
                 ]
             )
             if not is_affine:
                 for d in range(dim):
                     lines.append(
-                        "    const geom_t *const RSTR %s = points[%d];"
+                        "  const geom_t *const RSTR %s = points[%d];"
                         % (_component_name(d), d)
                     )
                 lines.extend(
@@ -5223,7 +5223,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "coordinate_elements",
                         "elements",
                         stream_shape_order,
-                        "    ",
+                        "  ",
                     )
                 )
             lines.extend(
@@ -5240,9 +5240,9 @@ def _sfem_soa_packed_apply_public_wrappers(
             if use_tensor_product_reference:
                 lines.extend(
                     [
-                        "    static constexpr int NQ1 = %d;"
+                        "  static constexpr int NQ1 = %d;"
                         % quadrature_rule.tensor_product_n_qp_1d,
-                        "    static constexpr int NS1 = %d;"
+                        "  static constexpr int NS1 = %d;"
                         % quadrature_rule.tensor_product_n_shape_1d,
                     ]
                 )
@@ -5250,162 +5250,162 @@ def _sfem_soa_packed_apply_public_wrappers(
                 [
                     "",
                     "#pragma omp parallel",
-                    "    {",
+                    "  {",
                 ]
             )
             if not is_affine:
                 lines.append(
-                    "        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
+                    "    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
                 )
             if uses_current:
                 lines.append(
-                    "        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
+                    "    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
                 )
             if uses_direction:
                 lines.append(
-                    "        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);"
+                    "    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);"
                 )
             lines.extend(
                 [
-                    "        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);",
+                    "    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);",
                     "",
                     "#pragma omp for schedule(static)",
-                    "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
-                    "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
-                    "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
-                    "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+                    "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+                    "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
+                    "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+                    "      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
                 ]
             )
             if two_pass:
                 lines.extend(
                     [
-                        "            (void)n_shared_nodes;",
-                        "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-                        "            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
-                        "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
-                        "            const ptrdiff_t ghost_off = ghost_ptr[pack];",
+                        "      (void)n_shared_nodes;",
+                        "      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+                        "      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
+                        "      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
+                        "      const ptrdiff_t ghost_off = ghost_ptr[pack];",
                     ]
                 )
             else:
                 lines.extend(
                     [
-                        "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
-                        "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
-                        "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-                        "            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
-                        "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
+                        "      const ptrdiff_t n_shared = n_shared_nodes[pack];",
+                        "      const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+                        "      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+                        "      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
+                        "      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
                     ]
                 )
             if not is_affine:
                 lines.append(
-                    "            const geom_t *const coordinate_components[ND] = {%s};"
+                    "      const geom_t *const coordinate_components[ND] = {%s};"
                     % ", ".join(_component_name(d) for d in range(dim))
                 )
             if uses_current:
                 lines.append(
-                    "            const s_t *const u_components[NC] = {%s};"
+                    "      const s_t *const u_components[NC] = {%s};"
                     % ", ".join("u%s" % _component_name(d) for d in range(n_field_components))
                 )
             if uses_direction:
                 lines.append(
-                    "            const s_t *const h_components[NC] = {%s};"
+                    "      const s_t *const h_components[NC] = {%s};"
                     % ", ".join("h%s" % _component_name(d) for d in range(n_field_components))
                 )
             lines.extend(
                 [
-                    "            s_t *const out_components[NC] = {%s};"
+                    "      s_t *const out_components[NC] = {%s};"
                     % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)),
-                    "            for (int d = 0; d < NC; ++d) {",
-                    "                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+                    "      for (int d = 0; d < NC; ++d) {",
+                    "        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
                 ]
             )
             if not is_affine:
                 lines.append(
-                    "                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;"
+                    "        s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;"
                 )
             if uses_current:
                 lines.append(
-                    "                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;"
+                    "        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;"
                 )
             if uses_direction:
                 lines.append(
-                    "                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;"
+                    "        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;"
                 )
             if not is_affine:
                 lines.append(
-                    "                const geom_t *const RSTR coordinate_component = coordinate_components[d];"
+                    "        const geom_t *const RSTR coordinate_component = coordinate_components[d];"
                 )
             if uses_current:
                 lines.append(
-                    "                const s_t *const RSTR u_component = u_components[d];"
+                    "        const s_t *const RSTR u_component = u_components[d];"
                 )
             if uses_direction:
-                lines.append("                const s_t *const RSTR h_component = h_components[d];")
+                lines.append("        const s_t *const RSTR h_component = h_components[d];")
             lines.extend(
                 [
-                    "                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {",
-                    "                    pk_component_out[k] = s_t(0);",
-                    "                }",
-                    "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                    "                    const idx_t node = owned_nodes_ptr[pack] + k;",
+                    "        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {",
+                    "          pk_component_out[k] = s_t(0);",
+                    "        }",
+                    "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                    "          const idx_t node = owned_nodes_ptr[pack] + k;",
                 ]
             )
             if not is_affine:
-                lines.append("                    pk_coordinate[k] = s_t(coordinate_component[node]);")
+                lines.append("          pk_coordinate[k] = s_t(coordinate_component[node]);")
             if uses_current:
-                lines.append("                    pk_u_component[k] = u_component[node * u_stride];")
+                lines.append("          pk_u_component[k] = u_component[node * u_stride];")
             if uses_direction:
-                lines.append("                    pk_h_component[k] = h_component[node * h_stride];")
+                lines.append("          pk_h_component[k] = h_component[node * h_stride];")
             lines.extend(
                 [
-                    "                }",
-                    "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                    "                    const idx_t node = ghosts[k];",
+                    "        }",
+                    "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                    "          const idx_t node = ghosts[k];",
                 ]
             )
             if not is_affine:
                 lines.append(
-                    "                    pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);"
+                    "          pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);"
                 )
             if uses_current:
                 lines.append(
-                    "                    pk_u_component[n_contiguous + k] = u_component[node * u_stride];"
+                    "          pk_u_component[n_contiguous + k] = u_component[node * u_stride];"
                 )
             if uses_direction:
                 lines.append(
-                    "                    pk_h_component[n_contiguous + k] = h_component[node * h_stride];"
+                    "          pk_h_component[n_contiguous + k] = h_component[node * h_stride];"
                 )
             lines.extend(
                 [
-                    "                }",
-                    "            }",
+                    "        }",
+                    "      }",
                     "",
                 ]
             )
             element_loop_start = len(lines)
             lines.extend(
                 [
-                    "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
-                    "                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
+                    "      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
+                    "        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
                 ]
             )
             if uses_current:
-                lines.append("                s_t bu_data[NS * NC][VS];")
+                lines.append("        s_t bu_data[NS * NC][VS];")
             if uses_direction:
-                lines.append("                s_t bh_data[NS * NC][VS];")
+                lines.append("        s_t bh_data[NS * NC][VS];")
             lines.extend(
                 [
-                    "                s_t bout_data[NS * NC][VS];",
+                    "        s_t bout_data[NS * NC][VS];",
                 ]
             )
             if not is_affine:
-                lines.append("                s_t bcoordinate_data[NS * ND][VS];")
+                lines.append("        s_t bcoordinate_data[NS * ND][VS];")
                 for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                    lines.append("                s_t b%s[NQ * VS];" % stream)
+                    lines.append("        s_t b%s[NQ * VS];" % stream)
                 lines.extend(
                     [
-                        "                s_t bdet0[NQ * VS];",
-                        "                s_t *badj_streams[ND * ND] = {%s};"
+                        "        s_t bdet0[NQ * VS];",
+                        "        s_t *badj_streams[ND * ND] = {%s};"
                         % ", ".join("badj%d" % i for i in range(dim * dim)),
                     ]
                 )
@@ -5417,7 +5417,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                             "bu_data",
                             dim,
                             stream_shape_order,
-                            "                ",
+                            "        ",
                         )
                 )
             if uses_direction:
@@ -5428,7 +5428,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                             "bh_data",
                             dim,
                             stream_shape_order,
-                            "                ",
+                            "        ",
                         )
                 )
             lines.extend(
@@ -5439,12 +5439,12 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "bout_data",
                         dim,
                         stream_shape_order,
-                        "                ",
+                        "        ",
                     ),
                     "",
-                    "                for (int shape = 0; shape < NS; ++shape) {",
-                    "                    const uint16_t *const RSTR element_shape = elements[shape];",
-                    *([] if identity_stream_shape_order else ["                    const uint16_t *const RSTR coordinate_shape = coordinate_elements[shape];"]),
+                    "        for (int shape = 0; shape < NS; ++shape) {",
+                    "          const uint16_t *const RSTR element_shape = elements[shape];",
+                    *([] if identity_stream_shape_order else ["          const uint16_t *const RSTR coordinate_shape = coordinate_elements[shape];"]),
                 ]
             )
             # Two loops, for the reason spelled at the other packed gather: the
@@ -5458,44 +5458,44 @@ def _sfem_soa_packed_apply_public_wrappers(
                 )
                 lines.extend(
                     [
-                        "                    for (int d = 0; d < ND; ++d) {",
+                        "          for (int d = 0; d < ND; ++d) {",
                         *source_builder.simd_lines(),
-                        "                        for (int lane = 0; lane < ne; ++lane) {",
-                        "                            const uint16_t %s = %s[evb + lane];"
+                        "            for (int lane = 0; lane < ne; ++lane) {",
+                        "              const uint16_t %s = %s[evb + lane];"
                         % (
                             coordinate_node,
                             "element_shape"
                             if identity_stream_shape_order
                             else "coordinate_shape",
                         ),
-                        "                            bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + %s];"
+                        "              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + %s];"
                         % coordinate_node,
-                        "                        }",
-                        "                    }",
+                        "            }",
+                        "          }",
                     ]
                 )
             lines.extend(
                 [
-                    "                    for (int d = 0; d < NC; ++d) {",
+                    "          for (int d = 0; d < NC; ++d) {",
                     *source_builder.simd_lines(),
-                    "                        for (int lane = 0; lane < ne; ++lane) {",
-                    "                            const uint16_t packed_node = element_shape[evb + lane];",
+                    "            for (int lane = 0; lane < ne; ++lane) {",
+                    "              const uint16_t packed_node = element_shape[evb + lane];",
                 ]
             )
             if uses_current:
                 lines.append(
-                    "                            bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];"
+                    "              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];"
                 )
             if uses_direction:
                 lines.append(
-                    "                            bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];"
+                    "              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];"
                 )
             lines.extend(
                 [
-                    "                            bout_data[shape * NC + d][lane] = s_t(0);",
-                    "                        }",
-                    "                    }",
-                    "                }",
+                    "              bout_data[shape * NC + d][lane] = s_t(0);",
+                    "            }",
+                    "          }",
+                    "        }",
                     "",
                 ]
             )
@@ -5504,7 +5504,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                     _sfem_soa_affine_geometry_stream_lines(
                         source_builder,
                         _packed_affine_geometry_inputs(dim, metric),
-                        "                ",
+                        "        ",
                         geometry_scalar_type="geom_t",
                     )
                 )
@@ -5534,7 +5534,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                     )
                 )
             else:
-                lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "                ")])
+                lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
                 geometry_lines = _sfem_soa_isoparametric_geometry_lines(
                     dim,
                     n_nodes,
@@ -5547,8 +5547,8 @@ def _sfem_soa_packed_apply_public_wrappers(
                     source_builder=source_builder,
                     coordinate_streams=coordinate_streams_name,
                 )
-                lines.extend("    %s" % line if line else line for line in geometry_lines)
-                lines.append("                }")
+                lines.extend("  %s" % line if line else line for line in geometry_lines)
+                lines.append("        }")
 
             call_args = ["ne", "0" if is_affine else "VS"]
             if is_affine:
@@ -5586,19 +5586,19 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 [
                     "",
-                    "                %s<s_t, NQ, NS, VS>(%s);"
+                    "        %s<s_t, NQ, NS, VS>(%s);"
                     % (block_name, ", ".join(call_args)),
                     "",
-                    "                for (int shape = 0; shape < NS; ++shape) {",
-                    "                    const uint16_t *const RSTR element_shape = elements[shape];",
-                    "                    for (int d = 0; d < NC; ++d) {",
-                    "                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
-                    "                        for (int lane = 0; lane < ne; ++lane) {",
-                    "                            pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];",
-                    "                        }",
-                    "                    }",
-                    "                }",
+                    "        for (int shape = 0; shape < NS; ++shape) {",
+                    "          const uint16_t *const RSTR element_shape = elements[shape];",
+                    "          for (int d = 0; d < NC; ++d) {",
+                    "            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+                    "            for (int lane = 0; lane < ne; ++lane) {",
+                    "              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];",
                     "            }",
+                    "          }",
+                    "        }",
+                    "      }",
                     "",
                 ]
             )
@@ -5614,68 +5614,68 @@ def _sfem_soa_packed_apply_public_wrappers(
             if two_pass:
                 lines.extend(
                     [
-                        "            for (int d = 0; d < NC; ++d) {",
-                        "                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
-                        "                s_t *const RSTR global_out = out_components[d];",
-                        "                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;",
-                        "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
-                        "                    pk_component_out[k] = s_t(0);",
-                        "                }",
-                        "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                        "                    ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];",
-                        "                    pk_component_out[n_contiguous + k] = s_t(0);",
-                        "                }",
-                        "            }",
+                        "      for (int d = 0; d < NC; ++d) {",
+                        "        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+                        "        s_t *const RSTR global_out = out_components[d];",
+                        "        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;",
+                        "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                        "          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
+                        "          pk_component_out[k] = s_t(0);",
                         "        }",
+                        "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                        "          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];",
+                        "          pk_component_out[n_contiguous + k] = s_t(0);",
+                        "        }",
+                        "      }",
+                        "    }",
                     ]
                 )
             else:
                 lines.extend(
                     [
-                        "            for (int d = 0; d < NC; ++d) {",
-                        "                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
-                        "                s_t *const RSTR global_out = out_components[d];",
-                        "                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
-                        "                    pk_component_out[k] = s_t(0);",
-                        "                }",
-                        "                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-                        *source_builder.atomic_update_lines(),
-                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
-                        "                    pk_component_out[k] = s_t(0);",
-                        "                }",
-                        "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                        *source_builder.atomic_update_lines(),
-                        "                    global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];",
-                        "                    pk_component_out[n_contiguous + k] = s_t(0);",
-                        "                }",
-                        "            }",
+                        "      for (int d = 0; d < NC; ++d) {",
+                        "        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+                        "        s_t *const RSTR global_out = out_components[d];",
+                        "        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+                        "          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
+                        "          pk_component_out[k] = s_t(0);",
                         "        }",
+                        "        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+                        *source_builder.atomic_update_lines(),
+                        "          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
+                        "          pk_component_out[k] = s_t(0);",
+                        "        }",
+                        "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                        *source_builder.atomic_update_lines(),
+                        "          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];",
+                        "          pk_component_out[n_contiguous + k] = s_t(0);",
+                        "        }",
+                        "      }",
+                        "    }",
                     ]
                 )
             if two_pass:
                 lines.extend(
                     [
-                        "    }",
+                        "  }",
                         "",
-                        "    s_t *const out_components[NC] = {%s};"
+                        "  s_t *const out_components[NC] = {%s};"
                         % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)),
                         *source_builder.parallel_for_lines(),
-                        "    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
-                        "        const idx_t dest = ghost_reduce_dest[row];",
-                        "        const ptrdiff_t begin = ghost_reduce_ptr[row];",
-                        "        const ptrdiff_t end = ghost_reduce_ptr[row + 1];",
-                        "        for (int d = 0; d < NC; ++d) {",
-                        "            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;",
-                        "            s_t sum = s_t(0);",
-                        "            for (ptrdiff_t j = begin; j < end; ++j) {",
-                        "                sum += ghost_component[ghost_reduce_idx[j]];",
-                        "            }",
-                        "            out_components[d][dest * out_stride] += sum;",
-                        "        }",
+                        "  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
+                        "    const idx_t dest = ghost_reduce_dest[row];",
+                        "    const ptrdiff_t begin = ghost_reduce_ptr[row];",
+                        "    const ptrdiff_t end = ghost_reduce_ptr[row + 1];",
+                        "    for (int d = 0; d < NC; ++d) {",
+                        "      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;",
+                        "      s_t sum = s_t(0);",
+                        "      for (ptrdiff_t j = begin; j < end; ++j) {",
+                        "        sum += ghost_component[ghost_reduce_idx[j]];",
+                        "      }",
+                        "      out_components[d][dest * out_stride] += sum;",
                         "    }",
-                        "    return SFEM_SUCCESS;",
+                        "  }",
+                        "  return SFEM_SUCCESS;",
                         "}",
                         "",
                     ]
@@ -5683,8 +5683,8 @@ def _sfem_soa_packed_apply_public_wrappers(
             else:
                 lines.extend(
                     [
-                        "    }",
-                        "    return SFEM_SUCCESS;",
+                        "  }",
+                        "  return SFEM_SUCCESS;",
                         "}",
                         "",
                     ]
@@ -5721,49 +5721,49 @@ def _expanded_simplex_metric_value_body(plan, source_builder):
     dim = plan.dim
     scale = _sfem_ccode(plan.scale)
     lines = [
-        "    (void)nnodes;",
+        "  (void)nnodes;",
         "",
     ]
     lines.extend(_target_parallel_element_loop_lines(source_builder))
     lines.append(
-        "    for (ptrdiff_t element = 0; element < nelements; ++element) {"
+        "  for (ptrdiff_t element = 0; element < nelements; ++element) {"
     )
     lines.extend(
-        "        const idx_t ev%d = elements[%d][element];" % (shape, shape)
+        "    const idx_t ev%d = elements[%d][element];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "        const s_t x%d = ux[ev%d * u_stride];" % (shape, shape)
+        "    const s_t x%d = ux[ev%d * u_stride];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "        const s_t h%d = hx[ev%d * h_stride];" % (shape, shape)
+        "    const s_t h%d = hx[ev%d * h_stride];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     for component in range(symmetric_metric_component_count(dim)):
         value = "s_t(g_met%d[element])" % component
         if scale != "1":
             value = "%s * %s" % (scale, value)
-        lines.append("        const s_t fff%d = %s;" % (component, value))
-    lines.append("        for (int step = 0; step < nsteps; ++step) {")
-    lines.append("            const s_t alpha = steps[step];")
+        lines.append("    const s_t fff%d = %s;" % (component, value))
+    lines.append("    for (int step = 0; step < nsteps; ++step) {")
+    lines.append("      const s_t alpha = steps[step];")
     lines.extend(
-        "            const s_t u%d = x%d + alpha * h%d;" % (shape, shape, shape)
+        "      const s_t u%d = x%d + alpha * h%d;" % (shape, shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "            const s_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        "      const s_t %s = %s;" % (symbol, _sfem_ccode(expression))
         for symbol, expression in plan.kernel.temporaries
     )
     (energy,) = plan.kernel.outputs
     lines.extend(
         [
-            "            value[(ptrdiff_t)step * nelements + element] = %s;"
+            "      value[(ptrdiff_t)step * nelements + element] = %s;"
             % _sfem_ccode(energy),
-            "        }",
             "    }",
+            "  }",
             "",
-            "    return SFEM_SUCCESS;",
+            "  return SFEM_SUCCESS;",
         ]
     )
     return lines
@@ -5939,18 +5939,18 @@ def _sfem_soa_mesh_objective_steps_function(
     lines.extend(
         [
             ") {",
-            "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-            "    static constexpr int NQ = %d;" % n_qp,
-            "    static constexpr int NS = %d;" % n_nodes,
-            "    static constexpr int VS = %d;" % vector_size,
-            "    (void)nnodes;",
+            "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+            "  static constexpr int NQ = %d;" % n_qp,
+            "  static constexpr int NS = %d;" % n_nodes,
+            "  static constexpr int VS = %d;" % vector_size,
+            "  (void)nnodes;",
         ]
     )
     if geometry_mode == "isoparametric":
         for d in range(dim):
             lines.append(
-                "    const g_t *const RSTR %s = points[%d];"
+                "  const g_t *const RSTR %s = points[%d];"
                 % (_component_name(d), d)
             )
         if compact_coordinate_buffers:
@@ -5960,7 +5960,7 @@ def _sfem_soa_mesh_objective_steps_function(
                     "coordinate_elements",
                     "elements",
                     stream_shape_order,
-                    "    ",
+                    "  ",
                 )
             )
     lines.extend(
@@ -5979,9 +5979,9 @@ def _sfem_soa_mesh_objective_steps_function(
     if use_tensor_product_reference:
         lines.extend(
             [
-                "    static constexpr int NQ1 = %d;"
+                "  static constexpr int NQ1 = %d;"
                 % quadrature_rule.tensor_product_n_qp_1d,
-                "    static constexpr int NS1 = %d;"
+                "  static constexpr int NS1 = %d;"
                 % quadrature_rule.tensor_product_n_shape_1d,
             ]
         )
@@ -5991,86 +5991,86 @@ def _sfem_soa_mesh_objective_steps_function(
             "",
             *source_builder.parallel_for_lines(),
             *source_builder.mesh_loop_lines(),
-            "        idx_t ev[VS * NS];",
+            "    idx_t ev[VS * NS];",
         ]
     )
 
     compact_stream_buffers = use_stream_arrays
     if compact_stream_buffers:
-        lines.append("        s_t bu_data[NS * NC][VS];")
-        lines.append("        s_t bu_base_data[NS * NC][VS];")
-        lines.append("        s_t bh_data[NS * NC][VS];")
-        lines.append("        s_t bvalue[VS];")
+        lines.append("    s_t bu_data[NS * NC][VS];")
+        lines.append("    s_t bu_base_data[NS * NC][VS];")
+        lines.append("    s_t bh_data[NS * NC][VS];")
+        lines.append("    s_t bvalue[VS];")
         if compact_coordinate_buffers:
-            lines.append("        s_t bcoordinate_data[NS * ND][VS];")
+            lines.append("    s_t bcoordinate_data[NS * ND][VS];")
     elif compact_coordinate_buffers:
-        lines.append("        s_t bcoordinate_data[NS * ND][VS];")
+        lines.append("    s_t bcoordinate_data[NS * ND][VS];")
     elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
-            lines.append("        s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s[VS];" % stream)
     if geometry_mode == "isoparametric":
         for array_input in element_inputs:
             for stream in _soa_array_stream_names(array_input):
                 extent = "NQ * VS"
-                lines.append("        s_t b%s[%s];" % (stream, extent))
+                lines.append("    s_t b%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
         for stream in _field_stream_names("u", n_field_components, n_nodes):
-            lines.append("        s_t b%s[VS];" % stream)
-            lines.append("        s_t b%s_base[VS];" % stream)
+            lines.append("    s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s_base[VS];" % stream)
         for stream in _field_stream_names("h", n_field_components, n_nodes):
-            lines.append("        s_t b%s[VS];" % stream)
-        lines.append("        s_t bvalue[VS];")
+            lines.append("    s_t b%s[VS];" % stream)
+        lines.append("    s_t bvalue[VS];")
 
     lines.extend(
         [
             "",
-            "        for (int element_node = 0; element_node < NS; ++element_node) {",
-            "            const idx_t *const RSTR element_shape = elements[element_node];",
-            *_work_item_loop_lines(source_builder, "            "),
-            "                ev[element_node * VS + %s] = element_shape[evb + %s];"
+            "    for (int element_node = 0; element_node < NS; ++element_node) {",
+            "      const idx_t *const RSTR element_shape = elements[element_node];",
+            *_work_item_loop_lines(source_builder, "      "),
+            "        ev[element_node * VS + %s] = element_shape[evb + %s];"
             % (work_item, work_item),
-            "            }",
-            "        }",
+            "      }",
+            "    }",
         ]
     )
 
     if geometry_mode == "isoparametric":
         if compact_coordinate_buffers:
-            lines.append("        const g_t *const coordinate_components[ND] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
+            lines.append("    const g_t *const coordinate_components[ND] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
             lines.extend(
                 [
                     "",
-                    "        for (int shape = 0; shape < NS; ++shape) {",
-                    *([] if identity_stream_shape_order else ["            const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
-                    "            for (int d = 0; d < ND; ++d) {",
-                    *_work_item_loop_lines(source_builder, "                "),
-                    "                    bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
+                    "    for (int shape = 0; shape < NS; ++shape) {",
+                    *([] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
+                    "      for (int d = 0; d < ND; ++d) {",
+                    *_work_item_loop_lines(source_builder, "        "),
+                    "          bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
                     % (
                         work_item,
                         "ev[shape * VS + %s]" % work_item
                         if identity_stream_shape_order
                         else "coordinate_element_shape[evb + %s]" % work_item,
                     ),
-                    "                }",
-                    "            }",
                     "        }",
+                    "      }",
+                    "    }",
                 ]
             )
         else:
-            lines.extend(["", *_work_item_loop_lines(source_builder, "        ")])
+            lines.extend(["", *_work_item_loop_lines(source_builder, "    ")])
             for shape in range(n_nodes):
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "            b%s[%s] = %s[ev[%d * VS + %s]];"
+                        "      b%s[%s] = %s[ev[%d * VS + %s]];"
                         % (stream, work_item, _component_name(d), shape, work_item)
                     )
-            lines.append("        }")
+            lines.append("    }")
 
     if compact_stream_buffers:
         lines.append("")
-        lines.append("        const s_t *const u_components[NC] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(n_field_components)))
-        lines.append("        const s_t *const h_components[NC] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(n_field_components)))
+        lines.append("    const s_t *const u_components[NC] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(n_field_components)))
+        lines.append("    const s_t *const h_components[NC] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(n_field_components)))
         lines.extend(
             [
                 *_ordered_stream_pointer_array_lines(
@@ -6079,27 +6079,27 @@ def _sfem_soa_mesh_objective_steps_function(
                     "bu_data",
                     dim,
                     stream_shape_order,
-                    "        ",
+                    "    ",
                 ),
             ]
         )
         lines.extend(
             [
                 "",
-                "        for (int shape = 0; shape < NS; ++shape) {",
-                "            for (int d = 0; d < NC; ++d) {",
-                *_work_item_loop_lines(source_builder, "                "),
-                "                    const idx_t node = ev[shape * VS + %s];" % work_item,
-                "                    bu_base_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item,
-                "                    bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item,
-                "                }",
-                "            }",
+                "    for (int shape = 0; shape < NS; ++shape) {",
+                "      for (int d = 0; d < NC; ++d) {",
+                *_work_item_loop_lines(source_builder, "        "),
+                "          const idx_t node = ev[shape * VS + %s];" % work_item,
+                "          bu_base_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item,
+                "          bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item,
                 "        }",
+                "      }",
+                "    }",
             ]
         )
     else:
         lines.append(
-            "        const s_t *const bu_streams[NS * %d] = {%s};"
+            "    const s_t *const bu_streams[NS * %d] = {%s};"
             % (
                 dim,
                 ", ".join(
@@ -6112,19 +6112,19 @@ def _sfem_soa_mesh_objective_steps_function(
                 ),
             )
         )
-        lines.extend(["", *_work_item_loop_lines(source_builder, "        ")])
+        lines.extend(["", *_work_item_loop_lines(source_builder, "    ")])
         for shape in range(n_nodes):
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "            bu%s%d_base[%s] = u%s[ev[%d * VS + %s] * u_stride];"
+                    "      bu%s%d_base[%s] = u%s[ev[%d * VS + %s] * u_stride];"
                     % (component, shape, work_item, component, shape, work_item)
                 )
                 lines.append(
-                    "            bh%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
+                    "      bh%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
                     % (component, shape, work_item, component, shape, work_item)
                 )
-        lines.append("        }")
+        lines.append("    }")
 
     if geometry_mode == "isoparametric" and use_tensor_product_geometry:
         lines.append("")
@@ -6153,9 +6153,9 @@ def _sfem_soa_mesh_objective_steps_function(
             )
         )
     elif geometry_mode == "isoparametric":
-        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
+        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
         if use_tensor_product_geometry:
-            lines.extend(_tensor_product_q_index_lines(dim, "            "))
+            lines.extend(_tensor_product_q_index_lines(dim, "      "))
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
                 dim,
@@ -6170,13 +6170,13 @@ def _sfem_soa_mesh_objective_steps_function(
                 coordinate_streams=coordinate_streams_name,
             )
         )
-        lines.append("        }")
+        lines.append("    }")
     elif geometry_mode == "affine":
         lines.extend(
             _sfem_soa_affine_geometry_stream_lines(
                 source_builder,
                 element_inputs,
-                "        ",
+                "    ",
             )
         )
 
@@ -6216,30 +6216,30 @@ def _sfem_soa_mesh_objective_steps_function(
     lines.extend(
         [
             "",
-            "        for (int step = 0; step < nsteps; ++step) {",
-            "            const s_t alpha = steps[step];",
+            "    for (int step = 0; step < nsteps; ++step) {",
+            "      const s_t alpha = steps[step];",
         ]
     )
     if compact_stream_buffers:
         lines.extend(
             [
-                "            for (int shape = 0; shape < NS; ++shape) {",
-                "                for (int d = 0; d < NC; ++d) {",
-                *_work_item_loop_lines(source_builder, "                    "),
-                "                        bu_data[shape * NC + d][%s] = bu_base_data[shape * NC + d][%s] + alpha * bh_data[shape * NC + d][%s];"
+                "      for (int shape = 0; shape < NS; ++shape) {",
+                "        for (int d = 0; d < NC; ++d) {",
+                *_work_item_loop_lines(source_builder, "          "),
+                "            bu_data[shape * NC + d][%s] = bu_base_data[shape * NC + d][%s] + alpha * bh_data[shape * NC + d][%s];"
                 % (work_item, work_item, work_item),
-                "                    }",
-                "                }",
-                "            }",
+                "          }",
+                "        }",
+                "      }",
             ]
         )
     else:
-        lines.extend(_work_item_loop_lines(source_builder, "            "))
+        lines.extend(_work_item_loop_lines(source_builder, "      "))
         for shape in range(n_nodes):
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "                bu%s%d[%s] = bu%s%d_base[%s] + alpha * bh%s%d[%s];"
+                    "        bu%s%d[%s] = bu%s%d_base[%s] + alpha * bh%s%d[%s];"
                     % (
                         component,
                         shape,
@@ -6252,22 +6252,22 @@ def _sfem_soa_mesh_objective_steps_function(
                         work_item,
                     )
                 )
-        lines.append("            }")
+        lines.append("      }")
     lines.extend(
         [
-            *_work_item_loop_lines(source_builder, "            "),
-            "                bvalue[%s] = s_t(0);" % work_item,
-            "            }",
+            *_work_item_loop_lines(source_builder, "      "),
+            "        bvalue[%s] = s_t(0);" % work_item,
+            "      }",
             "",
-            "            %s<s_t, NQ, NS, VS>(%s);"
+            "      %s<s_t, NQ, NS, VS>(%s);"
             % (block_name, ", ".join(call_args)),
             "",
-            *_work_item_loop_lines(source_builder, "            "),
-            "                value[(ptrdiff_t)step * nelements + evb + %s] = bvalue[%s];"
+            *_work_item_loop_lines(source_builder, "      "),
+            "        value[(ptrdiff_t)step * nelements + evb + %s] = bvalue[%s];"
             % (work_item, work_item),
-            "            }",
-            "        }",
+            "      }",
             "    }",
+            "  }",
             "",
             *source_builder.success_return_lines(),
             "}",
@@ -6379,7 +6379,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     )
     lines = [
         "%sfor (int entry = 0; entry < NDOFS * NDOFS; ++entry) {" % indent,
-        "%s    element_matrix[entry] = s_t(0);" % indent,
+        "%s  element_matrix[entry] = s_t(0);" % indent,
         "%s}" % indent,
     ]
     if use_tensor_product_reference and emit_tensor_product_static_constants:
@@ -6393,33 +6393,33 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
         )
     lines.append("%sfor (int q = 0; q < NQ; ++q) {" % indent)
     if use_tensor_product_reference:
-        lines.extend(_tensor_product_q_index_lines(dim, indent + "    "))
+        lines.extend(_tensor_product_q_index_lines(dim, indent + "  "))
         lines.append(
-            "%s    const s_t qw = %s;"
+            "%s  const s_t qw = %s;"
             % (indent, _tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
         )
     else:
-        lines.append("%s    const s_t qw = %sq_weight[q];" % (indent, reference_prefix))
+        lines.append("%s  const s_t qw = %sq_weight[q];" % (indent, reference_prefix))
     lines.extend(
         [
-            "%s    const int lane = 0;" % indent,
-            "%s    const ptrdiff_t goff = q * VS + lane;" % indent,
+            "%s  const int lane = 0;" % indent,
+            "%s  const ptrdiff_t goff = q * VS + lane;" % indent,
         ]
     )
     for component in range(dim * dim):
         lines.append(
-            "%s    const s_t adj_lane%d = badj%d[goff];"
+            "%s  const s_t adj_lane%d = badj%d[goff];"
             % (indent, component, component)
         )
     lines.extend(
         [
-            "%s    const s_t det_lane0 = bdet0[goff];"
+            "%s  const s_t det_lane0 = bdet0[goff];"
             % indent,
-            "%s    const s_t idet = s_t(1) / det_lane0;"
+            "%s  const s_t idet = s_t(1) / det_lane0;"
             % indent,
-            "%s    for (int trial_component = 0; trial_component < NC; ++trial_component) {"
+            "%s  for (int trial_component = 0; trial_component < NC; ++trial_component) {"
             % indent,
-            "%s        for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {"
+            "%s    for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {"
             % indent,
         ]
     )
@@ -6429,12 +6429,12 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
                 dim,
                 "trial_shape",
                 "trial",
-                "%s            " % indent,
+                "%s      " % indent,
             )
         )
     for ref_component in range(dim):
         lines.append(
-            "%s            const s_t trial_grad_ref%d = %s;"
+            "%s      const s_t trial_grad_ref%d = %s;"
             % (
                 indent,
                 ref_component,
@@ -6459,10 +6459,10 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     # laplace was written as an energy.
     lines.extend(
         [
-            "%s            s_t trial_grad[NC * ND];" % indent,
-            "%s            for (int i = 0; i < NC * ND; ++i) {" % indent,
-            "%s                trial_grad[i] = s_t(0);" % indent,
-            "%s            }" % indent,
+            "%s      s_t trial_grad[NC * ND];" % indent,
+            "%s      for (int i = 0; i < NC * ND; ++i) {" % indent,
+            "%s        trial_grad[i] = s_t(0);" % indent,
+            "%s      }" % indent,
         ]
     )
     for phys_component in range(dim):
@@ -6472,10 +6472,10 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
             for ref_component in range(dim)
         ]
         lines.append(
-            "%s            trial_grad[trial_component * ND + %d] = (%s) * idet;"
+            "%s      trial_grad[trial_component * ND + %d] = (%s) * idet;"
             % (indent, phys_component, " + ".join(terms))
         )
-    lines.append("%s            s_t material[NC * ND];" % indent)
+    lines.append("%s      s_t material[NC * ND];" % indent)
     local_material_lines = []
     _append_cse_array_assignments(
         local_material_lines,
@@ -6483,12 +6483,12 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
         ["material[%d] =" % i for i in range(dim * dim)],
         "weak_hess_tmp",
     )
-    lines.extend("%s            %s" % (indent, line.strip()) for line in local_material_lines)
+    lines.extend("%s      %s" % (indent, line.strip()) for line in local_material_lines)
     lines.extend(
         [
-            "%s            for (int test_component = 0; test_component < NC; ++test_component) {"
+            "%s      for (int test_component = 0; test_component < NC; ++test_component) {"
             % indent,
-            "%s                for (int test_shape = 0; test_shape < NS; ++test_shape) {"
+            "%s        for (int test_shape = 0; test_shape < NS; ++test_shape) {"
             % indent,
         ]
     )
@@ -6498,12 +6498,12 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
                 dim,
                 "test_shape",
                 "test",
-                "%s                    " % indent,
+                "%s          " % indent,
             )
         )
     for ref_component in range(dim):
         lines.append(
-            "%s                    const s_t test_grad_ref%d = %s;"
+            "%s          const s_t test_grad_ref%d = %s;"
             % (
                 indent,
                 ref_component,
@@ -6519,7 +6519,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
                 ),
             )
         )
-    lines.append("%s                    s_t entry = s_t(0);" % indent)
+    lines.append("%s          s_t entry = s_t(0);" % indent)
     for ref_component in range(dim):
         terms = [
             "material[test_component * ND + %d] * adj_lane%d"
@@ -6527,20 +6527,20 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
             for k in range(dim)
         ]
         lines.append(
-            "%s                    entry += test_grad_ref%d * qw * (%s);"
+            "%s          entry += test_grad_ref%d * qw * (%s);"
             % (indent, ref_component, " + ".join(terms))
         )
     lines.extend(
         [
-            "%s                    const int row = test_component * NS + test_shape;"
+            "%s          const int row = test_component * NS + test_shape;"
             % indent,
-            "%s                    const int col = trial_component * NS + trial_shape;"
+            "%s          const int col = trial_component * NS + trial_shape;"
             % indent,
-            "%s                    element_matrix[row * NDOFS + col] += entry;" % indent,
-            "%s                }" % indent,
-            "%s            }" % indent,
+            "%s          element_matrix[row * NDOFS + col] += entry;" % indent,
             "%s        }" % indent,
+            "%s      }" % indent,
             "%s    }" % indent,
+            "%s  }" % indent,
             "%s}" % indent,
         ]
     )
@@ -6687,27 +6687,27 @@ def _sfem_soa_hessian_packed_crs_passes(
         lines.extend(
             [
                 ") {",
-                "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-                "    static constexpr int NS = %d;" % n_nodes,
-                "    (void)nnodes;",
-                "    (void)max_nodes_per_pack;",
-                "    (void)n_shared_nodes;",
-                "    int unsupported_matrix_format = 0;",
+                "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+                "  static constexpr int NS = %d;" % n_nodes,
+                "  (void)nnodes;",
+                "  (void)max_nodes_per_pack;",
+                "  (void)n_shared_nodes;",
+                "  int unsupported_matrix_format = 0;",
                 *source_builder.parallel_for_lines(reduction="|:unsupported_matrix_format"),
-                "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
-                "        const ptrdiff_t e_start = pack * n_elements_per_pack;",
-                "        const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
-                "        for (ptrdiff_t element = e_start; element < e_end; ++element) {",
-                "            idx_t ev[NS];",
-                "            for (int shape = 0; shape < NS; ++shape) {",
-                "                ev[shape] = %s_packed_global_node(elements[shape][element], pack, owned_nodes_ptr, ghost_ptr, ghost_idx);" % function_base,
-                "            }",
-                "            count_t *const entries = &packed_element_entries[element * (NC * NS) * (NC * NS)];",
-                "            %s_discover_packed_crs_entries<s_t>(ev, rowptr, colidx, entries);" % function_base,
-                "        }",
+                "  for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+                "    const ptrdiff_t e_start = pack * n_elements_per_pack;",
+                "    const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+                "    for (ptrdiff_t element = e_start; element < e_end; ++element) {",
+                "      idx_t ev[NS];",
+                "      for (int shape = 0; shape < NS; ++shape) {",
+                "        ev[shape] = %s_packed_global_node(elements[shape][element], pack, owned_nodes_ptr, ghost_ptr, ghost_idx);" % function_base,
+                "      }",
+                "      count_t *const entries = &packed_element_entries[element * (NC * NS) * (NC * NS)];",
+                "      %s_discover_packed_crs_entries<s_t>(ev, rowptr, colidx, entries);" % function_base,
                 "    }",
-                "    return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;",
+                "  }",
+                "  return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;",
                 "}",
                 "",
                 "template <typename s_t, typename g_t>",
@@ -6718,19 +6718,19 @@ def _sfem_soa_hessian_packed_crs_passes(
         lines.extend(
             [
                 ") {",
-                "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-                "    static constexpr int NQ = %d;" % n_qp,
-                "    static constexpr int NS = %d;" % n_nodes,
-                "    static constexpr int VS = 1;",
-                "    static constexpr int NDOFS = NC * NS;",
-                "    (void)nnodes;",
-                "    (void)n_shared_nodes;",
+                "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+                "  static constexpr int NQ = %d;" % n_qp,
+                "  static constexpr int NS = %d;" % n_nodes,
+                "  static constexpr int VS = 1;",
+                "  static constexpr int NDOFS = NC * NS;",
+                "  (void)nnodes;",
+                "  (void)n_shared_nodes;",
             ]
         )
         for d in range(dim):
             lines.append(
-                "    const g_t *const RSTR %s = points[%d];"
+                "  const g_t *const RSTR %s = points[%d];"
                 % (_component_name(d), d)
             )
         lines.extend(
@@ -6739,7 +6739,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "coordinate_elements",
                 "elements",
                 stream_shape_order,
-                "    ",
+                "  ",
             )
         )
         lines.extend(
@@ -6757,86 +6757,86 @@ def _sfem_soa_hessian_packed_crs_passes(
             [
                 "",
                 "#pragma omp parallel",
-                "    {",
-                "        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
+                "  {",
+                "    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
             ]
         )
         if uses_current:
             lines.append(
-                "        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
+                "    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
             )
         lines.extend(
             [
                 "",
                 "#pragma omp for schedule(static)",
-                "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
-                "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
-                "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
-                "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
-                "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-                "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
-                "            const g_t *const coordinate_components[ND] = {%s};"
+                "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+                "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
+                "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+                "      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+                "      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+                "      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
+                "      const g_t *const coordinate_components[ND] = {%s};"
                 % ", ".join(_component_name(d) for d in range(dim)),
             ]
         )
         if uses_current:
             lines.append(
-                "            const s_t *const u_components[NC] = {%s};"
+                "      const s_t *const u_components[NC] = {%s};"
                 % ", ".join("u%s" % _component_name(d) for d in range(n_field_components))
             )
         lines.extend(
             [
-                "            for (int d = 0; d < ND; ++d) {",
-                "                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
-                "                const g_t *const RSTR coordinate_component = coordinate_components[d];",
+                "      for (int d = 0; d < ND; ++d) {",
+                "        s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
+                "        const g_t *const RSTR coordinate_component = coordinate_components[d];",
             ]
         )
         if uses_current:
             lines.extend(
                 [
-                    "                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;",
-                    "                const s_t *const RSTR u_component = u_components[d];",
+                    "        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;",
+                    "        const s_t *const RSTR u_component = u_components[d];",
                 ]
             )
         lines.extend(
             [
-                "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                "                    const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                    pk_coordinate[k] = s_t(coordinate_component[node]);",
+                "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "          const idx_t node = owned_nodes_ptr[pack] + k;",
+                "          pk_coordinate[k] = s_t(coordinate_component[node]);",
             ]
         )
         if uses_current:
-            lines.append("                    pk_u_component[k] = u_component[node * u_stride];")
+            lines.append("          pk_u_component[k] = u_component[node * u_stride];")
         lines.extend(
             [
-                "                }",
-                "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                    const idx_t node = ghosts[k];",
-                "                    pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);",
+                "        }",
+                "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "          const idx_t node = ghosts[k];",
+                "          pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);",
             ]
         )
         if uses_current:
-            lines.append("                    pk_u_component[n_contiguous + k] = u_component[node * u_stride];")
+            lines.append("          pk_u_component[n_contiguous + k] = u_component[node * u_stride];")
         lines.extend(
             [
-                "                }",
-                "            }",
+                "        }",
+                "      }",
                 "",
-                "            for (ptrdiff_t element = e_start; element < e_end; ++element) {",
-                "                s_t element_matrix[NDOFS * NDOFS];",
-                "                s_t bh_data[NS * NC][VS];",
-                "                s_t bout_data[NS * NC][VS];",
-                "                s_t bcoordinate_data[NS * ND][VS];",
-                "                static constexpr int ne = VS;",
+                "      for (ptrdiff_t element = e_start; element < e_end; ++element) {",
+                "        s_t element_matrix[NDOFS * NDOFS];",
+                "        s_t bh_data[NS * NC][VS];",
+                "        s_t bout_data[NS * NC][VS];",
+                "        s_t bcoordinate_data[NS * ND][VS];",
+                "        static constexpr int ne = VS;",
             ]
         )
         if uses_current:
-            lines.append("                s_t bu_data[NS * NC][VS];")
+            lines.append("        s_t bu_data[NS * NC][VS];")
         for stream in _soa_array_stream_names(_adjugate_input(dim)):
-            lines.append("                s_t b%s[NQ * VS];" % stream)
-        lines.append("                s_t bdet0[NQ * VS];")
+            lines.append("        s_t b%s[NQ * VS];" % stream)
+        lines.append("        s_t bdet0[NQ * VS];")
         lines.append(
-            "                s_t *badj_streams[ND * ND] = {%s};"
+            "        s_t *badj_streams[ND * ND] = {%s};"
             % ", ".join("badj%d" % i for i in range(dim * dim))
         )
         if uses_current:
@@ -6847,7 +6847,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                     "bu_data",
                     dim,
                     stream_shape_order,
-                    "                ",
+                    "        ",
                 )
             )
         lines.extend(
@@ -6858,7 +6858,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                     "bh_data",
                     dim,
                     stream_shape_order,
-                    "                ",
+                    "        ",
                 ),
                 *_ordered_stream_pointer_array_lines(
                     "s_t *",
@@ -6866,22 +6866,22 @@ def _sfem_soa_hessian_packed_crs_passes(
                     "bout_data",
                     dim,
                     stream_shape_order,
-                    "                ",
+                    "        ",
                 ),
                 "",
-                "                for (int shape = 0; shape < NS; ++shape) {",
-                "                    const uint16_t packed_node = elements[shape][element];",
-                *([] if identity_stream_shape_order else ["                    const uint16_t coordinate_packed_node = coordinate_elements[shape][element];"]),
-                "                    for (int d = 0; d < ND; ++d) {",
-                "                        bcoordinate_data[shape * ND + d][0] = pk_coordinates[d * max_nodes_per_pack + %s];" % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node"),
+                "        for (int shape = 0; shape < NS; ++shape) {",
+                "          const uint16_t packed_node = elements[shape][element];",
+                *([] if identity_stream_shape_order else ["          const uint16_t coordinate_packed_node = coordinate_elements[shape][element];"]),
+                "          for (int d = 0; d < ND; ++d) {",
+                "            bcoordinate_data[shape * ND + d][0] = pk_coordinates[d * max_nodes_per_pack + %s];" % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node"),
             ]
         )
         if uses_current:
-            lines.append("                        bu_data[shape * NC + d][0] = pk_u[d * max_nodes_per_pack + packed_node];")
+            lines.append("            bu_data[shape * NC + d][0] = pk_u[d * max_nodes_per_pack + packed_node];")
         lines.extend(
             [
-                "                    }",
-                "                }",
+                "          }",
+                "        }",
                 "",
             ]
         )
@@ -6911,7 +6911,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 )
             )
         else:
-            lines.extend(["", "            for (int q = 0; q < NQ; ++q) {"])
+            lines.extend(["", "      for (int q = 0; q < NQ; ++q) {"])
             geometry_lines = _sfem_soa_isoparametric_geometry_lines(
                 dim,
                 n_nodes,
@@ -6924,8 +6924,8 @@ def _sfem_soa_hessian_packed_crs_passes(
                 source_builder=source_builder,
                 coordinate_streams=coordinate_streams_name,
             )
-            lines.extend("    %s" % line if line else line for line in geometry_lines)
-            lines.append("            }")
+            lines.extend("  %s" % line if line else line for line in geometry_lines)
+            lines.append("      }")
         packed_call_args = [
             "1",
             "1",
@@ -6966,45 +6966,45 @@ def _sfem_soa_hessian_packed_crs_passes(
                     tensor_weight_name,
                     scalar_weight_name,
                     reference_prefix,
-                    "            ",
+                    "      ",
                 )
             )
         else:
             lines.extend(
                 [
-                    "            for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
-                    "                element_matrix[entry] = s_t(0);",
-                    "            }",
+                    "      for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
+                    "        element_matrix[entry] = s_t(0);",
+                    "      }",
                     "",
-                    "            for (int trial_component = 0; trial_component < NC; ++trial_component) {",
-                    "                for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {",
-                    "                    for (int stream = 0; stream < NS * NC; ++stream) {",
-                    "                        bh_data[stream][0] = s_t(0);",
-                    "                        bout_data[stream][0] = s_t(0);",
-                    "                    }",
-                    "                    bh_data[trial_shape * NC + trial_component][0] = s_t(1);",
-                    "                    %s<s_t, NQ, NS, VS>(%s);"
+                    "      for (int trial_component = 0; trial_component < NC; ++trial_component) {",
+                    "        for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {",
+                    "          for (int stream = 0; stream < NS * NC; ++stream) {",
+                    "            bh_data[stream][0] = s_t(0);",
+                    "            bout_data[stream][0] = s_t(0);",
+                    "          }",
+                    "          bh_data[trial_shape * NC + trial_component][0] = s_t(1);",
+                    "          %s<s_t, NQ, NS, VS>(%s);"
                     % (block_name, ", ".join(packed_call_args)),
-                    "                    const int col = trial_component * NS + trial_shape;",
-                    "                    for (int test_component = 0; test_component < NC; ++test_component) {",
-                    "                        for (int test_shape = 0; test_shape < NS; ++test_shape) {",
-                    "                            const int row = test_component * NS + test_shape;",
-                    "                            element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];",
-                    "                        }",
-                    "                    }",
-                    "                }",
+                    "          const int col = trial_component * NS + trial_shape;",
+                    "          for (int test_component = 0; test_component < NC; ++test_component) {",
+                    "            for (int test_shape = 0; test_shape < NS; ++test_shape) {",
+                    "              const int row = test_component * NS + test_shape;",
+                    "              element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];",
                     "            }",
+                    "          }",
+                    "        }",
+                    "      }",
                 ]
             )
         lines.extend(
             [
                 "",
-                "            const count_t *const entries = &packed_element_entries[element * NDOFS * NDOFS];",
-                "            %s_scatter_packed_crs_entries(element_matrix, entries, values);" % function_base,
-                "            }",
-                "        }",
+                "      const count_t *const entries = &packed_element_entries[element * NDOFS * NDOFS];",
+                "      %s_scatter_packed_crs_entries(element_matrix, entries, values);" % function_base,
+                "      }",
                 "    }",
-                "    return SFEM_SUCCESS;",
+                "  }",
+                "  return SFEM_SUCCESS;",
                 "}",
                 "",
             ]
@@ -7046,34 +7046,34 @@ def _sfem_soa_hessian_direct_assembly(
                 tensor_weight_name,
                 scalar_weight_name,
                 reference_prefix,
-                "        ",
+                "    ",
             )
         )
     else:
         lines.extend(
             [
-                "        for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
-                "            element_matrix[entry] = s_t(0);",
-                "        }",
+                "    for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
+                "      element_matrix[entry] = s_t(0);",
+                "    }",
                 "",
-                "        for (int trial_component = 0; trial_component < NC; ++trial_component) {",
-                "            for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {",
-                "                for (int stream = 0; stream < NS * NC; ++stream) {",
-                "                    bh_data[stream][0] = s_t(0);",
-                "                    bout_data[stream][0] = s_t(0);",
-                "                }",
-                "                bh_data[trial_shape * NC + trial_component][0] = s_t(1);",
-                "                %s<s_t, NQ, NS, VS>(%s);"
-                % (block_name, ", ".join(call_args)),
-                "                const int col = trial_component * NS + trial_shape;",
-                "                for (int test_component = 0; test_component < NC; ++test_component) {",
-                "                    for (int test_shape = 0; test_shape < NS; ++test_shape) {",
-                "                        const int row = test_component * NS + test_shape;",
-                "                        element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];",
-                "                    }",
-                "                }",
-                "            }",
+                "    for (int trial_component = 0; trial_component < NC; ++trial_component) {",
+                "      for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {",
+                "        for (int stream = 0; stream < NS * NC; ++stream) {",
+                "          bh_data[stream][0] = s_t(0);",
+                "          bout_data[stream][0] = s_t(0);",
                 "        }",
+                "        bh_data[trial_shape * NC + trial_component][0] = s_t(1);",
+                "        %s<s_t, NQ, NS, VS>(%s);"
+                % (block_name, ", ".join(call_args)),
+                "        const int col = trial_component * NS + trial_shape;",
+                "        for (int test_component = 0; test_component < NC; ++test_component) {",
+                "          for (int test_shape = 0; test_shape < NS; ++test_shape) {",
+                "            const int row = test_component * NS + test_shape;",
+                "            element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];",
+                "          }",
+                "        }",
+                "      }",
+                "    }",
             ]
         )
 
@@ -7174,53 +7174,53 @@ def _sfem_soa_hessian_matrix_assembly_function(
         [
             "template <typename s_t, typename g_t, int FORMAT>",
             "static int %s(" % implementation_name,
-            "        const ptrdiff_t nelements,",
-            "        const ptrdiff_t nnodes,",
-            "        idx_t **const RSTR elements,",
-            "        const g_t *const *const RSTR points,",
+            "    const ptrdiff_t nelements,",
+            "    const ptrdiff_t nnodes,",
+            "    idx_t **const RSTR elements,",
+            "    const g_t *const *const RSTR points,",
         ]
     )
     lines.extend(
-        "        const s_t %s," % parameter
+        "    const s_t %s," % parameter
         for parameter in material_parameter_names
     )
     if uses_current:
-        lines.append("        const ptrdiff_t u_stride,")
+        lines.append("    const ptrdiff_t u_stride,")
         for d in range(dim):
             comma = "," if d + 1 < dim else ","
             lines.append(
-                "        const s_t *const RSTR u%s%s"
+                "    const s_t *const RSTR u%s%s"
                 % (_component_name(d), comma)
             )
     lines.extend(
         [
-            "        const count_t *const RSTR rowptr,",
-            "        const idx_t *const RSTR colidx,",
-            "        s_t *const RSTR values,",
-            "        const int *const RSTR diag_offsets,",
-            "        const ptrdiff_t ndiag,",
-            "        const ptrdiff_t coo_nnz,",
-            "        const idx_t *const RSTR coo_rows,",
-            "        const idx_t *const RSTR coo_cols,",
-            "        idx_t *const RSTR coo_triplet_rows,",
-            "        idx_t *const RSTR coo_triplet_cols) {",
-            "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-            "    static constexpr int NQ = %d;" % n_qp,
-            "    static constexpr int NS = %d;" % n_nodes,
-            "    static constexpr int VS = 1;",
-            "    static constexpr int NDOFS = NC * NS;",
-            "    (void)nnodes;",
+            "    const count_t *const RSTR rowptr,",
+            "    const idx_t *const RSTR colidx,",
+            "    s_t *const RSTR values,",
+            "    const int *const RSTR diag_offsets,",
+            "    const ptrdiff_t ndiag,",
+            "    const ptrdiff_t coo_nnz,",
+            "    const idx_t *const RSTR coo_rows,",
+            "    const idx_t *const RSTR coo_cols,",
+            "    idx_t *const RSTR coo_triplet_rows,",
+            "    idx_t *const RSTR coo_triplet_cols) {",
+            "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+            "  static constexpr int NQ = %d;" % n_qp,
+            "  static constexpr int NS = %d;" % n_nodes,
+            "  static constexpr int VS = 1;",
+            "  static constexpr int NDOFS = NC * NS;",
+            "  (void)nnodes;",
         ]
     )
     if uses_current:
         lines.append(
-            "    const s_t *const u_components[NC] = {%s};"
+            "  const s_t *const u_components[NC] = {%s};"
             % ", ".join("u%s" % _component_name(d) for d in range(n_field_components))
         )
     for d in range(dim):
         lines.append(
-            "    const g_t *const RSTR %s = points[%d];"
+            "  const g_t *const RSTR %s = points[%d];"
             % (_component_name(d), d)
         )
     lines.extend(
@@ -7229,7 +7229,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "coordinate_elements",
             "elements",
             stream_shape_order,
-            "    ",
+            "  ",
         )
     )
     lines.extend(
@@ -7246,24 +7246,24 @@ def _sfem_soa_hessian_matrix_assembly_function(
     lines.extend(
         [
             "",
-            "    int unsupported_matrix_format = 0;",
+            "  int unsupported_matrix_format = 0;",
             *source_builder.parallel_for_lines(reduction="|:unsupported_matrix_format"),
-            "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
-            "        idx_t ev[NS];",
-            "        s_t element_matrix[NDOFS * NDOFS];",
-            "        s_t bh_data[NS * NC][VS];",
-            "        s_t bout_data[NS * NC][VS];",
-            "        s_t bcoordinate_data[NS * ND][VS];",
-            "        static constexpr int ne = VS;",
+            "  for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            "    idx_t ev[NS];",
+            "    s_t element_matrix[NDOFS * NDOFS];",
+            "    s_t bh_data[NS * NC][VS];",
+            "    s_t bout_data[NS * NC][VS];",
+            "    s_t bcoordinate_data[NS * ND][VS];",
+            "    static constexpr int ne = VS;",
         ]
     )
     if uses_current:
-        lines.append("        s_t bu_data[NS * NC][VS];")
+        lines.append("    s_t bu_data[NS * NC][VS];")
     for stream in _soa_array_stream_names(_adjugate_input(dim)):
-        lines.append("        s_t b%s[NQ * VS];" % stream)
-    lines.append("        s_t bdet0[NQ * VS];")
+        lines.append("    s_t b%s[NQ * VS];" % stream)
+    lines.append("    s_t bdet0[NQ * VS];")
     lines.append(
-            "        s_t *badj_streams[ND * ND] = {%s};"
+            "    s_t *badj_streams[ND * ND] = {%s};"
             % ", ".join("badj%d" % i for i in range(dim * dim))
         )
     if uses_current:
@@ -7274,7 +7274,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 "bu_data",
                 dim,
                 stream_shape_order,
-                "        ",
+                "    ",
             )
         )
     lines.extend(
@@ -7285,7 +7285,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 "bh_data",
                 dim,
                 stream_shape_order,
-                "        ",
+                "    ",
             ),
             *_ordered_stream_pointer_array_lines(
                 "s_t *",
@@ -7293,23 +7293,23 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 "bout_data",
                 dim,
                 stream_shape_order,
-                "        ",
+                "    ",
             ),
             "",
-            "        for (int shape = 0; shape < NS; ++shape) {",
-            "            const idx_t node = elements[shape][element];",
-            *([] if identity_stream_shape_order else ["            const idx_t coordinate_node = coordinate_elements[shape][element];"]),
-            "            ev[shape] = node;",
-            "            for (int d = 0; d < ND; ++d) {",
-            "                bcoordinate_data[shape * ND + d][0] = s_t(points[d][%s]);" % ("node" if identity_stream_shape_order else "coordinate_node"),
+            "    for (int shape = 0; shape < NS; ++shape) {",
+            "      const idx_t node = elements[shape][element];",
+            *([] if identity_stream_shape_order else ["      const idx_t coordinate_node = coordinate_elements[shape][element];"]),
+            "      ev[shape] = node;",
+            "      for (int d = 0; d < ND; ++d) {",
+            "        bcoordinate_data[shape * ND + d][0] = s_t(points[d][%s]);" % ("node" if identity_stream_shape_order else "coordinate_node"),
         ]
     )
     if uses_current:
-        lines.append("                bu_data[shape * NC + d][0] = u_components[d][node * u_stride];")
+        lines.append("        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];")
     lines.extend(
         [
-            "            }",
-            "        }",
+            "      }",
+            "    }",
             "",
         ]
     )
@@ -7339,7 +7339,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
             )
         )
     else:
-        lines.extend(["", "        for (int q = 0; q < NQ; ++q) {"])
+        lines.extend(["", "    for (int q = 0; q < NQ; ++q) {"])
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
                 dim,
@@ -7354,7 +7354,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 coordinate_streams=coordinate_streams_name,
             )
         )
-        lines.append("        }")
+        lines.append("    }")
 
     call_args = [
         "1",
@@ -7401,12 +7401,12 @@ def _sfem_soa_hessian_matrix_assembly_function(
         use_tensor_product_reference,
     )
     lines.append("")
-    lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "        "))
+    lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "    "))
     lines.extend(
         [
-            "    }",
+            "  }",
             "",
-            "    return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;",
+            "  return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;",
             "}",
             "",
         ]
@@ -7532,7 +7532,7 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
             continue
         keyword = "if" if first else "} else if"
         lines.append("%s%s constexpr (FORMAT == %d) {" % (indent, keyword, format_id))
-        lines.append("%s    %s" % (indent, statement))
+        lines.append("%s  %s" % (indent, statement))
         first = False
     if first:
         lines.append("%sunsupported_matrix_format |= 1;" % indent)
@@ -7540,7 +7540,7 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
     lines.extend(
         [
             "%s} else {" % indent,
-            "%s    unsupported_matrix_format |= 1;" % indent,
+            "%s  unsupported_matrix_format |= 1;" % indent,
             "%s}" % indent,
         ]
     )
@@ -7591,7 +7591,7 @@ def _ordered_stream_pointer_array_lines(pointer_type, array_name, storage_name, 
         lines.extend(
             [
                 "%sfor (int stream = 0; stream < NS * NC; ++stream) {" % indent,
-                "%s    %s[stream] = %s[stream];" % (indent, array_name, storage_name),
+                "%s  %s[stream] = %s[stream];" % (indent, array_name, storage_name),
                 "%s}" % indent,
             ]
         )
@@ -7622,29 +7622,29 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_fiel
     if "bsr" in formats or "crs" in formats or "patch" in formats:
         find_cols_lines = [
             "static SFEM_INLINE void %s_find_cols(" % function_base,
-            "        const idx_t *const RSTR targets,",
-            "        const idx_t *const RSTR row,",
-            "        const int lenrow,",
-            "        idx_t *const RSTR ks) {",
+            "    const idx_t *const RSTR targets,",
+            "    const idx_t *const RSTR row,",
+            "    const int lenrow,",
+            "    idx_t *const RSTR ks) {",
         ]
         if n_nodes <= 10:
             find_cols_lines.append("#pragma unroll(%d)" % n_nodes)
         find_cols_lines.extend(
             [
-                "    for (int d = 0; d < %d; ++d) {" % n_nodes,
-                "        ks[d] = 0;",
-                "    }",
-                "    for (int k = 0; k < lenrow; ++k) {",
+                "  for (int d = 0; d < %d; ++d) {" % n_nodes,
+                "    ks[d] = 0;",
+                "  }",
+                "  for (int k = 0; k < lenrow; ++k) {",
             ]
         )
         if n_nodes <= 10:
             find_cols_lines.append("#pragma unroll(%d)" % n_nodes)
         find_cols_lines.extend(
             [
-                "        for (int d = 0; d < %d; ++d) {" % n_nodes,
-                "            ks[d] += row[k] < targets[d];",
-                "        }",
+                "    for (int d = 0; d < %d; ++d) {" % n_nodes,
+                "      ks[d] += row[k] < targets[d];",
                 "    }",
+                "  }",
                 "}",
                 "",
             ]
@@ -7865,43 +7865,43 @@ def _sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes, n_field_com
     return [
         "template <typename s_t>",
         "static SFEM_INLINE void %s_scatter_crs(" % function_base,
-        "        const idx_t *const RSTR ev,",
-        "        const s_t *const RSTR element_matrix,",
-        "        const count_t *const RSTR rowptr,",
-        "        const idx_t *const RSTR colidx,",
-        "        s_t *const RSTR values) {",
-        "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-        "    static constexpr int NS = %d;" % n_nodes,
-        "    count_t row_begin[NS];",
-        "    int lenrow[NS];",
-        "    int local_col[NS * NS];",
-        "    idx_t ks[NS];",
-        "    for (int i = 0; i < NS; ++i) {",
-        "        row_begin[i] = rowptr[ev[i]];",
-        "        lenrow[i] = (int)(rowptr[ev[i] + 1] - row_begin[i]);",
-        "        const idx_t *const RSTR cols = &colidx[row_begin[i]];",
-        "        %s_find_cols(ev, cols, lenrow[i], ks);" % function_base,
-        "        for (int j = 0; j < NS; ++j) {",
-        "            local_col[i * NS + j] = (int)ks[j];",
-        "        }",
+        "    const idx_t *const RSTR ev,",
+        "    const s_t *const RSTR element_matrix,",
+        "    const count_t *const RSTR rowptr,",
+        "    const idx_t *const RSTR colidx,",
+        "    s_t *const RSTR values) {",
+        "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+        "  static constexpr int NS = %d;" % n_nodes,
+        "  count_t row_begin[NS];",
+        "  int lenrow[NS];",
+        "  int local_col[NS * NS];",
+        "  idx_t ks[NS];",
+        "  for (int i = 0; i < NS; ++i) {",
+        "    row_begin[i] = rowptr[ev[i]];",
+        "    lenrow[i] = (int)(rowptr[ev[i] + 1] - row_begin[i]);",
+        "    const idx_t *const RSTR cols = &colidx[row_begin[i]];",
+        "    %s_find_cols(ev, cols, lenrow[i], ks);" % function_base,
+        "    for (int j = 0; j < NS; ++j) {",
+        "      local_col[i * NS + j] = (int)ks[j];",
         "    }",
-        "    for (int i = 0; i < NS; ++i) {",
-        "        const count_t rb = row_begin[i];",
-        "        const int lr = lenrow[i];",
-        "        for (int j = 0; j < NS; ++j) {",
-        "            const int lc = local_col[i * NS + j];",
-        "            for (int bi = 0; bi < NC; ++bi) {",
-        "                const int row = bi * NS + i;",
-        "                s_t *const row_values = &values[rb * NC * NC + bi * lr * NC];",
-        "                for (int bj = 0; bj < NC; ++bj) {",
-        "                    const int col = bj * NS + j;",
+        "  }",
+        "  for (int i = 0; i < NS; ++i) {",
+        "    const count_t rb = row_begin[i];",
+        "    const int lr = lenrow[i];",
+        "    for (int j = 0; j < NS; ++j) {",
+        "      const int lc = local_col[i * NS + j];",
+        "      for (int bi = 0; bi < NC; ++bi) {",
+        "        const int row = bi * NS + i;",
+        "        s_t *const row_values = &values[rb * NC * NC + bi * lr * NC];",
+        "        for (int bj = 0; bj < NC; ++bj) {",
+        "          const int col = bj * NS + j;",
         "#pragma omp atomic update",
-        "                    row_values[lc * NC + bj] += element_matrix[row * (NC * NS) + col];",
-        "                }",
-        "            }",
+        "          row_values[lc * NC + bj] += element_matrix[row * (NC * NS) + col];",
         "        }",
+        "      }",
         "    }",
+        "  }",
         "}",
         "",
     ]
@@ -7911,60 +7911,60 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes, n_fie
     n_field_components = dim if n_field_components is None else n_field_components
     return [
         "static SFEM_INLINE idx_t %s_packed_global_node(" % function_base,
-        "        const uint16_t packed_node,",
-        "        const ptrdiff_t pack,",
-        "        const ptrdiff_t *const RSTR owned_nodes_ptr,",
-        "        const ptrdiff_t *const RSTR ghost_ptr,",
-        "        const idx_t *const RSTR ghost_idx) {",
-        "    const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
-        "    return packed_node < n_contiguous ? idx_t(owned_nodes_ptr[pack] + packed_node) : ghost_idx[ghost_ptr[pack] + packed_node - n_contiguous];",
+        "    const uint16_t packed_node,",
+        "    const ptrdiff_t pack,",
+        "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
+        "    const ptrdiff_t *const RSTR ghost_ptr,",
+        "    const idx_t *const RSTR ghost_idx) {",
+        "  const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+        "  return packed_node < n_contiguous ? idx_t(owned_nodes_ptr[pack] + packed_node) : ghost_idx[ghost_ptr[pack] + packed_node - n_contiguous];",
         "}",
         "",
         "template <typename s_t>",
         "static SFEM_INLINE void %s_discover_packed_crs_entries(" % function_base,
-        "        const idx_t *const RSTR ev,",
-        "        const count_t *const RSTR rowptr,",
-        "        const idx_t *const RSTR colidx,",
-        "        count_t *const RSTR entries) {",
-        "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-        "    static constexpr int NS = %d;" % n_nodes,
-        "    static constexpr int NDOFS = NC * NS;",
-        "    idx_t ks[NS];",
-        "    for (int i = 0; i < NS; ++i) {",
-        "        const count_t row_begin = rowptr[ev[i]];",
-        "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
-        "        const idx_t *const RSTR cols = &colidx[row_begin];",
-        "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
-        "        for (int j = 0; j < NS; ++j) {",
-        "            const int local_col = (int)ks[j];",
-        "            for (int bi = 0; bi < NC; ++bi) {",
-        "                const count_t row_value_offset = row_begin * NC * NC + bi * lenrow * NC;",
-        "                for (int bj = 0; bj < NC; ++bj) {",
-        "                    const int row = bi * NS + i;",
-        "                    const int col = bj * NS + j;",
-        "                    entries[row * NDOFS + col] = row_value_offset + local_col * NC + bj;",
-        "                }",
-        "            }",
+        "    const idx_t *const RSTR ev,",
+        "    const count_t *const RSTR rowptr,",
+        "    const idx_t *const RSTR colidx,",
+        "    count_t *const RSTR entries) {",
+        "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+        "  static constexpr int NS = %d;" % n_nodes,
+        "  static constexpr int NDOFS = NC * NS;",
+        "  idx_t ks[NS];",
+        "  for (int i = 0; i < NS; ++i) {",
+        "    const count_t row_begin = rowptr[ev[i]];",
+        "    const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
+        "    const idx_t *const RSTR cols = &colidx[row_begin];",
+        "    %s_find_cols(ev, cols, lenrow, ks);" % function_base,
+        "    for (int j = 0; j < NS; ++j) {",
+        "      const int local_col = (int)ks[j];",
+        "      for (int bi = 0; bi < NC; ++bi) {",
+        "        const count_t row_value_offset = row_begin * NC * NC + bi * lenrow * NC;",
+        "        for (int bj = 0; bj < NC; ++bj) {",
+        "          const int row = bi * NS + i;",
+        "          const int col = bj * NS + j;",
+        "          entries[row * NDOFS + col] = row_value_offset + local_col * NC + bj;",
         "        }",
+        "      }",
         "    }",
+        "  }",
         "}",
         "",
         "template <typename s_t>",
         "static SFEM_INLINE void %s_scatter_packed_crs_entries(" % function_base,
-        "        const s_t *const RSTR element_matrix,",
-        "        const count_t *const RSTR entries,",
-        "        s_t *const RSTR values) {",
-        "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-        "    static constexpr int NS = %d;" % n_nodes,
-        "    static constexpr int NDOFS = NC * NS;",
-        "    for (int row = 0; row < NDOFS; ++row) {",
-        "        for (int col = 0; col < NDOFS; ++col) {",
+        "    const s_t *const RSTR element_matrix,",
+        "    const count_t *const RSTR entries,",
+        "    s_t *const RSTR values) {",
+        "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+        "  static constexpr int NS = %d;" % n_nodes,
+        "  static constexpr int NDOFS = NC * NS;",
+        "  for (int row = 0; row < NDOFS; ++row) {",
+        "    for (int col = 0; col < NDOFS; ++col) {",
         "#pragma omp atomic update",
-        "            values[entries[row * NDOFS + col]] += element_matrix[row * NDOFS + col];",
-        "        }",
+        "      values[entries[row * NDOFS + col]] += element_matrix[row * NDOFS + col];",
         "    }",
+        "  }",
         "}",
         "",
     ]
@@ -8156,16 +8156,16 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
         lines.append(") {")
         if two_pass:
             lines.append(
-                "    const int graph_status = sfem::codegen::%s_packed_discover_impl<%s, geom_t>(%s);"
+                "  const int graph_status = sfem::codegen::%s_packed_discover_impl<%s, geom_t>(%s);"
                 % (
                     function_base,
                     scalar_type,
                     ", ".join(common_args + ["rowptr", "colidx", "packed_element_entries"]),
                 )
             )
-            lines.append("    if (graph_status != SFEM_SUCCESS) return graph_status;")
+            lines.append("  if (graph_status != SFEM_SUCCESS) return graph_status;")
         lines.append(
-            "    return sfem::codegen::%s_packed_fill_impl<%s, geom_t>(%s);"
+            "  return sfem::codegen::%s_packed_fill_impl<%s, geom_t>(%s);"
             % (function_base, scalar_type, ", ".join(fill_args))
         )
         lines.extend(["}", ""])
@@ -8196,7 +8196,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         lines.extend(parameter_list_lines(params))
         lines.append(") {")
         lines.append(
-            "    return sfem::codegen::%s<%s, geom_t, %d>(%s);"
+            "  return sfem::codegen::%s<%s, geom_t, %d>(%s);"
             % (
                 implementation_name,
                 scalar_type,
@@ -8514,206 +8514,206 @@ def _sfem_soa_diagnostics_header(
         "namespace codegen {",
         "",
         "struct %s {" % struct_name,
-        "    const char *kernel_name;",
-        "    const char *element_type;",
-        "    int dim;",
-        "    int n_qp;",
-        "    int n_shape;",
-        "    int vector_size;",
-        "    int quadrature_order;",
-        "    long add_instructions_%s;" % per_qp,
-        "    long mul_instructions_%s;" % per_qp,
-        "    long div_instructions_%s;" % per_qp,
-        "    long sqrt_instructions_%s;" % per_qp,
-        "    long pow_instructions_%s;" % per_qp,
-        "    long exp_instructions_%s;" % per_qp,
-        "    long log_instructions_%s;" % per_qp,
-        "    long trig_instructions_%s;" % per_qp,
-        "    long load_instructions_%s;" % per_qp,
-        "    long store_instructions_%s;" % per_qp,
-        "    long flops_%s;" % per_qp,
-        "    long affine_mesh_flops_per_element;",
-        "    long isoparametric_mesh_flops_per_element;",
-        "    long temporaries;",
-        "    long estimated_registers;",
-        "    int geometry_streams;",
-        "    int reference_scalars;",
-        "    int quadrature_weight_scalars;",
-        "    int material_scalars;",
-        "    int u_streams;",
-        "    int h_streams;",
-        "    int output_streams;",
-        "    int output_reads_per_element;",
-        "    int output_writes_per_element;",
-        "    double add_cpi;",
-        "    double mul_cpi;",
-        "    double div_cpi;",
-        "    double sqrt_cpi;",
-        "    double pow_cpi;",
-        "    double exp_cpi;",
-        "    double log_cpi;",
-        "    double trig_cpi;",
-        "    double load_cpi;",
-        "    double store_cpi;",
+        "  const char *kernel_name;",
+        "  const char *element_type;",
+        "  int dim;",
+        "  int n_qp;",
+        "  int n_shape;",
+        "  int vector_size;",
+        "  int quadrature_order;",
+        "  long add_instructions_%s;" % per_qp,
+        "  long mul_instructions_%s;" % per_qp,
+        "  long div_instructions_%s;" % per_qp,
+        "  long sqrt_instructions_%s;" % per_qp,
+        "  long pow_instructions_%s;" % per_qp,
+        "  long exp_instructions_%s;" % per_qp,
+        "  long log_instructions_%s;" % per_qp,
+        "  long trig_instructions_%s;" % per_qp,
+        "  long load_instructions_%s;" % per_qp,
+        "  long store_instructions_%s;" % per_qp,
+        "  long flops_%s;" % per_qp,
+        "  long affine_mesh_flops_per_element;",
+        "  long isoparametric_mesh_flops_per_element;",
+        "  long temporaries;",
+        "  long estimated_registers;",
+        "  int geometry_streams;",
+        "  int reference_scalars;",
+        "  int quadrature_weight_scalars;",
+        "  int material_scalars;",
+        "  int u_streams;",
+        "  int h_streams;",
+        "  int output_streams;",
+        "  int output_reads_per_element;",
+        "  int output_writes_per_element;",
+        "  double add_cpi;",
+        "  double mul_cpi;",
+        "  double div_cpi;",
+        "  double sqrt_cpi;",
+        "  double pow_cpi;",
+        "  double exp_cpi;",
+        "  double log_cpi;",
+        "  double trig_cpi;",
+        "  double load_cpi;",
+        "  double store_cpi;",
         "};",
         "",
         "static %s double %s_total_flops(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements) {",
-        "    const double n = nelements > 0 ? (double)nelements : 0.0;",
-        "    return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->isoparametric_mesh_flops_per_element);" % per_qp,
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements) {",
+        "  const double n = nelements > 0 ? (double)nelements : 0.0;",
+        "  return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->isoparametric_mesh_flops_per_element);" % per_qp,
         "}",
         "",
         "static %s double %s_total_flops_affine_mesh(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements) {",
-        "    const double n = nelements > 0 ? (double)nelements : 0.0;",
-        "    return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->affine_mesh_flops_per_element);" % per_qp,
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements) {",
+        "  const double n = nelements > 0 ? (double)nelements : 0.0;",
+        "  return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->affine_mesh_flops_per_element);" % per_qp,
         "}",
         "",
         "static %s double %s_total_flops_isoparametric_mesh(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements) {",
-        "    const double n = nelements > 0 ? (double)nelements : 0.0;",
-        "    return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->isoparametric_mesh_flops_per_element);" % per_qp,
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements) {",
+        "  const double n = nelements > 0 ? (double)nelements : 0.0;",
+        "  return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->isoparametric_mesh_flops_per_element);" % per_qp,
         "}",
         "",
         "static %s size_t %s_total_bytes(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    (void)accumulator_bytes;",
-        "    const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
-        "    const size_t geometry_bytes = n * (size_t)d->n_qp * (size_t)d->geometry_streams * scalar_bytes;",
-        "    const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
-        "    const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
-        "    const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
-        "    return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  (void)accumulator_bytes;",
+        "  const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
+        "  const size_t geometry_bytes = n * (size_t)d->n_qp * (size_t)d->geometry_streams * scalar_bytes;",
+        "  const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
+        "  const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
+        "  const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
+        "  return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
         "}",
         "",
         "static %s size_t %s_total_bytes_affine_mesh(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    (void)accumulator_bytes;",
-        "    const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
-        "    const size_t geometry_bytes = n * (size_t)(d->dim * d->dim + 1) * scalar_bytes;",
-        "    const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
-        "    const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
-        "    const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
-        "    return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  (void)accumulator_bytes;",
+        "  const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
+        "  const size_t geometry_bytes = n * (size_t)(d->dim * d->dim + 1) * scalar_bytes;",
+        "  const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
+        "  const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
+        "  const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
+        "  return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
         "}",
         "",
         "static %s size_t %s_total_bytes_isoparametric_mesh(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    (void)accumulator_bytes;",
-        "    const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
-        "    const size_t geometry_bytes = n * (size_t)d->dim * (size_t)d->n_shape * scalar_bytes;",
-        "    const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
-        "    const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
-        "    const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
-        "    return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  (void)accumulator_bytes;",
+        "  const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
+        "  const size_t geometry_bytes = n * (size_t)d->dim * (size_t)d->n_shape * scalar_bytes;",
+        "  const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
+        "  const size_t output_bytes = n * (size_t)(d->output_reads_per_element + d->output_writes_per_element) * real_bytes;",
+        "  const size_t reference_bytes = ((size_t)d->reference_scalars + (size_t)d->quadrature_weight_scalars + (size_t)d->material_scalars) * scalar_bytes;",
+        "  return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
         "}",
         "",
         "static %s double %s_arithmetic_intensity(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    const size_t bytes = %s_total_bytes(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
-        "    return bytes ? %s_total_flops(d, nelements) / (double)bytes : 0.0;" % struct_name,
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  const size_t bytes = %s_total_bytes(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
+        "  return bytes ? %s_total_flops(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
         "static %s double %s_arithmetic_intensity_affine_mesh(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    const size_t bytes = %s_total_bytes_affine_mesh(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
-        "    return bytes ? %s_total_flops_affine_mesh(d, nelements) / (double)bytes : 0.0;" % struct_name,
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  const size_t bytes = %s_total_bytes_affine_mesh(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
+        "  return bytes ? %s_total_flops_affine_mesh(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
         "static %s double %s_arithmetic_intensity_isoparametric_mesh(" % (inline_qualifier, struct_name),
-        "        const %s *const d," % struct_name,
-        "        const ptrdiff_t nelements,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    const size_t bytes = %s_total_bytes_isoparametric_mesh(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
-        "    return bytes ? %s_total_flops_isoparametric_mesh(d, nelements) / (double)bytes : 0.0;" % struct_name,
+        "    const %s *const d," % struct_name,
+        "    const ptrdiff_t nelements,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  const size_t bytes = %s_total_bytes_isoparametric_mesh(d, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % struct_name,
+        "  return bytes ? %s_total_flops_isoparametric_mesh(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
         "static %s void %s_print_rate_with_ai(" % (inline_qualifier, struct_name),
-        "        const char *const name,",
-        "        const %s *const d," % struct_name,
-        "        const double elapsed,",
-        "        const ptrdiff_t nelements,",
-        "        const ptrdiff_t ndofs,",
-        "        const double ai,",
-        "        const double total_flops) {",
-        "    const double element_rate = elapsed > 0.0 ? 1e-6 * (double)nelements / elapsed : 0.0;",
-        "    const double dof_rate = elapsed > 0.0 ? 1e-6 * (double)ndofs / elapsed : 0.0;",
-        "    const double gflops = elapsed > 0.0",
-        "            ? 1e-9 * total_flops / elapsed",
-        "            : 0.0;",
-        '    printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f\\n",',
+        "    const char *const name,",
+        "    const %s *const d," % struct_name,
+        "    const double elapsed,",
+        "    const ptrdiff_t nelements,",
+        "    const ptrdiff_t ndofs,",
+        "    const double ai,",
+        "    const double total_flops) {",
+        "  const double element_rate = elapsed > 0.0 ? 1e-6 * (double)nelements / elapsed : 0.0;",
+        "  const double dof_rate = elapsed > 0.0 ? 1e-6 * (double)ndofs / elapsed : 0.0;",
+        "  const double gflops = elapsed > 0.0",
+        "      ? 1e-9 * total_flops / elapsed",
+        "      : 0.0;",
+        '  printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f\\n",',
         "           name ? name : d->kernel_name,",
         "           elapsed, element_rate, dof_rate, ai, gflops);",
         "}",
         "",
         "static %s void %s_print_rate(" % (inline_qualifier, struct_name),
-        "        const char *const name,",
-        "        const %s *const d," % struct_name,
-        "        const double elapsed,",
-        "        const ptrdiff_t nelements,",
-        "        const ptrdiff_t ndofs,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    const double ai = %s_arithmetic_intensity(" % struct_name,
-        "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
-        "    const double total_flops = %s_total_flops(d, nelements);" % struct_name,
-        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
+        "    const char *const name,",
+        "    const %s *const d," % struct_name,
+        "    const double elapsed,",
+        "    const ptrdiff_t nelements,",
+        "    const ptrdiff_t ndofs,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  const double ai = %s_arithmetic_intensity(" % struct_name,
+        "      d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
+        "  const double total_flops = %s_total_flops(d, nelements);" % struct_name,
+        "  %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
         "}",
         "",
         "static %s void %s_print_rate_affine_mesh(" % (inline_qualifier, struct_name),
-        "        const char *const name,",
-        "        const %s *const d," % struct_name,
-        "        const double elapsed,",
-        "        const ptrdiff_t nelements,",
-        "        const ptrdiff_t ndofs,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    const double ai = %s_arithmetic_intensity_affine_mesh(" % struct_name,
-        "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
-        "    const double total_flops = %s_total_flops_affine_mesh(d, nelements);" % struct_name,
-        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
+        "    const char *const name,",
+        "    const %s *const d," % struct_name,
+        "    const double elapsed,",
+        "    const ptrdiff_t nelements,",
+        "    const ptrdiff_t ndofs,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  const double ai = %s_arithmetic_intensity_affine_mesh(" % struct_name,
+        "      d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
+        "  const double total_flops = %s_total_flops_affine_mesh(d, nelements);" % struct_name,
+        "  %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
         "}",
         "",
         "static %s void %s_print_rate_isoparametric_mesh(" % (inline_qualifier, struct_name),
-        "        const char *const name,",
-        "        const %s *const d," % struct_name,
-        "        const double elapsed,",
-        "        const ptrdiff_t nelements,",
-        "        const ptrdiff_t ndofs,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    const double ai = %s_arithmetic_intensity_isoparametric_mesh(" % struct_name,
-        "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
-        "    const double total_flops = %s_total_flops_isoparametric_mesh(d, nelements);" % struct_name,
-        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
+        "    const char *const name,",
+        "    const %s *const d," % struct_name,
+        "    const double elapsed,",
+        "    const ptrdiff_t nelements,",
+        "    const ptrdiff_t ndofs,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  const double ai = %s_arithmetic_intensity_isoparametric_mesh(" % struct_name,
+        "      d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
+        "  const double total_flops = %s_total_flops_isoparametric_mesh(d, nelements);" % struct_name,
+        "  %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
         "}",
         "",
         "} // namespace codegen",
@@ -8734,14 +8734,14 @@ def _sfem_soa_diagnostic_print_wrapper_lines(
     public_name = "%s%s_print_rate" % (function_name, suffix)
     return [
         'extern "C" void %s(' % public_name,
-        "        const double elapsed,",
-        "        const ptrdiff_t nelements,",
-        "        const ptrdiff_t ndofs) {",
-        "    sfem::codegen::%s(" % print_rate_helper,
-        '            "%s%s",' % (function_name, suffix),
-        "            &sfem::codegen::%s," % variable_name,
-        "            elapsed, nelements, ndofs,",
-        "            sizeof(%s), sizeof(%s), sizeof(%s));"
+        "    const double elapsed,",
+        "    const ptrdiff_t nelements,",
+        "    const ptrdiff_t ndofs) {",
+        "  sfem::codegen::%s(" % print_rate_helper,
+        '      "%s%s",' % (function_name, suffix),
+        "      &sfem::codegen::%s," % variable_name,
+        "      elapsed, nelements, ndofs,",
+        "      sizeof(%s), sizeof(%s), sizeof(%s));"
         % (scalar_type, scalar_type, scalar_type),
         "}",
     ]
@@ -8910,62 +8910,62 @@ def _sfem_soa_diagnostics_lines(
         "namespace codegen {",
         "",
         "static const %s %s = {" % (struct_name, variable_name),
-        '    "%s",' % public_name,
-        '    "%s",' % element_type,
-        "    %d," % dim,
-        "    %d," % n_qp,
-        "    %d," % n_nodes,
-        "    %d," % vector_size,
-        "    %d," % quadrature_order,
-        "    %d," % cost.adds,
-        "    %d," % cost.muls,
-        "    %d," % cost.divs,
-        "    %d," % cost.sqrts,
-        "    %d," % cost.pows,
-        "    %d," % cost.exps,
-        "    %d," % cost.logs,
-        "    %d," % cost.trigs,
-        "    %d," % cost.loads,
-        "    %d," % cost.stores,
-        "    %d," % cost.flops,
-        "    %d," % affine_extra_flops,
-        "    %d," % isoparametric_extra_flops,
-        "    %d," % cost.temporaries,
-        "    %d," % cost.estimated_registers,
-        "    %d," % geometry_streams,
-        "    %d," % reference_scalars,
-        "    %d," % quadrature_weight_scalars,
-        "    2,",
-        "    %d," % u_streams,
-        "    %d," % h_streams,
-        "    %d," % output_streams,
-        "    %d," % output_reads,
-        "    %d," % output_writes,
-        "    1.0,",
-        "    1.0,",
-        "    8.0,",
-        "    12.0,",
-        "    16.0,",
-        "    20.0,",
-        "    20.0,",
-        "    24.0,",
-        "    1.0,",
-        "    1.0",
+        '  "%s",' % public_name,
+        '  "%s",' % element_type,
+        "  %d," % dim,
+        "  %d," % n_qp,
+        "  %d," % n_nodes,
+        "  %d," % vector_size,
+        "  %d," % quadrature_order,
+        "  %d," % cost.adds,
+        "  %d," % cost.muls,
+        "  %d," % cost.divs,
+        "  %d," % cost.sqrts,
+        "  %d," % cost.pows,
+        "  %d," % cost.exps,
+        "  %d," % cost.logs,
+        "  %d," % cost.trigs,
+        "  %d," % cost.loads,
+        "  %d," % cost.stores,
+        "  %d," % cost.flops,
+        "  %d," % affine_extra_flops,
+        "  %d," % isoparametric_extra_flops,
+        "  %d," % cost.temporaries,
+        "  %d," % cost.estimated_registers,
+        "  %d," % geometry_streams,
+        "  %d," % reference_scalars,
+        "  %d," % quadrature_weight_scalars,
+        "  2,",
+        "  %d," % u_streams,
+        "  %d," % h_streams,
+        "  %d," % output_streams,
+        "  %d," % output_reads,
+        "  %d," % output_writes,
+        "  1.0,",
+        "  1.0,",
+        "  8.0,",
+        "  12.0,",
+        "  16.0,",
+        "  20.0,",
+        "  20.0,",
+        "  24.0,",
+        "  1.0,",
+        "  1.0",
         "};",
         "",
         "} // namespace codegen",
         "} // namespace sfem",
         "",
         'extern "C" const sfem::codegen::%s *%s_diagnostics(void) {' % (struct_name, public_name),
-        "    return &sfem::codegen::%s;" % variable_name,
+        "  return &sfem::codegen::%s;" % variable_name,
         "}",
         "",
         'extern "C" double %s_arithmetic_intensity(' % public_name,
-        "        const ptrdiff_t nelements,",
-        "        const size_t scalar_bytes,",
-        "        const size_t real_bytes,",
-        "        const size_t accumulator_bytes) {",
-        "    return sfem::codegen::%s_arithmetic_intensity(&sfem::codegen::%s, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % (struct_name, variable_name),
+        "    const ptrdiff_t nelements,",
+        "    const size_t scalar_bytes,",
+        "    const size_t real_bytes,",
+        "    const size_t accumulator_bytes) {",
+        "  return sfem::codegen::%s_arithmetic_intensity(&sfem::codegen::%s, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % (struct_name, variable_name),
         "}",
     ]
     function_names = [public_name]
@@ -9384,12 +9384,12 @@ def _sfem_soa_element_api_alias_function_lines(
     lines.extend(
         [
             ") {",
-            "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-            "    static constexpr int NS = %d;" % n_nodes,
-            "    static constexpr int NQ = %d;" % n_qp,
-            "    static constexpr int NDOFS = NC * NS;",
-            "    static constexpr int SHAPE_ORDER[NS] = {%s};" % ", ".join(str(i) for i in shape_order),
+            "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+            "  static constexpr int NS = %d;" % n_nodes,
+            "  static constexpr int NQ = %d;" % n_qp,
+            "  static constexpr int NDOFS = NC * NS;",
+            "  static constexpr int SHAPE_ORDER[NS] = {%s};" % ", ".join(str(i) for i in shape_order),
         ]
     )
     param_names = [_cpp_argument_name(param) for param in params]
@@ -9414,42 +9414,42 @@ def _sfem_soa_element_api_alias_function_lines(
             args.append("ordered_matrix_streams")
         else:
             args.append(name_)
-    lines.append("    return %s<s_t, VS>(%s);" % (target_name, ", ".join(args)))
+    lines.append("  return %s<s_t, VS>(%s);" % (target_name, ", ".join(args)))
     lines.append("}")
     return lines
 
 
 def _sfem_soa_element_api_alias_stream_lines(source_name, ordered_name, pointer_type, matrix):
-    lines = ["    %s%s[NDOFS%s];" % (pointer_type, ordered_name, " * NDOFS" if matrix else "")]
+    lines = ["  %s%s[NDOFS%s];" % (pointer_type, ordered_name, " * NDOFS" if matrix else "")]
     if matrix:
         lines.extend(
             [
-                "    for (int row_shape = 0; row_shape < NS; ++row_shape) {",
-                "        const int source_row_shape = SHAPE_ORDER[row_shape];",
-                "        for (int row_component = 0; row_component < NC; ++row_component) {",
-                "            const int row = row_shape * NC + row_component;",
-                "            const int source_row = source_row_shape * NC + row_component;",
-                "            for (int col_shape = 0; col_shape < NS; ++col_shape) {",
-                "                const int source_col_shape = SHAPE_ORDER[col_shape];",
-                "                for (int col_component = 0; col_component < NC; ++col_component) {",
-                "                    const int col = col_shape * NC + col_component;",
-                "                    const int source_col = source_col_shape * NC + col_component;",
-                "                    %s[row * NDOFS + col] = %s[source_row * NDOFS + source_col];" % (ordered_name, source_name),
-                "                }",
-                "            }",
+                "  for (int row_shape = 0; row_shape < NS; ++row_shape) {",
+                "    const int source_row_shape = SHAPE_ORDER[row_shape];",
+                "    for (int row_component = 0; row_component < NC; ++row_component) {",
+                "      const int row = row_shape * NC + row_component;",
+                "      const int source_row = source_row_shape * NC + row_component;",
+                "      for (int col_shape = 0; col_shape < NS; ++col_shape) {",
+                "        const int source_col_shape = SHAPE_ORDER[col_shape];",
+                "        for (int col_component = 0; col_component < NC; ++col_component) {",
+                "          const int col = col_shape * NC + col_component;",
+                "          const int source_col = source_col_shape * NC + col_component;",
+                "          %s[row * NDOFS + col] = %s[source_row * NDOFS + source_col];" % (ordered_name, source_name),
                 "        }",
+                "      }",
                 "    }",
+                "  }",
             ]
         )
     else:
         lines.extend(
             [
-                "    for (int shape = 0; shape < NS; ++shape) {",
-                "        const int source_shape = SHAPE_ORDER[shape];",
-                "        for (int component = 0; component < NC; ++component) {",
-                "            %s[shape * NC + component] = %s[source_shape * NC + component];" % (ordered_name, source_name),
-                "        }",
+                "  for (int shape = 0; shape < NS; ++shape) {",
+                "    const int source_shape = SHAPE_ORDER[shape];",
+                "    for (int component = 0; component < NC; ++component) {",
+                "      %s[shape * NC + component] = %s[source_shape * NC + component];" % (ordered_name, source_name),
                 "    }",
+                "  }",
             ]
         )
     return lines
@@ -9534,52 +9534,52 @@ def _sfem_soa_element_api_block_call(
 
 def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
     lines = [
-        "        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+        "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
     ]
     if _form_uses_current(form, default=True):
-        lines.append("        const s_t *bu_streams[NDOFS];")
-        lines.append("        for (int stream = 0; stream < NDOFS; ++stream) {")
-        lines.append("            bu_streams[stream] = u_streams[stream] + evb;")
-        lines.append("        }")
+        lines.append("    const s_t *bu_streams[NDOFS];")
+        lines.append("    for (int stream = 0; stream < NDOFS; ++stream) {")
+        lines.append("      bu_streams[stream] = u_streams[stream] + evb;")
+        lines.append("    }")
     if output_kind == "value":
-        lines.append("        s_t *const bvalue = values + evb;")
-        lines.append("        #pragma omp simd")
-        lines.append("        for (int lane = 0; lane < ne; ++lane) {")
-        lines.append("            bvalue[lane] = s_t(0);")
-        lines.append("        }")
+        lines.append("    s_t *const bvalue = values + evb;")
+        lines.append("    #pragma omp simd")
+        lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+        lines.append("      bvalue[lane] = s_t(0);")
+        lines.append("    }")
     elif output_kind == "vector":
-        lines.append("        s_t *bout_streams[NDOFS];")
-        lines.append("        for (int stream = 0; stream < NDOFS; ++stream) {")
-        lines.append("            bout_streams[stream] = out_streams[stream] + evb;")
-        lines.append("            #pragma omp simd")
-        lines.append("            for (int lane = 0; lane < ne; ++lane) {")
-        lines.append("                bout_streams[stream][lane] = s_t(0);")
-        lines.append("            }")
-        lines.append("        }")
+        lines.append("    s_t *bout_streams[NDOFS];")
+        lines.append("    for (int stream = 0; stream < NDOFS; ++stream) {")
+        lines.append("      bout_streams[stream] = out_streams[stream] + evb;")
+        lines.append("      #pragma omp simd")
+        lines.append("      for (int lane = 0; lane < ne; ++lane) {")
+        lines.append("        bout_streams[stream][lane] = s_t(0);")
+        lines.append("      }")
+        lines.append("    }")
     return lines
 
 
 def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
     lines = []
     for component in range(dim * dim):
-        lines.append("        s_t badj%d[NQ * VS];" % component)
-    lines.append("        s_t bdet0[NQ * VS];")
+        lines.append("    s_t badj%d[NQ * VS];" % component)
+    lines.append("    s_t bdet0[NQ * VS];")
     # The element API tiles are per element, so the scope the
     # element calls for can be printed here without the shared
     # local header disagreeing with itself about it.
     lines.extend(
-        quadrature_scope_lines(quadrature_rule.element_type, "        ")
+        quadrature_scope_lines(quadrature_rule.element_type, "    ")
     )
-    lines.append("            #pragma omp simd")
-    lines.append("            for (int lane = 0; lane < ne; ++lane) {")
+    lines.append("      #pragma omp simd")
+    lines.append("      for (int lane = 0; lane < ne; ++lane) {")
     for component in range(dim * dim):
         lines.append(
-            "                badj%d[q * VS + lane] = adj[%d][q * nelements + evb + lane];"
+            "        badj%d[q * VS + lane] = adj[%d][q * nelements + evb + lane];"
             % (component, component)
         )
-    lines.append("                bdet0[q * VS + lane] = det[q * nelements + evb + lane];")
-    lines.append("            }")
-    lines.append("        }")
+    lines.append("        bdet0[q * VS + lane] = det[q * nelements + evb + lane];")
+    lines.append("      }")
+    lines.append("    }")
     return lines
 
 
@@ -9594,26 +9594,26 @@ def _sfem_soa_element_api_coords_tile_lines(
     source_builder,
 ):
     lines = [
-        "        s_t bcoordinate_data[NDOFS][VS];",
-        "        for (int stream = 0; stream < NDOFS; ++stream) {",
-        "            #pragma omp simd",
-        "            for (int lane = 0; lane < ne; ++lane) {",
-        "                bcoordinate_data[stream][lane] = coords[stream][evb + lane];",
-        "            }",
-        "        }",
+        "    s_t bcoordinate_data[NDOFS][VS];",
+        "    for (int stream = 0; stream < NDOFS; ++stream) {",
+        "      #pragma omp simd",
+        "      for (int lane = 0; lane < ne; ++lane) {",
+        "        bcoordinate_data[stream][lane] = coords[stream][evb + lane];",
+        "      }",
+        "    }",
     ]
     for component in range(dim * dim):
-        lines.append("        s_t badj%d[NQ * VS];" % component)
-    lines.append("        s_t bdet0[NQ * VS];")
+        lines.append("    s_t badj%d[NQ * VS];" % component)
+    lines.append("    s_t bdet0[NQ * VS];")
     if use_tensor_product_reference:
         lines.extend(
             [
-                "        s_t coordinate_grad_ref[ND * NQ * ND * VS];",
+                "    s_t coordinate_grad_ref[ND * NQ * ND * VS];",
             ]
         )
         for d in range(dim):
             lines.append(
-                "        tensor_gradient_contiguous<s_t, NQ, NS, VS, %d>(ne, %s, %s, bcoordinate_data, %d, coordinate_grad_ref + %d * NQ * ND * VS);"
+                "    tensor_gradient_contiguous<s_t, NQ, NS, VS, %d>(ne, %s, %s, bcoordinate_data, %d, coordinate_grad_ref + %d * NQ * ND * VS);"
                 % (
                     dim,
                     quadrature_reference_accessor(prefix, "isoparametric", "shape_1d"),
@@ -9623,18 +9623,18 @@ def _sfem_soa_element_api_coords_tile_lines(
                 )
             )
         lines.append(
-            "        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {%s};"
+            "    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {%s};"
             % ", ".join("badj%d" % component for component in range(dim * dim))
         )
         lines.append(
-            "        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
+            "    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
         )
         return lines
     if use_reference_gradient_vectors:
         for component in range(dim):
             reference_name = _sfem_reference_gradient_vector_name(component)
             lines.append(
-                "        const s_t *const %s = %s;"
+                "    const s_t *const %s = %s;"
                 % (
                     reference_name,
                     quadrature_reference_accessor(prefix, "isoparametric", reference_name),
@@ -9642,14 +9642,14 @@ def _sfem_soa_element_api_coords_tile_lines(
             )
     else:
         lines.append(
-            "        const s_t *const grad_ref = %s;"
+            "    const s_t *const grad_ref = %s;"
             % quadrature_reference_accessor(prefix, "isoparametric", "grad_ref")
         )
     # The element API tiles are per element, so the scope the
     # element calls for can be printed here without the shared
     # local header disagreeing with itself about it.
     lines.extend(
-        quadrature_scope_lines(quadrature_rule.element_type, "        ")
+        quadrature_scope_lines(quadrature_rule.element_type, "    ")
     )
     lines.extend(
         _sfem_soa_isoparametric_geometry_lines(
@@ -9664,7 +9664,7 @@ def _sfem_soa_element_api_coords_tile_lines(
             coordinate_streams="bcoordinate_data",
         )
     )
-    lines.append("        }")
+    lines.append("    }")
     return lines
 
 
@@ -9702,13 +9702,13 @@ def _sfem_soa_element_api_operation_lines(
         lines.extend(
             [
                 ") {",
-                "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-                "    static constexpr int NS = %d;" % n_nodes,
-                "    static constexpr int NQ = %d;" % n_qp,
-                "    static constexpr int NDOFS = NC * NS;",
-                "    if (nelements <= 0) return SFEM_SUCCESS;",
-                "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
+                "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+                "  static constexpr int NS = %d;" % n_nodes,
+                "  static constexpr int NQ = %d;" % n_qp,
+                "  static constexpr int NDOFS = NC * NS;",
+                "  if (nelements <= 0) return SFEM_SUCCESS;",
+                "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
             ]
         )
         lines.extend(_sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind))
@@ -9728,7 +9728,7 @@ def _sfem_soa_element_api_operation_lines(
         else:
             lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule))
         lines.append(
-            "        %s"
+            "    %s"
             % _sfem_soa_element_api_block_call(
                 form,
                 local_prefix,
@@ -9742,7 +9742,7 @@ def _sfem_soa_element_api_operation_lines(
                 use_shared_weak_local,
             )
         )
-        lines.extend(["    }", "    return SFEM_SUCCESS;", "}", ""])
+        lines.extend(["  }", "  return SFEM_SUCCESS;", "}", ""])
     return lines
 
 
@@ -9777,19 +9777,19 @@ def _sfem_soa_element_api_hessian_lines(
         lines.extend(
             [
                 ") {",
-                "    static constexpr int NC = %d;" % n_field_components,
-                "    static constexpr int ND = %d;" % dim,
-                "    static constexpr int NS = %d;" % n_nodes,
-                "    static constexpr int NQ = %d;" % n_qp,
-                "    static constexpr int NDOFS = NC * NS;",
-                "    if (nelements <= 0) return SFEM_SUCCESS;",
-                "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-                "        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+                "  static constexpr int NC = %d;" % n_field_components,
+                "  static constexpr int ND = %d;" % dim,
+                "  static constexpr int NS = %d;" % n_nodes,
+                "  static constexpr int NQ = %d;" % n_qp,
+                "  static constexpr int NDOFS = NC * NS;",
+                "  if (nelements <= 0) return SFEM_SUCCESS;",
+                "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
+                "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
             ]
         )
         if _form_uses_current(form, default=True):
-            lines.append("        const s_t *bu_streams[NDOFS];")
-            lines.append("        for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;")
+            lines.append("    const s_t *bu_streams[NDOFS];")
+            lines.append("    for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;")
         if include_coords:
             lines.extend(
                 _sfem_soa_element_api_coords_tile_lines(
@@ -9807,23 +9807,23 @@ def _sfem_soa_element_api_hessian_lines(
             lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule))
         lines.extend(
             [
-                "        s_t bh_data[NDOFS][VS];",
-                "        s_t bout_data[NDOFS][VS];",
-                "        const s_t *bh_streams[NDOFS];",
-                "        s_t *bout_streams[NDOFS];",
-                "        for (int stream = 0; stream < NDOFS; ++stream) {",
-                "            bh_streams[stream] = bh_data[stream];",
-                "            bout_streams[stream] = bout_data[stream];",
+                "    s_t bh_data[NDOFS][VS];",
+                "    s_t bout_data[NDOFS][VS];",
+                "    const s_t *bh_streams[NDOFS];",
+                "    s_t *bout_streams[NDOFS];",
+                "    for (int stream = 0; stream < NDOFS; ++stream) {",
+                "      bh_streams[stream] = bh_data[stream];",
+                "      bout_streams[stream] = bout_data[stream];",
+                "    }",
+                "    for (int col = 0; col < NDOFS; ++col) {",
+                "      for (int stream = 0; stream < NDOFS; ++stream) {",
+                "        #pragma omp simd",
+                "        for (int lane = 0; lane < ne; ++lane) {",
+                "          bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);",
+                "          bout_data[stream][lane] = s_t(0);",
                 "        }",
-                "        for (int col = 0; col < NDOFS; ++col) {",
-                "            for (int stream = 0; stream < NDOFS; ++stream) {",
-                "                #pragma omp simd",
-                "                for (int lane = 0; lane < ne; ++lane) {",
-                "                    bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);",
-                "                    bout_data[stream][lane] = s_t(0);",
-                "                }",
-                "            }",
-                "            %s" % _sfem_soa_element_api_block_call(
+                "      }",
+                "      %s" % _sfem_soa_element_api_block_call(
                     form,
                     local_prefix,
                     dim,
@@ -9835,16 +9835,16 @@ def _sfem_soa_element_api_hessian_lines(
                     "bout_streams",
                     use_shared_weak_local,
                 ),
-                "            for (int row = 0; row < NDOFS; ++row) {",
-                "                s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;",
-                "                #pragma omp simd",
-                "                for (int lane = 0; lane < ne; ++lane) {",
-                "                    matrix_stream[lane] = bout_data[row][lane];",
-                "                }",
-                "            }",
+                "      for (int row = 0; row < NDOFS; ++row) {",
+                "        s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;",
+                "        #pragma omp simd",
+                "        for (int lane = 0; lane < ne; ++lane) {",
+                "          matrix_stream[lane] = bout_data[row][lane];",
                 "        }",
+                "      }",
                 "    }",
-                "    return SFEM_SUCCESS;",
+                "  }",
+                "  return SFEM_SUCCESS;",
                 "}",
                 "",
             ]
@@ -9865,7 +9865,7 @@ def _sfem_soa_mesh_reference_alias_lines(
     reference_prefix = "%s_" % geometry_mode
     if not emit_reference_basis:
         lines.append(
-            "    const s_t *const %sq_weight = %s;"
+            "  const s_t *const %sq_weight = %s;"
             % (
                 reference_prefix,
                 quadrature_reference_accessor(prefix, geometry_mode, "q_weight"),
@@ -9875,7 +9875,7 @@ def _sfem_soa_mesh_reference_alias_lines(
     if use_tensor_product_reference:
         for name in ("shape_1d", "grad_1d", "q_weight_1d"):
             lines.append(
-                "    const s_t *const %s = %s;"
+                "  const s_t *const %s = %s;"
                 % (
                     "%s%s" % (reference_prefix, name),
                     quadrature_reference_accessor(prefix, geometry_mode, name),
@@ -9886,7 +9886,7 @@ def _sfem_soa_mesh_reference_alias_lines(
         for component in range(quadrature_rule.dim):
             reference_name = _sfem_reference_gradient_vector_name(component)
             lines.append(
-                "    const s_t *const %s%s = %s;"
+                "  const s_t *const %s%s = %s;"
                 % (
                     reference_prefix,
                     reference_name,
@@ -9894,7 +9894,7 @@ def _sfem_soa_mesh_reference_alias_lines(
                 )
             )
         lines.append(
-            "    const s_t *const %sq_weight = %s;"
+            "  const s_t *const %sq_weight = %s;"
             % (
                 reference_prefix,
                 quadrature_reference_accessor(prefix, geometry_mode, "q_weight"),
@@ -9905,7 +9905,7 @@ def _sfem_soa_mesh_reference_alias_lines(
         if array_input.name != "grad_ref":
             raise ValueError("mesh reference aliases require grad_ref")
         lines.append(
-            "    const s_t *const %s%s = %s;"
+            "  const s_t *const %s%s = %s;"
             % (
                 reference_prefix,
                 array_input.name,
@@ -9913,7 +9913,7 @@ def _sfem_soa_mesh_reference_alias_lines(
             )
         )
     lines.append(
-        "    const s_t *const %sq_weight = %s;"
+        "  const s_t *const %sq_weight = %s;"
         % (
             reference_prefix,
             quadrature_reference_accessor(prefix, geometry_mode, "q_weight"),

@@ -24,31 +24,31 @@ def matrix_formats_header_source():
 #include <cstdio>
 
 struct sfem_MatrixAssemblyDiagnostics {
-    const char *format;
-    const char *mesh_layout;
-    const char *packed_pass;
-    const char *mesh_access;
-    const char *assembly_kind;
-    const char *index_policy;
-    const char *value_layout;
-    const char *accumulation_policy;
-    const char *structural_compatibility;
-    const char *reduction_policy;
-    int node_index_filter;
-    int row_block_size;
-    int column_block_size;
-    int block_size;
-    int block_rows_per_element;
-    int block_columns_per_element;
-    int block_entries_per_element;
-    int compatible_block_size;
-    ptrdiff_t row_dofs_per_element;
-    ptrdiff_t column_dofs_per_element;
-    ptrdiff_t entries_per_element;
-    ptrdiff_t index_reads_per_element;
-    ptrdiff_t value_writes_per_element;
-    double flops_per_element;
-    size_t bytes_per_element;
+  const char *format;
+  const char *mesh_layout;
+  const char *packed_pass;
+  const char *mesh_access;
+  const char *assembly_kind;
+  const char *index_policy;
+  const char *value_layout;
+  const char *accumulation_policy;
+  const char *structural_compatibility;
+  const char *reduction_policy;
+  int node_index_filter;
+  int row_block_size;
+  int column_block_size;
+  int block_size;
+  int block_rows_per_element;
+  int block_columns_per_element;
+  int block_entries_per_element;
+  int compatible_block_size;
+  ptrdiff_t row_dofs_per_element;
+  ptrdiff_t column_dofs_per_element;
+  ptrdiff_t entries_per_element;
+  ptrdiff_t index_reads_per_element;
+  ptrdiff_t value_writes_per_element;
+  double flops_per_element;
+  size_t bytes_per_element;
 };
 
 namespace sfem {
@@ -57,46 +57,46 @@ namespace codegen {
 using MatrixAssemblyDiagnostics = ::sfem_MatrixAssemblyDiagnostics;
 
 static inline double MatrixAssemblyDiagnostics_total_flops(
-        const MatrixAssemblyDiagnostics *const d,
-        const ptrdiff_t nelements) {
-    return d->flops_per_element * double(nelements);
+    const MatrixAssemblyDiagnostics *const d,
+    const ptrdiff_t nelements) {
+  return d->flops_per_element * double(nelements);
 }
 
 static inline size_t MatrixAssemblyDiagnostics_total_bytes(
-        const MatrixAssemblyDiagnostics *const d,
-        const ptrdiff_t nelements) {
-    return size_t(nelements) * d->bytes_per_element;
+    const MatrixAssemblyDiagnostics *const d,
+    const ptrdiff_t nelements) {
+  return size_t(nelements) * d->bytes_per_element;
 }
 
 static inline double MatrixAssemblyDiagnostics_arithmetic_intensity(
-        const MatrixAssemblyDiagnostics *const d) {
-    return d->bytes_per_element == 0 ? 0.0 : d->flops_per_element / double(d->bytes_per_element);
+    const MatrixAssemblyDiagnostics *const d) {
+  return d->bytes_per_element == 0 ? 0.0 : d->flops_per_element / double(d->bytes_per_element);
 }
 
 static inline void MatrixAssemblyDiagnostics_print(
-        const char *const name,
-        const MatrixAssemblyDiagnostics *const d,
-        const ptrdiff_t nelements) {
-    std::printf(
-            "%s format=%s mesh=%s pass=%s access=%s layout=%s index=%s values=%s accum=%s compat=%s reduce=%s indexed=%d block=%d rows=%td cols=%td entries=%td bytes=%zu ai=%g\\n",
-            name,
-            d->format,
-            d->mesh_layout,
-            d->packed_pass,
-            d->mesh_access,
-            d->assembly_kind,
-            d->index_policy,
-            d->value_layout,
-            d->accumulation_policy,
-            d->structural_compatibility,
-            d->reduction_policy,
-            d->node_index_filter,
-            d->block_size,
-            d->row_dofs_per_element,
-            d->column_dofs_per_element,
-            d->entries_per_element,
-            MatrixAssemblyDiagnostics_total_bytes(d, nelements),
-            MatrixAssemblyDiagnostics_arithmetic_intensity(d));
+    const char *const name,
+    const MatrixAssemblyDiagnostics *const d,
+    const ptrdiff_t nelements) {
+  std::printf(
+      "%s format=%s mesh=%s pass=%s access=%s layout=%s index=%s values=%s accum=%s compat=%s reduce=%s indexed=%d block=%d rows=%td cols=%td entries=%td bytes=%zu ai=%g\\n",
+      name,
+      d->format,
+      d->mesh_layout,
+      d->packed_pass,
+      d->mesh_access,
+      d->assembly_kind,
+      d->index_policy,
+      d->value_layout,
+      d->accumulation_policy,
+      d->structural_compatibility,
+      d->reduction_policy,
+      d->node_index_filter,
+      d->block_size,
+      d->row_dofs_per_element,
+      d->column_dofs_per_element,
+      d->entries_per_element,
+      MatrixAssemblyDiagnostics_total_bytes(d, nelements),
+      MatrixAssemblyDiagnostics_arithmetic_intensity(d));
 }
 
 } // namespace codegen
@@ -130,45 +130,45 @@ def matrix_format_operator_source(operator_prefix, matrix_format_plan):
             % (operator_prefix, len(names)),
         ]
     )
-    lines.extend("    &%s," % name for name in names)
+    lines.extend("  &%s," % name for name in names)
     lines.extend(
         [
             "};",
             "",
             "int %s_matrix_assembly_variant_count() {" % operator_prefix,
-            "    return %d;" % len(names),
+            "  return %d;" % len(names),
             "}",
             "",
             "const MatrixAssemblyDiagnostics *%s_matrix_assembly_variant(const int variant) {"
             % operator_prefix,
-            "    return (variant >= 0 && variant < %d) ? %s_matrix_assembly_variants[variant] : nullptr;"
+            "  return (variant >= 0 && variant < %d) ? %s_matrix_assembly_variants[variant] : nullptr;"
             % (len(names), operator_prefix),
             "}",
             "",
             "void %s_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements) {"
             % operator_prefix,
-            "    const MatrixAssemblyDiagnostics *const d = %s_matrix_assembly_variant(variant);"
+            "  const MatrixAssemblyDiagnostics *const d = %s_matrix_assembly_variant(variant);"
             % operator_prefix,
-            "    if (d) {",
-            "        MatrixAssemblyDiagnostics_print(\"%s\", d, nelements);" % operator_prefix,
-            "    }",
+            "  if (d) {",
+            "    MatrixAssemblyDiagnostics_print(\"%s\", d, nelements);" % operator_prefix,
+            "  }",
             "}",
             "",
             "} // namespace codegen",
             "} // namespace sfem",
             "",
             'extern "C" int %s_matrix_assembly_variant_count() {' % operator_prefix,
-            "    return sfem::codegen::%s_matrix_assembly_variant_count();" % operator_prefix,
+            "  return sfem::codegen::%s_matrix_assembly_variant_count();" % operator_prefix,
             "}",
             "",
             'extern "C" const sfem_MatrixAssemblyDiagnostics *%s_matrix_assembly_variant(const int variant) {'
             % operator_prefix,
-            "    return sfem::codegen::%s_matrix_assembly_variant(variant);" % operator_prefix,
+            "  return sfem::codegen::%s_matrix_assembly_variant(variant);" % operator_prefix,
             "}",
             "",
             'extern "C" void %s_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements) {'
             % operator_prefix,
-            "    sfem::codegen::%s_matrix_assembly_print_variant(variant, nelements);" % operator_prefix,
+            "  sfem::codegen::%s_matrix_assembly_print_variant(variant, nelements);" % operator_prefix,
             "}",
             "",
         ]
@@ -180,31 +180,31 @@ def _variant_definition_lines(name, variant):
     layout = _diagnostics_layout_fields(variant)
     return [
         "static const MatrixAssemblyDiagnostics %s = {" % name,
-        '    "%s",' % variant.matrix_format.value,
-        '    "%s",' % variant.mesh_layout.value,
-        '    "%s",' % variant.packed_pass.value,
-        '    "%s",' % layout["mesh_access"],
-        '    "%s",' % layout["assembly_kind"],
-        '    "%s",' % layout["index_policy"],
-        '    "%s",' % layout["value_layout"],
-        '    "%s",' % layout["accumulation_policy"],
-        '    "%s",' % layout["structural_compatibility"],
-        '    "%s",' % layout["reduction_policy"],
-        "    %d," % int(variant.node_index_filter),
-        "    %d," % int(layout["row_block_size"]),
-        "    %d," % int(layout["column_block_size"]),
-        "    %d," % int(layout["block_size"]),
-        "    %d," % int(layout["block_rows_per_element"]),
-        "    %d," % int(layout["block_columns_per_element"]),
-        "    %d," % int(layout["block_entries_per_element"]),
-        "    %d," % int(layout["compatible_block_size"]),
-        "    %d," % int(variant.row_dofs_per_element),
-        "    %d," % int(variant.column_dofs_per_element),
-        "    %d," % int(variant.entries_per_element),
-        "    %d," % int(variant.index_reads_per_element),
-        "    %d," % int(variant.value_writes_per_element),
-        "    %.17g," % float(variant.expected_flops_per_element),
-        "    size_t(%d)," % int(variant.expected_bytes_per_element),
+        '  "%s",' % variant.matrix_format.value,
+        '  "%s",' % variant.mesh_layout.value,
+        '  "%s",' % variant.packed_pass.value,
+        '  "%s",' % layout["mesh_access"],
+        '  "%s",' % layout["assembly_kind"],
+        '  "%s",' % layout["index_policy"],
+        '  "%s",' % layout["value_layout"],
+        '  "%s",' % layout["accumulation_policy"],
+        '  "%s",' % layout["structural_compatibility"],
+        '  "%s",' % layout["reduction_policy"],
+        "  %d," % int(variant.node_index_filter),
+        "  %d," % int(layout["row_block_size"]),
+        "  %d," % int(layout["column_block_size"]),
+        "  %d," % int(layout["block_size"]),
+        "  %d," % int(layout["block_rows_per_element"]),
+        "  %d," % int(layout["block_columns_per_element"]),
+        "  %d," % int(layout["block_entries_per_element"]),
+        "  %d," % int(layout["compatible_block_size"]),
+        "  %d," % int(variant.row_dofs_per_element),
+        "  %d," % int(variant.column_dofs_per_element),
+        "  %d," % int(variant.entries_per_element),
+        "  %d," % int(variant.index_reads_per_element),
+        "  %d," % int(variant.value_writes_per_element),
+        "  %.17g," % float(variant.expected_flops_per_element),
+        "  size_t(%d)," % int(variant.expected_bytes_per_element),
         "};",
     ]
 

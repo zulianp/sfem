@@ -9,7 +9,7 @@
       "name": "neohookean_ogden_apply_2d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "neohookean_ogden_apply_2d_soa_diagnostics"
     },
     {
@@ -21,7 +21,7 @@
       "name": "neohookean_ogden_apply_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "neohookean_ogden_apply_3d_soa_diagnostics"
     },
     {
@@ -49,7 +49,7 @@
       "name": "neohookean_ogden_gradient_2d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "neohookean_ogden_gradient_2d_soa_diagnostics"
     },
     {
@@ -61,7 +61,7 @@
       "name": "neohookean_ogden_gradient_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "neohookean_ogden_gradient_3d_soa_diagnostics"
     },
     {
@@ -101,11 +101,11 @@
       "name": "neohookean_ogden_hex8_matrix_assembly_variant_count"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "neohookean_ogden_objective_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "neohookean_ogden_objective_3d_soa_diagnostics"
     },
     {

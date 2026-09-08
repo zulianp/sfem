@@ -104,10 +104,10 @@ extern "C" int two_phase_flow_form_1_p_c_jacobian_action_3d_isoparametric_mesh_s
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_1_p_c_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -295,10 +295,10 @@ extern "C" int two_phase_flow_form_1_p_c_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_1_p_w_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -371,10 +371,10 @@ extern "C" int two_phase_flow_form_1_p_w_jacobian_action_3d_isoparametric_mesh_s
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_1_p_w_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -554,10 +554,10 @@ extern "C" int two_phase_flow_form_1_p_w_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -745,10 +745,10 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_isoparametric_me
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -821,10 +821,10 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -1012,10 +1012,10 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_isoparametric_me
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -1088,10 +1088,10 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -1271,10 +1271,10 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_isoparametric_me
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -1347,10 +1347,10 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -1530,10 +1530,10 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_isoparametric_me
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -1606,10 +1606,10 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -1817,10 +1817,10 @@ extern "C" int two_phase_flow_jacobian_action_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int two_phase_flow_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -2028,7 +2028,7 @@ extern "C" int two_phase_flow_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);

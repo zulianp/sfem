@@ -79,7 +79,7 @@ extern "C" int neohookean_ogden_apply_2d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int neohookean_ogden_apply_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -137,7 +137,7 @@ extern "C" int neohookean_ogden_apply_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int neohookean_ogden_apply_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -328,7 +328,7 @@ extern "C" int neohookean_ogden_gradient_2d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int neohookean_ogden_gradient_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -378,7 +378,7 @@ extern "C" int neohookean_ogden_gradient_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int neohookean_ogden_gradient_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -556,10 +556,10 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_hex8_matrix_as
 extern "C" int neohookean_ogden_hex8_matrix_assembly_variant_count();
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int neohookean_ogden_objective_steps_2d_affine_mesh_soa(
         const smesh::ElemType element_type,

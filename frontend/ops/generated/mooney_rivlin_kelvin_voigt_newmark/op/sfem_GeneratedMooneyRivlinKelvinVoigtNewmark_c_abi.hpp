@@ -78,7 +78,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -136,7 +136,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_isoparametric
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -327,7 +327,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparamet
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -377,7 +377,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_isoparamet
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -514,10 +514,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pa
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_objective_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_objective_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_affine_mesh_soa(
         const smesh::ElemType element_type,

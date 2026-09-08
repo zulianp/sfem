@@ -362,7 +362,7 @@ def _registration_aggregate_header(function_name):
     return """#pragma once
 
 namespace sfem {
-    void %(function)s();
+  void %(function)s();
 }  // namespace sfem
 """ % {
         "function": function_name,
@@ -370,8 +370,8 @@ namespace sfem {
 
 
 def _registration_aggregate_source(header_name, function_name, entries):
-    declarations = "\n".join("    void %s();" % function for _, function in entries)
-    calls = "\n".join("        %s();" % function for _, function in entries)
+    declarations = "\n".join("  void %s();" % function for _, function in entries)
+    calls = "\n".join("    %s();" % function for _, function in entries)
     if declarations:
         declarations += "\n"
     if calls:
@@ -380,7 +380,7 @@ def _registration_aggregate_source(header_name, function_name, entries):
 
 namespace sfem {
 %(declarations)s
-    void %(function)s() {
+  void %(function)s() {
 %(calls)s    }
 }  // namespace sfem
 """ % {
@@ -443,9 +443,9 @@ def _inexact_declarations(material):
     if not getattr(material, "inexact_apply", False):
         return ""
     return """
-        bool inexact_supported() const override;
-        int inexact_update(const real_t *const x) override;
-        int inexact_apply(const real_t *const h, real_t *const out) override;"""
+    bool inexact_supported() const override;
+    int inexact_update(const real_t *const x) override;
+    int inexact_apply(const real_t *const h, real_t *const out) override;"""
 
 
 def _header(material, residual, publishes_value_steps=None):
@@ -468,28 +468,28 @@ def _header(material, residual, publishes_value_steps=None):
     if publishes_value_steps is None:
         publishes_value_steps = not residual
     extra = """
-        int update(const real_t *const x) override;
-        int update(const real_t *const previous, const real_t *const current) override;
-        void set_field(const char *name,
+    int update(const real_t *const x) override;
+    int update(const real_t *const previous, const real_t *const current) override;
+    void set_field(const char *name,
                        const std::shared_ptr<Buffer<real_t>> &values,
                        int component) override;""" if residual else ""
     value_steps = """
-        int value_steps(const real_t *x,
-                        const real_t *h,
-                        const int nsteps,
-                        const real_t *const steps,
-                        real_t *const out) override;""" if publishes_value_steps else ""
+    int value_steps(const real_t *x,
+            const real_t *h,
+            const int nsteps,
+            const real_t *const steps,
+            real_t *const out) override;""" if publishes_value_steps else ""
     matrix_methods = """
-        int hessian_bsr(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override;
+    int hessian_bsr(const real_t *const x,
+            const count_t *const rowptr,
+            const idx_t *const colidx,
+            real_t *const values) override;
 """ if residual else """
-        int hessian_bsr(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override;
-        int hessian_block_diag_sym(const real_t *const x,
+    int hessian_bsr(const real_t *const x,
+            const count_t *const rowptr,
+            const idx_t *const colidx,
+            real_t *const values) override;
+    int hessian_block_diag_sym(const real_t *const x,
                                    real_t *const values) override;"""
     return """#pragma once
 
@@ -497,57 +497,57 @@ def _header(material, residual, publishes_value_steps=None):
 #include "sfem_NeumannConditions.hpp"
 
 namespace sfem {
-    class %(op)s final : public Op {
-    public:
-        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
+  class %(op)s final : public Op {
+  public:
+    static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
-        explicit %(op)s(const std::shared_ptr<FunctionSpace> &space);
-        ~%(op)s() override;
+    explicit %(op)s(const std::shared_ptr<FunctionSpace> &space);
+    ~%(op)s() override;
 
-        const char *name() const override { return "%(op)s"; }
-        bool is_linear() const override { return false; }
-        ptrdiff_t n_dofs_domain() const override;
-        ptrdiff_t n_dofs_image() const override;
-        double flops_value() const override;
-        double flops_gradient() const override;
-        double flops_apply() const override;
-        size_t memory_traffic_bytes_value() const override;
-        size_t memory_traffic_bytes_gradient() const override;
-        size_t memory_traffic_bytes_apply() const override;
+    const char *name() const override { return "%(op)s"; }
+    bool is_linear() const override { return false; }
+    ptrdiff_t n_dofs_domain() const override;
+    ptrdiff_t n_dofs_image() const override;
+    double flops_value() const override;
+    double flops_gradient() const override;
+    double flops_apply() const override;
+    size_t memory_traffic_bytes_value() const override;
+    size_t memory_traffic_bytes_gradient() const override;
+    size_t memory_traffic_bytes_apply() const override;
 
-        int initialize(const std::vector<std::string> &block_names = {}) override;%(extra)s
-        int gradient(const real_t *const x, real_t *const out) override;
-        int apply(const real_t *const x,
+    int initialize(const std::vector<std::string> &block_names = {}) override;%(extra)s
+    int gradient(const real_t *const x, real_t *const out) override;
+    int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;
-        int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s
-        int hessian_crs(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override;%(matrix_methods)s
-        void set_option(const std::string &name, bool val) override;
-        void set_value_in_block(const std::string &block_name,
-                                const std::string &var_name,
-                                real_t value) override;
+    int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s
+    int hessian_crs(const real_t *const x,
+            const count_t *const rowptr,
+            const idx_t *const colidx,
+            real_t *const values) override;%(matrix_methods)s
+    void set_option(const std::string &name, bool val) override;
+    void set_value_in_block(const std::string &block_name,
+                const std::string &var_name,
+                real_t value) override;
 #ifdef SFEM_ENABLE_RYAML
-        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
 #endif  // SFEM_ENABLE_RYAML
 
-        //! The scalar type the kernels are asked for at run time.
-        //!
-        //! Mirrors GPULaplacian, which declares the same member with the same
-        //! default and hands it to every kernel call.  SMESH_DEFAULT resolves
-        //! to the build's real_t, so the default costs a caller nothing and is
-        //! the common path rather than a fallback.  The Op interface itself is
-        //! unchanged: its methods still take real_t*, which converts to void*
-        //! at the call, exactly as gpu_laplacian_block_vector relies on.
-        enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
+    //! The scalar type the kernels are asked for at run time.
+    //!
+    //! Mirrors GPULaplacian, which declares the same member with the same
+    //! default and hands it to every kernel call.  SMESH_DEFAULT resolves
+    //! to the build's real_t, so the default costs a caller nothing and is
+    //! the common path rather than a fallback.  The Op interface itself is
+    //! unchanged: its methods still take real_t*, which converts to void*
+    //! at the call, exactly as gpu_laplacian_block_vector relies on.
+    enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
 
-    private:
-        class Impl;
-        std::unique_ptr<Impl> impl_;
-    };
+  private:
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+  };
 }  // namespace sfem
 """ % {
         "op": material.op_name,
@@ -679,10 +679,10 @@ def _inexact_definitions(
         arguments.append("1, nelements")
         arguments.append("cache->inexact_tangent->data()")
         update_lines.extend([
-            "            %s (dim == %d) {" % (prefix, dim),
-            "                return %s(" % tangent_abi,
-            "                        %s);" % ",\n                        ".join(arguments),
-            "            }",
+            "      %s (dim == %d) {" % (prefix, dim),
+            "        return %s(" % tangent_abi,
+            "            %s);" % ",\n                        ".join(arguments),
+            "      }",
         ])
         apply_arguments = ["domain.element_type", "real_type", "nelements",
                            "domain.block->elements()->data()",
@@ -690,10 +690,10 @@ def _inexact_definitions(
                            "cache->inexact_tangent->data()",
                            increment, output]
         apply_lines.extend([
-            "            %s (dim == %d) {" % (prefix, dim),
-            "                return %s(" % stored_abi,
-            "                        %s);" % ",\n                        ".join(apply_arguments),
-            "            }",
+            "      %s (dim == %d) {" % (prefix, dim),
+            "        return %s(" % stored_abi,
+            "            %s);" % ",\n                        ".join(apply_arguments),
+            "      }",
         ])
     if not reachable:
         return ""
@@ -703,72 +703,72 @@ def _inexact_definitions(
     ) + " : 0"
     return """
 
-    bool %%(op)s::inexact_supported() const {
-        // The split assembles its tangent from the cached affine geometry, and
-        // that cache does not exist for every element: smesh's adjugate fill
-        // refuses TRI3 and QUAD4, so a 2D mesh reaches `inexact_update` with
-        // nothing to read.  Reporting support the operator cannot deliver is
-        // worse than reporting none, so this asks the cache rather than
-        // answering from what was generated.
-        for (const auto &entry : impl_->domains->domains()) {
-            auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                    entry.second.user_data);
-            if (!cache || !cache->jacobian_soa) {
-                return false;
-            }
+  bool %%(op)s::inexact_supported() const {
+    // The split assembles its tangent from the cached affine geometry, and
+    // that cache does not exist for every element: smesh's adjugate fill
+    // refuses TRI3 and QUAD4, so a 2D mesh reaches `inexact_update` with
+    // nothing to read.  Reporting support the operator cannot deliver is
+    // worse than reporting none, so this asks the cache rather than
+    // answering from what was generated.
+    for (const auto &entry : impl_->domains->domains()) {
+      auto cache = std::static_pointer_cast<AffineGeometryCache>(
+          entry.second.user_data);
+      if (!cache || !cache->jacobian_soa) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  int %%(op)s::inexact_update(const real_t *const x) {
+    SFEM_TRACE_SCOPE("%%(op)s::inexact_update");
+    auto mesh = impl_->space->mesh_ptr();
+    const int dim = mesh->spatial_dimension();
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+      if (!cache || !cache->jacobian_soa) {
+        SFEM_ERROR("%%(op)s::inexact_update requires cached affine geometry\\n");
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nelements = domain.block->n_elements();
+      if (!cache->inexact_tangent) {
+        // Sized by the mesh's dimension: the tangent is 10 numbers per
+        // element in two dimensions and 45 in three, and a material that
+        // generates both would overflow one store if sized from the other.
+        const ptrdiff_t components = %(components_by_dim)s;
+        if (components == 0) {
+          SFEM_ERROR("%%(op)s::inexact_update has no tangent size for dimension %%%%d\\n", dim);
+          return SFEM_FAILURE;
         }
-        return true;
-    }
-
-    int %%(op)s::inexact_update(const real_t *const x) {
-        SFEM_TRACE_SCOPE("%%(op)s::inexact_update");
-        auto mesh = impl_->space->mesh_ptr();
-        const int dim = mesh->spatial_dimension();
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
-            if (!cache || !cache->jacobian_soa) {
-                SFEM_ERROR("%%(op)s::inexact_update requires cached affine geometry\\n");
-                return SFEM_FAILURE;
-            }
-            const ptrdiff_t nelements = domain.block->n_elements();
-            if (!cache->inexact_tangent) {
-                // Sized by the mesh's dimension: the tangent is 10 numbers per
-                // element in two dimensions and 45 in three, and a material that
-                // generates both would overflow one store if sized from the other.
-                const ptrdiff_t components = %(components_by_dim)s;
-                if (components == 0) {
-                    SFEM_ERROR("%%(op)s::inexact_update has no tangent size for dimension %%%%d\\n", dim);
-                    return SFEM_FAILURE;
-                }
-                cache->inexact_tangent =
-                        sfem::create_host_buffer<metric_tensor_t>(nelements * components);
-            }
-            auto adjugate = reinterpret_cast<const geom_t *const *>(
-                    cache->jacobian_soa->jacobian_adjugate_SoA()->data());
-            auto determinant = reinterpret_cast<const geom_t *>(
-                    cache->jacobian_soa->jacobian_determinant()->data());
+        cache->inexact_tangent =
+            sfem::create_host_buffer<metric_tensor_t>(nelements * components);
+      }
+      auto adjugate = reinterpret_cast<const geom_t *const *>(
+          cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+      auto determinant = reinterpret_cast<const geom_t *>(
+          cache->jacobian_soa->jacobian_determinant()->data());
 %(update_body)s
-            SFEM_ERROR("%%(op)s::inexact_update has no kernel for dimension %%%%d\\n", dim);
-            return SFEM_FAILURE;
-        });
-    }
+      SFEM_ERROR("%%(op)s::inexact_update has no kernel for dimension %%%%d\\n", dim);
+      return SFEM_FAILURE;
+    });
+  }
 
-    int %%(op)s::inexact_apply(const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("%%(op)s::inexact_apply");
-        auto mesh = impl_->space->mesh_ptr();
-        const int dim = mesh->spatial_dimension();
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
-            if (!cache || !cache->inexact_tangent) {
-                SFEM_ERROR("%%(op)s::inexact_apply requires inexact_update first\\n");
-                return SFEM_FAILURE;
-            }
-            const ptrdiff_t nelements = domain.block->n_elements();
+  int %%(op)s::inexact_apply(const real_t *const h, real_t *const out) {
+    SFEM_TRACE_SCOPE("%%(op)s::inexact_apply");
+    auto mesh = impl_->space->mesh_ptr();
+    const int dim = mesh->spatial_dimension();
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+      if (!cache || !cache->inexact_tangent) {
+        SFEM_ERROR("%%(op)s::inexact_apply requires inexact_update first\\n");
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nelements = domain.block->n_elements();
 %(apply_body)s
-            SFEM_ERROR("%%(op)s::inexact_apply has no kernel for dimension %%%%d\\n", dim);
-            return SFEM_FAILURE;
-        });
-    }""" % {
+      SFEM_ERROR("%%(op)s::inexact_apply has no kernel for dimension %%%%d\\n", dim);
+      return SFEM_FAILURE;
+    });
+  }""" % {
         "components_by_dim": components_by_dim,
         "update_body": "\n".join(update_lines),
         "apply_body": "\n".join(apply_lines),
@@ -796,22 +796,22 @@ def _hyperelastic_op(
     packed_scratch_include = '#include "packed_thread_scratch.hpp"\n#include "smesh_env.hpp"' if generated_packed_apply else ""
     packed_scratch_prealloc = (
         """        impl_->use_packed_two_pass = smesh::Env::read("SFEM_PACKED_TWO_PASS", false);
-        if (impl_->space->has_packed_mesh()) {
-            auto packed = impl_->space->packed_mesh();
-            const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
-            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-            const size_t scratch_size = (size_t)dim * (size_t)max_nodes_per_pack;
-            sfem::codegen::prealloc_thread_scratch<real_t>(0, scratch_size);
-            sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
-            sfem::codegen::prealloc_thread_scratch<real_t>(2, scratch_size);
-            sfem::codegen::prealloc_thread_scratch<real_t>(3, scratch_size);
-            impl_->packed_ghost_buf.resize((size_t)packed->n_blocks());
-            for (int b = 0; b < packed->n_blocks(); ++b) {
-                const ptrdiff_t n_ghost = packed->n_ghost_entries(b);
-                const ptrdiff_t n_slots = (n_ghost > 0 ? n_ghost : 1) * (ptrdiff_t)dim;
-                impl_->packed_ghost_buf[b] = create_host_buffer<real_t>(n_slots);
-            }
-        }"""
+    if (impl_->space->has_packed_mesh()) {
+      auto packed = impl_->space->packed_mesh();
+      const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
+      const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+      const size_t scratch_size = (size_t)dim * (size_t)max_nodes_per_pack;
+      sfem::codegen::prealloc_thread_scratch<real_t>(0, scratch_size);
+      sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
+      sfem::codegen::prealloc_thread_scratch<real_t>(2, scratch_size);
+      sfem::codegen::prealloc_thread_scratch<real_t>(3, scratch_size);
+      impl_->packed_ghost_buf.resize((size_t)packed->n_blocks());
+      for (int b = 0; b < packed->n_blocks(); ++b) {
+        const ptrdiff_t n_ghost = packed->n_ghost_entries(b);
+        const ptrdiff_t n_slots = (n_ghost > 0 ? n_ghost : 1) * (ptrdiff_t)dim;
+        impl_->packed_ghost_buf[b] = create_host_buffer<real_t>(n_slots);
+      }
+    }"""
         if generated_packed_apply
         else ""
     )
@@ -1156,451 +1156,451 @@ def _hyperelastic_op(
 %(declaration_block)s
 
 namespace sfem {
-    namespace {
-        void seed_parameters(Parameters &parameters) {
+  namespace {
+    void seed_parameters(Parameters &parameters) {
 %(defaults)s
-        }
+    }
 
-        void seed_material(MultiDomainOp &domains) {
-            for (auto &entry : domains.domains()) {
-                seed_parameters(*entry.second.parameters);
-            }
-        }
+    void seed_material(MultiDomainOp &domains) {
+      for (auto &entry : domains.domains()) {
+        seed_parameters(*entry.second.parameters);
+      }
+    }
 
 %(yaml_helpers)s
 
-        smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
+    smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
                                                const smesh::Mesh::Block &block) {
-            for (size_t i = 0; i < mesh.n_blocks(); ++i) {
-                if (mesh.block(i).get() == &block) {
-                    return static_cast<smesh::block_idx_t>(i);
-                }
-            }
-            SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
-            return 0;
+      for (size_t i = 0; i < mesh.n_blocks(); ++i) {
+        if (mesh.block(i).get() == &block) {
+          return static_cast<smesh::block_idx_t>(i);
         }
-
-        int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
-                                       const smesh::Mesh::Block &block) {
-            for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
-                if (packed.block_name(i) == block.name()) {
-                    return static_cast<int>(i);
-                }
-            }
-            return -1;
-        }
-
-        struct AffineGeometryCache {
-            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
-            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
-%(metric_cache_field)s%(inexact_cache_field)s        };
-
-        int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
-                                  MultiDomainOp &domains) {
-            auto mesh = space->mesh_ptr();
-            const bool needs_jacobian_aos =
-                    %(gradient_affine_uses_jacobian_aos)s ||
-                    %(apply_affine_uses_jacobian_aos)s;
-            for (auto &entry : domains.domains()) {
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                auto cache = std::make_shared<AffineGeometryCache>();
-                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!cache->jacobian_soa) {
-                    return SFEM_FAILURE;
-                }
-                if (needs_jacobian_aos) {
-                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->jacobian_aos) {
-                        return SFEM_FAILURE;
-                    }
-                }
-%(metric_cache_setup)s                entry.second.user_data = std::static_pointer_cast<void>(cache);
-            }
-            return SFEM_SUCCESS;
-        }
-
-        ptrdiff_t block_size_for_dim(const int dim) {
-%(block_size_lines)s
-        }
-    }  // namespace
-
-    class %(op)s::Impl {
-    public:
-        explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
-
-        std::shared_ptr<FunctionSpace> space;
-        std::shared_ptr<MultiDomainOp> domains;
-        std::unique_ptr<real_t[]> element_values;
-        ptrdiff_t element_capacity{0};
-        bool objective_uses_affine{false};
-        bool gradient_uses_affine{false};
-        bool apply_uses_affine{false};
-        bool use_packed_two_pass{false};
-        std::vector<SharedBuffer<real_t>> packed_ghost_buf;
-    };
-
-    std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
-        const ptrdiff_t expected_block_size =
-                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
-        if (space->block_size() != expected_block_size) {
-            SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
-                       static_cast<long>(expected_block_size));
-            return nullptr;
-        }
-        auto op = std::make_unique<%(op)s>(space);
-        op->initialize();
-        return op;
+      }
+      SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
+      return 0;
     }
 
-    %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>(space)) {}
-    %(op)s::~%(op)s() = default;
+    int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+                                       const smesh::Mesh::Block &block) {
+      for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+        if (packed.block_name(i) == block.name()) {
+          return static_cast<int>(i);
+        }
+      }
+      return -1;
+    }
 
-    ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
-    ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
+    struct AffineGeometryCache {
+      std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
+      std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
+%(metric_cache_field)s%(inexact_cache_field)s        };
+
+    int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
+                                  MultiDomainOp &domains) {
+      auto mesh = space->mesh_ptr();
+      const bool needs_jacobian_aos =
+          %(gradient_affine_uses_jacobian_aos)s ||
+          %(apply_affine_uses_jacobian_aos)s;
+      for (auto &entry : domains.domains()) {
+        const smesh::block_idx_t block_id =
+            block_id_for_domain(*mesh, *entry.second.block);
+        auto cache = std::make_shared<AffineGeometryCache>();
+        cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+        if (!cache->jacobian_soa) {
+          return SFEM_FAILURE;
+        }
+        if (needs_jacobian_aos) {
+          cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
+              mesh, smesh::MEMORY_SPACE_HOST, block_id);
+          if (!cache->jacobian_aos) {
+            return SFEM_FAILURE;
+          }
+        }
+%(metric_cache_setup)s                entry.second.user_data = std::static_pointer_cast<void>(cache);
+      }
+      return SFEM_SUCCESS;
+    }
+
+    ptrdiff_t block_size_for_dim(const int dim) {
+%(block_size_lines)s
+    }
+  }  // namespace
+
+  class %(op)s::Impl {
+  public:
+    explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+    std::shared_ptr<FunctionSpace> space;
+    std::shared_ptr<MultiDomainOp> domains;
+    std::unique_ptr<real_t[]> element_values;
+    ptrdiff_t element_capacity{0};
+    bool objective_uses_affine{false};
+    bool gradient_uses_affine{false};
+    bool apply_uses_affine{false};
+    bool use_packed_two_pass{false};
+    std::vector<SharedBuffer<real_t>> packed_ghost_buf;
+  };
+
+  std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
+    const ptrdiff_t expected_block_size =
+        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+    if (space->block_size() != expected_block_size) {
+      SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
+                       static_cast<long>(expected_block_size));
+      return nullptr;
+    }
+    auto op = std::make_unique<%(op)s>(space);
+    op->initialize();
+    return op;
+  }
+
+  %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
+    : impl_(std::make_unique<Impl>(space)) {}
+  %(op)s::~%(op)s() = default;
+
+  ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
+  ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
 %(performance_methods)s
 
-    // Establish once, at setup, that this operator's dof graph is well formed:
-    // rows in order, every column in range, each row sorted and duplicate free.
-    // The assembly kernels assume it -- they locate an entry and write to it
-    // without re-checking that it is there -- so this is where the assumption
-    // is earned.
-    //
-    // It used to be earned per element instead: every scatter walked its
-    // NS x NS candidates, tested each with a three-condition branch
-    // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x NS^2) on every assembly for a
-    // property of the mesh and the graph together, which cannot change between
-    // elements or between calls.  Here it is O(nnz), once.
-    //
-    // Raw pointers rather than the graph type, so this does not depend on which
-    // headers the generated wrapper happens to pull in.
-    static int validate_dof_graph(const count_t *const rowptr,
+  // Establish once, at setup, that this operator's dof graph is well formed:
+  // rows in order, every column in range, each row sorted and duplicate free.
+  // The assembly kernels assume it -- they locate an entry and write to it
+  // without re-checking that it is there -- so this is where the assumption
+  // is earned.
+  //
+  // It used to be earned per element instead: every scatter walked its
+  // NS x NS candidates, tested each with a three-condition branch
+  // and reported through std::fprintf from inside the caller's parallel
+  // region.  That paid O(elements x NS^2) on every assembly for a
+  // property of the mesh and the graph together, which cannot change between
+  // elements or between calls.  Here it is O(nnz), once.
+  //
+  // Raw pointers rather than the graph type, so this does not depend on which
+  // headers the generated wrapper happens to pull in.
+  static int validate_dof_graph(const count_t *const rowptr,
                                   const idx_t *const colidx,
                                   const ptrdiff_t n_nodes,
                                   const ptrdiff_t nnz) {
-        if (!rowptr || !colidx || n_nodes < 0) {
-            return SFEM_FAILURE;
-        }
-        if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-            return SFEM_FAILURE;
-        }
-        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-            const count_t begin = rowptr[i];
-            const count_t end = rowptr[i + 1];
-            if (end < begin || (ptrdiff_t)end > nnz) {
-                return SFEM_FAILURE;
-            }
-            for (count_t k = begin; k < end; ++k) {
-                if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-                    return SFEM_FAILURE;
-                }
-                if (k > begin && colidx[k] <= colidx[k - 1]) {
-                    return SFEM_FAILURE;
-                }
-            }
-        }
-        return SFEM_SUCCESS;
+    if (!rowptr || !colidx || n_nodes < 0) {
+      return SFEM_FAILURE;
     }
+    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
+      return SFEM_FAILURE;
+    }
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+      const count_t begin = rowptr[i];
+      const count_t end = rowptr[i + 1];
+      if (end < begin || (ptrdiff_t)end > nnz) {
+        return SFEM_FAILURE;
+      }
+      for (count_t k = begin; k < end; ++k) {
+        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
+          return SFEM_FAILURE;
+        }
+        if (k > begin && colidx[k] <= colidx[k - 1]) {
+          return SFEM_FAILURE;
+        }
+      }
+    }
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::initialize(const std::vector<std::string> &block_names) {
-        SFEM_TRACE_SCOPE("%(op)s::initialize");
-        impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-        {
-            auto dof_graph = impl_->space->dof_to_dof_graph();
-            if (!dof_graph ||
-                validate_dof_graph(dof_graph->rowptr()->data(),
+  int %(op)s::initialize(const std::vector<std::string> &block_names) {
+    SFEM_TRACE_SCOPE("%(op)s::initialize");
+    impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    {
+      auto dof_graph = impl_->space->dof_to_dof_graph();
+      if (!dof_graph ||
+        validate_dof_graph(dof_graph->rowptr()->data(),
                                    dof_graph->colidx()->data(),
                                    dof_graph->n_nodes(),
                                    dof_graph->nnz()) != SFEM_SUCCESS) {
-                SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-                return SFEM_FAILURE;
-            }
-        }
-        const bool needs_affine_geometry =
-                impl_->objective_uses_affine ||
-                impl_->gradient_uses_affine ||
-                impl_->apply_uses_affine%(inexact_needs_affine)s;
-        for (auto &entry : impl_->domains->domains()) {
-            seed_parameters(*entry.second.parameters);
-            impl_->element_capacity =
-                    std::max(impl_->element_capacity, entry.second.block->n_elements());
-        }
-        // One cache builder, shared with set_option.  This used to be a second
-        // copy of the loop inlined here, and the copies drifted: the inlined
-        // one never built the metric, so an operator whose affine kernels read
-        // it worked when the option was set after initialize and failed when it
-        // was set before.
-        if (needs_affine_geometry &&
-            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
-            return SFEM_FAILURE;
-        }
-        impl_->element_values.reset(new real_t[impl_->element_capacity]);
-%(packed_scratch_prealloc)s
-        return SFEM_SUCCESS;
+        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
+        return SFEM_FAILURE;
+      }
     }
+    const bool needs_affine_geometry =
+        impl_->objective_uses_affine ||
+        impl_->gradient_uses_affine ||
+        impl_->apply_uses_affine%(inexact_needs_affine)s;
+    for (auto &entry : impl_->domains->domains()) {
+      seed_parameters(*entry.second.parameters);
+      impl_->element_capacity =
+          std::max(impl_->element_capacity, entry.second.block->n_elements());
+    }
+    // One cache builder, shared with set_option.  This used to be a second
+    // copy of the loop inlined here, and the copies drifted: the inlined
+    // one never built the metric, so an operator whose affine kernels read
+    // it worked when the option was set after initialize and failed when it
+    // was set before.
+    if (needs_affine_geometry &&
+      cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    impl_->element_values.reset(new real_t[impl_->element_capacity]);
+%(packed_scratch_prealloc)s
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::gradient(const real_t *const x, real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::gradient");
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *adjugate_aos = nullptr;
-            const geom_t *determinant = nullptr;
+  int %(op)s::gradient(const real_t *const x, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::gradient");
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *adjugate_aos = nullptr;
+      const geom_t *determinant = nullptr;
 %(metric_declaration)s            if (impl_->gradient_uses_affine) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        domain.user_data);
-                if (!cache || !cache->jacobian_soa) {
-                    SFEM_ERROR("%(op)s affine gradient requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        cache->jacobian_soa->jacobian_determinant()->data());
-                if (%(gradient_affine_uses_jacobian_aos)s) {
-                    if (!cache->jacobian_aos) {
-                        SFEM_ERROR("%(op)s affine gradient requires cached AoS geometry\\n");
-                        return SFEM_FAILURE;
-                    }
-                    adjugate_aos = reinterpret_cast<const geom_t *>(
-                            cache->jacobian_aos->jacobian_adjugate_AoS()->data());
-                    determinant = reinterpret_cast<const geom_t *>(
-                            cache->jacobian_aos->jacobian_determinant()->data());
-                }
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache || !cache->jacobian_soa) {
+          SFEM_ERROR("%(op)s affine gradient requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian_soa->jacobian_determinant()->data());
+        if (%(gradient_affine_uses_jacobian_aos)s) {
+          if (!cache->jacobian_aos) {
+            SFEM_ERROR("%(op)s affine gradient requires cached AoS geometry\\n");
+            return SFEM_FAILURE;
+          }
+          adjugate_aos = reinterpret_cast<const geom_t *>(
+              cache->jacobian_aos->jacobian_adjugate_AoS()->data());
+          determinant = reinterpret_cast<const geom_t *>(
+              cache->jacobian_aos->jacobian_determinant()->data());
+        }
 %(gradient_metric_binding)s            }
 %(gradient_packed_dispatch_body)s
 %(gradient_dispatch_body)s
-        });
-    }
+    });
+  }
 
-    int %(op)s::apply(const real_t *const x,
+  int %(op)s::apply(const real_t *const x,
                       const real_t *const h,
                       real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::apply");
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *adjugate_aos = nullptr;
-            const geom_t *determinant = nullptr;
+    SFEM_TRACE_SCOPE("%(op)s::apply");
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *adjugate_aos = nullptr;
+      const geom_t *determinant = nullptr;
 %(metric_declaration)s            if (impl_->apply_uses_affine) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        domain.user_data);
-                if (!cache || !cache->jacobian_soa) {
-                    SFEM_ERROR("%(op)s affine hessian action requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        cache->jacobian_soa->jacobian_determinant()->data());
-                if (%(apply_affine_uses_jacobian_aos)s) {
-                    if (!cache->jacobian_aos) {
-                        SFEM_ERROR("%(op)s affine hessian action requires cached AoS geometry\\n");
-                        return SFEM_FAILURE;
-                    }
-                    adjugate_aos = reinterpret_cast<const geom_t *>(
-                            cache->jacobian_aos->jacobian_adjugate_AoS()->data());
-                    determinant = reinterpret_cast<const geom_t *>(
-                            cache->jacobian_aos->jacobian_determinant()->data());
-                }
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache || !cache->jacobian_soa) {
+          SFEM_ERROR("%(op)s affine hessian action requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian_soa->jacobian_determinant()->data());
+        if (%(apply_affine_uses_jacobian_aos)s) {
+          if (!cache->jacobian_aos) {
+            SFEM_ERROR("%(op)s affine hessian action requires cached AoS geometry\\n");
+            return SFEM_FAILURE;
+          }
+          adjugate_aos = reinterpret_cast<const geom_t *>(
+              cache->jacobian_aos->jacobian_adjugate_AoS()->data());
+          determinant = reinterpret_cast<const geom_t *>(
+              cache->jacobian_aos->jacobian_determinant()->data());
+        }
 %(apply_metric_binding)s            }
 %(apply_dispatch_body)s
-        });
-    }
+    });
+  }
 
-    int %(op)s::value(const real_t *x, real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::value");
-        // The objective is the 0-form at one step of length zero.  `value_steps`
-        // evaluates at `x + alpha * h`, so alpha = 0 leaves the increment
-        // unused and `x` itself can stand in for it -- `x + 0 * x` is `x`
-        // exactly in IEEE arithmetic for any finite state, and the kernel then
-        // calls the same block function the objective kernel called.
-        //
-        // Writing it this way is what keeps the two from disagreeing.  They
-        // did: this method zeroed `*out` before accumulating while
-        // `value_steps` only accumulated, so the same Op answered the same
-        // question two ways depending on which entry point was used.  With one
-        // implementation there is nothing left to diverge.
-        const real_t objective_step = 0;
-        *out = 0;
-        return value_steps(x, x, 1, &objective_step, out);
-    }
+  int %(op)s::value(const real_t *x, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::value");
+    // The objective is the 0-form at one step of length zero.  `value_steps`
+    // evaluates at `x + alpha * h`, so alpha = 0 leaves the increment
+    // unused and `x` itself can stand in for it -- `x + 0 * x` is `x`
+    // exactly in IEEE arithmetic for any finite state, and the kernel then
+    // calls the same block function the objective kernel called.
+    //
+    // Writing it this way is what keeps the two from disagreeing.  They
+    // did: this method zeroed `*out` before accumulating while
+    // `value_steps` only accumulated, so the same Op answered the same
+    // question two ways depending on which entry point was used.  With one
+    // implementation there is nothing left to diverge.
+    const real_t objective_step = 0;
+    *out = 0;
+    return value_steps(x, x, 1, &objective_step, out);
+  }
 
-    int %(op)s::value_steps(const real_t *x,
-                            const real_t *h,
-                            const int nsteps,
-                            const real_t *const steps,
-                            real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::value_steps");
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        if (nsteps <= 0) {
-            return SFEM_SUCCESS;
-        }
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const ptrdiff_t nelements = domain.block->n_elements();
-            const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
+  int %(op)s::value_steps(const real_t *x,
+              const real_t *h,
+              const int nsteps,
+              const real_t *const steps,
+              real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::value_steps");
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    if (nsteps <= 0) {
+      return SFEM_SUCCESS;
+    }
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
+      const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
 %(metric_declaration)s            if (impl_->objective_uses_affine) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        domain.user_data);
-                if (!cache || !cache->jacobian_soa) {
-                    SFEM_ERROR("%(op)s affine objective_steps requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        cache->jacobian_soa->jacobian_determinant()->data());
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache || !cache->jacobian_soa) {
+          SFEM_ERROR("%(op)s affine objective_steps requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian_soa->jacobian_determinant()->data());
 %(objective_steps_metric_binding)s            }
-            if (nvalues > impl_->element_capacity) {
-                impl_->element_values.reset(new real_t[nvalues]);
-                impl_->element_capacity = nvalues;
-            }
-            std::fill(impl_->element_values.get(),
+      if (nvalues > impl_->element_capacity) {
+        impl_->element_values.reset(new real_t[nvalues]);
+        impl_->element_capacity = nvalues;
+      }
+      std::fill(impl_->element_values.get(),
                       impl_->element_values.get() + nvalues,
                       real_t(0));
-            int status = SFEM_FAILURE;
+      int status = SFEM_FAILURE;
 %(objective_steps_packed_dispatch_body)s
-            if (status == SFEM_FAILURE) {
+      if (status == SFEM_FAILURE) {
 %(objective_steps_dispatch_body)s
-            }
-            if (status != SFEM_SUCCESS) return status;
-            for (int step = 0; step < nsteps; ++step) {
-                real_t sum = 0;
+      }
+      if (status != SFEM_SUCCESS) return status;
+      for (int step = 0; step < nsteps; ++step) {
+        real_t sum = 0;
 #pragma omp simd reduction(+ : sum)
-                for (ptrdiff_t element = 0; element < nelements; ++element) {
-                    sum += impl_->element_values[(ptrdiff_t)step * nelements + element];
-                }
-                out[step] += sum;
-            }
-            return SFEM_SUCCESS;
-        });
-    }
+        for (ptrdiff_t element = 0; element < nelements; ++element) {
+          sum += impl_->element_values[(ptrdiff_t)step * nelements + element];
+        }
+        out[step] += sum;
+      }
+      return SFEM_SUCCESS;
+    });
+  }
 
-    int %(op)s::hessian_crs(const real_t *const x,
-                            const count_t *const rowptr,
-                            const idx_t *const colidx,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
+  int %(op)s::hessian_crs(const real_t *const x,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
 %(hessian_crs_current_prologue)s
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
 %(hessian_crs_dispatch_body)s
-        });
-    }
+    });
+  }
 
-    int %(op)s::hessian_bsr(const real_t *const x,
-                            const count_t *const rowptr,
-                            const idx_t *const colidx,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+  int %(op)s::hessian_bsr(const real_t *const x,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
 %(hessian_bsr_current_prologue)s
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
 %(hessian_bsr_dispatch_body)s
-        });
-    }
+    });
+  }
 
 
 
 
-    int %(op)s::hessian_block_diag_sym(const real_t *const x,
+  int %(op)s::hessian_block_diag_sym(const real_t *const x,
                                        real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_block_diag_sym");
+    SFEM_TRACE_SCOPE("%(op)s::hessian_block_diag_sym");
 %(hessian_block_diag_sym_current_prologue)s
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
 %(hessian_block_diag_sym_dispatch_body)s
-        });
-    }
+    });
+  }
 
-    void %(op)s::set_option(const std::string &name, const bool val) {
-        SFEM_TRACE_SCOPE("%(op)s::set_option");
-        if (name == "PACKED_TWO_PASS" || name == "two_pass") {
-            impl_->use_packed_two_pass = val;
-            return;
-        }
-        AffineOption options[] = {
+  void %(op)s::set_option(const std::string &name, const bool val) {
+    SFEM_TRACE_SCOPE("%(op)s::set_option");
+    if (name == "PACKED_TWO_PASS" || name == "two_pass") {
+      impl_->use_packed_two_pass = val;
+      return;
+    }
+    AffineOption options[] = {
 %(affine_options)s
-        };
-        const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
-        if (matched && val && impl_->domains) {
-            if (cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
-                SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
-            }
-        }
+    };
+    const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+    if (matched && val && impl_->domains) {
+      if (cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+        SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
+      }
     }
+  }
 
-    void %(op)s::set_value_in_block(const std::string &block_name,
-                                    const std::string &var_name,
-                                    const real_t value) {
-        SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
-        impl_->domains->set_value_in_block(block_name, var_name, value);
-    }
+  void %(op)s::set_value_in_block(const std::string &block_name,
+                  const std::string &var_name,
+                  const real_t value) {
+    SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
+    impl_->domains->set_value_in_block(block_name, var_name, value);
+  }
 
 #ifdef SFEM_ENABLE_RYAML
-    std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+  std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
-        SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
-        auto ret = std::make_shared<%(op)s>(space);
+    SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
+    auto ret = std::make_shared<%(op)s>(space);
 
-        std::vector<std::string> block_names;
-        if (node.has_child("blocks")) {
-            for (auto block : node["blocks"].children()) {
-                if (block.has_child("name")) {
-                    block_names.push_back(yaml_read_string(block["name"]));
-                }
-            }
+    std::vector<std::string> block_names;
+    if (node.has_child("blocks")) {
+      for (auto block : node["blocks"].children()) {
+        if (block.has_child("name")) {
+          block_names.push_back(yaml_read_string(block["name"]));
         }
-
-        AffineOption options[] = {
-%(yaml_affine_options)s
-        };
-        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
-
-        if (ret->initialize(block_names) != SFEM_SUCCESS) {
-            return nullptr;
-        }
-
-        real_t defaults[N_MATERIAL_PARAMETERS];
-        material_defaults(defaults);
-        real_t top_values[N_MATERIAL_PARAMETERS];
-        copy_material_parameters(defaults, top_values);
-        if (material_from_yaml(node, defaults, top_values)) {
-            set_material(*ret->impl_->domains, top_values);
-        }
-
-        if (node.has_child("blocks")) {
-            for (auto block : node["blocks"].children()) {
-                if (!block.has_child("name")) {
-                    continue;
-                }
-
-                real_t block_values[N_MATERIAL_PARAMETERS];
-                copy_material_parameters(top_values, block_values);
-                if (!material_from_yaml(block, top_values, block_values)) {
-                    continue;
-                }
-
-                const std::string block_name = yaml_read_string(block["name"]);
-                set_material_in_block(*ret->impl_->domains, block_name, block_values);
-            }
-        }
-
-        return ret;
+      }
     }
+
+    AffineOption options[] = {
+%(yaml_affine_options)s
+    };
+    read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
+
+    if (ret->initialize(block_names) != SFEM_SUCCESS) {
+      return nullptr;
+    }
+
+    real_t defaults[N_MATERIAL_PARAMETERS];
+    material_defaults(defaults);
+    real_t top_values[N_MATERIAL_PARAMETERS];
+    copy_material_parameters(defaults, top_values);
+    if (material_from_yaml(node, defaults, top_values)) {
+      set_material(*ret->impl_->domains, top_values);
+    }
+
+    if (node.has_child("blocks")) {
+      for (auto block : node["blocks"].children()) {
+        if (!block.has_child("name")) {
+          continue;
+        }
+
+        real_t block_values[N_MATERIAL_PARAMETERS];
+        copy_material_parameters(top_values, block_values);
+        if (!material_from_yaml(block, top_values, block_values)) {
+          continue;
+        }
+
+        const std::string block_name = yaml_read_string(block["name"]);
+        set_material_in_block(*ret->impl_->domains, block_name, block_values);
+      }
+    }
+
+    return ret;
+  }
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
 """ % {
@@ -1649,42 +1649,42 @@ namespace sfem {
             material.name,
             kernel_sources,
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
-            indent="            ",
+            indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "gradient_packed_dispatch_body": _hyperelastic_gradient_packed_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
-            indent="            ",
+            indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "gradient_dispatch_body": _hyperelastic_gradient_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
-            indent="            ",
+            indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "objective_dispatch_body": _hyperelastic_objective_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
-            indent="            ",
+            indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "objective_steps_packed_dispatch_body": _hyperelastic_objective_steps_packed_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
-            indent="            ",
+            indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "objective_steps_dispatch_body": _hyperelastic_objective_steps_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
-            indent="                ",
+            indent="        ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_crs_dispatch_body": _hyperelastic_hessian_dispatch_body(
@@ -1693,7 +1693,7 @@ namespace sfem {
             kernel_sources,
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("rowptr", "colidx", "values"),
-            indent="            ",
+            indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_crs_current_prologue": _hyperelastic_hessian_current_prologue(
@@ -1707,7 +1707,7 @@ namespace sfem {
             kernel_sources,
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("rowptr", "colidx", "values"),
-            indent="            ",
+            indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_bsr_current_prologue": _hyperelastic_hessian_current_prologue(
@@ -1721,7 +1721,7 @@ namespace sfem {
             kernel_sources,
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("values",),
-            indent="            ",
+            indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_block_diag_sym_current_prologue": _hyperelastic_hessian_current_prologue(
@@ -2195,15 +2195,15 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         dependencies[1].previous for dependencies in dependencies_by_dim.values()
     )
     hessian_state_alias = (
-        "        const real_t *const current = state ? state : impl_->current;"
+        "    const real_t *const current = state ? state : impl_->current;"
         if action_uses_current
         else ""
     )
     hessian_state_check = (
-        "        if (%s) {\n"
-        '            SFEM_ERROR("%s requires %s\\n");\n'
-        "            return SFEM_FAILURE;\n"
-        "        }"
+        "    if (%s) {\n"
+        '      SFEM_ERROR("%s requires %s\\n");\n'
+        "      return SFEM_FAILURE;\n"
+        "    }"
         % (
             " || ".join(
                 condition
@@ -2228,7 +2228,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         else ""
     )
     hessian_previous_alias = (
-        "            const real_t *const previous = impl_->previous;"
+        "      const real_t *const previous = impl_->previous;"
         if action_uses_previous
         else ""
     )
@@ -2291,75 +2291,75 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     packed_scratch_include = '#include "packed_thread_scratch.hpp"' if generated_packed_apply else ""
     packed_scratch_prealloc = (
         """        if (impl_->space->has_packed_mesh()) {
-            auto packed = impl_->space->packed_mesh();
-            const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
-            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-            sfem::codegen::prealloc_thread_scratch<real_t>(
-                    0, (size_t)dim * (size_t)max_nodes_per_pack);
-            sfem::codegen::prealloc_thread_scratch<real_t>(
-                    1, (size_t)max_nodes_per_pack);
-            sfem::codegen::prealloc_thread_scratch<real_t>(
-                    2, (size_t)max_nodes_per_pack);
-            sfem::codegen::prealloc_thread_scratch<real_t>(
-                    3, (size_t)max_nodes_per_pack);
-        }"""
+      auto packed = impl_->space->packed_mesh();
+      const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
+      const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+      sfem::codegen::prealloc_thread_scratch<real_t>(
+          0, (size_t)dim * (size_t)max_nodes_per_pack);
+      sfem::codegen::prealloc_thread_scratch<real_t>(
+          1, (size_t)max_nodes_per_pack);
+      sfem::codegen::prealloc_thread_scratch<real_t>(
+          2, (size_t)max_nodes_per_pack);
+      sfem::codegen::prealloc_thread_scratch<real_t>(
+          3, (size_t)max_nodes_per_pack);
+    }"""
         if generated_packed_apply
         else ""
     )
     laplace_packed_helpers = (
         """
-        bool packed_laplacian_apply_supported(const smesh::ElemType element_type) {
-            switch (element_type) {
-                case smesh::TET4:
-                case smesh::TET10:
-                case smesh::HEX8:
-                    return true;
-                default:
-                    return false;
-            }
+    bool packed_laplacian_apply_supported(const smesh::ElemType element_type) {
+      switch (element_type) {
+        case smesh::TET4:
+        case smesh::TET10:
+        case smesh::HEX8:
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    bool can_use_packed_laplacian_apply(const FunctionSpace &space,
+                      MultiDomainOp &domains) {
+      if (!space.has_packed_mesh()) {
+        return false;
+      }
+
+      for (auto &entry : domains.domains()) {
+        const OpDomain &domain = entry.second;
+        if (!packed_laplacian_apply_supported(domain.element_type)) {
+          return false;
         }
-
-        bool can_use_packed_laplacian_apply(const FunctionSpace &space,
-                                            MultiDomainOp &domains) {
-            if (!space.has_packed_mesh()) {
-                return false;
-            }
-
-            for (auto &entry : domains.domains()) {
-                const OpDomain &domain = entry.second;
-                if (!packed_laplacian_apply_supported(domain.element_type)) {
-                    return false;
-                }
-                if (domain.parameters->require_real_value("kappa") != real_t(1)) {
-                    return false;
-                }
-            }
-
-            return true;
+        if (domain.parameters->require_real_value("kappa") != real_t(1)) {
+          return false;
         }
+      }
+
+      return true;
+    }
 """
         if laplace_packed_apply
         and use_laplace_packed_fast_path
         else ""
     )
     laplace_packed_member = (
-        "        std::shared_ptr<Op> packed_affine_apply;"
+        "    std::shared_ptr<Op> packed_affine_apply;"
         if use_laplace_packed_fast_path
         else ""
     )
     laplace_packed_apply_fast_path = (
         """
-        if (impl_->jacobian_action_uses_affine &&
-            can_use_packed_laplacian_apply(*impl_->space, *impl_->domains)) {
-            if (!impl_->packed_affine_apply) {
-                impl_->packed_affine_apply = std::make_shared<PackedLaplacian>(impl_->space);
-                if (impl_->packed_affine_apply->initialize() != SFEM_SUCCESS) {
-                    SFEM_ERROR("%s failed to initialize packed affine apply backend\\n");
-                    return SFEM_FAILURE;
-                }
-            }
-            return impl_->packed_affine_apply->apply(current, direction, out);
+    if (impl_->jacobian_action_uses_affine &&
+      can_use_packed_laplacian_apply(*impl_->space, *impl_->domains)) {
+      if (!impl_->packed_affine_apply) {
+        impl_->packed_affine_apply = std::make_shared<PackedLaplacian>(impl_->space);
+        if (impl_->packed_affine_apply->initialize() != SFEM_SUCCESS) {
+          SFEM_ERROR("%s failed to initialize packed affine apply backend\\n");
+          return SFEM_FAILURE;
         }
+      }
+      return impl_->packed_affine_apply->apply(current, direction, out);
+    }
 """
         % material.op_name
         if use_laplace_packed_fast_path
@@ -2369,27 +2369,27 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     if laplace_tet4_packed_affine_uses_metric_soa:
         private_declarations.append(
             """int laplace_tet4_jacobian_action_packed_affine_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_met0,
-        const geom_t *const RSTR g_met1,
-        const geom_t *const RSTR g_met2,
-        const geom_t *const RSTR g_met3,
-        const geom_t *const RSTR g_met4,
-        const geom_t *const RSTR g_met5,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const double kappa,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out
 );"""
         )
     for private_name in (
@@ -2399,22 +2399,22 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         if material.name == "laplace" and _c_abi_function_exists(kernel_sources, private_name):
             private_declarations.append(
                 """int %s(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_met,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met,
+    const double kappa,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out
 );"""
                 % private_name
             )
@@ -2445,461 +2445,461 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
 %(declaration_block)s
 
 namespace sfem {
-    namespace {
-        constexpr int MAX_PARAMETERS = %(max_parameters)d;
+  namespace {
+    constexpr int MAX_PARAMETERS = %(max_parameters)d;
 
-        void seed_parameters(Parameters &parameters) {
+    void seed_parameters(Parameters &parameters) {
 %(defaults)s
-        }
+    }
 
-        void seed_material(MultiDomainOp &domains) {
-            for (auto &entry : domains.domains()) {
-                seed_parameters(*entry.second.parameters);
-            }
-        }
+    void seed_material(MultiDomainOp &domains) {
+      for (auto &entry : domains.domains()) {
+        seed_parameters(*entry.second.parameters);
+      }
+    }
 
 %(yaml_helpers)s
 
-        smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
+    smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
                                                const smesh::Mesh::Block &block) {
-            for (size_t i = 0; i < mesh.n_blocks(); ++i) {
-                if (mesh.block(i).get() == &block) {
-                    return static_cast<smesh::block_idx_t>(i);
-                }
-            }
-            SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
-            return 0;
+      for (size_t i = 0; i < mesh.n_blocks(); ++i) {
+        if (mesh.block(i).get() == &block) {
+          return static_cast<smesh::block_idx_t>(i);
         }
+      }
+      SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
+      return 0;
+    }
 
-        int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+    int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
                                        const smesh::Mesh::Block &block) {
-            for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
-                if (packed.block_name(i) == block.name()) {
-                    return static_cast<int>(i);
-                }
-            }
-            return -1;
+      for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+        if (packed.block_name(i) == block.name()) {
+          return static_cast<int>(i);
         }
+      }
+      return -1;
+    }
 
-        struct AffineGeometryCache {
-            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
-            std::shared_ptr<smesh::FFF> metric_soa;
-            std::shared_ptr<smesh::FFF> metric_aos;
-        };
+    struct AffineGeometryCache {
+      std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
+      std::shared_ptr<smesh::FFF> metric_soa;
+      std::shared_ptr<smesh::FFF> metric_aos;
+    };
 
-        int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
+    int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool needs_jacobian,
                                   const bool needs_metric_soa,
                                   const bool needs_metric_aos) {
-            auto mesh = space->mesh_ptr();
-            for (auto &entry : domains.domains()) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        entry.second.user_data);
-                if (!cache) {
-                    cache = std::make_shared<AffineGeometryCache>();
-                }
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                if (needs_jacobian && !cache->jacobian) {
-                    cache->jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->jacobian) {
-                        return SFEM_FAILURE;
-                    }
-                }
-                if (needs_metric_soa && !cache->metric_soa) {
-                    cache->metric_soa = smesh::FFF::create_SoA(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->metric_soa) {
-                        return SFEM_FAILURE;
-                    }
-                }
-                if (needs_metric_aos && !cache->metric_aos) {
-                    cache->metric_aos = smesh::FFF::create_AoS(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->metric_aos) {
-                        return SFEM_FAILURE;
-                    }
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(cache);
-            }
-            return SFEM_SUCCESS;
+      auto mesh = space->mesh_ptr();
+      for (auto &entry : domains.domains()) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            entry.second.user_data);
+        if (!cache) {
+          cache = std::make_shared<AffineGeometryCache>();
         }
-
-        void parameter_array(const Parameters &parameters,
-                             const int dim,
-                             real_t *const values) {
-            int index = 0;
-%(parameter_lines)s
+        const smesh::block_idx_t block_id =
+            block_id_for_domain(*mesh, *entry.second.block);
+        if (needs_jacobian && !cache->jacobian) {
+          cache->jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+              mesh, smesh::MEMORY_SPACE_HOST, block_id);
+          if (!cache->jacobian) {
+            return SFEM_FAILURE;
+          }
         }
-
-        ptrdiff_t block_size_for_dim(const int dim) {
-%(block_size_lines)s
+        if (needs_metric_soa && !cache->metric_soa) {
+          cache->metric_soa = smesh::FFF::create_SoA(
+              mesh, smesh::MEMORY_SPACE_HOST, block_id);
+          if (!cache->metric_soa) {
+            return SFEM_FAILURE;
+          }
         }
-%(laplace_packed_helpers)s
-    }  // namespace
-
-    class %(op)s::Impl {
-    public:
-        explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
-
-        std::shared_ptr<FunctionSpace> space;
-        std::shared_ptr<MultiDomainOp> domains;
-%(laplace_packed_member)s
-        std::shared_ptr<Buffer<real_t>> previous_buffer;
-        const real_t *previous{nullptr};
-        const real_t *current{nullptr};
-        bool residual_uses_affine{false};
-        bool jacobian_action_uses_affine{false};
-    };
-
-    std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
-        const ptrdiff_t expected_block_size =
-                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
-        if (space->block_size() != expected_block_size) {
-            SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
-                       static_cast<long>(expected_block_size));
-            return nullptr;
+        if (needs_metric_aos && !cache->metric_aos) {
+          cache->metric_aos = smesh::FFF::create_AoS(
+              mesh, smesh::MEMORY_SPACE_HOST, block_id);
+          if (!cache->metric_aos) {
+            return SFEM_FAILURE;
+          }
         }
-        auto op = std::make_unique<%(op)s>(space);
-        op->initialize();
-        return op;
+        entry.second.user_data = std::static_pointer_cast<void>(cache);
+      }
+      return SFEM_SUCCESS;
     }
 
-    %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>(space)) {}
-    %(op)s::~%(op)s() = default;
+    void parameter_array(const Parameters &parameters,
+                             const int dim,
+                             real_t *const values) {
+      int index = 0;
+%(parameter_lines)s
+    }
 
-    ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
-    ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
+    ptrdiff_t block_size_for_dim(const int dim) {
+%(block_size_lines)s
+    }
+%(laplace_packed_helpers)s
+  }  // namespace
+
+  class %(op)s::Impl {
+  public:
+    explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+    std::shared_ptr<FunctionSpace> space;
+    std::shared_ptr<MultiDomainOp> domains;
+%(laplace_packed_member)s
+    std::shared_ptr<Buffer<real_t>> previous_buffer;
+    const real_t *previous{nullptr};
+    const real_t *current{nullptr};
+    bool residual_uses_affine{false};
+    bool jacobian_action_uses_affine{false};
+  };
+
+  std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
+    const ptrdiff_t expected_block_size =
+        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+    if (space->block_size() != expected_block_size) {
+      SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
+                       static_cast<long>(expected_block_size));
+      return nullptr;
+    }
+    auto op = std::make_unique<%(op)s>(space);
+    op->initialize();
+    return op;
+  }
+
+  %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
+    : impl_(std::make_unique<Impl>(space)) {}
+  %(op)s::~%(op)s() = default;
+
+  ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
+  ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
 %(performance_methods)s
 
-    // Establish once, at setup, that this operator's dof graph is well formed:
-    // rows in order, every column in range, each row sorted and duplicate free.
-    // The assembly kernels assume it -- they locate an entry and write to it
-    // without re-checking that it is there -- so this is where the assumption
-    // is earned.
-    //
-    // It used to be earned per element instead: every scatter walked its
-    // NS x NS candidates, tested each with a three-condition branch
-    // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x NS^2) on every assembly for a
-    // property of the mesh and the graph together, which cannot change between
-    // elements or between calls.  Here it is O(nnz), once.
-    //
-    // Raw pointers rather than the graph type, so this does not depend on which
-    // headers the generated wrapper happens to pull in.
-    static int validate_dof_graph(const count_t *const rowptr,
+  // Establish once, at setup, that this operator's dof graph is well formed:
+  // rows in order, every column in range, each row sorted and duplicate free.
+  // The assembly kernels assume it -- they locate an entry and write to it
+  // without re-checking that it is there -- so this is where the assumption
+  // is earned.
+  //
+  // It used to be earned per element instead: every scatter walked its
+  // NS x NS candidates, tested each with a three-condition branch
+  // and reported through std::fprintf from inside the caller's parallel
+  // region.  That paid O(elements x NS^2) on every assembly for a
+  // property of the mesh and the graph together, which cannot change between
+  // elements or between calls.  Here it is O(nnz), once.
+  //
+  // Raw pointers rather than the graph type, so this does not depend on which
+  // headers the generated wrapper happens to pull in.
+  static int validate_dof_graph(const count_t *const rowptr,
                                   const idx_t *const colidx,
                                   const ptrdiff_t n_nodes,
                                   const ptrdiff_t nnz) {
-        if (!rowptr || !colidx || n_nodes < 0) {
-            return SFEM_FAILURE;
-        }
-        if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-            return SFEM_FAILURE;
-        }
-        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-            const count_t begin = rowptr[i];
-            const count_t end = rowptr[i + 1];
-            if (end < begin || (ptrdiff_t)end > nnz) {
-                return SFEM_FAILURE;
-            }
-            for (count_t k = begin; k < end; ++k) {
-                if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-                    return SFEM_FAILURE;
-                }
-                if (k > begin && colidx[k] <= colidx[k - 1]) {
-                    return SFEM_FAILURE;
-                }
-            }
-        }
-        return SFEM_SUCCESS;
+    if (!rowptr || !colidx || n_nodes < 0) {
+      return SFEM_FAILURE;
     }
+    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
+      return SFEM_FAILURE;
+    }
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+      const count_t begin = rowptr[i];
+      const count_t end = rowptr[i + 1];
+      if (end < begin || (ptrdiff_t)end > nnz) {
+        return SFEM_FAILURE;
+      }
+      for (count_t k = begin; k < end; ++k) {
+        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
+          return SFEM_FAILURE;
+        }
+        if (k > begin && colidx[k] <= colidx[k - 1]) {
+          return SFEM_FAILURE;
+        }
+      }
+    }
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::initialize(const std::vector<std::string> &block_names) {
-        SFEM_TRACE_SCOPE("%(op)s::initialize");
-        impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-        {
-            auto dof_graph = impl_->space->dof_to_dof_graph();
-            if (!dof_graph ||
-                validate_dof_graph(dof_graph->rowptr()->data(),
+  int %(op)s::initialize(const std::vector<std::string> &block_names) {
+    SFEM_TRACE_SCOPE("%(op)s::initialize");
+    impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    {
+      auto dof_graph = impl_->space->dof_to_dof_graph();
+      if (!dof_graph ||
+        validate_dof_graph(dof_graph->rowptr()->data(),
                                    dof_graph->colidx()->data(),
                                    dof_graph->n_nodes(),
                                    dof_graph->nnz()) != SFEM_SUCCESS) {
-                SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-                return SFEM_FAILURE;
-            }
-        }
-        seed_material(*impl_->domains);
-        const bool needs_affine_jacobian =
-                (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
-                (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
-        const bool needs_affine_metric =
-                (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
-                (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
-        const bool needs_affine_metric_soa =
-                (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
-                (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
-        const bool needs_affine_metric_aos =
-                (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
-                (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
-        if (needs_affine_jacobian || needs_affine_metric) {
-            const int status = cache_affine_geometry(impl_->space,
+        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
+        return SFEM_FAILURE;
+      }
+    }
+    seed_material(*impl_->domains);
+    const bool needs_affine_jacobian =
+        (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
+        (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
+    const bool needs_affine_metric =
+        (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
+        (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
+    const bool needs_affine_metric_soa =
+        (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
+        (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
+    const bool needs_affine_metric_aos =
+        (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
+        (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
+    if (needs_affine_jacobian || needs_affine_metric) {
+      const int status = cache_affine_geometry(impl_->space,
                                                      *impl_->domains,
                                                      needs_affine_jacobian,
                                                      needs_affine_metric_soa,
                                                      needs_affine_metric_aos);
-            if (status != SFEM_SUCCESS) return status;
-        }
+      if (status != SFEM_SUCCESS) return status;
+    }
 %(packed_scratch_prealloc)s
-        return SFEM_SUCCESS;
-    }
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::update(const real_t *const x) {
-        SFEM_TRACE_SCOPE("%(op)s::update");
-        impl_->current = x;
-        return SFEM_SUCCESS;
-    }
+  int %(op)s::update(const real_t *const x) {
+    SFEM_TRACE_SCOPE("%(op)s::update");
+    impl_->current = x;
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::update(const real_t *const previous,
+  int %(op)s::update(const real_t *const previous,
                        const real_t *const current) {
-        SFEM_TRACE_SCOPE("%(op)s::update");
-        impl_->previous_buffer.reset();
-        impl_->previous = previous;
-        impl_->current = current;
-        return SFEM_SUCCESS;
-    }
+    SFEM_TRACE_SCOPE("%(op)s::update");
+    impl_->previous_buffer.reset();
+    impl_->previous = previous;
+    impl_->current = current;
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::gradient(const real_t *const state, real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::gradient");
+  int %(op)s::gradient(const real_t *const state, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::gradient");
 %(gradient_previous_check)s
-        impl_->current = state;
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            const geom_t *const *geom_metric = nullptr;
-            const geom_t *geom_metric_aos = nullptr;
-            if (impl_->residual_uses_affine) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        domain.user_data);
-                if (!cache) {
-                    SFEM_ERROR("%(op)s affine residual requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                if (%(residual_affine_uses_jacobian)s) {
-                    if (!cache->jacobian) {
-                        SFEM_ERROR("%(op)s affine residual requires cached jacobian geometry\\n");
-                        return SFEM_FAILURE;
-                    }
-                    adjugate = reinterpret_cast<const geom_t *const *>(
-                            cache->jacobian->jacobian_adjugate_SoA()->data());
-                    determinant = reinterpret_cast<const geom_t *>(
-                            cache->jacobian->jacobian_determinant()->data());
-                }
-                if (%(residual_affine_uses_metric_soa)s) {
-                    if (!cache->metric_soa) {
-                        SFEM_ERROR("%(op)s affine residual requires cached SoA metric geometry\\n");
-                        return SFEM_FAILURE;
-                    }
-                    geom_metric = reinterpret_cast<const geom_t *const *>(
-                            cache->metric_soa->fff_SoA()->data());
-                }
-                if (%(residual_affine_uses_metric_aos)s) {
-                    if (!cache->metric_aos) {
-                        SFEM_ERROR("%(op)s affine residual requires cached AoS metric geometry\\n");
-                        return SFEM_FAILURE;
-                    }
-                    geom_metric_aos = reinterpret_cast<const geom_t *>(
-                            cache->metric_aos->fff_AoS()->data());
-                }
-            }
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters,
-                            mesh->spatial_dimension(),
-                            storage);
+    impl_->current = state;
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      const geom_t *const *geom_metric = nullptr;
+      const geom_t *geom_metric_aos = nullptr;
+      if (impl_->residual_uses_affine) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache) {
+          SFEM_ERROR("%(op)s affine residual requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        if (%(residual_affine_uses_jacobian)s) {
+          if (!cache->jacobian) {
+            SFEM_ERROR("%(op)s affine residual requires cached jacobian geometry\\n");
+            return SFEM_FAILURE;
+          }
+          adjugate = reinterpret_cast<const geom_t *const *>(
+              cache->jacobian->jacobian_adjugate_SoA()->data());
+          determinant = reinterpret_cast<const geom_t *>(
+              cache->jacobian->jacobian_determinant()->data());
+        }
+        if (%(residual_affine_uses_metric_soa)s) {
+          if (!cache->metric_soa) {
+            SFEM_ERROR("%(op)s affine residual requires cached SoA metric geometry\\n");
+            return SFEM_FAILURE;
+          }
+          geom_metric = reinterpret_cast<const geom_t *const *>(
+              cache->metric_soa->fff_SoA()->data());
+        }
+        if (%(residual_affine_uses_metric_aos)s) {
+          if (!cache->metric_aos) {
+            SFEM_ERROR("%(op)s affine residual requires cached AoS metric geometry\\n");
+            return SFEM_FAILURE;
+          }
+          geom_metric_aos = reinterpret_cast<const geom_t *>(
+              cache->metric_aos->fff_AoS()->data());
+        }
+      }
+      real_t storage[MAX_PARAMETERS];
+      parameter_array(*domain.parameters,
+              mesh->spatial_dimension(),
+              storage);
 %(gradient_previous_alias)s
 %(residual_dispatch_body)s
-        });
-    }
+    });
+  }
 
-    int %(op)s::apply(const real_t *const state,
+  int %(op)s::apply(const real_t *const state,
                       const real_t *const direction,
                       real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::apply");
-        const real_t *const current = state ? state : impl_->current;
+    SFEM_TRACE_SCOPE("%(op)s::apply");
+    const real_t *const current = state ? state : impl_->current;
 %(apply_state_check)s
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
 %(laplace_packed_apply_fast_path)s
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            const geom_t *const *geom_metric = nullptr;
-            const geom_t *geom_metric_aos = nullptr;
-            if (impl_->jacobian_action_uses_affine) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        domain.user_data);
-                if (!cache) {
-                    SFEM_ERROR("%(op)s affine jacobian action requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                if (%(action_affine_uses_jacobian)s) {
-                    if (!cache->jacobian) {
-                        SFEM_ERROR("%(op)s affine jacobian action requires cached jacobian geometry\\n");
-                        return SFEM_FAILURE;
-                    }
-                    adjugate = reinterpret_cast<const geom_t *const *>(
-                            cache->jacobian->jacobian_adjugate_SoA()->data());
-                    determinant = reinterpret_cast<const geom_t *>(
-                            cache->jacobian->jacobian_determinant()->data());
-                }
-                if (%(action_affine_uses_metric_soa)s) {
-                    if (!cache->metric_soa) {
-                        SFEM_ERROR("%(op)s affine jacobian action requires cached SoA metric geometry\\n");
-                        return SFEM_FAILURE;
-                    }
-                    geom_metric = reinterpret_cast<const geom_t *const *>(
-                            cache->metric_soa->fff_SoA()->data());
-                }
-                if (%(action_affine_uses_metric_aos)s) {
-                    if (!cache->metric_aos) {
-                        SFEM_ERROR("%(op)s affine jacobian action requires cached AoS metric geometry\\n");
-                        return SFEM_FAILURE;
-                    }
-                    geom_metric_aos = reinterpret_cast<const geom_t *>(
-                            cache->metric_aos->fff_AoS()->data());
-                }
-            }
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters,
-                            mesh->spatial_dimension(),
-                            storage);
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      const geom_t *const *geom_metric = nullptr;
+      const geom_t *geom_metric_aos = nullptr;
+      if (impl_->jacobian_action_uses_affine) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache) {
+          SFEM_ERROR("%(op)s affine jacobian action requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        if (%(action_affine_uses_jacobian)s) {
+          if (!cache->jacobian) {
+            SFEM_ERROR("%(op)s affine jacobian action requires cached jacobian geometry\\n");
+            return SFEM_FAILURE;
+          }
+          adjugate = reinterpret_cast<const geom_t *const *>(
+              cache->jacobian->jacobian_adjugate_SoA()->data());
+          determinant = reinterpret_cast<const geom_t *>(
+              cache->jacobian->jacobian_determinant()->data());
+        }
+        if (%(action_affine_uses_metric_soa)s) {
+          if (!cache->metric_soa) {
+            SFEM_ERROR("%(op)s affine jacobian action requires cached SoA metric geometry\\n");
+            return SFEM_FAILURE;
+          }
+          geom_metric = reinterpret_cast<const geom_t *const *>(
+              cache->metric_soa->fff_SoA()->data());
+        }
+        if (%(action_affine_uses_metric_aos)s) {
+          if (!cache->metric_aos) {
+            SFEM_ERROR("%(op)s affine jacobian action requires cached AoS metric geometry\\n");
+            return SFEM_FAILURE;
+          }
+          geom_metric_aos = reinterpret_cast<const geom_t *>(
+              cache->metric_aos->fff_AoS()->data());
+        }
+      }
+      real_t storage[MAX_PARAMETERS];
+      parameter_array(*domain.parameters,
+              mesh->spatial_dimension(),
+              storage);
 %(apply_previous_alias)s
 %(action_dispatch_body)s
-        });
-    }
+    });
+  }
 
-    void %(op)s::set_field(const char *name,
+  void %(op)s::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
-        SFEM_TRACE_SCOPE("%(op)s::set_field");
-        if (component != 0 || std::strcmp(name, "previous") != 0) {
-            SFEM_ERROR("%(op)s supports set_field(\\"previous\\", buffer, 0)\\n");
-            return;
-        }
-        impl_->previous_buffer = values;
-        impl_->previous = values->data();
+    SFEM_TRACE_SCOPE("%(op)s::set_field");
+    if (component != 0 || std::strcmp(name, "previous") != 0) {
+      SFEM_ERROR("%(op)s supports set_field(\\"previous\\", buffer, 0)\\n");
+      return;
     }
+    impl_->previous_buffer = values;
+    impl_->previous = values->data();
+  }
 
-    void %(op)s::set_value_in_block(const std::string &block_name,
-                                    const std::string &var_name,
-                                    const real_t value) {
-        SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
-        impl_->domains->set_value_in_block(block_name, var_name, value);
-    }
+  void %(op)s::set_value_in_block(const std::string &block_name,
+                  const std::string &var_name,
+                  const real_t value) {
+    SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
+    impl_->domains->set_value_in_block(block_name, var_name, value);
+  }
 
-    void %(op)s::set_option(const std::string &name, const bool val) {
-        SFEM_TRACE_SCOPE("%(op)s::set_option");
-        AffineOption options[] = {
+  void %(op)s::set_option(const std::string &name, const bool val) {
+    SFEM_TRACE_SCOPE("%(op)s::set_option");
+    AffineOption options[] = {
 %(affine_options)s
-        };
-        const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
-        if (matched && val && impl_->domains) {
-            const bool needs_affine_jacobian =
-                    (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
-                    (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
-            const bool needs_affine_metric =
-                    (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
-                    (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
-            const bool needs_affine_metric_soa =
-                    (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
-                    (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
-            const bool needs_affine_metric_aos =
-                    (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
-                    (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
-            if (cache_affine_geometry(impl_->space,
+    };
+    const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+    if (matched && val && impl_->domains) {
+      const bool needs_affine_jacobian =
+          (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
+          (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
+      const bool needs_affine_metric =
+          (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
+          (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
+      const bool needs_affine_metric_soa =
+          (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
+          (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
+      const bool needs_affine_metric_aos =
+          (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
+          (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
+      if (cache_affine_geometry(impl_->space,
                                       *impl_->domains,
                                       needs_affine_jacobian,
                                       needs_affine_metric_soa,
                                       needs_affine_metric_aos) != SFEM_SUCCESS) {
-                SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
-            }
-        }
+        SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
+      }
     }
+  }
 
 #ifdef SFEM_ENABLE_RYAML
-    std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+  std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
-        SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
-        auto ret = std::make_shared<%(op)s>(space);
+    SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
+    auto ret = std::make_shared<%(op)s>(space);
 
-        std::vector<std::string> block_names;
-        if (node.has_child("blocks")) {
-            for (auto block : node["blocks"].children()) {
-                if (block.has_child("name")) {
-                    block_names.push_back(yaml_read_string(block["name"]));
-                }
-            }
+    std::vector<std::string> block_names;
+    if (node.has_child("blocks")) {
+      for (auto block : node["blocks"].children()) {
+        if (block.has_child("name")) {
+          block_names.push_back(yaml_read_string(block["name"]));
         }
-
-        AffineOption options[] = {
-%(yaml_affine_options)s
-        };
-        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
-
-        if (ret->initialize(block_names) != SFEM_SUCCESS) {
-            return nullptr;
-        }
-
-        real_t defaults[N_MATERIAL_PARAMETERS];
-        material_defaults(defaults);
-        real_t top_values[N_MATERIAL_PARAMETERS];
-        copy_material_parameters(defaults, top_values);
-        if (material_from_yaml(node, defaults, top_values)) {
-            set_material(*ret->impl_->domains, top_values);
-        }
-
-        if (node.has_child("blocks")) {
-            for (auto block : node["blocks"].children()) {
-                if (!block.has_child("name")) {
-                    continue;
-                }
-
-                real_t block_values[N_MATERIAL_PARAMETERS];
-                copy_material_parameters(top_values, block_values);
-                if (!material_from_yaml(block, top_values, block_values)) {
-                    continue;
-                }
-
-                const std::string block_name = yaml_read_string(block["name"]);
-                set_material_in_block(*ret->impl_->domains, block_name, block_values);
-            }
-        }
-
-        return ret;
+      }
     }
+
+    AffineOption options[] = {
+%(yaml_affine_options)s
+    };
+    read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
+
+    if (ret->initialize(block_names) != SFEM_SUCCESS) {
+      return nullptr;
+    }
+
+    real_t defaults[N_MATERIAL_PARAMETERS];
+    material_defaults(defaults);
+    real_t top_values[N_MATERIAL_PARAMETERS];
+    copy_material_parameters(defaults, top_values);
+    if (material_from_yaml(node, defaults, top_values)) {
+      set_material(*ret->impl_->domains, top_values);
+    }
+
+    if (node.has_child("blocks")) {
+      for (auto block : node["blocks"].children()) {
+        if (!block.has_child("name")) {
+          continue;
+        }
+
+        real_t block_values[N_MATERIAL_PARAMETERS];
+        copy_material_parameters(top_values, block_values);
+        if (!material_from_yaml(block, top_values, block_values)) {
+          continue;
+        }
+
+        const std::string block_name = yaml_read_string(block["name"]);
+        set_material_in_block(*ret->impl_->domains, block_name, block_values);
+      }
+    }
+
+    return ret;
+  }
 #endif  // SFEM_ENABLE_RYAML
 
-    int %(op)s::hessian_crs(const real_t *const state,
-                            const count_t *const rowptr,
-                            const idx_t *const colidx,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
+  int %(op)s::hessian_crs(const real_t *const state,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
 %(hessian_crs_body)s
-    }
+  }
 
-    int %(op)s::hessian_bsr(const real_t *const state,
-                            const count_t *const rowptr,
-                            const idx_t *const colidx,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+  int %(op)s::hessian_bsr(const real_t *const state,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
 %(hessian_bsr_body)s
-    }
+  }
 
 %(merit_methods)s}  // namespace sfem
 """ % {
@@ -2929,9 +2929,9 @@ namespace sfem {
             _residual_merit_methods(material.op_name)
             if emits_merit
             else """    int %s::value(const real_t *, real_t *const) {
-        SFEM_TRACE_SCOPE("%s::value");
-        return SFEM_FAILURE;
-    }
+    SFEM_TRACE_SCOPE("%s::value");
+    return SFEM_FAILURE;
+  }
 """ % (material.op_name, material.op_name)
         ),
         "residual_cases": "\n".join(residual_cases),
@@ -2948,7 +2948,7 @@ namespace sfem {
             block_size_by_dim,
             residual_affine_metric_aos_elements_by_dim,
             residual_affine_metric_aos_unit_elements_by_dim,
-            "            ",
+            "      ",
                     mixed_order=mixed_order,
                 ),
         "action_dispatch_body": _residual_apply_dispatch_body(
@@ -2963,22 +2963,22 @@ namespace sfem {
             block_size_by_dim,
             action_affine_metric_aos_elements_by_dim,
             action_affine_metric_aos_unit_elements_by_dim,
-            "            ",
+            "      ",
                     mixed_order=mixed_order,
                 ),
         "hessian_crs_body": (
             "%s\n"
             "%s\n"
-            "        auto mesh = impl_->space->mesh_ptr();\n"
-            "        auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
-            "        return impl_->domains->iterate([&](const OpDomain &domain) {\n"
-            "            real_t storage[MAX_PARAMETERS];\n"
-            "            parameter_array(*domain.parameters,\n"
-            "                            mesh->spatial_dimension(),\n"
-            "                            storage);\n"
+            "    auto mesh = impl_->space->mesh_ptr();\n"
+            "    auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
+            "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
+            "      real_t storage[MAX_PARAMETERS];\n"
+            "      parameter_array(*domain.parameters,\n"
+            "              mesh->spatial_dimension(),\n"
+            "              storage);\n"
             "%s\n"
             "%s\n"
-            "        });"
+            "    });"
             % (
                 hessian_state_alias,
                 hessian_state_check,
@@ -2992,26 +2992,26 @@ namespace sfem {
                     fields_by_dim,
                     block_size_by_dim,
                     ("rowptr", "colidx", "values"),
-                    "            ",
+                    "      ",
                     mixed_order=mixed_order,
                 ),
             )
             if hessian_crs_cases
-            else "        return SFEM_FAILURE;"
+            else "    return SFEM_FAILURE;"
         ),
         "hessian_bsr_body": (
             "%s\n"
             "%s\n"
-            "        auto mesh = impl_->space->mesh_ptr();\n"
-            "        auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
-            "        return impl_->domains->iterate([&](const OpDomain &domain) {\n"
-            "            real_t storage[MAX_PARAMETERS];\n"
-            "            parameter_array(*domain.parameters,\n"
-            "                            mesh->spatial_dimension(),\n"
-            "                            storage);\n"
+            "    auto mesh = impl_->space->mesh_ptr();\n"
+            "    auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
+            "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
+            "      real_t storage[MAX_PARAMETERS];\n"
+            "      parameter_array(*domain.parameters,\n"
+            "              mesh->spatial_dimension(),\n"
+            "              storage);\n"
             "%s\n"
             "%s\n"
-            "        });"
+            "    });"
             % (
                 hessian_state_alias,
                 hessian_state_check,
@@ -3025,12 +3025,12 @@ namespace sfem {
                     fields_by_dim,
                     block_size_by_dim,
                     ("rowptr", "colidx", "values"),
-                    "            ",
+                    "      ",
                     mixed_order=mixed_order,
                 ),
             )
             if hessian_bsr_cases
-            else "        return SFEM_FAILURE;"
+            else "    return SFEM_FAILURE;"
         ),
         "affine_options": _affine_option_entries(
             "residual_uses_affine",
@@ -3050,23 +3050,23 @@ namespace sfem {
             owner="ret->impl_",
         ),
         "gradient_previous_check": (
-            "        if (!impl_->previous) {\n"
-            '            SFEM_ERROR("%s requires a previous state\\n");\n'
-            "            return SFEM_FAILURE;\n"
-            "        }" % material.op_name
+            "    if (!impl_->previous) {\n"
+            '      SFEM_ERROR("%s requires a previous state\\n");\n'
+            "      return SFEM_FAILURE;\n"
+            "    }" % material.op_name
             if residual_uses_previous
             else ""
         ),
         "gradient_previous_alias": (
-            "            const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = impl_->previous;"
             if residual_uses_previous
             else ""
         ),
         "apply_state_check": (
-            "        if (%s) {\n"
-            '            SFEM_ERROR("%s requires %s\\n");\n'
-            "            return SFEM_FAILURE;\n"
-            "        }"
+            "    if (%s) {\n"
+            '      SFEM_ERROR("%s requires %s\\n");\n'
+            "      return SFEM_FAILURE;\n"
+            "    }"
             % (
                 " || ".join(
                     condition
@@ -3091,7 +3091,7 @@ namespace sfem {
             else ""
         ),
         "apply_previous_alias": (
-            "            const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = impl_->previous;"
             if action_uses_previous
             else ""
         ),
@@ -3184,324 +3184,324 @@ def _boundary_residual_op(material, elements, c_abi_header=None, form_collection
 %(declaration_block)s
 
 namespace sfem {
-    namespace {
-        constexpr int MAX_PARAMETERS = %(max_parameters)d;
+  namespace {
+    constexpr int MAX_PARAMETERS = %(max_parameters)d;
 
-        void seed_parameters(Parameters &parameters) {
+    void seed_parameters(Parameters &parameters) {
 %(defaults)s
-        }
+    }
 
-        void seed_material(MultiDomainOp &domains) {
-            for (auto &entry : domains.domains()) {
-                seed_parameters(*entry.second.parameters);
-            }
-        }
+    void seed_material(MultiDomainOp &domains) {
+      for (auto &entry : domains.domains()) {
+        seed_parameters(*entry.second.parameters);
+      }
+    }
 
 %(yaml_helpers)s
 
-        void parameter_array(const Parameters &parameters,
+    void parameter_array(const Parameters &parameters,
                              const int dim,
                              real_t *const values) {
-            int index = 0;
+      int index = 0;
 %(parameter_lines)s
-        }
-
-        ptrdiff_t block_size_for_dim(const int dim) {
-%(block_size_lines)s
-        }
-
-        smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
-                                               const smesh::Mesh::Block &block) {
-            for (size_t i = 0; i < mesh.n_blocks(); ++i) {
-                if (mesh.block(i).get() == &block) {
-                    return static_cast<smesh::block_idx_t>(i);
-                }
-            }
-            SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
-            return 0;
-        }
-
-#ifdef SFEM_ENABLE_RYAML
-        std::shared_ptr<smesh::Sideset> sideset_from_yaml(
-                const std::shared_ptr<FunctionSpace> &space,
-                const ryml::ConstNodeRef             &node) {
-            const bool is_sideset = node["type"].readable() && node["type"].val() == "sideset";
-            const bool is_file    = node["format"].readable() && node["format"].val() == "file";
-            const bool is_expr    = node["format"].readable() && node["format"].val() == "expr";
-
-            if (!is_sideset && node.has_child("type")) {
-                SFEM_ERROR("%(op)s neumann condition requires type=sideset\\n");
-                return nullptr;
-            }
-
-            if (is_file || node.has_child("path")) {
-                if (!node.has_child("path")) {
-                    SFEM_ERROR("%(op)s file sideset condition requires path\\n");
-                    return nullptr;
-                }
-                const std::string path = yaml_read_string(node["path"]);
-                return smesh::Sideset::create_from_file(
-                        space->mesh_ptr()->comm(), smesh::Path(path));
-            }
-
-            if (is_expr || (node.has_child("parent") && node.has_child("lfi"))) {
-                if (!node["parent"].is_seq() || !node["lfi"].is_seq()) {
-                    SFEM_ERROR("%(op)s expr sideset condition requires parent/lfi sequences\\n");
-                    return nullptr;
-                }
-
-                const ptrdiff_t size = node["parent"].num_children();
-                if (node["lfi"].num_children() != size) {
-                    SFEM_ERROR("%(op)s expr sideset parent/lfi length mismatch\\n");
-                    return nullptr;
-                }
-
-                auto parent = create_host_buffer<element_idx_t>(size);
-                auto lfi    = create_host_buffer<int16_t>(size);
-
-                ptrdiff_t parent_count = 0;
-                for (auto p : node["parent"].children()) {
-                    p >> parent->data()[parent_count++];
-                }
-
-                ptrdiff_t lfi_count = 0;
-                for (auto p : node["lfi"].children()) {
-                    p >> lfi->data()[lfi_count++];
-                }
-
-                return std::make_shared<smesh::Sideset>(
-                        space->mesh_ptr()->comm(), parent, lfi);
-            }
-
-            SFEM_ERROR("%(op)s neumann condition requires format=file or format=expr\\n");
-            return nullptr;
-        }
-#endif  // SFEM_ENABLE_RYAML
-    }  // namespace
-
-    class %(op)s::Impl {
-    public:
-        explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
-
-        std::shared_ptr<FunctionSpace> space;
-        std::shared_ptr<MultiDomainOp> domains;
-        std::vector<NeumannConditions::Condition> conditions;
-    };
-
-    std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
-        const ptrdiff_t expected_block_size =
-                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
-        if (space->block_size() != expected_block_size) {
-            SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
-                       static_cast<long>(expected_block_size));
-            return nullptr;
-        }
-        auto op = std::make_unique<%(op)s>(space);
-        op->initialize();
-        return op;
     }
 
-    %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>(space)) {}
-    %(op)s::~%(op)s() = default;
+    ptrdiff_t block_size_for_dim(const int dim) {
+%(block_size_lines)s
+    }
 
-    ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
-    ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
+    smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
+                                               const smesh::Mesh::Block &block) {
+      for (size_t i = 0; i < mesh.n_blocks(); ++i) {
+        if (mesh.block(i).get() == &block) {
+          return static_cast<smesh::block_idx_t>(i);
+        }
+      }
+      SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
+      return 0;
+    }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<smesh::Sideset> sideset_from_yaml(
+        const std::shared_ptr<FunctionSpace> &space,
+        const ryml::ConstNodeRef             &node) {
+      const bool is_sideset = node["type"].readable() && node["type"].val() == "sideset";
+      const bool is_file    = node["format"].readable() && node["format"].val() == "file";
+      const bool is_expr    = node["format"].readable() && node["format"].val() == "expr";
+
+      if (!is_sideset && node.has_child("type")) {
+        SFEM_ERROR("%(op)s neumann condition requires type=sideset\\n");
+        return nullptr;
+      }
+
+      if (is_file || node.has_child("path")) {
+        if (!node.has_child("path")) {
+          SFEM_ERROR("%(op)s file sideset condition requires path\\n");
+          return nullptr;
+        }
+        const std::string path = yaml_read_string(node["path"]);
+        return smesh::Sideset::create_from_file(
+            space->mesh_ptr()->comm(), smesh::Path(path));
+      }
+
+      if (is_expr || (node.has_child("parent") && node.has_child("lfi"))) {
+        if (!node["parent"].is_seq() || !node["lfi"].is_seq()) {
+          SFEM_ERROR("%(op)s expr sideset condition requires parent/lfi sequences\\n");
+          return nullptr;
+        }
+
+        const ptrdiff_t size = node["parent"].num_children();
+        if (node["lfi"].num_children() != size) {
+          SFEM_ERROR("%(op)s expr sideset parent/lfi length mismatch\\n");
+          return nullptr;
+        }
+
+        auto parent = create_host_buffer<element_idx_t>(size);
+        auto lfi    = create_host_buffer<int16_t>(size);
+
+        ptrdiff_t parent_count = 0;
+        for (auto p : node["parent"].children()) {
+          p >> parent->data()[parent_count++];
+        }
+
+        ptrdiff_t lfi_count = 0;
+        for (auto p : node["lfi"].children()) {
+          p >> lfi->data()[lfi_count++];
+        }
+
+        return std::make_shared<smesh::Sideset>(
+            space->mesh_ptr()->comm(), parent, lfi);
+      }
+
+      SFEM_ERROR("%(op)s neumann condition requires format=file or format=expr\\n");
+      return nullptr;
+    }
+#endif  // SFEM_ENABLE_RYAML
+  }  // namespace
+
+  class %(op)s::Impl {
+  public:
+    explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+    std::shared_ptr<FunctionSpace> space;
+    std::shared_ptr<MultiDomainOp> domains;
+    std::vector<NeumannConditions::Condition> conditions;
+  };
+
+  std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
+    const ptrdiff_t expected_block_size =
+        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+    if (space->block_size() != expected_block_size) {
+      SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
+                       static_cast<long>(expected_block_size));
+      return nullptr;
+    }
+    auto op = std::make_unique<%(op)s>(space);
+    op->initialize();
+    return op;
+  }
+
+  %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
+    : impl_(std::make_unique<Impl>(space)) {}
+  %(op)s::~%(op)s() = default;
+
+  ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
+  ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
 %(performance_methods)s
 
-    // Establish once, at setup, that this operator's dof graph is well formed:
-    // rows in order, every column in range, each row sorted and duplicate free.
-    // The assembly kernels assume it -- they locate an entry and write to it
-    // without re-checking that it is there -- so this is where the assumption
-    // is earned.
-    //
-    // It used to be earned per element instead: every scatter walked its
-    // NS x NS candidates, tested each with a three-condition branch
-    // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x NS^2) on every assembly for a
-    // property of the mesh and the graph together, which cannot change between
-    // elements or between calls.  Here it is O(nnz), once.
-    //
-    // Raw pointers rather than the graph type, so this does not depend on which
-    // headers the generated wrapper happens to pull in.
-    static int validate_dof_graph(const count_t *const rowptr,
+  // Establish once, at setup, that this operator's dof graph is well formed:
+  // rows in order, every column in range, each row sorted and duplicate free.
+  // The assembly kernels assume it -- they locate an entry and write to it
+  // without re-checking that it is there -- so this is where the assumption
+  // is earned.
+  //
+  // It used to be earned per element instead: every scatter walked its
+  // NS x NS candidates, tested each with a three-condition branch
+  // and reported through std::fprintf from inside the caller's parallel
+  // region.  That paid O(elements x NS^2) on every assembly for a
+  // property of the mesh and the graph together, which cannot change between
+  // elements or between calls.  Here it is O(nnz), once.
+  //
+  // Raw pointers rather than the graph type, so this does not depend on which
+  // headers the generated wrapper happens to pull in.
+  static int validate_dof_graph(const count_t *const rowptr,
                                   const idx_t *const colidx,
                                   const ptrdiff_t n_nodes,
                                   const ptrdiff_t nnz) {
-        if (!rowptr || !colidx || n_nodes < 0) {
-            return SFEM_FAILURE;
-        }
-        if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-            return SFEM_FAILURE;
-        }
-        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-            const count_t begin = rowptr[i];
-            const count_t end = rowptr[i + 1];
-            if (end < begin || (ptrdiff_t)end > nnz) {
-                return SFEM_FAILURE;
-            }
-            for (count_t k = begin; k < end; ++k) {
-                if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-                    return SFEM_FAILURE;
-                }
-                if (k > begin && colidx[k] <= colidx[k - 1]) {
-                    return SFEM_FAILURE;
-                }
-            }
-        }
-        return SFEM_SUCCESS;
+    if (!rowptr || !colidx || n_nodes < 0) {
+      return SFEM_FAILURE;
     }
+    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
+      return SFEM_FAILURE;
+    }
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+      const count_t begin = rowptr[i];
+      const count_t end = rowptr[i + 1];
+      if (end < begin || (ptrdiff_t)end > nnz) {
+        return SFEM_FAILURE;
+      }
+      for (count_t k = begin; k < end; ++k) {
+        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
+          return SFEM_FAILURE;
+        }
+        if (k > begin && colidx[k] <= colidx[k - 1]) {
+          return SFEM_FAILURE;
+        }
+      }
+    }
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::initialize(const std::vector<std::string> &block_names) {
-        SFEM_TRACE_SCOPE("%(op)s::initialize");
-        impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-        {
-            auto dof_graph = impl_->space->dof_to_dof_graph();
-            if (!dof_graph ||
-                validate_dof_graph(dof_graph->rowptr()->data(),
+  int %(op)s::initialize(const std::vector<std::string> &block_names) {
+    SFEM_TRACE_SCOPE("%(op)s::initialize");
+    impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    {
+      auto dof_graph = impl_->space->dof_to_dof_graph();
+      if (!dof_graph ||
+        validate_dof_graph(dof_graph->rowptr()->data(),
                                    dof_graph->colidx()->data(),
                                    dof_graph->n_nodes(),
                                    dof_graph->nnz()) != SFEM_SUCCESS) {
-                SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-                return SFEM_FAILURE;
-            }
-        }
-        seed_material(*impl_->domains);
-        return SFEM_SUCCESS;
+        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
+        return SFEM_FAILURE;
+      }
     }
+    seed_material(*impl_->domains);
+    return SFEM_SUCCESS;
+  }
 
-    void %(op)s::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset) {
-        real_t values[MAX_PARAMETERS];
-        material_defaults(values);
-        add_sideset(sideset, values);
-    }
+  void %(op)s::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset) {
+    real_t values[MAX_PARAMETERS];
+    material_defaults(values);
+    add_sideset(sideset, values);
+  }
 
-    void %(op)s::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
+  void %(op)s::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
                              const real_t *const parameters) {
-        SFEM_TRACE_SCOPE("%(op)s::add_sideset");
-        NeumannConditions::Condition condition;
-        condition.sidesets = {sideset};
-        condition.values = create_host_buffer<real_t>(MAX_PARAMETERS);
-        for (int i = 0; i < MAX_PARAMETERS; ++i) {
-            condition.values->data()[i] = parameters[i];
-        }
-        condition.value = parameters[0];
-        condition.component = 0;
-        add_condition(condition);
+    SFEM_TRACE_SCOPE("%(op)s::add_sideset");
+    NeumannConditions::Condition condition;
+    condition.sidesets = {sideset};
+    condition.values = create_host_buffer<real_t>(MAX_PARAMETERS);
+    for (int i = 0; i < MAX_PARAMETERS; ++i) {
+      condition.values->data()[i] = parameters[i];
     }
+    condition.value = parameters[0];
+    condition.component = 0;
+    add_condition(condition);
+  }
 
-    void %(op)s::add_condition(const NeumannConditions::Condition &condition) {
-        SFEM_TRACE_SCOPE("%(op)s::add_condition");
-        impl_->conditions.push_back(condition);
+  void %(op)s::add_condition(const NeumannConditions::Condition &condition) {
+    SFEM_TRACE_SCOPE("%(op)s::add_condition");
+    impl_->conditions.push_back(condition);
+  }
+
+  int %(op)s::gradient(const real_t *const, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::gradient");
+    if (impl_->conditions.empty()) {
+      return SFEM_SUCCESS;
     }
-
-    int %(op)s::gradient(const real_t *const, real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::gradient");
-        if (impl_->conditions.empty()) {
-            return SFEM_SUCCESS;
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
+      int status = SFEM_SUCCESS;
+      for (const auto &condition : impl_->conditions) {
+        const auto sideset = condition.sidesets.empty() ? nullptr : condition.sidesets[0];
+        if (!sideset || !condition.values || sideset->block_id() != block_id) {
+          continue;
         }
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
-            int status = SFEM_SUCCESS;
-            for (const auto &condition : impl_->conditions) {
-                const auto sideset = condition.sidesets.empty() ? nullptr : condition.sidesets[0];
-                if (!sideset || !condition.values || sideset->block_id() != block_id) {
-                    continue;
-                }
-                switch (domain.element_type) {
+        switch (domain.element_type) {
 %(gradient_cases)s
-                    default:
-                        SFEM_ERROR("%(op)s does not support element type %%d\\n",
+          default:
+            SFEM_ERROR("%(op)s does not support element type %%d\\n",
                                    domain.element_type);
-                        return SFEM_FAILURE;
-                }
-            }
-            return status;
-        });
-    }
+            return SFEM_FAILURE;
+        }
+      }
+      return status;
+    });
+  }
 
-    int %(op)s::apply(const real_t *const,
+  int %(op)s::apply(const real_t *const,
                       const real_t *const,
                       real_t *const) {
-        SFEM_TRACE_SCOPE("%(op)s::apply");
-        return SFEM_SUCCESS;
-    }
+    SFEM_TRACE_SCOPE("%(op)s::apply");
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::value(const real_t *, real_t *const) {
-        SFEM_TRACE_SCOPE("%(op)s::value");
-        return SFEM_SUCCESS;
-    }
+  int %(op)s::value(const real_t *, real_t *const) {
+    SFEM_TRACE_SCOPE("%(op)s::value");
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
-        return SFEM_SUCCESS;
-    }
+  int %(op)s::hessian_crs(const real_t *const,
+              const count_t *const,
+              const idx_t *const,
+              real_t *const) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
+    return SFEM_SUCCESS;
+  }
 
-    void %(op)s::set_field(const char *,
+  void %(op)s::set_field(const char *,
                            const std::shared_ptr<Buffer<real_t>> &,
                            const int) {
-        SFEM_TRACE_SCOPE("%(op)s::set_field");
-    }
+    SFEM_TRACE_SCOPE("%(op)s::set_field");
+  }
 
-    void %(op)s::set_option(const std::string &, const bool) {
-        SFEM_TRACE_SCOPE("%(op)s::set_option");
-    }
+  void %(op)s::set_option(const std::string &, const bool) {
+    SFEM_TRACE_SCOPE("%(op)s::set_option");
+  }
 
-    void %(op)s::set_value_in_block(const std::string &block_name,
-                                    const std::string &var_name,
-                                    const real_t value) {
-        SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
-        impl_->domains->set_value_in_block(block_name, var_name, value);
-    }
+  void %(op)s::set_value_in_block(const std::string &block_name,
+                  const std::string &var_name,
+                  const real_t value) {
+    SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
+    impl_->domains->set_value_in_block(block_name, var_name, value);
+  }
 
 #ifdef SFEM_ENABLE_RYAML
-    std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+  std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
-        SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
-        auto ret = std::make_shared<%(op)s>(space);
+    SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
+    auto ret = std::make_shared<%(op)s>(space);
 
-        std::vector<std::string> block_names;
-        if (node.has_child("blocks")) {
-            for (auto block : node["blocks"].children()) {
-                if (block.has_child("name")) {
-                    block_names.push_back(yaml_read_string(block["name"]));
-                }
-            }
+    std::vector<std::string> block_names;
+    if (node.has_child("blocks")) {
+      for (auto block : node["blocks"].children()) {
+        if (block.has_child("name")) {
+          block_names.push_back(yaml_read_string(block["name"]));
         }
-
-        if (ret->initialize(block_names) != SFEM_SUCCESS) {
-            return nullptr;
-        }
-
-        real_t defaults[MAX_PARAMETERS];
-        material_defaults(defaults);
-        real_t top_values[MAX_PARAMETERS];
-        copy_material_parameters(defaults, top_values);
-        material_from_yaml(node, defaults, top_values);
-
-        const auto neumann_node =
-                node.has_child("neumann_conditions") ? node["neumann_conditions"] :
-                 ryml::ConstNodeRef();
-        if (neumann_node.readable() && neumann_node.is_seq()) {
-            for (auto condition_node : neumann_node.children()) {
-                auto sideset = sideset_from_yaml(space, condition_node);
-                if (!sideset) {
-                    return nullptr;
-                }
-                real_t condition_values[MAX_PARAMETERS];
-                material_from_yaml(condition_node, top_values, condition_values);
-                ret->add_sideset(sideset, condition_values);
-            }
-        }
-
-        return ret;
+      }
     }
+
+    if (ret->initialize(block_names) != SFEM_SUCCESS) {
+      return nullptr;
+    }
+
+    real_t defaults[MAX_PARAMETERS];
+    material_defaults(defaults);
+    real_t top_values[MAX_PARAMETERS];
+    copy_material_parameters(defaults, top_values);
+    material_from_yaml(node, defaults, top_values);
+
+    const auto neumann_node =
+        node.has_child("neumann_conditions") ? node["neumann_conditions"] :
+                 ryml::ConstNodeRef();
+    if (neumann_node.readable() && neumann_node.is_seq()) {
+      for (auto condition_node : neumann_node.children()) {
+        auto sideset = sideset_from_yaml(space, condition_node);
+        if (!sideset) {
+          return nullptr;
+        }
+        real_t condition_values[MAX_PARAMETERS];
+        material_from_yaml(condition_node, top_values, condition_values);
+        ret->add_sideset(sideset, condition_values);
+      }
+    }
+
+    return ret;
+  }
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
 """ % {
@@ -3526,68 +3526,68 @@ def _boundary_header(material):
 #include "sfem_Op.hpp"
 
 namespace smesh {
-    class Sideset;
+  class Sideset;
 }
 
 namespace sfem {
-    class %(op)s final : public Op {
-    public:
-        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
+  class %(op)s final : public Op {
+  public:
+    static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
-        explicit %(op)s(const std::shared_ptr<FunctionSpace> &space);
-        ~%(op)s() override;
+    explicit %(op)s(const std::shared_ptr<FunctionSpace> &space);
+    ~%(op)s() override;
 
-        const char *name() const override { return "%(op)s"; }
-        bool is_linear() const override { return true; }
-        ptrdiff_t n_dofs_domain() const override;
-        ptrdiff_t n_dofs_image() const override;
-        double flops_value() const override;
-        double flops_gradient() const override;
-        double flops_apply() const override;
-        size_t memory_traffic_bytes_value() const override;
-        size_t memory_traffic_bytes_gradient() const override;
-        size_t memory_traffic_bytes_apply() const override;
+    const char *name() const override { return "%(op)s"; }
+    bool is_linear() const override { return true; }
+    ptrdiff_t n_dofs_domain() const override;
+    ptrdiff_t n_dofs_image() const override;
+    double flops_value() const override;
+    double flops_gradient() const override;
+    double flops_apply() const override;
+    size_t memory_traffic_bytes_value() const override;
+    size_t memory_traffic_bytes_gradient() const override;
+    size_t memory_traffic_bytes_apply() const override;
 
-        int initialize(const std::vector<std::string> &block_names = {}) override;
-        void add_condition(const NeumannConditions::Condition &condition);
-        void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset);
-        void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
+    int initialize(const std::vector<std::string> &block_names = {}) override;
+    void add_condition(const NeumannConditions::Condition &condition);
+    void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset);
+    void add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
                          const real_t *parameters);
-        int gradient(const real_t *const x, real_t *const out) override;
-        int apply(const real_t *const x,
+    int gradient(const real_t *const x, real_t *const out) override;
+    int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;
-        int value(const real_t *x, real_t *const out) override;
-        int hessian_crs(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override;
-        void set_field(const char *name,
+    int value(const real_t *x, real_t *const out) override;
+    int hessian_crs(const real_t *const x,
+            const count_t *const rowptr,
+            const idx_t *const colidx,
+            real_t *const values) override;
+    void set_field(const char *name,
                        const std::shared_ptr<Buffer<real_t>> &values,
                        int component) override;
-        void set_option(const std::string &name, bool val) override;
-        void set_value_in_block(const std::string &block_name,
-                                const std::string &var_name,
-                                real_t value) override;
+    void set_option(const std::string &name, bool val) override;
+    void set_value_in_block(const std::string &block_name,
+                const std::string &var_name,
+                real_t value) override;
 #ifdef SFEM_ENABLE_RYAML
-        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
 #endif  // SFEM_ENABLE_RYAML
 
-        //! The scalar type the kernels are asked for at run time.
-        //!
-        //! Mirrors GPULaplacian, which declares the same member with the same
-        //! default and hands it to every kernel call.  SMESH_DEFAULT resolves
-        //! to the build's real_t, so the default costs a caller nothing and is
-        //! the common path rather than a fallback.  The Op interface itself is
-        //! unchanged: its methods still take real_t*, which converts to void*
-        //! at the call, exactly as gpu_laplacian_block_vector relies on.
-        enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
+    //! The scalar type the kernels are asked for at run time.
+    //!
+    //! Mirrors GPULaplacian, which declares the same member with the same
+    //! default and hands it to every kernel call.  SMESH_DEFAULT resolves
+    //! to the build's real_t, so the default costs a caller nothing and is
+    //! the common path rather than a fallback.  The Op interface itself is
+    //! unchanged: its methods still take real_t*, which converts to void*
+    //! at the call, exactly as gpu_laplacian_block_vector relies on.
+    enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
 
-    private:
-        class Impl;
-        std::unique_ptr<Impl> impl_;
-    };
+  private:
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+  };
 }  // namespace sfem
 """ % {"op": material.op_name}
 
@@ -3657,374 +3657,374 @@ def _coupled_energy_residual_op(
 %(declaration_block)s
 
 namespace sfem {
-    namespace {
-        constexpr int MAX_PARAMETERS = %(max_parameters)d;
+  namespace {
+    constexpr int MAX_PARAMETERS = %(max_parameters)d;
 
-        void seed_parameters(Parameters &parameters) {
+    void seed_parameters(Parameters &parameters) {
 %(defaults)s
-        }
+    }
 
-        void seed_material(MultiDomainOp &domains) {
-            for (auto &entry : domains.domains()) {
-                seed_parameters(*entry.second.parameters);
-            }
-        }
+    void seed_material(MultiDomainOp &domains) {
+      for (auto &entry : domains.domains()) {
+        seed_parameters(*entry.second.parameters);
+      }
+    }
 
 %(yaml_helpers)s
 
-        smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
+    smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
                                                const smesh::Mesh::Block &block) {
-            for (size_t i = 0; i < mesh.n_blocks(); ++i) {
-                if (mesh.block(i).get() == &block) {
-                    return static_cast<smesh::block_idx_t>(i);
-                }
-            }
-            SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
-            return 0;
+      for (size_t i = 0; i < mesh.n_blocks(); ++i) {
+        if (mesh.block(i).get() == &block) {
+          return static_cast<smesh::block_idx_t>(i);
         }
-
-        int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
-                                  MultiDomainOp &domains) {
-            auto mesh = space->mesh_ptr();
-            for (auto &entry : domains.domains()) {
-                if (entry.second.user_data) {
-                    continue;
-                }
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
-                    return SFEM_FAILURE;
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
-            }
-            return SFEM_SUCCESS;
-        }
-
-        void parameter_array(const Parameters &parameters,
-                             real_t *const values) {
-%(parameter_lines)s
-        }
-
-        ptrdiff_t block_size_for_dim(const int dim) {
-            switch (dim) {
-%(block_size_lines)s
-                default:
-                    SFEM_ERROR("unsupported spatial dimension %%d for generated coupled block size\\n", dim);
-                    return 0;
-            }
-        }
-    }  // namespace
-
-    class %(op)s::Impl {
-    public:
-        explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
-
-        std::shared_ptr<FunctionSpace> space;
-        std::shared_ptr<MultiDomainOp> domains;
-        std::shared_ptr<Buffer<real_t>> previous_buffer;
-        std::unique_ptr<real_t[]> element_values;
-        ptrdiff_t element_capacity{0};
-        const real_t *previous{nullptr};
-        const real_t *current{nullptr};
-        bool objective_uses_affine{false};
-        bool gradient_uses_affine{false};
-        bool apply_uses_affine{false};
-        bool residual_uses_affine{false};
-        bool jacobian_action_uses_affine{false};
-    };
-
-    std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
-        const ptrdiff_t expected_block_size =
-                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
-        if (space->block_size() != expected_block_size) {
-            SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
-                       static_cast<long>(expected_block_size));
-            return nullptr;
-        }
-        auto op = std::make_unique<%(op)s>(space);
-        op->initialize();
-        return op;
+      }
+      SFEM_ERROR("%(op)s: mesh block pointer not found in mesh.blocks()\\n");
+      return 0;
     }
 
-    %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>(space)) {}
-    %(op)s::~%(op)s() = default;
+    int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
+                                  MultiDomainOp &domains) {
+      auto mesh = space->mesh_ptr();
+      for (auto &entry : domains.domains()) {
+        if (entry.second.user_data) {
+          continue;
+        }
+        const smesh::block_idx_t block_id =
+            block_id_for_domain(*mesh, *entry.second.block);
+        auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+        if (!jacobian) {
+          return SFEM_FAILURE;
+        }
+        entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+      }
+      return SFEM_SUCCESS;
+    }
 
-    ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
-    ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
+    void parameter_array(const Parameters &parameters,
+                             real_t *const values) {
+%(parameter_lines)s
+    }
+
+    ptrdiff_t block_size_for_dim(const int dim) {
+      switch (dim) {
+%(block_size_lines)s
+        default:
+          SFEM_ERROR("unsupported spatial dimension %%d for generated coupled block size\\n", dim);
+          return 0;
+      }
+    }
+  }  // namespace
+
+  class %(op)s::Impl {
+  public:
+    explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+    std::shared_ptr<FunctionSpace> space;
+    std::shared_ptr<MultiDomainOp> domains;
+    std::shared_ptr<Buffer<real_t>> previous_buffer;
+    std::unique_ptr<real_t[]> element_values;
+    ptrdiff_t element_capacity{0};
+    const real_t *previous{nullptr};
+    const real_t *current{nullptr};
+    bool objective_uses_affine{false};
+    bool gradient_uses_affine{false};
+    bool apply_uses_affine{false};
+    bool residual_uses_affine{false};
+    bool jacobian_action_uses_affine{false};
+  };
+
+  std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
+    const ptrdiff_t expected_block_size =
+        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+    if (space->block_size() != expected_block_size) {
+      SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
+                       static_cast<long>(expected_block_size));
+      return nullptr;
+    }
+    auto op = std::make_unique<%(op)s>(space);
+    op->initialize();
+    return op;
+  }
+
+  %(op)s::%(op)s(const std::shared_ptr<FunctionSpace> &space)
+    : impl_(std::make_unique<Impl>(space)) {}
+  %(op)s::~%(op)s() = default;
+
+  ptrdiff_t %(op)s::n_dofs_domain() const { return impl_->space->n_dofs(); }
+  ptrdiff_t %(op)s::n_dofs_image() const { return impl_->space->n_dofs(); }
 
 %(performance_methods)s
 
-    // Establish once, at setup, that this operator's dof graph is well formed:
-    // rows in order, every column in range, each row sorted and duplicate free.
-    // The assembly kernels assume it -- they locate an entry and write to it
-    // without re-checking that it is there -- so this is where the assumption
-    // is earned.
-    //
-    // It used to be earned per element instead: every scatter walked its
-    // NS x NS candidates, tested each with a three-condition branch
-    // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x NS^2) on every assembly for a
-    // property of the mesh and the graph together, which cannot change between
-    // elements or between calls.  Here it is O(nnz), once.
-    //
-    // Raw pointers rather than the graph type, so this does not depend on which
-    // headers the generated wrapper happens to pull in.
-    static int validate_dof_graph(const count_t *const rowptr,
+  // Establish once, at setup, that this operator's dof graph is well formed:
+  // rows in order, every column in range, each row sorted and duplicate free.
+  // The assembly kernels assume it -- they locate an entry and write to it
+  // without re-checking that it is there -- so this is where the assumption
+  // is earned.
+  //
+  // It used to be earned per element instead: every scatter walked its
+  // NS x NS candidates, tested each with a three-condition branch
+  // and reported through std::fprintf from inside the caller's parallel
+  // region.  That paid O(elements x NS^2) on every assembly for a
+  // property of the mesh and the graph together, which cannot change between
+  // elements or between calls.  Here it is O(nnz), once.
+  //
+  // Raw pointers rather than the graph type, so this does not depend on which
+  // headers the generated wrapper happens to pull in.
+  static int validate_dof_graph(const count_t *const rowptr,
                                   const idx_t *const colidx,
                                   const ptrdiff_t n_nodes,
                                   const ptrdiff_t nnz) {
-        if (!rowptr || !colidx || n_nodes < 0) {
-            return SFEM_FAILURE;
-        }
-        if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-            return SFEM_FAILURE;
-        }
-        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-            const count_t begin = rowptr[i];
-            const count_t end = rowptr[i + 1];
-            if (end < begin || (ptrdiff_t)end > nnz) {
-                return SFEM_FAILURE;
-            }
-            for (count_t k = begin; k < end; ++k) {
-                if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-                    return SFEM_FAILURE;
-                }
-                if (k > begin && colidx[k] <= colidx[k - 1]) {
-                    return SFEM_FAILURE;
-                }
-            }
-        }
-        return SFEM_SUCCESS;
+    if (!rowptr || !colidx || n_nodes < 0) {
+      return SFEM_FAILURE;
     }
+    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
+      return SFEM_FAILURE;
+    }
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+      const count_t begin = rowptr[i];
+      const count_t end = rowptr[i + 1];
+      if (end < begin || (ptrdiff_t)end > nnz) {
+        return SFEM_FAILURE;
+      }
+      for (count_t k = begin; k < end; ++k) {
+        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
+          return SFEM_FAILURE;
+        }
+        if (k > begin && colidx[k] <= colidx[k - 1]) {
+          return SFEM_FAILURE;
+        }
+      }
+    }
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::initialize(const std::vector<std::string> &block_names) {
-        SFEM_TRACE_SCOPE("%(op)s::initialize");
-        impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-        {
-            auto dof_graph = impl_->space->dof_to_dof_graph();
-            if (!dof_graph ||
-                validate_dof_graph(dof_graph->rowptr()->data(),
+  int %(op)s::initialize(const std::vector<std::string> &block_names) {
+    SFEM_TRACE_SCOPE("%(op)s::initialize");
+    impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    {
+      auto dof_graph = impl_->space->dof_to_dof_graph();
+      if (!dof_graph ||
+        validate_dof_graph(dof_graph->rowptr()->data(),
                                    dof_graph->colidx()->data(),
                                    dof_graph->n_nodes(),
                                    dof_graph->nnz()) != SFEM_SUCCESS) {
-                SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-                return SFEM_FAILURE;
-            }
-        }
-        seed_material(*impl_->domains);
-        auto mesh = impl_->space->mesh_ptr();
-        const bool needs_affine_geometry =
-                impl_->objective_uses_affine ||
-                impl_->gradient_uses_affine ||
-                impl_->apply_uses_affine ||
-                impl_->residual_uses_affine ||
-                impl_->jacobian_action_uses_affine;
-        for (auto &entry : impl_->domains->domains()) {
-            impl_->element_capacity =
-                    std::max(impl_->element_capacity, entry.second.block->n_elements());
-            if (needs_affine_geometry) {
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!jacobian) {
-                    return SFEM_FAILURE;
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(jacobian);
-            }
-        }
-        impl_->element_values.reset(new real_t[impl_->element_capacity]);
-        return SFEM_SUCCESS;
+        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
+        return SFEM_FAILURE;
+      }
     }
-
-    int %(op)s::update(const real_t *const x) {
-        SFEM_TRACE_SCOPE("%(op)s::update");
-        impl_->current = x;
-        return SFEM_SUCCESS;
+    seed_material(*impl_->domains);
+    auto mesh = impl_->space->mesh_ptr();
+    const bool needs_affine_geometry =
+        impl_->objective_uses_affine ||
+        impl_->gradient_uses_affine ||
+        impl_->apply_uses_affine ||
+        impl_->residual_uses_affine ||
+        impl_->jacobian_action_uses_affine;
+    for (auto &entry : impl_->domains->domains()) {
+      impl_->element_capacity =
+          std::max(impl_->element_capacity, entry.second.block->n_elements());
+      if (needs_affine_geometry) {
+        const smesh::block_idx_t block_id =
+            block_id_for_domain(*mesh, *entry.second.block);
+        auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
+            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+        if (!jacobian) {
+          return SFEM_FAILURE;
+        }
+        entry.second.user_data = std::static_pointer_cast<void>(jacobian);
+      }
     }
+    impl_->element_values.reset(new real_t[impl_->element_capacity]);
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::update(const real_t *const previous,
+  int %(op)s::update(const real_t *const x) {
+    SFEM_TRACE_SCOPE("%(op)s::update");
+    impl_->current = x;
+    return SFEM_SUCCESS;
+  }
+
+  int %(op)s::update(const real_t *const previous,
                        const real_t *const current) {
-        SFEM_TRACE_SCOPE("%(op)s::update");
-        impl_->previous_buffer.reset();
-        impl_->previous = previous;
-        impl_->current = current;
-        return SFEM_SUCCESS;
-    }
+    SFEM_TRACE_SCOPE("%(op)s::update");
+    impl_->previous_buffer.reset();
+    impl_->previous = previous;
+    impl_->current = current;
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::gradient(const real_t *const state, real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::gradient");
+  int %(op)s::gradient(const real_t *const state, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::gradient");
 %(gradient_previous_check)s
-        impl_->current = state;
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            if (impl_->gradient_uses_affine || impl_->residual_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
-                        domain.user_data);
-                if (!jacobian) {
-                    SFEM_ERROR("%(op)s affine gradient/residual requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
-            }
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters, storage);
+    impl_->current = state;
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      if (impl_->gradient_uses_affine || impl_->residual_uses_affine) {
+        auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+            domain.user_data);
+        if (!jacobian) {
+          SFEM_ERROR("%(op)s affine gradient/residual requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            jacobian->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            jacobian->jacobian_determinant()->data());
+      }
+      real_t storage[MAX_PARAMETERS];
+      parameter_array(*domain.parameters, storage);
 %(gradient_previous_alias)s
-            switch (domain.element_type) {
+      switch (domain.element_type) {
 %(gradient_cases)s
-                default:
-                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
+        default:
+          SFEM_ERROR("%(op)s does not support element type %%d\\n",
                                domain.element_type);
-                    return SFEM_FAILURE;
-            }
-        });
-    }
+          return SFEM_FAILURE;
+      }
+    });
+  }
 
-    int %(op)s::apply(const real_t *const state,
+  int %(op)s::apply(const real_t *const state,
                       const real_t *const direction,
                       real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::apply");
-        const real_t *const current = state ? state : impl_->current;
+    SFEM_TRACE_SCOPE("%(op)s::apply");
+    const real_t *const current = state ? state : impl_->current;
 %(apply_state_check)s
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            if (impl_->apply_uses_affine || impl_->jacobian_action_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
-                        domain.user_data);
-                if (!jacobian) {
-                    SFEM_ERROR("%(op)s affine hessian/jacobian action requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
-            }
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters, storage);
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      if (impl_->apply_uses_affine || impl_->jacobian_action_uses_affine) {
+        auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+            domain.user_data);
+        if (!jacobian) {
+          SFEM_ERROR("%(op)s affine hessian/jacobian action requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            jacobian->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            jacobian->jacobian_determinant()->data());
+      }
+      real_t storage[MAX_PARAMETERS];
+      parameter_array(*domain.parameters, storage);
 %(apply_previous_alias)s
-            switch (domain.element_type) {
+      switch (domain.element_type) {
 %(apply_cases)s
-                default:
-                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
+        default:
+          SFEM_ERROR("%(op)s does not support element type %%d\\n",
                                domain.element_type);
-                    return SFEM_FAILURE;
-            }
-        });
-    }
+          return SFEM_FAILURE;
+      }
+    });
+  }
 
 %(value_steps_method)s
-    void %(op)s::set_field(const char *name,
+  void %(op)s::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
-        SFEM_TRACE_SCOPE("%(op)s::set_field");
-        if (component != 0 || std::strcmp(name, "previous") != 0) {
-            SFEM_ERROR("%(op)s supports set_field(\\"previous\\", buffer, 0)\\n");
-            return;
-        }
-        impl_->previous_buffer = values;
-        impl_->previous = values->data();
+    SFEM_TRACE_SCOPE("%(op)s::set_field");
+    if (component != 0 || std::strcmp(name, "previous") != 0) {
+      SFEM_ERROR("%(op)s supports set_field(\\"previous\\", buffer, 0)\\n");
+      return;
     }
+    impl_->previous_buffer = values;
+    impl_->previous = values->data();
+  }
 
-    void %(op)s::set_option(const std::string &name, const bool val) {
-        SFEM_TRACE_SCOPE("%(op)s::set_option");
-        AffineOption options[] = {
+  void %(op)s::set_option(const std::string &name, const bool val) {
+    SFEM_TRACE_SCOPE("%(op)s::set_option");
+    AffineOption options[] = {
 %(affine_options)s
-        };
-        const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
-        if (matched && val && impl_->domains &&
-            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
-            SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
-        }
+    };
+    const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
+    if (matched && val && impl_->domains &&
+      cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+      SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
     }
+  }
 
-    void %(op)s::set_value_in_block(const std::string &block_name,
-                                    const std::string &var_name,
-                                    const real_t value) {
-        SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
-        impl_->domains->set_value_in_block(block_name, var_name, value);
-    }
+  void %(op)s::set_value_in_block(const std::string &block_name,
+                  const std::string &var_name,
+                  const real_t value) {
+    SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
+    impl_->domains->set_value_in_block(block_name, var_name, value);
+  }
 
 #ifdef SFEM_ENABLE_RYAML
-    std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+  std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
-        SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
-        auto ret = std::make_shared<%(op)s>(space);
+    SFEM_TRACE_SCOPE("%(op)s::create_from_yaml");
+    auto ret = std::make_shared<%(op)s>(space);
 
-        std::vector<std::string> block_names;
-        if (node.has_child("blocks")) {
-            for (auto block : node["blocks"].children()) {
-                if (block.has_child("name")) {
-                    block_names.push_back(yaml_read_string(block["name"]));
-                }
-            }
+    std::vector<std::string> block_names;
+    if (node.has_child("blocks")) {
+      for (auto block : node["blocks"].children()) {
+        if (block.has_child("name")) {
+          block_names.push_back(yaml_read_string(block["name"]));
         }
-
-        AffineOption options[] = {
-%(yaml_affine_options)s
-        };
-        read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
-
-        if (ret->initialize(block_names) != SFEM_SUCCESS) {
-            return nullptr;
-        }
-
-        real_t defaults[N_MATERIAL_PARAMETERS];
-        material_defaults(defaults);
-        real_t top_values[N_MATERIAL_PARAMETERS];
-        copy_material_parameters(defaults, top_values);
-        if (material_from_yaml(node, defaults, top_values)) {
-            set_material(*ret->impl_->domains, top_values);
-        }
-
-        if (node.has_child("blocks")) {
-            for (auto block : node["blocks"].children()) {
-                if (!block.has_child("name")) {
-                    continue;
-                }
-
-                real_t block_values[N_MATERIAL_PARAMETERS];
-                copy_material_parameters(top_values, block_values);
-                if (!material_from_yaml(block, top_values, block_values)) {
-                    continue;
-                }
-
-                const std::string block_name = yaml_read_string(block["name"]);
-                set_material_in_block(*ret->impl_->domains, block_name, block_values);
-            }
-        }
-
-        return ret;
+      }
     }
+
+    AffineOption options[] = {
+%(yaml_affine_options)s
+    };
+    read_affine_options(node, options, sizeof(options) / sizeof(options[0]));
+
+    if (ret->initialize(block_names) != SFEM_SUCCESS) {
+      return nullptr;
+    }
+
+    real_t defaults[N_MATERIAL_PARAMETERS];
+    material_defaults(defaults);
+    real_t top_values[N_MATERIAL_PARAMETERS];
+    copy_material_parameters(defaults, top_values);
+    if (material_from_yaml(node, defaults, top_values)) {
+      set_material(*ret->impl_->domains, top_values);
+    }
+
+    if (node.has_child("blocks")) {
+      for (auto block : node["blocks"].children()) {
+        if (!block.has_child("name")) {
+          continue;
+        }
+
+        real_t block_values[N_MATERIAL_PARAMETERS];
+        copy_material_parameters(top_values, block_values);
+        if (!material_from_yaml(block, top_values, block_values)) {
+          continue;
+        }
+
+        const std::string block_name = yaml_read_string(block["name"]);
+        set_material_in_block(*ret->impl_->domains, block_name, block_values);
+      }
+    }
+
+    return ret;
+  }
 #endif  // SFEM_ENABLE_RYAML
 
-    int %(op)s::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
-        return SFEM_FAILURE;
-    }
+  int %(op)s::hessian_crs(const real_t *const,
+              const count_t *const,
+              const idx_t *const,
+              real_t *const) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
+    return SFEM_FAILURE;
+  }
 
-    int %(op)s::hessian_bsr(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
-        return SFEM_FAILURE;
-    }
+  int %(op)s::hessian_bsr(const real_t *const,
+              const count_t *const,
+              const idx_t *const,
+              real_t *const) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+    return SFEM_FAILURE;
+  }
 }  // namespace sfem
 """ % {
         "op": material.op_name,
@@ -4037,15 +4037,15 @@ namespace sfem {
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
         "performance_methods": _performance_methods(material.op_name, material.name, elements, cases["performance"]),
         "gradient_previous_check": (
-            "        if (!impl_->previous) {\n"
-            '            SFEM_ERROR("%s requires a previous state\\n");\n'
-            "            return SFEM_FAILURE;\n"
-            "        }" % material.op_name
+            "    if (!impl_->previous) {\n"
+            '      SFEM_ERROR("%s requires a previous state\\n");\n'
+            "      return SFEM_FAILURE;\n"
+            "    }" % material.op_name
             if dependency_flags["gradient_previous"]
             else ""
         ),
         "gradient_previous_alias": (
-            "            const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = impl_->previous;"
             if dependency_flags["gradient_previous"]
             else ""
         ),
@@ -4055,7 +4055,7 @@ namespace sfem {
             dependency_flags["apply_previous"],
         ),
         "apply_previous_alias": (
-            "            const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = impl_->previous;"
             if dependency_flags["apply_previous"]
             else ""
         ),
@@ -4126,10 +4126,10 @@ def _coupled_apply_state_check(op_name, uses_current, uses_previous):
         else ("a current state" if uses_current else "a previous state")
     )
     return (
-        "        if (%s) {\n"
-        '            SFEM_ERROR("%s requires %s\\n");\n'
-        "            return SFEM_FAILURE;\n"
-        "        }"
+        "    if (%s) {\n"
+        '      SFEM_ERROR("%s requires %s\\n");\n'
+        "      return SFEM_FAILURE;\n"
+        "    }"
         % (" || ".join(conditions), op_name, requirement)
     )
 
@@ -4180,47 +4180,47 @@ def _residual_merit_methods(op_name):
     same traversal the Newton iteration performs anyway.
     """
     return """
-    int %(op)s::value_steps(const real_t *state,
-                            const real_t *h,
-                            const int nsteps,
-                            const real_t *const steps,
-                            real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::value_steps");
-        if (nsteps <= 0) {
-            return SFEM_SUCCESS;
-        }
-        const ptrdiff_t ndofs = n_dofs_domain();
-        std::vector<real_t> stepped(ndofs);
-        std::vector<real_t> residual(ndofs);
-        for (int step = 0; step < nsteps; ++step) {
-            const real_t alpha = steps[step];
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                stepped[i] = state[i] + alpha * h[i];
-            }
-            std::fill(residual.begin(), residual.end(), real_t(0));
-            const int status = gradient(stepped.data(), residual.data());
-            if (status != SFEM_SUCCESS) {
-                return status;
-            }
-            real_t sum = 0;
+  int %(op)s::value_steps(const real_t *state,
+              const real_t *h,
+              const int nsteps,
+              const real_t *const steps,
+              real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::value_steps");
+    if (nsteps <= 0) {
+      return SFEM_SUCCESS;
+    }
+    const ptrdiff_t ndofs = n_dofs_domain();
+    std::vector<real_t> stepped(ndofs);
+    std::vector<real_t> residual(ndofs);
+    for (int step = 0; step < nsteps; ++step) {
+      const real_t alpha = steps[step];
+      for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        stepped[i] = state[i] + alpha * h[i];
+      }
+      std::fill(residual.begin(), residual.end(), real_t(0));
+      const int status = gradient(stepped.data(), residual.data());
+      if (status != SFEM_SUCCESS) {
+        return status;
+      }
+      real_t sum = 0;
 #pragma omp simd reduction(+ : sum)
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                sum += residual[i] * residual[i];
-            }
-            out[step] += real_t(0.5) * sum;
-        }
-        return SFEM_SUCCESS;
+      for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        sum += residual[i] * residual[i];
+      }
+      out[step] += real_t(0.5) * sum;
     }
+    return SFEM_SUCCESS;
+  }
 
-    int %(op)s::value(const real_t *state, real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::value");
-        // One step of length zero: `state + 0 * h` is `state` exactly, so the
-        // increment is unused and `state` can stand in for it.  One
-        // implementation, so the two cannot disagree.
-        const real_t objective_step = 0;
-        *out = 0;
-        return value_steps(state, state, 1, &objective_step, out);
-    }
+  int %(op)s::value(const real_t *state, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::value");
+    // One step of length zero: `state + 0 * h` is `state` exactly, so the
+    // increment is unused and `state` can stand in for it.  One
+    // implementation, so the two cannot disagree.
+    const real_t objective_step = 0;
+    *out = 0;
+    return value_steps(state, state, 1, &objective_step, out);
+  }
 """ % {"op": op_name}
 
 
@@ -4394,9 +4394,9 @@ def _coupled_cases(
                     block_size,
                     residual_gradient_setup,
                     (
-                        "                    int status = %s;\n"
-                        "                    if (status != SFEM_SUCCESS) return status;\n"
-                        "                    return %s;"
+                        "          int status = %s;\n"
+                        "          if (status != SFEM_SUCCESS) return status;\n"
+                        "          return %s;"
                     ) % (
                         _geometry_variant_expression(
                             kernel_sources, energy_stem, "gradient",
@@ -4460,9 +4460,9 @@ def _coupled_cases(
                     block_size,
                     residual_apply_setup,
                     (
-                        "                    int status = %s;\n"
-                        "                    if (status != SFEM_SUCCESS) return status;\n"
-                        "                    return %s;"
+                        "          int status = %s;\n"
+                        "          if (status != SFEM_SUCCESS) return status;\n"
+                        "          return %s;"
                     ) % (
                         _geometry_variant_expression(
                             kernel_sources, energy_stem, "apply",
@@ -4496,9 +4496,9 @@ def _coupled_cases(
         if has_objective:
             cases["objective"].append(
                 """%(cases)s
-                    status = %(call)s;
-                    break;""" % {
-                    "cases": _mesh_case_labels(element, "                "),
+          status = %(call)s;
+          break;""" % {
+                    "cases": _mesh_case_labels(element, "        "),
                     "call": _geometry_variant_expression(
                         kernel_sources, energy_stem, "objective",
                         "impl_->objective_uses_affine", energy_objective_affine, energy_objective_iso,
@@ -4536,9 +4536,9 @@ def _coupled_cases(
         if has_objective_steps:
             cases["objective_steps"].append(
                 """%(cases)s
-                    status = %(call)s;
-                    break;""" % {
-                    "cases": _mesh_case_labels(element, "                "),
+          status = %(call)s;
+          break;""" % {
+                    "cases": _mesh_case_labels(element, "        "),
                     "call": _geometry_variant_expression(
                         kernel_sources, energy_stem, "objective_steps",
                         "impl_->objective_uses_affine", energy_objective_steps_affine, energy_objective_steps_iso,
@@ -4550,11 +4550,11 @@ def _coupled_cases(
 
 def _coupled_case(element, block_size, setup_lines, body):
     return """%(cases)s {
-                    static constexpr ptrdiff_t FIELD_STRIDE = %(block_size)d;
+          static constexpr ptrdiff_t FIELD_STRIDE = %(block_size)d;
 %(setup)s
 %(body)s
-                }""" % {
-        "cases": _mesh_case_labels(element, "                "),
+        }""" % {
+        "cases": _mesh_case_labels(element, "        "),
         "block_size": block_size,
         "setup": "\n".join(setup_lines),
         "body": body,
@@ -4565,11 +4565,11 @@ def _coupled_parameter_array_lines(defaults):
     lines = []
     for index, (name, _) in enumerate(defaults):
         lines.append(
-            '            values[%d] = parameters.require_real_value("%s");'
+            '      values[%d] = parameters.require_real_value("%s");'
             % (index, name)
         )
     if not lines:
-        lines.append("            values[0] = 0;")
+        lines.append("      values[0] = 0;")
     return "\n".join(lines)
 
 
@@ -4578,7 +4578,7 @@ def _coupled_block_size_lines(systems_by_dim):
     for dim in sorted(systems_by_dim):
         fields = systems_by_dim[dim].fields
         block_size = sum(int(field.components) for field in fields)
-        lines.append("                case %d: return %d;" % (dim, block_size))
+        lines.append("        case %d: return %d;" % (dim, block_size))
     return "\n".join(lines)
 
 
@@ -4724,36 +4724,36 @@ def _form_order_two():
 
 
 def _residual_parameter_array_lines(parameter_names_by_dim):
-    lines = ["            switch (dim) {"]
+    lines = ["      switch (dim) {"]
     for dim in sorted(parameter_names_by_dim):
-        lines.append("                case %d:" % dim)
+        lines.append("        case %d:" % dim)
         for name in parameter_names_by_dim[dim]:
             lines.append(
-                '                    values[index++] = parameters.require_real_value("%s");'
+                '          values[index++] = parameters.require_real_value("%s");'
                 % name
             )
-        lines.append("                    break;")
+        lines.append("          break;")
     lines.extend(
         [
-            "                default:",
-            '                    SFEM_ERROR("unsupported spatial dimension %d for generated residual parameters\\n", dim);',
-            "                    break;",
-            "            }",
+            "        default:",
+            '          SFEM_ERROR("unsupported spatial dimension %d for generated residual parameters\\n", dim);',
+            "          break;",
+            "      }",
         ]
     )
     return "\n".join(lines)
 
 
 def _residual_block_size_lines(block_size_by_dim):
-    lines = ["            switch (dim) {"]
+    lines = ["      switch (dim) {"]
     for dim in sorted(block_size_by_dim):
-        lines.append("                case %d: return %d;" % (dim, block_size_by_dim[dim]))
+        lines.append("        case %d: return %d;" % (dim, block_size_by_dim[dim]))
     lines.extend(
         [
-            "                default:",
-            '                    SFEM_ERROR("unsupported spatial dimension %d for generated block size\\n", dim);',
-            "                    return 0;",
-            "            }",
+            "        default:",
+            '          SFEM_ERROR("unsupported spatial dimension %d for generated block size\\n", dim);',
+            "          return 0;",
+            "      }",
         ]
     )
     return "\n".join(lines)
@@ -4767,13 +4767,13 @@ def _residual_soa_view_declarations(fields, base, suffix, scalar_type):
         name = _safe_identifier("%s_%s" % (field.name, suffix))
         if components == 1:
             lines.append(
-                "                    %s *const RSTR %s = %s + %d;"
+                "          %s *const RSTR %s = %s + %d;"
                 % (scalar_type, name, base, offset)
             )
         else:
             entries = ", ".join("%s + %d" % (base, offset + component) for component in range(components))
             lines.append(
-                "                    %s *const RSTR %s[%d] = {%s};"
+                "          %s *const RSTR %s[%d] = {%s};"
                 % (scalar_type, name, components, entries)
             )
         offset += components
@@ -4848,10 +4848,10 @@ def _boundary_soa_component_argument_names(fields, suffix):
 
 def _residual_soa_case(element, function, arguments, field_stride, setup_lines):
     return """                case smesh::%(element)s: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
+          static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
 %(setup)s
-                    return %(function)s(%(arguments)s);
-                }""" % {
+          return %(function)s(%(arguments)s);
+        }""" % {
         "element": _mesh_element_name(element),
         "function": function,
         "arguments": arguments,
@@ -4862,11 +4862,11 @@ def _residual_soa_case(element, function, arguments, field_stride, setup_lines):
 
 def _boundary_residual_soa_case(element, function, arguments, field_stride, setup_lines):
     return """                    case smesh::%(element)s: {
-                        static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
+            static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
 %(setup)s
-                        status |= %(function)s(%(arguments)s);
-                        break;
-                    }""" % {
+            status |= %(function)s(%(arguments)s);
+            break;
+          }""" % {
         "element": _mesh_element_name(element),
         "function": function,
         "arguments": arguments,
@@ -4889,12 +4889,12 @@ def _residual_dual_soa_case(
         affine_unit_condition=None):
     if affine_unit_function:
         body = """                    if (impl_->%(flag)s) {
-                        if (%(affine_unit_condition)s) {
-                            return %(affine_unit_function)s(%(affine_unit_arguments)s);
-                        }
-                        return %(affine_function)s(%(affine_arguments)s);
-                    }
-                    return %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
+            if (%(affine_unit_condition)s) {
+              return %(affine_unit_function)s(%(affine_unit_arguments)s);
+            }
+            return %(affine_function)s(%(affine_arguments)s);
+          }
+          return %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
             "flag": flag,
             "affine_unit_condition": affine_unit_condition,
             "affine_unit_function": affine_unit_function,
@@ -4905,7 +4905,7 @@ def _residual_dual_soa_case(
             "isoparametric_arguments": isoparametric_arguments,
         }
     else:
-        body = """                    return impl_->%(flag)s ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
+        body = """          return impl_->%(flag)s ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
             "flag": flag,
             "affine_function": affine_function,
             "affine_arguments": affine_arguments,
@@ -4913,10 +4913,10 @@ def _residual_dual_soa_case(
             "isoparametric_arguments": isoparametric_arguments,
         }
     return """                case smesh::%(element)s: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
+          static constexpr ptrdiff_t FIELD_STRIDE = %(field_stride)d;
 %(setup)s
 %(body)s
-                }""" % {
+        }""" % {
         "element": _mesh_element_name(element),
         "field_stride": field_stride,
         "setup": "\n".join(setup_lines),
@@ -5037,14 +5037,14 @@ def _element_api_dispatch_function_lines(function_name, operation, suffix, entri
     lines = [
         "template <typename s_t, int VS = 16, typename elem_type_t>",
         "static SFEM_INLINE int %s(" % function_name,
-        "        const elem_type_t element_type%s" % ("," if params else ""),
+        "    const elem_type_t element_type%s" % ("," if params else ""),
     ]
     lines.extend(parameter_list_lines(params))
     arg_names = ", ".join(_element_api_param_name(param) for param in params)
     lines.extend(
         [
             ") {",
-            "    switch ((int)element_type) {",
+            "  switch ((int)element_type) {",
         ]
     )
     for entry in entries:
@@ -5058,15 +5058,15 @@ def _element_api_dispatch_function_lines(function_name, operation, suffix, entri
             continue
         lines.extend(
             [
-                "        case %d:" % _smesh_elem_type_value(_mesh_element_name(entry["element"])),
-                "            return %s<s_t, VS>(%s);" % (element_function, arg_names),
+                "    case %d:" % _smesh_elem_type_value(_mesh_element_name(entry["element"])),
+                "      return %s<s_t, VS>(%s);" % (element_function, arg_names),
             ]
         )
     lines.extend(
         [
-            "        default:",
-            "            return SFEM_FAILURE;",
-            "    }",
+            "    default:",
+            "      return SFEM_FAILURE;",
+            "  }",
             "}",
         ]
     )
@@ -5544,19 +5544,19 @@ def _runtime_typed_dispatch_function_lines(group):
     lines.extend(
         [
             ") {",
-            "    const enum smesh::PrimitiveType %s =" % _RESOLVED_RUNTIME_TYPE,
-            "            (%s == smesh::SMESH_DEFAULT)" % _RUNTIME_TYPE_ARGUMENT,
-            "                    ? smesh::TypeToEnum<real_t>::value()",
-            "                    : %s;" % _RUNTIME_TYPE_ARGUMENT,
-            "    switch (element_type) {",
+            "  const enum smesh::PrimitiveType %s =" % _RESOLVED_RUNTIME_TYPE,
+            "      (%s == smesh::SMESH_DEFAULT)" % _RUNTIME_TYPE_ARGUMENT,
+            "          ? smesh::TypeToEnum<real_t>::value()",
+            "          : %s;" % _RUNTIME_TYPE_ARGUMENT,
+            "  switch (element_type) {",
         ]
     )
     cases = (("smesh::SMESH_FLOAT64", "double"), ("smesh::SMESH_FLOAT32", "float"))
     for variant in group["variants"]:
         lines.extend(
             [
-                "        case smesh::%s: {" % variant["mesh_element"],
-                "            switch (%s) {" % _RESOLVED_RUNTIME_TYPE,
+                "    case smesh::%s: {" % variant["mesh_element"],
+                "      switch (%s) {" % _RESOLVED_RUNTIME_TYPE,
             ]
         )
         for enum_value, scalar_type in cases:
@@ -5569,31 +5569,31 @@ def _runtime_typed_dispatch_function_lines(group):
             ]
             lines.extend(
                 [
-                    "                case %s:" % enum_value,
-                    "                    return %s(%s);"
+                    "        case %s:" % enum_value,
+                    "          return %s(%s);"
                     % (variant["by_scalar_type"][scalar_type], ", ".join(args)),
                 ]
             )
         lines.extend(
             [
-                "                default:",
-                "                    break;",
-                "            }",
-                "            break;",
-                "        }",
+                "        default:",
+                "          break;",
+                "      }",
+                "      break;",
+                "    }",
             ]
         )
     lines.extend(
         [
-            "        default:",
-            "            break;",
-            "    }",
-            '    std::fprintf(stderr,',
-            '            "%s does not support element type %%d with real type %%d\\n",'
+            "    default:",
+            "      break;",
+            "  }",
+            '  std::fprintf(stderr,',
+            '      "%s does not support element type %%d with real type %%d\\n",'
             % group["name"],
-            "            (int)element_type,",
-            "            (int)%s);" % _RUNTIME_TYPE_ARGUMENT,
-            "    return SFEM_FAILURE;",
+            "      (int)element_type,",
+            "      (int)%s);" % _RUNTIME_TYPE_ARGUMENT,
+            "  return SFEM_FAILURE;",
             "}",
             "",
         ]
@@ -5613,23 +5613,23 @@ def _dispatch_function_lines(group):
     lines.extend(
         [
             ") {",
-            "    switch (element_type) {",
+            "  switch (element_type) {",
         ]
     )
     for variant in group["variants"]:
         lines.extend(
             [
-                "        case smesh::%s:" % variant["mesh_element"],
-                "            return %s(%s);" % (variant["function"], ", ".join(arg_names)),
+                "    case smesh::%s:" % variant["mesh_element"],
+                "      return %s(%s);" % (variant["function"], ", ".join(arg_names)),
             ]
         )
     lines.extend(
         [
-            "        default:",
-            '            std::fprintf(stderr, "%s does not support element type %%d\\n", (int)element_type);'
+            "    default:",
+            '      std::fprintf(stderr, "%s does not support element type %%d\\n", (int)element_type);'
             % group["name"],
-            "            return SFEM_FAILURE;",
-            "    }",
+            "      return SFEM_FAILURE;",
+            "  }",
             "}",
             "",
         ]
@@ -5751,23 +5751,23 @@ def _diagnostic_dispatch_function_lines(group):
     lines = [
         "SFEM_CODEGEN_PUBLIC_C_ABI extern \"C\" const sfem::codegen::KernelDiagnostics *%s("
         % group["name"],
-        "        const smesh::ElemType element_type) {",
-        "    switch (element_type) {",
+        "    const smesh::ElemType element_type) {",
+        "  switch (element_type) {",
     ]
     for variant in group["variants"]:
         lines.extend(
             [
-                "        case smesh::%s:" % variant["mesh_element"],
-                "            return %s();" % variant["function"],
+                "    case smesh::%s:" % variant["mesh_element"],
+                "      return %s();" % variant["function"],
             ]
         )
     lines.extend(
         [
-            "        default:",
-            '            std::fprintf(stderr, "%s does not support element type %%d\\n", (int)element_type);'
+            "    default:",
+            '      std::fprintf(stderr, "%s does not support element type %%d\\n", (int)element_type);'
             % group["name"],
-            "            return nullptr;",
-            "    }",
+            "      return nullptr;",
+            "  }",
             "}",
             "",
         ]
@@ -5840,10 +5840,10 @@ def _registration_source(material, wrapper_header):
 #include "sfem_OpFactory.hpp"
 
 namespace sfem {
-    void %(function)s() {
-        Factory::register_op("%(op)s", %(op)s::create);
-        Factory::register_op("ss:%(op)s", %(op)s::create);
-    }
+  void %(function)s() {
+    Factory::register_op("%(op)s", %(op)s::create);
+    Factory::register_op("ss:%(op)s", %(op)s::create);
+  }
 }  // namespace sfem
 """ % {
         "header": os.path.basename(wrapper_header),
@@ -6503,20 +6503,20 @@ def _performance_dispatch_cases(material_name, element_names, cases):
 
 def _performance_flops_method(op_name, method, cases):
     return """    double %(op)s::flops_%(method)s() const {
-        double total = 0;
-        if (!impl_->domains) {
-            return total;
-        }
+    double total = 0;
+    if (!impl_->domains) {
+      return total;
+    }
 
-        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-        impl_->domains->iterate([&](const OpDomain &domain) {
-            const ptrdiff_t nelements = domain.block->n_elements();
+    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
 %(cases)s
-            return SFEM_SUCCESS;
-        });
+      return SFEM_SUCCESS;
+    });
 
-        return total;
-    }""" % {
+    return total;
+  }""" % {
         "op": op_name,
         "method": method,
         "cases": _performance_flops_cases(cases),
@@ -6525,20 +6525,20 @@ def _performance_flops_method(op_name, method, cases):
 
 def _performance_bytes_method(op_name, method, cases):
     return """    size_t %(op)s::memory_traffic_bytes_%(method)s() const {
-        size_t total = 0;
-        if (!impl_->domains) {
-            return total;
-        }
+    size_t total = 0;
+    if (!impl_->domains) {
+      return total;
+    }
 
-        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-        impl_->domains->iterate([&](const OpDomain &domain) {
-            const ptrdiff_t nelements = domain.block->n_elements();
+    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
 %(cases)s
-            return SFEM_SUCCESS;
-        });
+      return SFEM_SUCCESS;
+    });
 
-        return total;
-    }""" % {
+    return total;
+  }""" % {
         "op": op_name,
         "method": method,
         "cases": _performance_bytes_cases(cases),
@@ -6548,56 +6548,56 @@ def _performance_bytes_method(op_name, method, cases):
 def _performance_flops_cases(cases):
     lines = []
     for case in cases:
-        lines.append("            if (dim == %d) {" % case["dim"])
+        lines.append("      if (dim == %d) {" % case["dim"])
         for diagnostic in case["diagnostics"]:
             name = diagnostic["name"]
             affine_flag = diagnostic["affine_flag"]
-            lines.append("                {")
+            lines.append("        {")
             lines.append(
-                "                    const sfem::codegen::KernelDiagnostics *const diagnostics = %s(domain.element_type);"
+                "          const sfem::codegen::KernelDiagnostics *const diagnostics = %s(domain.element_type);"
                 % name
             )
-            lines.append("                    if (diagnostics) {")
+            lines.append("          if (diagnostics) {")
             if affine_flag is None:
                 lines.append(
-                    "                        total += sfem::codegen::KernelDiagnostics_total_flops(diagnostics, nelements);"
+                    "            total += sfem::codegen::KernelDiagnostics_total_flops(diagnostics, nelements);"
                 )
             else:
                 lines.append(
-                    "                        total += impl_->%s ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);"
+                    "            total += impl_->%s ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);"
                     % affine_flag
                 )
-            lines.append("                    }")
-            lines.append("                }")
-        lines.append("            }")
+            lines.append("          }")
+            lines.append("        }")
+        lines.append("      }")
     return "\n".join(lines)
 
 
 def _performance_bytes_cases(cases):
     lines = []
     for case in cases:
-        lines.append("            if (dim == %d) {" % case["dim"])
+        lines.append("      if (dim == %d) {" % case["dim"])
         for diagnostic in case["diagnostics"]:
             name = diagnostic["name"]
             affine_flag = diagnostic["affine_flag"]
-            lines.append("                {")
+            lines.append("        {")
             lines.append(
-                "                    const sfem::codegen::KernelDiagnostics *const diagnostics = %s(domain.element_type);"
+                "          const sfem::codegen::KernelDiagnostics *const diagnostics = %s(domain.element_type);"
                 % name
             )
-            lines.append("                    if (diagnostics) {")
+            lines.append("          if (diagnostics) {")
             if affine_flag is None:
                 lines.append(
-                    "                        total += sfem::codegen::KernelDiagnostics_total_bytes(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));"
+                    "            total += sfem::codegen::KernelDiagnostics_total_bytes(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));"
                 )
             else:
                 lines.append(
-                    "                        total += impl_->%s ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));"
+                    "            total += impl_->%s ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));"
                     % affine_flag
                 )
-            lines.append("                    }")
-            lines.append("                }")
-        lines.append("            }")
+            lines.append("          }")
+            lines.append("        }")
+        lines.append("      }")
     return "\n".join(lines)
 
 
@@ -6605,7 +6605,7 @@ def _affine_option_entries(*flags, owner="impl_"):
     lines = []
     for flag in flags:
         for alias in _AFFINE_OPTION_ALIASES[flag]:
-            lines.append('            {"%s", &%s->%s},' % (alias, owner, flag))
+            lines.append('      {"%s", &%s->%s},' % (alias, owner, flag))
     return "\n".join(lines)
 
 
@@ -6791,8 +6791,8 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
 
 def _case(element, function, arguments):
     return """%(cases)s
-                    return %(function)s(%(arguments)s);""" % {
-        "cases": _mesh_case_labels(element, "                "),
+          return %(function)s(%(arguments)s);""" % {
+        "cases": _mesh_case_labels(element, "        "),
         "function": function,
         "arguments": arguments,
     }
@@ -6823,7 +6823,7 @@ def _residual_hessian_dispatch_body(
         prefix = "if" if not any(line.endswith("{") for line in lines) else "else if"
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append(
-            "%s    static constexpr ptrdiff_t FIELD_STRIDE = %d;"
+            "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
             % (indent, block_size_by_dim[dim])
         )
         setup = []
@@ -6866,13 +6866,13 @@ def _residual_hessian_dispatch_body(
         for line in setup:
             lines.append(line)
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
-            lines.append("%s    return %s(%s);" % (indent, function, ", ".join(args)))
+            lines.append("%s  return %s(%s);" % (indent, function, ", ".join(args)))
         else:
             lines.append(
-                '%s    SFEM_ERROR("%s %s %dd dispatch was not generated\\n");'
+                '%s  SFEM_ERROR("%s %s %dd dispatch was not generated\\n");'
                 % (indent, material_name, operation, dim)
             )
-            lines.append("%s    return SFEM_FAILURE;" % indent)
+            lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
     lines.extend(
         [
@@ -6914,7 +6914,7 @@ def _residual_apply_dispatch_body(
         prefix = "if" if not any(line.endswith("{") for line in lines) else "else if"
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append(
-            "%s    static constexpr ptrdiff_t FIELD_STRIDE = %d;"
+            "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
             % (indent, block_size_by_dim[dim])
         )
         setup = []
@@ -7011,7 +7011,7 @@ def _residual_apply_dispatch_body(
             "domain.element_type", affine_aos_unit_elements_by_dim.get(dim, ())
         )
 
-        lines.append("%s    if (impl_->%s) {" % (indent, affine_flag))
+        lines.append("%s  if (impl_->%s) {" % (indent, affine_flag))
         if operation == "jacobian_action" and _c_abi_function_exists(
             kernel_sources, packed_affine, public_only=True
         ):
@@ -7022,19 +7022,19 @@ def _residual_apply_dispatch_body(
             )
             lines.extend(
                 [
-                    "%s        if (impl_->space->has_packed_mesh()) {" % indent,
-                    "%s            auto packed = impl_->space->packed_mesh();" % indent,
-                    "%s            const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
-                    "%s            if (packed_block >= 0) {" % indent,
-                    "%s                auto packed_elements = packed->elements(packed_block);" % indent,
-                    "%s                auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
-                    "%s                auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
-                    "%s                auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
-                    "%s                auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+                    "%s    if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s      auto packed = impl_->space->packed_mesh();" % indent,
+                    "%s      const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+                    "%s      if (packed_block >= 0) {" % indent,
+                    "%s        auto packed_elements = packed->elements(packed_block);" % indent,
+                    "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+                    "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+                    "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+                    "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
                     *(
                         [
-                            "%s                if (domain.element_type == smesh::TET4) {" % indent,
-                            "%s                    return laplace_tet4_jacobian_action_packed_affine_mesh_soa(%s);"
+                            "%s        if (domain.element_type == smesh::TET4) {" % indent,
+                            "%s          return laplace_tet4_jacobian_action_packed_affine_mesh_soa(%s);"
                             % (
                                 indent,
                                 ", ".join(
@@ -7060,7 +7060,7 @@ def _residual_apply_dispatch_body(
                                     ]
                                 ),
                             ),
-                            "%s                }" % indent,
+                            "%s        }" % indent,
                         ]
                         if material_name == "laplace"
                         and operation == "jacobian_action"
@@ -7073,9 +7073,9 @@ def _residual_apply_dispatch_body(
                     ),
                     *(
                         [
-                            "%s                if (domain.element_type == smesh::HEX8) {" % indent,
-                            "%s                    uint16_t *proteus_elements[8] = {packed_elements->data()[0], packed_elements->data()[1], packed_elements->data()[3], packed_elements->data()[2], packed_elements->data()[4], packed_elements->data()[5], packed_elements->data()[7], packed_elements->data()[6]};" % indent,
-                            "%s                    return laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(%s);"
+                            "%s        if (domain.element_type == smesh::HEX8) {" % indent,
+                            "%s          uint16_t *proteus_elements[8] = {packed_elements->data()[0], packed_elements->data()[1], packed_elements->data()[3], packed_elements->data()[2], packed_elements->data()[4], packed_elements->data()[5], packed_elements->data()[7], packed_elements->data()[6]};" % indent,
+                            "%s          return laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(%s);"
                             % (
                                 indent,
                                 ", ".join(
@@ -7096,9 +7096,9 @@ def _residual_apply_dispatch_body(
                                     ]
                                 ),
                             ),
-                            "%s                }" % indent,
-                            "%s                if (domain.element_type == smesh::PROTEUS_HEX8) {" % indent,
-                            "%s                    return laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(%s);"
+                            "%s        }" % indent,
+                            "%s        if (domain.element_type == smesh::PROTEUS_HEX8) {" % indent,
+                            "%s          return laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa(%s);"
                             % (
                                 indent,
                                 ", ".join(
@@ -7119,7 +7119,7 @@ def _residual_apply_dispatch_body(
                                     ]
                                 ),
                             ),
-                            "%s                }" % indent,
+                            "%s        }" % indent,
                         ]
                         if material_name == "laplace"
                         and operation == "jacobian_action"
@@ -7132,8 +7132,8 @@ def _residual_apply_dispatch_body(
                     ),
                     *(
                         [
-                            "%s                if (domain.element_type == smesh::TET10) {" % indent,
-                            "%s                    return laplace_tet10_private_metric_jacobian_action_packed_mesh_soa(%s);"
+                            "%s        if (domain.element_type == smesh::TET10) {" % indent,
+                            "%s          return laplace_tet10_private_metric_jacobian_action_packed_mesh_soa(%s);"
                             % (
                                 indent,
                                 ", ".join(
@@ -7154,7 +7154,7 @@ def _residual_apply_dispatch_body(
                                     ]
                                 ),
                             ),
-                            "%s                }" % indent,
+                            "%s        }" % indent,
                         ]
                         if material_name == "laplace"
                         and operation == "jacobian_action"
@@ -7165,7 +7165,7 @@ def _residual_apply_dispatch_body(
                         )
                         else []
                     ),
-                    "%s                return %s(%s);"
+                    "%s        return %s(%s);"
                     % (
                         indent,
                         packed_affine,
@@ -7189,17 +7189,17 @@ def _residual_apply_dispatch_body(
                             ]
                         ),
                     ),
-                    "%s            }" % indent,
-                    "%s        }" % indent,
+                    "%s      }" % indent,
+                    "%s    }" % indent,
                 ]
             )
         if _c_abi_function_exists(kernel_sources, affine_aos_unit, public_only=True):
             lines.append(
-                "%s        if ((%s) && storage[0] == real_t(1)) {"
+                "%s    if ((%s) && storage[0] == real_t(1)) {"
                 % (indent, unit_condition)
             )
             lines.append(
-                "%s            return %s(%s);"
+                "%s      return %s(%s);"
                 % (
                     indent,
                     affine_aos_unit,
@@ -7212,11 +7212,11 @@ def _residual_apply_dispatch_body(
                     ),
                 )
             )
-            lines.append("%s        }" % indent)
+            lines.append("%s    }" % indent)
         if _c_abi_function_exists(kernel_sources, affine_aos, public_only=True):
-            lines.append("%s        if (%s) {" % (indent, aos_condition))
+            lines.append("%s    if (%s) {" % (indent, aos_condition))
             lines.append(
-                "%s            return %s(%s);"
+                "%s      return %s(%s);"
                 % (
                     indent,
                     affine_aos,
@@ -7230,10 +7230,10 @@ def _residual_apply_dispatch_body(
                     ),
                 )
             )
-            lines.append("%s        }" % indent)
+            lines.append("%s    }" % indent)
         if _c_abi_function_exists(kernel_sources, affine_soa, public_only=True):
             lines.append(
-                "%s        return %s(%s);"
+                "%s    return %s(%s);"
                 % (
                     indent,
                     affine_soa,
@@ -7266,26 +7266,26 @@ def _residual_apply_dispatch_body(
             )
         else:
             lines.append(
-                '%s        SFEM_ERROR("%s %s affine %dd dispatch was not generated\\n");'
+                '%s    SFEM_ERROR("%s %s affine %dd dispatch was not generated\\n");'
                 % (indent, material_name, operation, dim)
             )
-            lines.append("%s        return SFEM_FAILURE;" % indent)
-        lines.append("%s    }" % indent)
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s  }" % indent)
         if operation == "jacobian_action" and _c_abi_function_exists(
             kernel_sources, packed, public_only=True
         ):
             lines.extend(
                 [
-                    "%s    if (impl_->space->has_packed_mesh()) {" % indent,
-                    "%s        auto packed = impl_->space->packed_mesh();" % indent,
-                    "%s        const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
-                    "%s        if (packed_block >= 0) {" % indent,
-                    "%s            auto packed_elements = packed->elements(packed_block);" % indent,
-                    "%s            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
-                    "%s            auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
-                    "%s            auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
-                    "%s            auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-                    "%s            return %s(%s);"
+                    "%s  if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s    auto packed = impl_->space->packed_mesh();" % indent,
+                    "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+                    "%s    if (packed_block >= 0) {" % indent,
+                    "%s      auto packed_elements = packed->elements(packed_block);" % indent,
+                    "%s      auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+                    "%s      auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+                    "%s      auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+                    "%s      auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+                    "%s      return %s(%s);"
                     % (
                         indent,
                         packed,
@@ -7309,13 +7309,13 @@ def _residual_apply_dispatch_body(
                             ]
                         ),
                     ),
-                    "%s        }" % indent,
                     "%s    }" % indent,
+                    "%s  }" % indent,
                 ]
             )
         if _c_abi_function_exists(kernel_sources, isop, public_only=True):
             lines.append(
-                "%s    return %s(%s);"
+                "%s  return %s(%s);"
                 % (
                     indent,
                     isop,
@@ -7331,10 +7331,10 @@ def _residual_apply_dispatch_body(
             )
         else:
             lines.append(
-                '%s    SFEM_ERROR("%s %s isoparametric %dd dispatch was not generated\\n");'
+                '%s  SFEM_ERROR("%s %s isoparametric %dd dispatch was not generated\\n");'
                 % (indent, material_name, operation, dim)
             )
-            lines.append("%s    return SFEM_FAILURE;" % indent)
+            lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
     lines.extend(
         [
@@ -7421,7 +7421,7 @@ def _hyperelastic_packed_return(indent, function, leading_args, trailing_args, k
                     ),
                 ),
                 *_packed_return_lines(
-                    indent + "    ", metric, leading_args, trailing_args, kernel_sources
+                    indent + "  ", metric, leading_args, trailing_args, kernel_sources
                 ),
                 "%s}" % indent,
             ]
@@ -7454,7 +7454,7 @@ def _packed_return_lines(indent, function, leading_args, trailing_args, kernel_s
     )
     return [
         "%sif (impl_->use_packed_two_pass) {" % indent,
-        "%s    return %s(%s);" % (indent, two_pass, two_call),
+        "%s  return %s(%s);" % (indent, two_pass, two_call),
         "%s}" % indent,
         "%sreturn %s(%s);" % (indent, function, one_call),
     ]
@@ -7476,21 +7476,21 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
         affine_aos_unit = "%s_gradient_%dd_affine_mesh_soa_aos_unit" % (material_name, dim)
         isop = "%s_gradient_%dd_isoparametric_mesh_soa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s    if (impl_->gradient_uses_affine) {" % indent)
+        lines.append("%s  if (impl_->gradient_uses_affine) {" % indent)
         affine_aos_unit_elements = _c_abi_public_dispatch_case_elements(
             kernel_sources,
             affine_aos_unit,
         )
         if affine_aos_unit_elements:
             lines.append(
-                "%s        if (adjugate_aos && (%s)) {"
+                "%s    if (adjugate_aos && (%s)) {"
                 % (
                     indent,
                     _element_condition("domain.element_type", affine_aos_unit_elements),
                 )
             )
             lines.append(
-                "%s            return %s(%s);"
+                "%s      return %s(%s);"
                 % (
                     indent,
                     affine_aos_unit,
@@ -7514,13 +7514,13 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                     ),
                 )
             )
-            lines.append("%s        }" % indent)
+            lines.append("%s    }" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             lines.extend(
                 _affine_dispatch_call_lines(
                     kernel_sources,
                     affine,
-                    indent + "        ",
+                    indent + "    ",
                     lambda callee: ", ".join(
                         [
                             "domain.element_type",
@@ -7541,12 +7541,12 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                 )
             )
         else:
-            lines.append('%s        SFEM_ERROR("%s affine gradient %dd dispatch was not generated\\n");' % (indent, material_name, dim))
-            lines.append("%s        return SFEM_FAILURE;" % indent)
-        lines.append("%s    }" % indent)
+            lines.append('%s    SFEM_ERROR("%s affine gradient %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s  }" % indent)
         if _c_abi_function_exists(kernel_sources, isop, public_only=True):
             lines.append(
-                "%s    return %s(%s);"
+                "%s  return %s(%s);"
                 % (
                     indent,
                     isop,
@@ -7570,8 +7570,8 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                 )
             )
         else:
-            lines.append('%s    SFEM_ERROR("%s isoparametric gradient %dd dispatch was not generated\\n");' % (indent, material_name, dim))
-            lines.append("%s    return SFEM_FAILURE;" % indent)
+            lines.append('%s  SFEM_ERROR("%s isoparametric gradient %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
     lines.extend(
         [
@@ -7599,10 +7599,10 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
         affine = "%s_objective_%dd_affine_mesh_soa" % (material_name, dim)
         isop = "%s_objective_%dd_isoparametric_mesh_soa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s    if (impl_->objective_uses_affine) {" % indent)
+        lines.append("%s  if (impl_->objective_uses_affine) {" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             lines.append(
-                "%s        status = %s(%s);"
+                "%s    status = %s(%s);"
                 % (
                     indent,
                     affine,
@@ -7622,12 +7622,12 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                 )
             )
         else:
-            lines.append('%s        SFEM_ERROR("%s affine objective %dd dispatch was not generated\\n");' % (indent, material_name, dim))
-            lines.append("%s        return SFEM_FAILURE;" % indent)
-        lines.append("%s    } else {" % indent)
+            lines.append('%s    SFEM_ERROR("%s affine objective %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s  } else {" % indent)
         if _c_abi_function_exists(kernel_sources, isop, public_only=True):
             lines.append(
-                "%s        status = %s(%s);"
+                "%s    status = %s(%s);"
                 % (
                     indent,
                     isop,
@@ -7647,16 +7647,16 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                 )
             )
         else:
-            lines.append('%s        SFEM_ERROR("%s isoparametric objective %dd dispatch was not generated\\n");' % (indent, material_name, dim))
-            lines.append("%s        return SFEM_FAILURE;" % indent)
-        lines.append("%s    }" % indent)
+            lines.append('%s    SFEM_ERROR("%s isoparametric objective %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s  }" % indent)
         lines.append("%s}" % indent)
     unsupported_condition = " && ".join("dim != %d" % dim for dim in emitted_dims) or "true"
     lines.extend(
         [
             '%sif (%s) {' % (indent, unsupported_condition),
-            '%s    SFEM_ERROR("%s objective does not support spatial dimension %%d\\n", dim);' % (indent, material_name),
-            "%s    return SFEM_FAILURE;" % indent,
+            '%s  SFEM_ERROR("%s objective does not support spatial dimension %%d\\n", dim);' % (indent, material_name),
+            "%s  return SFEM_FAILURE;" % indent,
             "%s}" % indent,
         ]
     )
@@ -7681,13 +7681,13 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
         affine = "%s_objective_steps_%dd_affine_mesh_soa" % (material_name, dim)
         isop = "%s_objective_steps_%dd_isoparametric_mesh_soa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s    if (impl_->objective_uses_affine) {" % indent)
+        lines.append("%s  if (impl_->objective_uses_affine) {" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             lines.extend(
                 _affine_dispatch_status_lines(
                     kernel_sources,
                     affine,
-                    indent + "        ",
+                    indent + "    ",
                     lambda callee: ", ".join(
                         [
                             "domain.element_type",
@@ -7707,12 +7707,12 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                 )
             )
         else:
-            lines.append('%s        SFEM_ERROR("%s affine objective_steps %dd dispatch was not generated\\n");' % (indent, material_name, dim))
-            lines.append("%s        return SFEM_FAILURE;" % indent)
-        lines.append("%s    } else {" % indent)
+            lines.append('%s    SFEM_ERROR("%s affine objective_steps %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s  } else {" % indent)
         if _c_abi_function_exists(kernel_sources, isop, public_only=True):
             lines.append(
-                "%s        status = %s(%s);"
+                "%s    status = %s(%s);"
                 % (
                     indent,
                     isop,
@@ -7735,16 +7735,16 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                 )
             )
         else:
-            lines.append('%s        SFEM_ERROR("%s isoparametric objective_steps %dd dispatch was not generated\\n");' % (indent, material_name, dim))
-            lines.append("%s        return SFEM_FAILURE;" % indent)
-        lines.append("%s    }" % indent)
+            lines.append('%s    SFEM_ERROR("%s isoparametric objective_steps %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s  }" % indent)
         lines.append("%s}" % indent)
     unsupported_condition = " && ".join("dim != %d" % dim for dim in emitted_dims) or "true"
     lines.extend(
         [
             '%sif (%s) {' % (indent, unsupported_condition),
-            '%s    SFEM_ERROR("%s objective_steps does not support spatial dimension %%d\\n", dim);' % (indent, material_name),
-            "%s    return SFEM_FAILURE;" % indent,
+            '%s  SFEM_ERROR("%s objective_steps does not support spatial dimension %%d\\n", dim);' % (indent, material_name),
+            "%s  return SFEM_FAILURE;" % indent,
             "%s}" % indent,
         ]
     )
@@ -7772,28 +7772,28 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         packed = "%s_apply_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
         packed_affine = "%s_apply_packed_%dd_affine_mesh_soa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s    if (impl_->apply_uses_affine) {" % indent)
+        lines.append("%s  if (impl_->apply_uses_affine) {" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             if _c_abi_function_exists(kernel_sources, packed_affine, public_only=True):
                 lines.extend(
                     [
-                        "%s        if (impl_->space->has_packed_mesh()) {" % indent,
-                        "%s            auto packed = impl_->space->packed_mesh();" % indent,
-                        "%s            const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
-                        "%s            if (packed_block >= 0) {" % indent,
-                        "%s                auto packed_elements = packed->elements(packed_block);" % indent,
-                        "%s                auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
-                        "%s                auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
-                        "%s                auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
-                        "%s                auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-                        "%s                auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
-                        "%s                auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
-                        "%s                auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
+                        "%s    if (impl_->space->has_packed_mesh()) {" % indent,
+                        "%s      auto packed = impl_->space->packed_mesh();" % indent,
+                        "%s      const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+                        "%s      if (packed_block >= 0) {" % indent,
+                        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
+                        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+                        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+                        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+                        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+                        "%s        auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
+                        "%s        auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
+                        "%s        auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
                     ]
                 )
                 lines.extend(
                     _hyperelastic_packed_return(
-                        indent + "                ",
+                        indent + "        ",
                         packed_affine,
                         ["domain.element_type"],
                         lambda callee: [
@@ -7808,15 +7808,15 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                 )
                 lines.extend(
                     [
-                        "%s            }" % indent,
-                        "%s        }" % indent,
+                        "%s      }" % indent,
+                        "%s    }" % indent,
                     ]
                 )
             lines.extend(
                 _affine_dispatch_call_lines(
                     kernel_sources,
                     affine,
-                    indent + "        ",
+                    indent + "    ",
                     lambda callee: ", ".join(
                         [
                             "domain.element_type",
@@ -7834,29 +7834,29 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                 )
             )
         else:
-            lines.append('%s        SFEM_ERROR("%s affine apply %dd dispatch was not generated\\n");' % (indent, material_name, dim))
-            lines.append("%s        return SFEM_FAILURE;" % indent)
-        lines.append("%s    }" % indent)
+            lines.append('%s    SFEM_ERROR("%s affine apply %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s    return SFEM_FAILURE;" % indent)
+        lines.append("%s  }" % indent)
         if _c_abi_function_exists(kernel_sources, packed, public_only=True):
             lines.extend(
                 [
-                    "%s    if (impl_->space->has_packed_mesh()) {" % indent,
-                    "%s        auto packed = impl_->space->packed_mesh();" % indent,
-                    "%s        const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
-                    "%s        if (packed_block >= 0) {" % indent,
-                    "%s            auto packed_elements = packed->elements(packed_block);" % indent,
-                    "%s            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
-                    "%s            auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
-                    "%s            auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
-                    "%s            auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-                    "%s            auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
-                    "%s            auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
-                    "%s            auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
+                    "%s  if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s    auto packed = impl_->space->packed_mesh();" % indent,
+                    "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+                    "%s    if (packed_block >= 0) {" % indent,
+                    "%s      auto packed_elements = packed->elements(packed_block);" % indent,
+                    "%s      auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+                    "%s      auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+                    "%s      auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+                    "%s      auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+                    "%s      auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
+                    "%s      auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
+                    "%s      auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
                 ]
             )
             lines.extend(
                 _hyperelastic_packed_return(
-                    indent + "            ",
+                    indent + "      ",
                     packed,
                     ["domain.element_type"],
                     [
@@ -7871,13 +7871,13 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
             )
             lines.extend(
                 [
-                    "%s        }" % indent,
                     "%s    }" % indent,
+                    "%s  }" % indent,
                 ]
             )
         if _c_abi_function_exists(kernel_sources, isop, public_only=True):
             lines.append(
-                "%s    return %s(%s);"
+                "%s  return %s(%s);"
                 % (
                     indent,
                     isop,
@@ -7898,8 +7898,8 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                 )
             )
         else:
-            lines.append('%s    SFEM_ERROR("%s isoparametric apply %dd dispatch was not generated\\n");' % (indent, material_name, dim))
-            lines.append("%s    return SFEM_FAILURE;" % indent)
+            lines.append('%s  SFEM_ERROR("%s isoparametric apply %dd dispatch was not generated\\n");' % (indent, material_name, dim))
+            lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
     lines.extend(
         [
@@ -7913,18 +7913,18 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
 def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, gradient_dependencies_by_dim, indent, n_field_components_by_dim=None):
     affine_lines = [
         "%sif (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
-        "%s    auto packed = impl_->space->packed_mesh();" % indent,
-        "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
-        "%s    if (packed_block >= 0) {" % indent,
-        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
-        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
-        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
-        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
-        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-        "%s        auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
-        "%s        auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
-        "%s        auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
-        "%s        const int dim = mesh->spatial_dimension();" % indent,
+        "%s  auto packed = impl_->space->packed_mesh();" % indent,
+        "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+        "%s  if (packed_block >= 0) {" % indent,
+        "%s    auto packed_elements = packed->elements(packed_block);" % indent,
+        "%s    auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+        "%s    auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+        "%s    auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+        "%s    auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s    auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
+        "%s    auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
+        "%s    auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
+        "%s    const int dim = mesh->spatial_dimension();" % indent,
     ]
     emitted_affine = False
     for dim in (2, 3):
@@ -7943,10 +7943,10 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
             else []
         )
         output_args = [str(_packed_n_components(n_field_components_by_dim, dim))] + ["out + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
-        affine_lines.append("%s        %s (dim == %d) {" % (indent, prefix, dim))
+        affine_lines.append("%s    %s (dim == %d) {" % (indent, prefix, dim))
         affine_lines.extend(
             _hyperelastic_packed_return(
-                indent + "            ",
+                indent + "      ",
                 function,
                 ["domain.element_type"],
                 lambda callee: [
@@ -7958,27 +7958,27 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
                 kernel_sources,
             )
         )
-        affine_lines.append("%s        }" % indent)
+        affine_lines.append("%s    }" % indent)
     affine_lines.extend(
         [
-            "%s    }" % indent,
+            "%s  }" % indent,
             "%s}" % indent,
         ]
     )
     lines = [
         "%sif (!impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
-        "%s    auto packed = impl_->space->packed_mesh();" % indent,
-        "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
-        "%s    if (packed_block >= 0) {" % indent,
-        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
-        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
-        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
-        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
-        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-        "%s        auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
-        "%s        auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
-        "%s        auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
-        "%s        const int dim = mesh->spatial_dimension();" % indent,
+        "%s  auto packed = impl_->space->packed_mesh();" % indent,
+        "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+        "%s  if (packed_block >= 0) {" % indent,
+        "%s    auto packed_elements = packed->elements(packed_block);" % indent,
+        "%s    auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+        "%s    auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+        "%s    auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+        "%s    auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s    auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);" % indent,
+        "%s    auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);" % indent,
+        "%s    auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);" % indent,
+        "%s    const int dim = mesh->spatial_dimension();" % indent,
     ]
     emitted = False
     for dim in (2, 3):
@@ -7997,10 +7997,10 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
             else []
         )
         output_args = [str(_packed_n_components(n_field_components_by_dim, dim))] + ["out + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
-        lines.append("%s        %s (dim == %d) {" % (indent, prefix, dim))
+        lines.append("%s    %s (dim == %d) {" % (indent, prefix, dim))
         lines.extend(
             _hyperelastic_packed_return(
-                indent + "            ",
+                indent + "      ",
                 function,
                 ["domain.element_type"],
                 [
@@ -8012,10 +8012,10 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
                 kernel_sources,
             )
         )
-        lines.append("%s        }" % indent)
+        lines.append("%s    }" % indent)
     lines.extend(
         [
-            "%s    }" % indent,
+            "%s  }" % indent,
             "%s}" % indent,
         ]
     )
@@ -8030,15 +8030,15 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
 def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent, n_field_components_by_dim=None):
     affine_lines = [
         "%sif (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
-        "%s    auto packed = impl_->space->packed_mesh();" % indent,
-        "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
-        "%s    if (packed_block >= 0) {" % indent,
-        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
-        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
-        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
-        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
-        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-        "%s        const int dim = mesh->spatial_dimension();" % indent,
+        "%s  auto packed = impl_->space->packed_mesh();" % indent,
+        "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+        "%s  if (packed_block >= 0) {" % indent,
+        "%s    auto packed_elements = packed->elements(packed_block);" % indent,
+        "%s    auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+        "%s    auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+        "%s    auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+        "%s    auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s    const int dim = mesh->spatial_dimension();" % indent,
     ]
     emitted_affine = False
     for dim in (2, 3):
@@ -8059,8 +8059,8 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
         direction_args = [str(_packed_n_components(n_field_components_by_dim, dim))] + ["h + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
         affine_lines.extend(
             [
-                "%s        %s (dim == %d) {" % (indent, prefix, dim),
-                "%s            status = %s(%s);" % (
+                "%s    %s (dim == %d) {" % (indent, prefix, dim),
+                "%s      status = %s(%s);" % (
                     indent,
                     function,
                     ", ".join(
@@ -8087,26 +8087,26 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                         ]
                     ),
                 ),
-                "%s        }" % indent,
+                "%s    }" % indent,
             ]
         )
     affine_lines.extend(
         [
-            "%s    }" % indent,
+            "%s  }" % indent,
             "%s}" % indent,
         ]
     )
     lines = [
         "%sif (!impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
-        "%s    auto packed = impl_->space->packed_mesh();" % indent,
-        "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
-        "%s    if (packed_block >= 0) {" % indent,
-        "%s        auto packed_elements = packed->elements(packed_block);" % indent,
-        "%s        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
-        "%s        auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
-        "%s        auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
-        "%s        auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
-        "%s        const int dim = mesh->spatial_dimension();" % indent,
+        "%s  auto packed = impl_->space->packed_mesh();" % indent,
+        "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
+        "%s  if (packed_block >= 0) {" % indent,
+        "%s    auto packed_elements = packed->elements(packed_block);" % indent,
+        "%s    auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);" % indent,
+        "%s    auto n_shared_nodes = packed->n_shared(packed_block);" % indent,
+        "%s    auto ghost_ptr = packed->ghost_ptr(packed_block);" % indent,
+        "%s    auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
+        "%s    const int dim = mesh->spatial_dimension();" % indent,
     ]
     emitted = False
     for dim in (2, 3):
@@ -8129,8 +8129,8 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
         )
         lines.extend(
             [
-                "%s        %s (dim == %d) {" % (indent, prefix, dim),
-                "%s            status = %s(%s);" % (
+                "%s    %s (dim == %d) {" % (indent, prefix, dim),
+                "%s      status = %s(%s);" % (
                     indent,
                     function,
                     ", ".join(
@@ -8157,12 +8157,12 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                         ]
                     ),
                 ),
-                "%s        }" % indent,
+                "%s    }" % indent,
             ]
         )
     lines.extend(
         [
-            "%s    }" % indent,
+            "%s  }" % indent,
             "%s}" % indent,
         ]
     )
@@ -8198,7 +8198,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
             lines.append(
-                "%s    return %s(%s);"
+                "%s  return %s(%s);"
                 % (
                     indent,
                     function,
@@ -8218,8 +8218,8 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                 )
             )
         else:
-            lines.append('%s    SFEM_ERROR("%s %s %dd dispatch was not generated\\n");' % (indent, material_name, operation, dim))
-            lines.append("%s    return SFEM_FAILURE;" % indent)
+            lines.append('%s  SFEM_ERROR("%s %s %dd dispatch was not generated\\n");' % (indent, material_name, operation, dim))
+            lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
     lines.extend(
         [
@@ -8236,23 +8236,23 @@ def _hyperelastic_hessian_current_prologue(op_name, operation, apply_dependencie
         for dependencies in apply_dependencies_by_dim.values()
     )
     if not uses_current:
-        return "        (void)x;"
+        return "    (void)x;"
     return "\n".join(
         (
-            "        const real_t *const current = x;",
-            "        if (!current) {",
-            '            SFEM_ERROR("%s::%s requires a current state\\n");'
+            "    const real_t *const current = x;",
+            "    if (!current) {",
+            '      SFEM_ERROR("%s::%s requires a current state\\n");'
             % (op_name, operation),
-            "            return SFEM_FAILURE;",
-            "        }",
+            "      return SFEM_FAILURE;",
+            "    }",
         )
     )
 
 
 def _dual_case(element, flag, affine_function, affine_arguments, isoparametric_function, isoparametric_arguments):
     return """%(cases)s
-                    return impl_->%(flag)s ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
-        "cases": _mesh_case_labels(element, "                "),
+          return impl_->%(flag)s ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
+        "cases": _mesh_case_labels(element, "        "),
         "flag": flag,
         "affine_function": affine_function,
         "affine_arguments": affine_arguments,
@@ -8272,11 +8272,11 @@ def _dual_aos_unit_case(
     isoparametric_arguments,
 ):
     return """%(cases)s
-                    if (impl_->%(flag)s) {
-                        return adjugate_aos ? %(affine_aos_function)s(%(affine_aos_arguments)s) : %(affine_function)s(%(affine_arguments)s);
-                    }
-                    return %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
-        "cases": _mesh_case_labels(element, "                "),
+          if (impl_->%(flag)s) {
+            return adjugate_aos ? %(affine_aos_function)s(%(affine_aos_arguments)s) : %(affine_function)s(%(affine_arguments)s);
+          }
+          return %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
+        "cases": _mesh_case_labels(element, "        "),
         "flag": flag,
         "affine_aos_function": affine_aos_function,
         "affine_aos_arguments": affine_aos_arguments,
@@ -8289,9 +8289,9 @@ def _dual_aos_unit_case(
 
 def _dual_status_case(element, affine_function, affine_arguments, isoparametric_function, isoparametric_arguments):
     return """%(cases)s
-                    status = impl_->objective_uses_affine ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);
-                    break;""" % {
-        "cases": _mesh_case_labels(element, "                "),
+          status = impl_->objective_uses_affine ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);
+          break;""" % {
+        "cases": _mesh_case_labels(element, "        "),
         "affine_function": affine_function,
         "affine_arguments": affine_arguments,
         "isoparametric_function": isoparametric_function,
@@ -8301,7 +8301,7 @@ def _dual_status_case(element, affine_function, affine_arguments, isoparametric_
 
 def _seed_lines(defaults):
     return "\n".join(
-        '            parameters.set_value("%s", %.17g);' % (name, value)
+        '      parameters.set_value("%s", %.17g);' % (name, value)
         for name, value in defaults
     )
 
@@ -8312,144 +8312,144 @@ def _yaml_helpers(defaults):
     names = ", ".join('"%s"' % name for name, _ in defaults) or "nullptr"
     default_lines = []
     for i, (_, value) in enumerate(defaults):
-        default_lines.append("            values[%d] = %.17g;" % (i, value))
+        default_lines.append("      values[%d] = %.17g;" % (i, value))
     if not default_lines:
-        default_lines.append("            values[0] = 0;")
+        default_lines.append("      values[0] = 0;")
     return """        struct AffineOption {
-            const char *name;
-            bool       *flag;
-        };
+      const char *name;
+      bool       *flag;
+    };
 
-        inline bool set_affine_option(const std::string &name,
+    inline bool set_affine_option(const std::string &name,
                                       const bool val,
                                       const AffineOption *const options,
                                       const int n_options) {
-            if (name == "ASSUME_AFFINE" || name == "assume_affine") {
-                for (int i = 0; i < n_options; ++i) {
-                    *options[i].flag = val;
-                }
-                return true;
-            }
-            bool matched = false;
-            for (int i = 0; i < n_options; ++i) {
-                if (name == options[i].name) {
-                    *options[i].flag = val;
-                    matched = true;
-                }
-            }
-            return matched;
+      if (name == "ASSUME_AFFINE" || name == "assume_affine") {
+        for (int i = 0; i < n_options; ++i) {
+          *options[i].flag = val;
         }
+        return true;
+      }
+      bool matched = false;
+      for (int i = 0; i < n_options; ++i) {
+        if (name == options[i].name) {
+          *options[i].flag = val;
+          matched = true;
+        }
+      }
+      return matched;
+    }
 
-        void material_defaults(real_t *const values) {
+    void material_defaults(real_t *const values) {
 %(default_lines)s
-        }
+    }
 
 #ifdef SFEM_ENABLE_RYAML
-        constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
-        constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
-        static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};
+    constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
+    constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
+    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};
 
-        bool yaml_read_real(const ryml::ConstNodeRef &node,
-                            const char *const key,
-                            real_t &value) {
-            if (!node.has_child(key)) {
-                return false;
-            }
-            node[key] >> value;
-            return true;
-        }
+    bool yaml_read_real(const ryml::ConstNodeRef &node,
+              const char *const key,
+              real_t &value) {
+      if (!node.has_child(key)) {
+        return false;
+      }
+      node[key] >> value;
+      return true;
+    }
 
-        bool yaml_read_parameter(const ryml::ConstNodeRef &node,
+    bool yaml_read_parameter(const ryml::ConstNodeRef &node,
                                  const char *const key,
                                  real_t &value) {
-            if (yaml_read_real(node, key, value)) {
-                return true;
-            }
-            if (node.has_child("parameters") &&
-                yaml_read_real(node["parameters"], key, value)) {
-                return true;
-            }
-            if (node.has_child("material") &&
-                yaml_read_real(node["material"], key, value)) {
-                return true;
-            }
-            return false;
-        }
+      if (yaml_read_real(node, key, value)) {
+        return true;
+      }
+      if (node.has_child("parameters") &&
+        yaml_read_real(node["parameters"], key, value)) {
+        return true;
+      }
+      if (node.has_child("material") &&
+        yaml_read_real(node["material"], key, value)) {
+        return true;
+      }
+      return false;
+    }
 
-        std::string yaml_read_string(const ryml::ConstNodeRef &node) {
-            const auto value = node.val();
-            return std::string(value.str, value.len);
-        }
+    std::string yaml_read_string(const ryml::ConstNodeRef &node) {
+      const auto value = node.val();
+      return std::string(value.str, value.len);
+    }
 
-        void copy_material_parameters(const real_t *const src,
+    void copy_material_parameters(const real_t *const src,
                                       real_t *const dst) {
-            for (int i = 0; i < N_MATERIAL_PARAMETERS; ++i) {
-                dst[i] = src[i];
-            }
-        }
+      for (int i = 0; i < N_MATERIAL_PARAMETERS; ++i) {
+        dst[i] = src[i];
+      }
+    }
 
-        bool material_from_yaml(const ryml::ConstNodeRef &node,
-                                const real_t *const base,
-                                real_t *const values) {
-            copy_material_parameters(base, values);
-            bool changed = false;
-            for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-                changed |= yaml_read_parameter(node,
+    bool material_from_yaml(const ryml::ConstNodeRef &node,
+                const real_t *const base,
+                real_t *const values) {
+      copy_material_parameters(base, values);
+      bool changed = false;
+      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+        changed |= yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
-            }
-            return changed;
-        }
+      }
+      return changed;
+    }
 
-        void set_material(MultiDomainOp &domains,
+    void set_material(MultiDomainOp &domains,
                           const real_t *const values) {
-            for (auto &entry : domains.domains()) {
-                for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-                    entry.second.parameters->set_value(MATERIAL_PARAMETER_NAMES[i],
+      for (auto &entry : domains.domains()) {
+        for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+          entry.second.parameters->set_value(MATERIAL_PARAMETER_NAMES[i],
                                                        values[i]);
-                }
-            }
         }
+      }
+    }
 
-        void set_material_in_block(MultiDomainOp &domains,
+    void set_material_in_block(MultiDomainOp &domains,
                                    const std::string &block_name,
                                    const real_t *const values) {
-            for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-                domains.set_value_in_block(block_name,
+      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+        domains.set_value_in_block(block_name,
                                            MATERIAL_PARAMETER_NAMES[i],
                                            values[i]);
-            }
-        }
+      }
+    }
 
-        bool yaml_read_bool(const ryml::ConstNodeRef &node,
-                            const char *const key,
-                            bool &value) {
-            if (!node.has_child(key)) {
-                return false;
-            }
-            int raw = value ? 1 : 0;
-            node[key] >> raw;
-            value = raw != 0;
-            return true;
-        }
+    bool yaml_read_bool(const ryml::ConstNodeRef &node,
+              const char *const key,
+              bool &value) {
+      if (!node.has_child(key)) {
+        return false;
+      }
+      int raw = value ? 1 : 0;
+      node[key] >> raw;
+      value = raw != 0;
+      return true;
+    }
 
-        inline void read_affine_options(const ryml::ConstNodeRef &node,
-                                        const AffineOption *const options,
-                                        const int n_options) {
-            bool all = true;
-            for (int i = 0; i < n_options; ++i) {
-                all = all && *options[i].flag;
-            }
-            if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
-                yaml_read_bool(node, "assume_affine", all)) {
-                for (int i = 0; i < n_options; ++i) {
-                    *options[i].flag = all;
-                }
-            }
-            for (int i = 0; i < n_options; ++i) {
-                yaml_read_bool(node, options[i].name, *options[i].flag);
-            }
+    inline void read_affine_options(const ryml::ConstNodeRef &node,
+                    const AffineOption *const options,
+                    const int n_options) {
+      bool all = true;
+      for (int i = 0; i < n_options; ++i) {
+        all = all && *options[i].flag;
+      }
+      if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
+        yaml_read_bool(node, "assume_affine", all)) {
+        for (int i = 0; i < n_options; ++i) {
+          *options[i].flag = all;
         }
+      }
+      for (int i = 0; i < n_options; ++i) {
+        yaml_read_bool(node, options[i].name, *options[i].flag);
+      }
+    }
 #endif  // SFEM_ENABLE_RYAML""" % {
         "nparameters": nparameters,
         "storage_size": storage_size,
@@ -8535,7 +8535,7 @@ def _affine_dispatch_call_lines(kernel_sources, name, indent, arguments):
                         for element in elements
                     ),
                 ),
-                "%s    return %s(%s);" % (indent, metric, arguments(metric)),
+                "%s  return %s(%s);" % (indent, metric, arguments(metric)),
                 "%s}" % indent,
             ]
         )
@@ -8568,9 +8568,9 @@ def _affine_dispatch_status_lines(kernel_sources, name, indent, arguments):
                         for element in elements
                     ),
                 ),
-                "%s    status = %s(%s);" % (indent, metric, arguments(metric)),
+                "%s  status = %s(%s);" % (indent, metric, arguments(metric)),
                 "%s} else {" % indent,
-                "%s    status = %s(%s);" % (indent, name, arguments(name)),
+                "%s  status = %s(%s);" % (indent, name, arguments(name)),
                 "%s}" % indent,
             ]
         )
@@ -8588,7 +8588,7 @@ def _metric_cache_field(uses_metric):
     """
     if not uses_metric:
         return ""
-    return "            std::shared_ptr<smesh::FFF> metric_soa;\n"
+    return "      std::shared_ptr<smesh::FFF> metric_soa;\n"
 
 
 def _metric_cache_setup(uses_metric):
@@ -8596,11 +8596,11 @@ def _metric_cache_setup(uses_metric):
     if not uses_metric:
         return ""
     return (
-        "                cache->metric_soa = smesh::FFF::create_SoA(\n"
-        "                        mesh, smesh::MEMORY_SPACE_HOST, block_id);\n"
-        "                if (!cache->metric_soa) {\n"
-        "                    return SFEM_FAILURE;\n"
-        "                }\n"
+        "        cache->metric_soa = smesh::FFF::create_SoA(\n"
+        "            mesh, smesh::MEMORY_SPACE_HOST, block_id);\n"
+        "        if (!cache->metric_soa) {\n"
+        "          return SFEM_FAILURE;\n"
+        "        }\n"
     )
 
 
@@ -8608,7 +8608,7 @@ def _metric_declaration(uses_metric):
     """The metric pointer an operation body passes to its affine kernels."""
     if not uses_metric:
         return ""
-    return "            const geom_t *const *geom_metric = nullptr;\n"
+    return "      const geom_t *const *geom_metric = nullptr;\n"
 
 
 def _metric_binding(uses_metric, op_name, label):
@@ -8620,12 +8620,12 @@ def _metric_binding(uses_metric, op_name, label):
     if not uses_metric:
         return ""
     return (
-        "                if (!cache->metric_soa) {\n"
-        '                    SFEM_ERROR("%s affine %s requires cached metric geometry\\n");\n'
-        "                    return SFEM_FAILURE;\n"
-        "                }\n"
-        "                geom_metric = reinterpret_cast<const geom_t *const *>(\n"
-        "                        cache->metric_soa->fff_SoA()->data());\n"
+        "        if (!cache->metric_soa) {\n"
+        '          SFEM_ERROR("%s affine %s requires cached metric geometry\\n");\n'
+        "          return SFEM_FAILURE;\n"
+        "        }\n"
+        "        geom_metric = reinterpret_cast<const geom_t *const *>(\n"
+        "            cache->metric_soa->fff_SoA()->data());\n"
     ) % (op_name, label)
 
 

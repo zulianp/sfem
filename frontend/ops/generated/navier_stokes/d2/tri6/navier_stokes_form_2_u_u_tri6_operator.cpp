@@ -35,24 +35,24 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int,
-        const g_t *const RSTR source,
-        s_t *const RSTR,
-        std::true_type) {
-    return source;
+    const int,
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
 }
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int ne,
-        const g_t *const RSTR source,
-        s_t *const RSTR converted,
-        std::false_type) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-        converted[lane] = s_t(source[lane]);
-    }
-    return converted;
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    converted[lane] = s_t(source[lane]);
+  }
+  return converted;
 }
 
 } // namespace codegen
@@ -64,42 +64,42 @@ namespace codegen {
 
 template <typename s_t>
 struct navier_stokes_form_2_u_u_affine_reference_data {
-    static const s_t *q_weight() {
-        static const s_t data[6] = {s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.054975871827660998), s_t(0.054975871827660998), s_t(0.054975871827660998)};
-        return data;
-    }
-    static const s_t *tri6_shape() {
-        static const s_t data[36] = {s_t(-0.084730493093977982), s_t(-0.04820837781551205), s_t(-0.04820837781551205), s_t(0.1928335112620482), s_t(0.79548022620090564), s_t(0.1928335112620482), s_t(-0.04820837781551205), s_t(-0.084730493093977968), s_t(-0.04820837781551205), s_t(0.19283351126204817), s_t(0.19283351126204817), s_t(0.79548022620090564), s_t(-0.04820837781551205), s_t(-0.04820837781551205), s_t(-0.084730493093977968), s_t(0.79548022620090564), s_t(0.19283351126204817), s_t(0.19283351126204817), s_t(0.5176323419876725), s_t(-0.074803807748196505), s_t(-0.074803807748196505), s_t(0.29921523099278602), s_t(0.03354481152314847), s_t(0.29921523099278602), s_t(-0.074803807748196505), s_t(0.5176323419876725), s_t(-0.074803807748196505), s_t(0.29921523099278602), s_t(0.29921523099278602), s_t(0.03354481152314847), s_t(-0.074803807748196505), s_t(-0.074803807748196505), s_t(0.5176323419876725), s_t(0.03354481152314847), s_t(0.29921523099278602), s_t(0.29921523099278602)};
-        return data;
-    }
-    static const s_t *tri6_grad_ref_x() {
-        static const s_t data[36] = {s_t(0.56758792732771912), s_t(0.78379396366385956), s_t(0), s_t(-1.3513818909915787), s_t(1.7837939636638596), s_t(-1.7837939636638596), s_t(-0.78379396366385956), s_t(-0.56758792732771912), s_t(0), s_t(1.3513818909915787), s_t(1.7837939636638596), s_t(-1.7837939636638596), s_t(-0.78379396366385956), s_t(0.78379396366385956), s_t(0), s_t(5.5511151231257827e-17), s_t(0.43241207267228082), s_t(-0.43241207267228082), s_t(-2.2673902919218341), s_t(-0.63369514596091703), s_t(0), s_t(2.9010854378827511), s_t(0.36630485403908297), s_t(-0.36630485403908297), s_t(0.63369514596091703), s_t(2.2673902919218341), s_t(0), s_t(-2.9010854378827511), s_t(0.36630485403908297), s_t(-0.36630485403908297), s_t(0.63369514596091703), s_t(-0.63369514596091703), s_t(0), s_t(0), s_t(3.2673902919218341), s_t(-3.2673902919218341)};
-        return data;
-    }
-    static const s_t *tri6_grad_ref_y() {
-        static const s_t data[36] = {s_t(0.56758792732771912), s_t(0), s_t(0.78379396366385956), s_t(-1.7837939636638596), s_t(1.7837939636638596), s_t(-1.3513818909915787), s_t(-0.78379396366385956), s_t(0), s_t(0.78379396366385956), s_t(-0.43241207267228082), s_t(0.43241207267228082), s_t(0), s_t(-0.78379396366385956), s_t(0), s_t(-0.56758792732771912), s_t(-1.7837939636638596), s_t(1.7837939636638596), s_t(1.3513818909915787), s_t(-2.2673902919218341), s_t(0), s_t(-0.63369514596091703), s_t(-0.36630485403908297), s_t(0.36630485403908297), s_t(2.9010854378827511), s_t(0.63369514596091703), s_t(0), s_t(-0.63369514596091703), s_t(-3.2673902919218341), s_t(3.2673902919218341), s_t(0), s_t(0.63369514596091703), s_t(0), s_t(2.2673902919218341), s_t(-0.36630485403908297), s_t(0.36630485403908297), s_t(-2.9010854378827511)};
-        return data;
-    }
+  static const s_t *q_weight() {
+    static const s_t data[6] = {s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.054975871827660998), s_t(0.054975871827660998), s_t(0.054975871827660998)};
+    return data;
+  }
+  static const s_t *tri6_shape() {
+    static const s_t data[36] = {s_t(-0.084730493093977982), s_t(-0.04820837781551205), s_t(-0.04820837781551205), s_t(0.1928335112620482), s_t(0.79548022620090564), s_t(0.1928335112620482), s_t(-0.04820837781551205), s_t(-0.084730493093977968), s_t(-0.04820837781551205), s_t(0.19283351126204817), s_t(0.19283351126204817), s_t(0.79548022620090564), s_t(-0.04820837781551205), s_t(-0.04820837781551205), s_t(-0.084730493093977968), s_t(0.79548022620090564), s_t(0.19283351126204817), s_t(0.19283351126204817), s_t(0.5176323419876725), s_t(-0.074803807748196505), s_t(-0.074803807748196505), s_t(0.29921523099278602), s_t(0.03354481152314847), s_t(0.29921523099278602), s_t(-0.074803807748196505), s_t(0.5176323419876725), s_t(-0.074803807748196505), s_t(0.29921523099278602), s_t(0.29921523099278602), s_t(0.03354481152314847), s_t(-0.074803807748196505), s_t(-0.074803807748196505), s_t(0.5176323419876725), s_t(0.03354481152314847), s_t(0.29921523099278602), s_t(0.29921523099278602)};
+    return data;
+  }
+  static const s_t *tri6_grad_ref_x() {
+    static const s_t data[36] = {s_t(0.56758792732771912), s_t(0.78379396366385956), s_t(0), s_t(-1.3513818909915787), s_t(1.7837939636638596), s_t(-1.7837939636638596), s_t(-0.78379396366385956), s_t(-0.56758792732771912), s_t(0), s_t(1.3513818909915787), s_t(1.7837939636638596), s_t(-1.7837939636638596), s_t(-0.78379396366385956), s_t(0.78379396366385956), s_t(0), s_t(5.5511151231257827e-17), s_t(0.43241207267228082), s_t(-0.43241207267228082), s_t(-2.2673902919218341), s_t(-0.63369514596091703), s_t(0), s_t(2.9010854378827511), s_t(0.36630485403908297), s_t(-0.36630485403908297), s_t(0.63369514596091703), s_t(2.2673902919218341), s_t(0), s_t(-2.9010854378827511), s_t(0.36630485403908297), s_t(-0.36630485403908297), s_t(0.63369514596091703), s_t(-0.63369514596091703), s_t(0), s_t(0), s_t(3.2673902919218341), s_t(-3.2673902919218341)};
+    return data;
+  }
+  static const s_t *tri6_grad_ref_y() {
+    static const s_t data[36] = {s_t(0.56758792732771912), s_t(0), s_t(0.78379396366385956), s_t(-1.7837939636638596), s_t(1.7837939636638596), s_t(-1.3513818909915787), s_t(-0.78379396366385956), s_t(0), s_t(0.78379396366385956), s_t(-0.43241207267228082), s_t(0.43241207267228082), s_t(0), s_t(-0.78379396366385956), s_t(0), s_t(-0.56758792732771912), s_t(-1.7837939636638596), s_t(1.7837939636638596), s_t(1.3513818909915787), s_t(-2.2673902919218341), s_t(0), s_t(-0.63369514596091703), s_t(-0.36630485403908297), s_t(0.36630485403908297), s_t(2.9010854378827511), s_t(0.63369514596091703), s_t(0), s_t(-0.63369514596091703), s_t(-3.2673902919218341), s_t(3.2673902919218341), s_t(0), s_t(0.63369514596091703), s_t(0), s_t(2.2673902919218341), s_t(-0.36630485403908297), s_t(0.36630485403908297), s_t(-2.9010854378827511)};
+    return data;
+  }
 };
 
 template <typename s_t>
 struct navier_stokes_form_2_u_u_isoparametric_reference_data {
-    static const s_t *q_weight() {
-        static const s_t data[6] = {s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.054975871827660998), s_t(0.054975871827660998), s_t(0.054975871827660998)};
-        return data;
-    }
-    static const s_t *tri6_shape() {
-        static const s_t data[36] = {s_t(-0.084730493093977982), s_t(-0.04820837781551205), s_t(-0.04820837781551205), s_t(0.1928335112620482), s_t(0.79548022620090564), s_t(0.1928335112620482), s_t(-0.04820837781551205), s_t(-0.084730493093977968), s_t(-0.04820837781551205), s_t(0.19283351126204817), s_t(0.19283351126204817), s_t(0.79548022620090564), s_t(-0.04820837781551205), s_t(-0.04820837781551205), s_t(-0.084730493093977968), s_t(0.79548022620090564), s_t(0.19283351126204817), s_t(0.19283351126204817), s_t(0.5176323419876725), s_t(-0.074803807748196505), s_t(-0.074803807748196505), s_t(0.29921523099278602), s_t(0.03354481152314847), s_t(0.29921523099278602), s_t(-0.074803807748196505), s_t(0.5176323419876725), s_t(-0.074803807748196505), s_t(0.29921523099278602), s_t(0.29921523099278602), s_t(0.03354481152314847), s_t(-0.074803807748196505), s_t(-0.074803807748196505), s_t(0.5176323419876725), s_t(0.03354481152314847), s_t(0.29921523099278602), s_t(0.29921523099278602)};
-        return data;
-    }
-    static const s_t *tri6_grad_ref_x() {
-        static const s_t data[36] = {s_t(0.56758792732771912), s_t(0.78379396366385956), s_t(0), s_t(-1.3513818909915787), s_t(1.7837939636638596), s_t(-1.7837939636638596), s_t(-0.78379396366385956), s_t(-0.56758792732771912), s_t(0), s_t(1.3513818909915787), s_t(1.7837939636638596), s_t(-1.7837939636638596), s_t(-0.78379396366385956), s_t(0.78379396366385956), s_t(0), s_t(5.5511151231257827e-17), s_t(0.43241207267228082), s_t(-0.43241207267228082), s_t(-2.2673902919218341), s_t(-0.63369514596091703), s_t(0), s_t(2.9010854378827511), s_t(0.36630485403908297), s_t(-0.36630485403908297), s_t(0.63369514596091703), s_t(2.2673902919218341), s_t(0), s_t(-2.9010854378827511), s_t(0.36630485403908297), s_t(-0.36630485403908297), s_t(0.63369514596091703), s_t(-0.63369514596091703), s_t(0), s_t(0), s_t(3.2673902919218341), s_t(-3.2673902919218341)};
-        return data;
-    }
-    static const s_t *tri6_grad_ref_y() {
-        static const s_t data[36] = {s_t(0.56758792732771912), s_t(0), s_t(0.78379396366385956), s_t(-1.7837939636638596), s_t(1.7837939636638596), s_t(-1.3513818909915787), s_t(-0.78379396366385956), s_t(0), s_t(0.78379396366385956), s_t(-0.43241207267228082), s_t(0.43241207267228082), s_t(0), s_t(-0.78379396366385956), s_t(0), s_t(-0.56758792732771912), s_t(-1.7837939636638596), s_t(1.7837939636638596), s_t(1.3513818909915787), s_t(-2.2673902919218341), s_t(0), s_t(-0.63369514596091703), s_t(-0.36630485403908297), s_t(0.36630485403908297), s_t(2.9010854378827511), s_t(0.63369514596091703), s_t(0), s_t(-0.63369514596091703), s_t(-3.2673902919218341), s_t(3.2673902919218341), s_t(0), s_t(0.63369514596091703), s_t(0), s_t(2.2673902919218341), s_t(-0.36630485403908297), s_t(0.36630485403908297), s_t(-2.9010854378827511)};
-        return data;
-    }
+  static const s_t *q_weight() {
+    static const s_t data[6] = {s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.054975871827660998), s_t(0.054975871827660998), s_t(0.054975871827660998)};
+    return data;
+  }
+  static const s_t *tri6_shape() {
+    static const s_t data[36] = {s_t(-0.084730493093977982), s_t(-0.04820837781551205), s_t(-0.04820837781551205), s_t(0.1928335112620482), s_t(0.79548022620090564), s_t(0.1928335112620482), s_t(-0.04820837781551205), s_t(-0.084730493093977968), s_t(-0.04820837781551205), s_t(0.19283351126204817), s_t(0.19283351126204817), s_t(0.79548022620090564), s_t(-0.04820837781551205), s_t(-0.04820837781551205), s_t(-0.084730493093977968), s_t(0.79548022620090564), s_t(0.19283351126204817), s_t(0.19283351126204817), s_t(0.5176323419876725), s_t(-0.074803807748196505), s_t(-0.074803807748196505), s_t(0.29921523099278602), s_t(0.03354481152314847), s_t(0.29921523099278602), s_t(-0.074803807748196505), s_t(0.5176323419876725), s_t(-0.074803807748196505), s_t(0.29921523099278602), s_t(0.29921523099278602), s_t(0.03354481152314847), s_t(-0.074803807748196505), s_t(-0.074803807748196505), s_t(0.5176323419876725), s_t(0.03354481152314847), s_t(0.29921523099278602), s_t(0.29921523099278602)};
+    return data;
+  }
+  static const s_t *tri6_grad_ref_x() {
+    static const s_t data[36] = {s_t(0.56758792732771912), s_t(0.78379396366385956), s_t(0), s_t(-1.3513818909915787), s_t(1.7837939636638596), s_t(-1.7837939636638596), s_t(-0.78379396366385956), s_t(-0.56758792732771912), s_t(0), s_t(1.3513818909915787), s_t(1.7837939636638596), s_t(-1.7837939636638596), s_t(-0.78379396366385956), s_t(0.78379396366385956), s_t(0), s_t(5.5511151231257827e-17), s_t(0.43241207267228082), s_t(-0.43241207267228082), s_t(-2.2673902919218341), s_t(-0.63369514596091703), s_t(0), s_t(2.9010854378827511), s_t(0.36630485403908297), s_t(-0.36630485403908297), s_t(0.63369514596091703), s_t(2.2673902919218341), s_t(0), s_t(-2.9010854378827511), s_t(0.36630485403908297), s_t(-0.36630485403908297), s_t(0.63369514596091703), s_t(-0.63369514596091703), s_t(0), s_t(0), s_t(3.2673902919218341), s_t(-3.2673902919218341)};
+    return data;
+  }
+  static const s_t *tri6_grad_ref_y() {
+    static const s_t data[36] = {s_t(0.56758792732771912), s_t(0), s_t(0.78379396366385956), s_t(-1.7837939636638596), s_t(1.7837939636638596), s_t(-1.3513818909915787), s_t(-0.78379396366385956), s_t(0), s_t(0.78379396366385956), s_t(-0.43241207267228082), s_t(0.43241207267228082), s_t(0), s_t(-0.78379396366385956), s_t(0), s_t(-0.56758792732771912), s_t(-1.7837939636638596), s_t(1.7837939636638596), s_t(1.3513818909915787), s_t(-2.2673902919218341), s_t(0), s_t(-0.63369514596091703), s_t(-0.36630485403908297), s_t(0.36630485403908297), s_t(2.9010854378827511), s_t(0.63369514596091703), s_t(0), s_t(-0.63369514596091703), s_t(-3.2673902919218341), s_t(3.2673902919218341), s_t(0), s_t(0.63369514596091703), s_t(0), s_t(2.2673902919218341), s_t(-0.36630485403908297), s_t(0.36630485403908297), s_t(-2.9010854378827511)};
+    return data;
+  }
 };
 
 } // namespace codegen
@@ -109,260 +109,260 @@ namespace sfem {
 namespace codegen {
 
 static const KernelDiagnostics navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data = {
-    "navier_stokes_form_2_u_u_tri6_residual_element_soa",
-    "TRI6",
-    2,
-    6,
-    6,
-    16,
-    4,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    2,
-    0,
-    0,
-    0,
-    0,
-    0,
-    5,
-    108,
-    6,
-    0,
-    0,
-    0,
-    12,
-    1,
-    1,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+  "navier_stokes_form_2_u_u_tri6_residual_element_soa",
+  "TRI6",
+  2,
+  6,
+  6,
+  16,
+  4,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  5,
+  108,
+  6,
+  0,
+  0,
+  0,
+  12,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics(void) {
-    return &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data;
+  return &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data;
 }
 
 extern "C" double navier_stokes_form_2_u_u_tri6_residual_element_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
-            nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    const ptrdiff_t nelements,
+    const size_t scalar_bytes,
+    const size_t real_bytes,
+    const size_t accumulator_bytes) {
+  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
+      nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_residual_element_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "navier_stokes_form_2_u_u_tri6_residual_element_soa",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "navier_stokes_form_2_u_u_tri6_residual_element_soa",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_residual_element_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "navier_stokes_form_2_u_u_tri6_residual_element_soa_float",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "navier_stokes_form_2_u_u_tri6_residual_element_soa_float",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_residual_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "navier_stokes_form_2_u_u_tri6_residual_affine_mesh_soa",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "navier_stokes_form_2_u_u_tri6_residual_affine_mesh_soa",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_residual_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "navier_stokes_form_2_u_u_tri6_residual_affine_mesh_soa_float",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "navier_stokes_form_2_u_u_tri6_residual_affine_mesh_soa_float",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_residual_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "navier_stokes_form_2_u_u_tri6_residual_isoparametric_mesh_soa",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "navier_stokes_form_2_u_u_tri6_residual_isoparametric_mesh_soa",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_residual_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "navier_stokes_form_2_u_u_tri6_residual_isoparametric_mesh_soa_float",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "navier_stokes_form_2_u_u_tri6_residual_isoparametric_mesh_soa_float",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_residual_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 namespace sfem {
 namespace codegen {
 
 static const KernelDiagnostics navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data = {
-    "navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa",
-    "TRI6",
-    2,
-    6,
-    6,
-    16,
-    4,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    2,
-    0,
-    0,
-    0,
-    0,
-    0,
-    5,
-    108,
-    6,
-    4,
-    12,
-    12,
-    12,
-    1,
-    1,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+  "navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa",
+  "TRI6",
+  2,
+  6,
+  6,
+  16,
+  4,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  5,
+  108,
+  6,
+  4,
+  12,
+  12,
+  12,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics(void) {
-    return &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data;
+  return &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data;
 }
 
 extern "C" double navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
-            nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    const ptrdiff_t nelements,
+    const size_t scalar_bytes,
+    const size_t real_bytes,
+    const size_t accumulator_bytes) {
+  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
+      nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_float",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_float",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa_float",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa_float",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa_float",
-            &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa_float",
+      &sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_element_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 namespace sfem {
@@ -370,22 +370,22 @@ namespace codegen {
 
 template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_form_2_u_u_tri6_residual_affine_mesh_mixed_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const g_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        s_t *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_det0,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR u_out[2]
 ) {
-    static constexpr int ND = 2;
-    static constexpr int NQ = 6;
-    static constexpr int CELL_NS = 6;
-    static constexpr int NS = CELL_NS;
-    static constexpr int NC = 1;
-    static constexpr int N_FIELD_STREAMS = 12;
-    static constexpr int VS = 16;
-    (void)nnodes;
-    return SFEM_SUCCESS;
+  static constexpr int ND = 2;
+  static constexpr int NQ = 6;
+  static constexpr int CELL_NS = 6;
+  static constexpr int NS = CELL_NS;
+  static constexpr int NC = 1;
+  static constexpr int N_FIELD_STREAMS = 12;
+  static constexpr int VS = 16;
+  (void)nnodes;
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
@@ -396,22 +396,22 @@ namespace codegen {
 
 template <typename s_t>
 static SFEM_INLINE int navier_stokes_form_2_u_u_tri6_residual_isoparametric_mesh_mixed_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        s_t *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR u_out[2]
 ) {
-    static constexpr int ND = 2;
-    static constexpr int NQ = 6;
-    static constexpr int CELL_NS = 6;
-    static constexpr int NS = CELL_NS;
-    static constexpr int NC = 1;
-    static constexpr int N_FIELD_STREAMS = 12;
-    static constexpr int VS = 16;
-    (void)nnodes;
-    return SFEM_SUCCESS;
+  static constexpr int ND = 2;
+  static constexpr int NQ = 6;
+  static constexpr int CELL_NS = 6;
+  static constexpr int NS = CELL_NS;
+  static constexpr int NC = 1;
+  static constexpr int N_FIELD_STREAMS = 12;
+  static constexpr int VS = 16;
+  (void)nnodes;
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
@@ -422,157 +422,157 @@ namespace codegen {
 
 template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_mixed_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const g_t *const RSTR g_adj0,
-        const g_t *const RSTR g_adj1,
-        const g_t *const RSTR g_adj2,
-        const g_t *const RSTR g_adj3,
-        const g_t *const RSTR g_det0,
-        const s_t convection_scale,
-        const s_t dt,
-        const s_t nu,
-        const s_t rho,
-        const ptrdiff_t previous_stride,
-        const s_t *const RSTR u_old_data[2],
-        const ptrdiff_t direction_stride,
-        const s_t *const RSTR u_direction_data[2],
-        const ptrdiff_t out_stride,
-        s_t *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_det0,
+    const s_t convection_scale,
+    const s_t dt,
+    const s_t nu,
+    const s_t rho,
+    const ptrdiff_t previous_stride,
+    const s_t *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const s_t *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    s_t *const RSTR u_out[2]
 ) {
-    static constexpr int ND = 2;
-    static constexpr int NQ = 6;
-    static constexpr int CELL_NS = 6;
-    static constexpr int NS = CELL_NS;
-    static constexpr int NC = 1;
-    static constexpr int N_FIELD_STREAMS = 12;
-    static constexpr int VS = 16;
-    (void)nnodes;
-    const s_t *const field_shape[NC] = {sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_shape()};
-    const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_grad_ref_x(), sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_grad_ref_y()};
+  static constexpr int ND = 2;
+  static constexpr int NQ = 6;
+  static constexpr int CELL_NS = 6;
+  static constexpr int NS = CELL_NS;
+  static constexpr int NC = 1;
+  static constexpr int N_FIELD_STREAMS = 12;
+  static constexpr int VS = 16;
+  (void)nnodes;
+  const s_t *const field_shape[NC] = {sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_shape()};
+  const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_grad_ref_x(), sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_grad_ref_y()};
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t bprevious[N_FIELD_STREAMS][VS];
-        s_t bdirection[N_FIELD_STREAMS][VS];
-        s_t boutput[N_FIELD_STREAMS][VS];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    s_t bprevious[N_FIELD_STREAMS][VS];
+    s_t bdirection[N_FIELD_STREAMS][VS];
+    s_t boutput[N_FIELD_STREAMS][VS];
 
-        for (int local_shape = 0; local_shape < 6; ++local_shape) {
-            const idx_t *const RSTR element_shape = elements[local_shape];
-            const int stream = 0 + local_shape;
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                const idx_t node = element_shape[evb + lane];
-                bprevious[stream][lane] = u_old_data[0][node * previous_stride];
-                bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
-            }
-        }
-        for (int local_shape = 0; local_shape < 6; ++local_shape) {
-            const idx_t *const RSTR element_shape = elements[local_shape];
-            const int stream = 6 + local_shape;
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                const idx_t node = element_shape[evb + lane];
-                bprevious[stream][lane] = u_old_data[1][node * previous_stride];
-                bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
-            }
-        }
-
-        for (int stream = 0; stream < 12; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                boutput[stream][lane] = s_t(0);
-            }
-        }
-        const g_t *const affine_geometry_sources[5] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_det0 + evb};
-        s_t baffine_geometry_data[5][VS];
-        const s_t *bageom_streams[5];
-        for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
-            bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
-        }
-        const s_t *badjugate[ND * ND];
-        for (int component = 0; component < ND * ND; ++component) {
-            badjugate[component] = bageom_streams[component];
-        }
-
-        navier_stokes_form_2_u_u_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
-
-        {
-            s_t *const RSTR out = u_out[0];
-            for (int local_shape = 0; local_shape < 6; ++local_shape) {
-                const idx_t *const RSTR element_shape = elements[local_shape];
-                const int stream = 0 + local_shape;
-                for (int scatter = 0; scatter < ne; ++scatter) {
-                    #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
-                }
-            }
-        }
-        {
-            s_t *const RSTR out = u_out[1];
-            for (int local_shape = 0; local_shape < 6; ++local_shape) {
-                const idx_t *const RSTR element_shape = elements[local_shape];
-                const int stream = 6 + local_shape;
-                for (int scatter = 0; scatter < ne; ++scatter) {
-                    #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
-                }
-            }
-        }
+    for (int local_shape = 0; local_shape < 6; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 0 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bprevious[stream][lane] = u_old_data[0][node * previous_stride];
+        bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
+      }
     }
-    return SFEM_SUCCESS;
+    for (int local_shape = 0; local_shape < 6; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 6 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bprevious[stream][lane] = u_old_data[1][node * previous_stride];
+        bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
+      }
+    }
+
+    for (int stream = 0; stream < 12; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        boutput[stream][lane] = s_t(0);
+      }
+    }
+    const g_t *const affine_geometry_sources[5] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_det0 + evb};
+    s_t baffine_geometry_data[5][VS];
+    const s_t *bageom_streams[5];
+    for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
+          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+    }
+    const s_t *badjugate[ND * ND];
+    for (int component = 0; component < ND * ND; ++component) {
+      badjugate[component] = bageom_streams[component];
+    }
+
+    navier_stokes_form_2_u_u_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
+
+    {
+      s_t *const RSTR out = u_out[0];
+      for (int local_shape = 0; local_shape < 6; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 0 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+    {
+      s_t *const RSTR out = u_out[1];
+      for (int local_shape = 0; local_shape < 6; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 6 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+  }
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_det0,
-        const double convection_scale,
-        const double dt,
-        const double nu,
-        const double rho,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[2],
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[2],
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const double convection_scale,
+    const double dt,
+    const double nu,
+    const double rho,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2]
 ) {
-    return sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
+  return sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
 }
 
 extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_det0,
-        const float convection_scale,
-        const float dt,
-        const float nu,
-        const float rho,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[2],
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[2],
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const float convection_scale,
+    const float dt,
+    const float nu,
+    const float rho,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2]
 ) {
-    return sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
+  return sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
 }
 
 namespace sfem {
@@ -580,163 +580,163 @@ namespace codegen {
 
 template <typename s_t>
 static SFEM_INLINE int navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_mixed_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const s_t convection_scale,
-        const s_t dt,
-        const s_t nu,
-        const s_t rho,
-        const ptrdiff_t previous_stride,
-        const s_t *const RSTR u_old_data[2],
-        const ptrdiff_t direction_stride,
-        const s_t *const RSTR u_direction_data[2],
-        const ptrdiff_t out_stride,
-        s_t *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const s_t convection_scale,
+    const s_t dt,
+    const s_t nu,
+    const s_t rho,
+    const ptrdiff_t previous_stride,
+    const s_t *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const s_t *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    s_t *const RSTR u_out[2]
 ) {
-    static constexpr int ND = 2;
-    static constexpr int NQ = 6;
-    static constexpr int CELL_NS = 6;
-    static constexpr int NS = CELL_NS;
-    static constexpr int NC = 1;
-    static constexpr int N_FIELD_STREAMS = 12;
-    static constexpr int VS = 16;
-    (void)nnodes;
-    const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_x();
-    const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_y();
+  static constexpr int ND = 2;
+  static constexpr int NQ = 6;
+  static constexpr int CELL_NS = 6;
+  static constexpr int NS = CELL_NS;
+  static constexpr int NC = 1;
+  static constexpr int N_FIELD_STREAMS = 12;
+  static constexpr int VS = 16;
+  (void)nnodes;
+  const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_x();
+  const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_y();
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t bcoordinates[ND * CELL_NS][VS];
-        s_t badjugate_data[ND * ND][NQ * VS];
-        s_t bdeterminant[NQ * VS];
-        s_t bprevious[N_FIELD_STREAMS][VS];
-        s_t bdirection[N_FIELD_STREAMS][VS];
-        s_t boutput[N_FIELD_STREAMS][VS];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    s_t bcoordinates[ND * CELL_NS][VS];
+    s_t badjugate_data[ND * ND][NQ * VS];
+    s_t bdeterminant[NQ * VS];
+    s_t bprevious[N_FIELD_STREAMS][VS];
+    s_t bdirection[N_FIELD_STREAMS][VS];
+    s_t boutput[N_FIELD_STREAMS][VS];
 
-        const geom_t *const coordinate_components[ND] = {points[0], points[1]};
-        for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const RSTR element_shape = elements[shape];
-            for (int d = 0; d < ND; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < ne; ++lane) {
-                    const idx_t node = element_shape[evb + lane];
-                    bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
-                }
-            }
+    const geom_t *const coordinate_components[ND] = {points[0], points[1]};
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR element_shape = elements[shape];
+      for (int d = 0; d < ND; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = element_shape[evb + lane];
+          bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
         }
-
-        for (int local_shape = 0; local_shape < 6; ++local_shape) {
-            const idx_t *const RSTR element_shape = elements[local_shape];
-            const int stream = 0 + local_shape;
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                const idx_t node = element_shape[evb + lane];
-                bprevious[stream][lane] = u_old_data[0][node * previous_stride];
-                bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
-            }
-        }
-        for (int local_shape = 0; local_shape < 6; ++local_shape) {
-            const idx_t *const RSTR element_shape = elements[local_shape];
-            const int stream = 6 + local_shape;
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                const idx_t node = element_shape[evb + lane];
-                bprevious[stream][lane] = u_old_data[1][node * previous_stride];
-                bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
-            }
-        }
-
-        for (int stream = 0; stream < 12; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                boutput[stream][lane] = s_t(0);
-            }
-        }
-
-        s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
-        for (int q = 0; q < NQ; ++q) {
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                const s_t J00 = bcoordinates[0][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 0] + bcoordinates[2][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[4][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[6][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[8][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[10][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
-                const s_t J01 = bcoordinates[0][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 0] + bcoordinates[2][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[4][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[6][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[8][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[10][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
-                const s_t J10 = bcoordinates[1][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 0] + bcoordinates[3][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[5][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[7][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[9][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[11][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
-                const s_t J11 = bcoordinates[1][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 0] + bcoordinates[3][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[5][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[7][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[9][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[11][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
-                geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, badjugate_streams, bdeterminant, q * VS + lane);
-            }
-        }
-
-        const s_t *const field_shape[NC] = {sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_shape()};
-        const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_x(), sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_y()};
-        const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
-
-        navier_stokes_form_2_u_u_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
-
-        {
-            s_t *const RSTR out = u_out[0];
-            for (int local_shape = 0; local_shape < 6; ++local_shape) {
-                const idx_t *const RSTR element_shape = elements[local_shape];
-                const int stream = 0 + local_shape;
-                for (int scatter = 0; scatter < ne; ++scatter) {
-                    #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
-                }
-            }
-        }
-        {
-            s_t *const RSTR out = u_out[1];
-            for (int local_shape = 0; local_shape < 6; ++local_shape) {
-                const idx_t *const RSTR element_shape = elements[local_shape];
-                const int stream = 6 + local_shape;
-                for (int scatter = 0; scatter < ne; ++scatter) {
-                    #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
-                }
-            }
-        }
+      }
     }
-    return SFEM_SUCCESS;
+
+    for (int local_shape = 0; local_shape < 6; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 0 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bprevious[stream][lane] = u_old_data[0][node * previous_stride];
+        bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
+      }
+    }
+    for (int local_shape = 0; local_shape < 6; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 6 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bprevious[stream][lane] = u_old_data[1][node * previous_stride];
+        bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
+      }
+    }
+
+    for (int stream = 0; stream < 12; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        boutput[stream][lane] = s_t(0);
+      }
+    }
+
+    s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
+    for (int q = 0; q < NQ; ++q) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t J00 = bcoordinates[0][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 0] + bcoordinates[2][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[4][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[6][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[8][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[10][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
+        const s_t J01 = bcoordinates[0][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 0] + bcoordinates[2][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[4][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[6][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[8][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[10][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
+        const s_t J10 = bcoordinates[1][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 0] + bcoordinates[3][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[5][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[7][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[9][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[11][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
+        const s_t J11 = bcoordinates[1][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 0] + bcoordinates[3][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[5][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[7][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[9][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[11][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
+        geometry_jacobian_adjugate_and_determinant_2<s_t>(
+            J00, J01, J10, J11, badjugate_streams, bdeterminant, q * VS + lane);
+      }
+    }
+
+    const s_t *const field_shape[NC] = {sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_shape()};
+    const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_x(), sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_y()};
+    const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
+
+    navier_stokes_form_2_u_u_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
+
+    {
+      s_t *const RSTR out = u_out[0];
+      for (int local_shape = 0; local_shape < 6; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 0 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+    {
+      s_t *const RSTR out = u_out[1];
+      for (int local_shape = 0; local_shape < 6; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 6 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+  }
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double nu,
-        const double rho,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[2],
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[2],
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double nu,
+    const double rho,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2]
 ) {
-    return sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
+  return sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
 }
 
 extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float nu,
-        const float rho,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[2],
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[2],
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float nu,
+    const float rho,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2]
 ) {
-    return sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
+  return sfem::codegen::navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
 }

@@ -320,7 +320,7 @@ class GenApiTest(unittest.TestCase):
                 "const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
                 "#pragma omp simd",
                 "for (int lane = 0; lane < ne; ++lane) {",
-                "    bvalue[lane] = s_t(0);",
+                "  bvalue[lane] = s_t(0);",
                 "}",
                 "#pragma omp atomic update",
                 "out[node * out_stride] += bout[lane];",
@@ -537,8 +537,8 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(
             OpenMPEnergySoASourceBuilder().mesh_loop_lines(),
             (
-                "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-                "        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+                "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
+                "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
             ),
         )
 
@@ -1462,84 +1462,84 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             le_include_only = r'''
 #include "op/sfem_GeneratedLinearElasticity_element_api.hpp"
 int main() {
-    constexpr int N = 1;
-    double data[144][N] = {};
-    const double *coords[12];
-    const double *u_streams[12];
-    double *out_streams[12];
-    double *matrix_streams[144];
-    double values[N] = {};
-    for (int i = 0; i < 12; ++i) {
-        coords[i] = data[i];
-        u_streams[i] = data[i];
-        out_streams[i] = data[i];
-    }
-    for (int i = 0; i < 144; ++i) {
-        matrix_streams[i] = data[i];
-    }
-    int status = sfem::codegen::linear_elasticity_tet4_energy_element_soa<double>(N, coords, 1.0, 1.0, u_streams, values);
-    status |= sfem::codegen::linear_elasticity_tet4_gradient_element_soa<double>(N, coords, 1.0, 1.0, u_streams, out_streams);
-    status |= sfem::codegen::linear_elasticity_tet4_hessian_element_soa<double>(N, coords, 1.0, 1.0, matrix_streams);
-    status |= sfem::codegen::linear_elasticity_hessian_3d_element_soa<double>(4, N, coords, 1.0, 1.0, matrix_streams);
-    return status;
+  constexpr int N = 1;
+  double data[144][N] = {};
+  const double *coords[12];
+  const double *u_streams[12];
+  double *out_streams[12];
+  double *matrix_streams[144];
+  double values[N] = {};
+  for (int i = 0; i < 12; ++i) {
+    coords[i] = data[i];
+    u_streams[i] = data[i];
+    out_streams[i] = data[i];
+  }
+  for (int i = 0; i < 144; ++i) {
+    matrix_streams[i] = data[i];
+  }
+  int status = sfem::codegen::linear_elasticity_tet4_energy_element_soa<double>(N, coords, 1.0, 1.0, u_streams, values);
+  status |= sfem::codegen::linear_elasticity_tet4_gradient_element_soa<double>(N, coords, 1.0, 1.0, u_streams, out_streams);
+  status |= sfem::codegen::linear_elasticity_tet4_hessian_element_soa<double>(N, coords, 1.0, 1.0, matrix_streams);
+  status |= sfem::codegen::linear_elasticity_hessian_3d_element_soa<double>(4, N, coords, 1.0, 1.0, matrix_streams);
+  return status;
 }
 '''
             nh_include_only = r'''
 #include "op/sfem_GeneratedNeoHookeanOgden_element_api.hpp"
 int main() {
-    constexpr int N = 1;
-    double data[144][N] = {};
-    const double *coords[12];
-    const double *u_streams[12];
-    double *matrix_streams[144];
-    for (int i = 0; i < 12; ++i) {
-        coords[i] = data[i];
-        u_streams[i] = data[i];
-    }
-    for (int i = 0; i < 144; ++i) {
-        matrix_streams[i] = data[i];
-    }
-    int status = sfem::codegen::neohookean_ogden_tet4_hessian_element_soa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
-    status |= sfem::codegen::neohookean_ogden_hessian_3d_element_soa<double>(4, N, coords, 1.0, 1.0, u_streams, matrix_streams);
-    return status;
+  constexpr int N = 1;
+  double data[144][N] = {};
+  const double *coords[12];
+  const double *u_streams[12];
+  double *matrix_streams[144];
+  for (int i = 0; i < 12; ++i) {
+    coords[i] = data[i];
+    u_streams[i] = data[i];
+  }
+  for (int i = 0; i < 144; ++i) {
+    matrix_streams[i] = data[i];
+  }
+  int status = sfem::codegen::neohookean_ogden_tet4_hessian_element_soa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  status |= sfem::codegen::neohookean_ogden_hessian_3d_element_soa<double>(4, N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  return status;
 }
 '''
             nh_hex8_include_only = r'''
 #include "op/sfem_GeneratedNeoHookeanOgden_element_api.hpp"
 int main() {
-    constexpr int N = 1;
-    double data[576][N] = {};
-    const double *coords[24];
-    const double *u_streams[24];
-    double *matrix_streams[576];
-    for (int i = 0; i < 24; ++i) {
-        coords[i] = data[i];
-        u_streams[i] = data[i];
-    }
-    for (int i = 0; i < 576; ++i) {
-        matrix_streams[i] = data[i];
-    }
-    int status = sfem::codegen::neohookean_ogden_hex8_hessian_element_soa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
-    status |= sfem::codegen::neohookean_ogden_hessian_3d_element_soa<double>(8, N, coords, 1.0, 1.0, u_streams, matrix_streams);
-    return status;
+  constexpr int N = 1;
+  double data[576][N] = {};
+  const double *coords[24];
+  const double *u_streams[24];
+  double *matrix_streams[576];
+  for (int i = 0; i < 24; ++i) {
+    coords[i] = data[i];
+    u_streams[i] = data[i];
+  }
+  for (int i = 0; i < 576; ++i) {
+    matrix_streams[i] = data[i];
+  }
+  int status = sfem::codegen::neohookean_ogden_hex8_hessian_element_soa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  status |= sfem::codegen::neohookean_ogden_hessian_3d_element_soa<double>(8, N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  return status;
 }
 '''
             le_hex8_include_only = r'''
 #include "op/sfem_GeneratedLinearElasticity_element_api.hpp"
 int main() {
-    constexpr int N = 1;
-    double data[576][N] = {};
-    const double *coords[24];
-    double *matrix_streams[576];
-    for (int i = 0; i < 24; ++i) {
-        coords[i] = data[i];
-    }
-    for (int i = 0; i < 576; ++i) {
-        matrix_streams[i] = data[i];
-    }
-    int status = sfem::codegen::linear_elasticity_hex8_hessian_element_soa<double>(N, coords, 1.0, 1.0, matrix_streams);
-    status |= sfem::codegen::linear_elasticity_hessian_3d_element_soa<double>(8, N, coords, 1.0, 1.0, matrix_streams);
-    return status;
+  constexpr int N = 1;
+  double data[576][N] = {};
+  const double *coords[24];
+  double *matrix_streams[576];
+  for (int i = 0; i < 24; ++i) {
+    coords[i] = data[i];
+  }
+  for (int i = 0; i < 576; ++i) {
+    matrix_streams[i] = data[i];
+  }
+  int status = sfem::codegen::linear_elasticity_hex8_hessian_element_soa<double>(N, coords, 1.0, 1.0, matrix_streams);
+  status |= sfem::codegen::linear_elasticity_hessian_3d_element_soa<double>(8, N, coords, 1.0, 1.0, matrix_streams);
+  return status;
 }
 '''
             _compile_include_only(self, compiler, le_dir, le_include_only, "le_element_api_include_only")
@@ -2747,8 +2747,8 @@ int main() {
             self.assertGreater(_assert_lane_loops_request_simd(self, source), 0)
         self.assertIn(
             "#pragma omp simd\n"
-            "        for (int lane = 0; lane < ne; ++lane) {\n"
-            "            bvalue[lane] = s_t(0);",
+            "    for (int lane = 0; lane < ne; ++lane) {\n"
+            "      bvalue[lane] = s_t(0);",
             contents,
         )
 
@@ -3639,7 +3639,7 @@ int main() {
             self.assertGreater(_assert_lane_loops_request_simd(self, mesh), 0)
             self.assertIn(
                 "const idx_t node = element_shape[evb + lane];\n"
-                "                bcurrent[stream][lane] =",
+                "        bcurrent[stream][lane] =",
                 mesh_contents,
             )
 

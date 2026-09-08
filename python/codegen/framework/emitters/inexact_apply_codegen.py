@@ -198,7 +198,7 @@ def _parallel_loop_lines():
     target = current_target()
     if target is None or not hasattr(target, "parallel_element_loop_lines"):
         return []
-    return ["    %s" % line for line in target.parallel_element_loop_lines("static")]
+    return ["  %s" % line for line in target.parallel_element_loop_lines("static")]
 
 
 def _scatter_lines(lhs, rhs, indent):
@@ -209,7 +209,7 @@ def _scatter_lines(lhs, rhs, indent):
     return list(target.scatter_add_lines(lhs, rhs, indent))
 
 
-def _assignment_lines(assignments, prefix, indent="        "):
+def _assignment_lines(assignments, prefix, indent="    "):
     """Common subexpressions first, then the named values, as C declarations."""
     if not assignments:
         return []
@@ -229,14 +229,14 @@ def _assignment_lines(assignments, prefix, indent="        "):
     return lines
 
 
-def _element_lines(n_nodes, indent="        "):
+def _element_lines(n_nodes, indent="    "):
     return [
         "%sconst idx_t ev%d = elements[%d][element];" % (indent, node, node)
         for node in range(n_nodes)
     ]
 
 
-def _gather_lines(role, component, n_nodes, wanted, indent="        "):
+def _gather_lines(role, component, n_nodes, wanted, indent="    "):
     """Element gathers for one role, restricted to the values that are read."""
     return [
         "%sconst s_t %s%s_%d = %s%s[ev%d * %s_stride];"
@@ -247,7 +247,7 @@ def _gather_lines(role, component, n_nodes, wanted, indent="        "):
     ]
 
 
-def _geometry_lines(dim, indent="        "):
+def _geometry_lines(dim, indent="    "):
     lines = [
         "%sconst s_t adjugate%d = s_t(g_adj%d[element]);"
         % (indent, index, index)
@@ -262,26 +262,26 @@ def _geometry_lines(dim, indent="        "):
 
 def _geometry_arguments(dim):
     lines = [
-        "        const g_t *const RSTR g_adj%d," % index
+        "    const g_t *const RSTR g_adj%d," % index
         for index in range(dim * dim)
     ]
-    lines.append("        const g_t *const RSTR g_det0,")
+    lines.append("    const g_t *const RSTR g_det0,")
     return lines
 
 
 def _stream_arguments(role, component):
-    lines = ["        const ptrdiff_t %s_stride," % role]
+    lines = ["    const ptrdiff_t %s_stride," % role]
     lines.extend(
-        "        const s_t *const RSTR %s%s," % (role, name)
+        "    const s_t *const RSTR %s%s," % (role, name)
         for name in component
     )
     return lines
 
 
 def _output_arguments(component):
-    lines = ["        const ptrdiff_t out_stride,"]
+    lines = ["    const ptrdiff_t out_stride,"]
     lines.extend(
-        "        s_t *const RSTR out%s%s"
+        "    s_t *const RSTR out%s%s"
         % (name, "," if index + 1 < len(component) else "")
         for index, name in enumerate(component)
     )
@@ -296,7 +296,7 @@ def _scatter_body(component, n_nodes, scale=""):
                 _scatter_lines(
                     "out%s[ev%d * out_stride]" % (name, node),
                     "%selement_out%d_%d" % (scale, index, node),
-                    "        ",
+                    "    ",
                 )
             )
     return lines
@@ -320,20 +320,20 @@ def _tangent_lines(
     body.extend(_geometry_lines(dim))
     body.extend(_assignment_lines(list(zip(tangent_symbols, packed)), "tangent"))
     body.extend(
-        "        tangent[%s] = tangent_t(tangent%d);" % (_TANGENT_ADDRESS % slot, slot)
+        "    tangent[%s] = tangent_t(tangent%d);" % (_TANGENT_ADDRESS % slot, slot)
         for slot in range(plan.tangent_components)
     )
 
-    signature = ["        const ptrdiff_t nelements,", "        idx_t **const RSTR elements,"]
+    signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]
     signature.extend(_geometry_arguments(dim))
-    signature.extend("        const s_t %s," % name for name in parameters)
+    signature.extend("    const s_t %s," % name for name in parameters)
     signature.extend(_stream_arguments("u", component))
     signature.extend(_PREVIOUS_STREAMS_BY_USE[bool(used_previous)](component))
     signature.extend(
         [
-            "        const ptrdiff_t tangent_element_stride,",
-            "        const ptrdiff_t tangent_component_stride,",
-            "        tangent_t *const RSTR tangent",
+            "    const ptrdiff_t tangent_element_stride,",
+            "    const ptrdiff_t tangent_component_stride,",
+            "    tangent_t *const RSTR tangent",
         ]
     )
     return _function_lines(
@@ -349,19 +349,19 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     body = _element_lines(n_nodes)
     body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
     body.extend(
-        "        const s_t tangent%d = s_t(tangent[%s]);"
+        "    const s_t tangent%d = s_t(tangent[%s]);"
         % (slot, _TANGENT_ADDRESS % slot)
         for slot in range(plan.tangent_components)
     )
     body.extend(action_body)
     body.extend(_scatter_body(component, n_nodes))
 
-    signature = ["        const ptrdiff_t nelements,", "        idx_t **const RSTR elements,"]
+    signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]
     signature.extend(
         [
-            "        const ptrdiff_t tangent_element_stride,",
-            "        const ptrdiff_t tangent_component_stride,",
-            "        const tangent_t *const RSTR tangent,",
+            "    const ptrdiff_t tangent_element_stride,",
+            "    const ptrdiff_t tangent_component_stride,",
+            "    const tangent_t *const RSTR tangent,",
         ]
     )
     signature.extend(_stream_arguments("h", component))
@@ -383,22 +383,22 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     """
     body = _element_lines(n_nodes)
     body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
-    body.append("        const s_t scale = s_t(scaling[element]);")
+    body.append("    const s_t scale = s_t(scaling[element]);")
     body.extend(
-        "        const s_t tangent%d = s_t(tangent[%s]);"
+        "    const s_t tangent%d = s_t(tangent[%s]);"
         % (slot, _TANGENT_ADDRESS % slot)
         for slot in range(plan.tangent_components)
     )
     body.extend(action_body)
     body.extend(_scatter_body(component, n_nodes, scale="scale * "))
 
-    signature = ["        const ptrdiff_t nelements,", "        idx_t **const RSTR elements,"]
+    signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]
     signature.extend(
         [
-            "        const ptrdiff_t tangent_element_stride,",
-            "        const ptrdiff_t tangent_component_stride,",
-            "        const tangent_t *const RSTR tangent,",
-            "        const scale_t *const RSTR scaling,",
+            "    const ptrdiff_t tangent_element_stride,",
+            "    const ptrdiff_t tangent_component_stride,",
+            "    const tangent_t *const RSTR tangent,",
+            "    const scale_t *const RSTR scaling,",
         ]
     )
     signature.extend(_stream_arguments("h", component))
@@ -434,9 +434,9 @@ def _function_lines(name, template, signature, body):
     lines.extend(signature)
     lines.append(") {")
     lines.extend(_parallel_loop_lines())
-    lines.append("    for (ptrdiff_t element = 0; element < nelements; ++element) {")
+    lines.append("  for (ptrdiff_t element = 0; element < nelements; ++element) {")
     lines.extend(body)
-    lines.extend(["    }", "", "    return SFEM_SUCCESS;", "}", ""])
+    lines.extend(["  }", "", "  return SFEM_SUCCESS;", "}", ""])
     return lines
 
 
@@ -450,9 +450,9 @@ _ABI_SCALARS = (("", "double"), ("_float", "float"))
 
 
 def _abi_stream(scalar, role, component, const="const "):
-    lines = ["        const ptrdiff_t %s_stride," % role]
+    lines = ["    const ptrdiff_t %s_stride," % role]
     lines.extend(
-        "        %s%s *const RSTR %s%s," % (const, scalar, role, name)
+        "    %s%s *const RSTR %s%s," % (const, scalar, role, name)
         for name in component
     )
     return lines
@@ -460,10 +460,10 @@ def _abi_stream(scalar, role, component, const="const "):
 
 def _abi_geometry(dim):
     lines = [
-        "        const geom_t *const RSTR g_adj%d," % index
+        "    const geom_t *const RSTR g_adj%d," % index
         for index in range(dim * dim)
     ]
-    lines.append("        const geom_t *const RSTR g_det0,")
+    lines.append("    const geom_t *const RSTR g_det0,")
     return lines
 
 
@@ -494,24 +494,24 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         # --- the partial assembly ---------------------------------------
         name = "%s_inexact_apply_tangent_affine_mesh_soa%s" % (prefix, suffix)
         lines.append('extern "C" int %s(' % name)
-        lines.append("        const ptrdiff_t nelements,")
-        lines.append("        idx_t **const RSTR elements,")
+        lines.append("    const ptrdiff_t nelements,")
+        lines.append("    idx_t **const RSTR elements,")
         lines.extend(_abi_geometry(dim))
-        lines.extend("        const %s %s," % (scalar, p) for p in parameters)
+        lines.extend("    const %s %s," % (scalar, p) for p in parameters)
         lines.extend(_abi_stream(scalar, "u", component))
         lines.extend(previous_signature(scalar, component))
         lines.extend(
             [
-                "        const ptrdiff_t tangent_element_stride,",
-                "        const ptrdiff_t tangent_component_stride,",
-                "        metric_tensor_t *const RSTR tangent",
+                "    const ptrdiff_t tangent_element_stride,",
+                "    const ptrdiff_t tangent_component_stride,",
+                "    metric_tensor_t *const RSTR tangent",
                 ") {",
-                "    return sfem::codegen::%s_inexact_apply_tangent_affine_mesh_soa_impl<"
+                "  return sfem::codegen::%s_inexact_apply_tangent_affine_mesh_soa_impl<"
                 "%s, geom_t, metric_tensor_t>(" % (prefix, scalar),
-                "            %s," % geometry_call,
-                "            %s," % ", ".join(parameters),
-                "            u_stride, %s," % ", ".join("u%s" % n for n in component),
-                "            %stangent_element_stride, tangent_component_stride, tangent);"
+                "      %s," % geometry_call,
+                "      %s," % ", ".join(parameters),
+                "      u_stride, %s," % ", ".join("u%s" % n for n in component),
+                "      %stangent_element_stride, tangent_component_stride, tangent);"
                 % previous_call(component),
                 "}",
                 "",
@@ -523,11 +523,11 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         lines.append('extern "C" int %s(' % name)
         lines.extend(
             [
-                "        const ptrdiff_t nelements,",
-                "        idx_t **const RSTR elements,",
-                "        const ptrdiff_t tangent_element_stride,",
-                "        const ptrdiff_t tangent_component_stride,",
-                "        const metric_tensor_t *const RSTR tangent,",
+                "    const ptrdiff_t nelements,",
+                "    idx_t **const RSTR elements,",
+                "    const ptrdiff_t tangent_element_stride,",
+                "    const ptrdiff_t tangent_component_stride,",
+                "    const metric_tensor_t *const RSTR tangent,",
             ]
         )
         lines.extend(_abi_stream(scalar, "h", component))
@@ -536,12 +536,12 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         lines.extend(
             [
                 ") {",
-                "    return sfem::codegen::%s_inexact_apply_stored_affine_mesh_soa_impl<"
+                "  return sfem::codegen::%s_inexact_apply_stored_affine_mesh_soa_impl<"
                 "%s, metric_tensor_t>(" % (prefix, scalar),
-                "            nelements, elements,",
-                "            tangent_element_stride, tangent_component_stride, tangent,",
-                "            h_stride, %s," % ", ".join("h%s" % n for n in component),
-                "            out_stride, %s);" % ", ".join("out%s" % n for n in component),
+                "      nelements, elements,",
+                "      tangent_element_stride, tangent_component_stride, tangent,",
+                "      h_stride, %s," % ", ".join("h%s" % n for n in component),
+                "      out_stride, %s);" % ", ".join("out%s" % n for n in component),
                 "}",
                 "",
             ]
@@ -552,12 +552,12 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         lines.append('extern "C" int %s(' % name)
         lines.extend(
             [
-                "        const ptrdiff_t nelements,",
-                "        idx_t **const RSTR elements,",
-                "        const ptrdiff_t tangent_element_stride,",
-                "        const ptrdiff_t tangent_component_stride,",
-                "        const compressed_t *const RSTR tangent,",
-                "        const scaling_t *const RSTR scaling,",
+                "    const ptrdiff_t nelements,",
+                "    idx_t **const RSTR elements,",
+                "    const ptrdiff_t tangent_element_stride,",
+                "    const ptrdiff_t tangent_component_stride,",
+                "    const compressed_t *const RSTR tangent,",
+                "    const scaling_t *const RSTR scaling,",
             ]
         )
         lines.extend(_abi_stream(scalar, "h", component))
@@ -566,12 +566,12 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         lines.extend(
             [
                 ") {",
-                "    return sfem::codegen::%s_inexact_apply_compressed_affine_mesh_soa_impl<"
+                "  return sfem::codegen::%s_inexact_apply_compressed_affine_mesh_soa_impl<"
                 "%s, compressed_t, scaling_t>(" % (prefix, scalar),
-                "            nelements, elements,",
-                "            tangent_element_stride, tangent_component_stride, tangent, scaling,",
-                "            h_stride, %s," % ", ".join("h%s" % n for n in component),
-                "            out_stride, %s);" % ", ".join("out%s" % n for n in component),
+                "      nelements, elements,",
+                "      tangent_element_stride, tangent_component_stride, tangent, scaling,",
+                "      h_stride, %s," % ", ".join("h%s" % n for n in component),
+                "      out_stride, %s);" % ", ".join("out%s" % n for n in component),
                 "}",
                 "",
             ]

@@ -9,7 +9,7 @@
       "name": "laplace_apply_2d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_apply_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_apply_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "laplace_apply_2d_soa_diagnostics"
     },
     {
@@ -25,7 +25,7 @@
       "name": "laplace_apply_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_apply_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_apply_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "laplace_apply_3d_soa_diagnostics"
     },
     {
@@ -61,7 +61,7 @@
       "name": "laplace_gradient_2d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_gradient_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_gradient_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "laplace_gradient_2d_soa_diagnostics"
     },
     {
@@ -77,7 +77,7 @@
       "name": "laplace_gradient_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_gradient_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_gradient_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "laplace_gradient_3d_soa_diagnostics"
     },
     {
@@ -133,11 +133,11 @@
       "name": "laplace_hex8_matrix_assembly_variant_count"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_objective_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "laplace_objective_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_objective_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *laplace_objective_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "laplace_objective_3d_soa_diagnostics"
     },
     {

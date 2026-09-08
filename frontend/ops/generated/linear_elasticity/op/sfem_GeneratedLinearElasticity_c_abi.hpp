@@ -73,7 +73,7 @@ extern "C" int linear_elasticity_apply_2d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_apply_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int linear_elasticity_apply_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -143,7 +143,7 @@ extern "C" int linear_elasticity_apply_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_apply_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int linear_elasticity_apply_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -318,7 +318,7 @@ extern "C" int linear_elasticity_gradient_2d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_gradient_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -388,7 +388,7 @@ extern "C" int linear_elasticity_gradient_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_gradient_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int linear_elasticity_gradient_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -699,10 +699,10 @@ extern "C" int linear_elasticity_inexact_apply_tangent_3d_affine_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_objective_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_objective_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int linear_elasticity_objective_steps_2d_affine_mesh_soa(
         const smesh::ElemType element_type,

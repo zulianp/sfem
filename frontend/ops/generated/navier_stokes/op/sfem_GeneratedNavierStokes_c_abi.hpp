@@ -34,10 +34,10 @@ typedef double geom_t;
 #endif
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int navier_stokes_form_1_p_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -113,16 +113,16 @@ extern "C" int navier_stokes_form_1_p_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int navier_stokes_form_1_u_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -236,10 +236,10 @@ extern "C" int navier_stokes_form_1_u_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int navier_stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -315,16 +315,16 @@ extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_so
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -400,16 +400,16 @@ extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_so
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -501,16 +501,16 @@ extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_so
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int navier_stokes_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -614,10 +614,10 @@ extern "C" int navier_stokes_jacobian_action_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_jacobian_action_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_jacobian_action_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" int navier_stokes_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -731,7 +731,7 @@ extern "C" int navier_stokes_residual_3d_isoparametric_mesh_soa(
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_residual_element_2d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_residual_element_3d_soa_diagnostics(
-        const smesh::ElemType element_type);
+    const smesh::ElemType element_type);

@@ -32,14 +32,14 @@ def quadrature_reference_struct_lines(prefix, stage, references):
         values = tuple(reference.values)
         lines.extend(
             [
-                "    static const s_t *%s() {" % reference.name,
-                "        static const s_t data[%d] = {%s};"
+                "  static const s_t *%s() {" % reference.name,
+                "    static const s_t data[%d] = {%s};"
                 % (
                     len(values),
                     cpp_scalar_initializer_list(values, "s_t"),
                 ),
-                "        return data;",
-                "    }",
+                "    return data;",
+                "  }",
             ]
         )
     lines.append("};")

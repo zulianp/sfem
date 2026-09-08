@@ -81,7 +81,7 @@ def _sfem_math_function_lines(inline_qualifier="SFEM_INLINE"):
                 "template <typename T>",
                 "static %s T %s(const T x) {"
                 % (inline_qualifier, _sfem_pow_function_name(exponent)),
-                "    return %s;" % _sfem_pow_product_expression(exponent),
+                "  return %s;" % _sfem_pow_product_expression(exponent),
                 "}",
                 "",
             ]
@@ -92,9 +92,9 @@ def _sfem_math_function_lines(inline_qualifier="SFEM_INLINE"):
                 "template <typename T>",
                 "static %s T %s(const T x) {"
                 % (inline_qualifier, _sfem_pow_function_name(-exponent)),
-                "    return T(1) / %s(x);" % _sfem_pow_function_name(exponent)
+                "  return T(1) / %s(x);" % _sfem_pow_function_name(exponent)
                 if exponent > 1
-                else "    return T(1) / x;",
+                else "  return T(1) / x;",
                 "}",
                 "",
             ]
@@ -247,7 +247,7 @@ def runtime_typed_entry_point(function_name, params, body, return_type="int"):
     lines.extend(
         [
             ") {",
-            "    switch (real_type == smesh::SMESH_DEFAULT",
+            "  switch (real_type == smesh::SMESH_DEFAULT",
             "                   ? smesh::TypeToEnum<real_t>::value()",
             "                   : real_type) {",
         ]
@@ -260,15 +260,15 @@ def runtime_typed_entry_point(function_name, params, body, return_type="int"):
         )
         lines.extend(
             [
-                "        case %s:" % enum_value,
-                "            return %s<%s>(%s);" % (implementation, scalar_type, arguments),
+                "    case %s:" % enum_value,
+                "      return %s<%s>(%s);" % (implementation, scalar_type, arguments),
             ]
         )
     lines.extend(
         [
-            "        default:",
-            "            return SFEM_FAILURE;",
-            "    }",
+            "    default:",
+            "      return SFEM_FAILURE;",
+            "  }",
             "}",
             "",
         ]

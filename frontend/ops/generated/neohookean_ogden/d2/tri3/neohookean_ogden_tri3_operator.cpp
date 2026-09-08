@@ -24,24 +24,24 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int,
-        const g_t *const RSTR source,
-        s_t *const RSTR,
-        std::true_type) {
-    return source;
+    const int,
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
 }
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int ne,
-        const g_t *const RSTR source,
-        s_t *const RSTR converted,
-        std::false_type) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-        converted[lane] = s_t(source[lane]);
-    }
-    return converted;
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    converted[lane] = s_t(source[lane]);
+  }
+  return converted;
 }
 
 } // namespace codegen
@@ -53,42 +53,42 @@ namespace codegen {
 
 template <typename s_t>
 struct neohookean_ogden_tri3_affine_reference_data {
-    static const s_t *shape() {
-        static const s_t data[3] = {s_t(0.33333333333333343), s_t(0.33333333333333331), s_t(0.33333333333333331)};
-        return data;
-    }
-    static const s_t *grad_ref_x() {
-        static const s_t data[3] = {s_t(-1), s_t(1), s_t(0)};
-        return data;
-    }
-    static const s_t *grad_ref_y() {
-        static const s_t data[3] = {s_t(-1), s_t(0), s_t(1)};
-        return data;
-    }
-    static const s_t *q_weight() {
-        static const s_t data[1] = {s_t(0.5)};
-        return data;
-    }
+  static const s_t *shape() {
+    static const s_t data[3] = {s_t(0.33333333333333343), s_t(0.33333333333333331), s_t(0.33333333333333331)};
+    return data;
+  }
+  static const s_t *grad_ref_x() {
+    static const s_t data[3] = {s_t(-1), s_t(1), s_t(0)};
+    return data;
+  }
+  static const s_t *grad_ref_y() {
+    static const s_t data[3] = {s_t(-1), s_t(0), s_t(1)};
+    return data;
+  }
+  static const s_t *q_weight() {
+    static const s_t data[1] = {s_t(0.5)};
+    return data;
+  }
 };
 
 template <typename s_t>
 struct neohookean_ogden_tri3_isoparametric_reference_data {
-    static const s_t *shape() {
-        static const s_t data[3] = {s_t(0.33333333333333343), s_t(0.33333333333333331), s_t(0.33333333333333331)};
-        return data;
-    }
-    static const s_t *grad_ref_x() {
-        static const s_t data[3] = {s_t(-1), s_t(1), s_t(0)};
-        return data;
-    }
-    static const s_t *grad_ref_y() {
-        static const s_t data[3] = {s_t(-1), s_t(0), s_t(1)};
-        return data;
-    }
-    static const s_t *q_weight() {
-        static const s_t data[1] = {s_t(0.5)};
-        return data;
-    }
+  static const s_t *shape() {
+    static const s_t data[3] = {s_t(0.33333333333333343), s_t(0.33333333333333331), s_t(0.33333333333333331)};
+    return data;
+  }
+  static const s_t *grad_ref_x() {
+    static const s_t data[3] = {s_t(-1), s_t(1), s_t(0)};
+    return data;
+  }
+  static const s_t *grad_ref_y() {
+    static const s_t data[3] = {s_t(-1), s_t(0), s_t(1)};
+    return data;
+  }
+  static const s_t *q_weight() {
+    static const s_t data[1] = {s_t(0.5)};
+    return data;
+  }
 };
 
 } // namespace codegen
@@ -98,128 +98,128 @@ namespace sfem {
 namespace codegen {
 
 static const KernelDiagnostics neohookean_ogden_tri3_objective_soa_diagnostics_data = {
-    "neohookean_ogden_tri3_objective_soa",
-    "TRI3",
-    2,
-    1,
-    3,
-    16,
-    1,
-    9,
-    9,
-    0,
-    0,
-    5,
-    0,
-    1,
-    0,
-    2,
-    4,
-    43,
-    0,
-    0,
-    3,
-    7,
-    5,
-    6,
-    1,
-    2,
-    6,
-    0,
-    1,
-    1,
-    1,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+  "neohookean_ogden_tri3_objective_soa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  9,
+  9,
+  0,
+  0,
+  5,
+  0,
+  1,
+  0,
+  2,
+  4,
+  43,
+  0,
+  0,
+  3,
+  7,
+  5,
+  6,
+  1,
+  2,
+  6,
+  0,
+  1,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tri3_objective_soa_diagnostics(void) {
-    return &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data;
+  return &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data;
 }
 
 extern "C" double neohookean_ogden_tri3_objective_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    const ptrdiff_t nelements,
+    const size_t scalar_bytes,
+    const size_t real_bytes,
+    const size_t accumulator_bytes) {
+  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
 extern "C" void neohookean_ogden_tri3_objective_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "neohookean_ogden_tri3_objective_soa",
-            &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "neohookean_ogden_tri3_objective_soa",
+      &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_objective_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "neohookean_ogden_tri3_objective_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "neohookean_ogden_tri3_objective_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void neohookean_ogden_tri3_objective_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "neohookean_ogden_tri3_objective_affine_mesh_soa",
-            &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "neohookean_ogden_tri3_objective_affine_mesh_soa",
+      &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_objective_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "neohookean_ogden_tri3_objective_affine_mesh_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "neohookean_ogden_tri3_objective_affine_mesh_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void neohookean_ogden_tri3_objective_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "neohookean_ogden_tri3_objective_isoparametric_mesh_soa",
-            &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "neohookean_ogden_tri3_objective_isoparametric_mesh_soa",
+      &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_objective_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "neohookean_ogden_tri3_objective_isoparametric_mesh_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "neohookean_ogden_tri3_objective_isoparametric_mesh_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_objective_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 
@@ -248,88 +248,88 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_imp
         const s_t *const RSTR steps,
         s_t *const RSTR value
 ) {
-    static constexpr int NC = 2;
-    static constexpr int NQ = 1;
-    static constexpr int NS = 3;
-    static constexpr int VS = 16;
-    (void)nnodes;
-    const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tri3_affine_reference_data<s_t>::q_weight();
+  static constexpr int NC = 2;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 3;
+  static constexpr int VS = 16;
+  (void)nnodes;
+  const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tri3_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        idx_t ev[VS * NS];
-        s_t bu_data[NS * NC][VS];
-        s_t bu_base_data[NS * NC][VS];
-        s_t bh_data[NS * NC][VS];
-        s_t bvalue[VS];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bu_base_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
+    s_t bvalue[VS];
 
-        for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const RSTR element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evb + lane];
-            }
-        }
-
-        const s_t *const u_components[NC] = {ux, uy};
-        const s_t *const h_components[NC] = {hx, hy};
-        const s_t *bu_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bu_streams[stream] = bu_data[stream];
-        }
-
-        for (int shape = 0; shape < NS; ++shape) {
-            for (int d = 0; d < NC; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < ne; ++lane) {
-                    const idx_t node = ev[shape * VS + lane];
-                    bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-                    bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
-                }
-            }
-        }
-        s_t badj0_data[VS];
-        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-        s_t badj1_data[VS];
-        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-        s_t badj2_data[VS];
-        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-        s_t badj3_data[VS];
-        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-        s_t bdet0_data[VS];
-        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
-
-        for (int step = 0; step < nsteps; ++step) {
-            const s_t alpha = steps[step];
-            for (int shape = 0; shape < NS; ++shape) {
-                for (int d = 0; d < NC; ++d) {
-                    #pragma omp simd
-                    for (int lane = 0; lane < ne; ++lane) {
-                        bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
-                    }
-                }
-            }
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                bvalue[lane] = s_t(0);
-            }
-
-            neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
-
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
-            }
-        }
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev[element_node * VS + lane] = element_shape[evb + lane];
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *const u_components[NC] = {ux, uy};
+    const s_t *const h_components[NC] = {hx, hy};
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+
+    for (int shape = 0; shape < NS; ++shape) {
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev[shape * VS + lane];
+          bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+        }
+      }
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      for (int shape = 0; shape < NS; ++shape) {
+        for (int d = 0; d < NC; ++d) {
+          #pragma omp simd
+          for (int lane = 0; lane < ne; ++lane) {
+            bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
+          }
+        }
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bvalue[lane] = s_t(0);
+      }
+
+      neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
+
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
@@ -356,7 +356,7 @@ extern "C" int neohookean_ogden_tri3_objective_steps_affine_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+  return sfem::codegen::neohookean_ogden_tri3_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 extern "C" int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_float(
@@ -380,7 +380,7 @@ extern "C" int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_float(
         const float *const RSTR steps,
         float *const RSTR value
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+  return sfem::codegen::neohookean_ogden_tri3_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 
@@ -388,128 +388,128 @@ namespace sfem {
 namespace codegen {
 
 static const KernelDiagnostics neohookean_ogden_tri3_gradient_soa_diagnostics_data = {
-    "neohookean_ogden_tri3_gradient_soa",
-    "TRI3",
-    2,
-    1,
-    3,
-    16,
-    1,
-    11,
-    22,
-    1,
-    0,
-    0,
-    0,
-    1,
-    0,
-    2,
-    13,
-    61,
-    0,
-    0,
-    9,
-    10,
-    5,
-    6,
-    1,
-    2,
-    6,
-    0,
-    6,
-    6,
-    6,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+  "neohookean_ogden_tri3_gradient_soa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  11,
+  22,
+  1,
+  0,
+  0,
+  0,
+  1,
+  0,
+  2,
+  13,
+  61,
+  0,
+  0,
+  9,
+  10,
+  5,
+  6,
+  1,
+  2,
+  6,
+  0,
+  6,
+  6,
+  6,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tri3_gradient_soa_diagnostics(void) {
-    return &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data;
+  return &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data;
 }
 
 extern "C" double neohookean_ogden_tri3_gradient_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    const ptrdiff_t nelements,
+    const size_t scalar_bytes,
+    const size_t real_bytes,
+    const size_t accumulator_bytes) {
+  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
 extern "C" void neohookean_ogden_tri3_gradient_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "neohookean_ogden_tri3_gradient_soa",
-            &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "neohookean_ogden_tri3_gradient_soa",
+      &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_gradient_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "neohookean_ogden_tri3_gradient_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "neohookean_ogden_tri3_gradient_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void neohookean_ogden_tri3_gradient_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "neohookean_ogden_tri3_gradient_affine_mesh_soa",
-            &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "neohookean_ogden_tri3_gradient_affine_mesh_soa",
+      &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_gradient_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "neohookean_ogden_tri3_gradient_affine_mesh_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "neohookean_ogden_tri3_gradient_affine_mesh_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void neohookean_ogden_tri3_gradient_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "neohookean_ogden_tri3_gradient_isoparametric_mesh_soa",
-            &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "neohookean_ogden_tri3_gradient_isoparametric_mesh_soa",
+      &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_gradient_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "neohookean_ogden_tri3_gradient_isoparametric_mesh_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "neohookean_ogden_tri3_gradient_isoparametric_mesh_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_gradient_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 
@@ -535,86 +535,86 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_affine_mesh_soa_impl(
         s_t *const RSTR outx,
         s_t *const RSTR outy
 ) {
-    static constexpr int NC = 2;
-    static constexpr int NQ = 1;
-    static constexpr int NS = 3;
-    static constexpr int VS = 16;
-    (void)nnodes;
-    const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tri3_affine_reference_data<s_t>::q_weight();
+  static constexpr int NC = 2;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 3;
+  static constexpr int VS = 16;
+  (void)nnodes;
+  const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tri3_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        idx_t ev[VS * NS];
-        s_t bu_data[NS * NC][VS];
-        s_t bout_data[NS * NC][VS];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
 
-        for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const RSTR element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evb + lane];
-            }
-        }
-        const s_t *const u_components[NC] = {ux, uy};
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev[element_node * VS + lane] = element_shape[evb + lane];
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy};
 
-        for (int shape = 0; shape < NS; ++shape) {
-            for (int d = 0; d < NC; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < ne; ++lane) {
-                    const idx_t node = ev[shape * VS + lane];
-                    bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-                }
-            }
+    for (int shape = 0; shape < NS; ++shape) {
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev[shape * VS + lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
         }
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                bout_data[stream][lane] = s_t(0);
-            }
-        }
-
-        const s_t *bu_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bu_streams[stream] = bu_data[stream];
-        }
-        s_t *bout_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bout_streams[stream] = bout_data[stream];
-        }
-        s_t badj0_data[VS];
-        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-        s_t badj1_data[VS];
-        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-        s_t badj2_data[VS];
-        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-        s_t badj3_data[VS];
-        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-        s_t bdet0_data[VS];
-        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
-
-        neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
-
-        s_t *const out_components[NC] = {outx, outy};
-
-        for (int shape = 0; shape < NS; ++shape) {
-            for (int d = 0; d < NC; ++d) {
-                {
-                    for (int scatter = 0; scatter < ne; ++scatter) {
-                        #pragma omp atomic update
-                        out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
-                    }
-                }
-            }
-        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      for (int d = 0; d < NC; ++d) {
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
@@ -638,7 +638,7 @@ extern "C" int neohookean_ogden_tri3_gradient_affine_mesh_soa(
         double *const RSTR outx,
         double *const RSTR outy
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+  return sfem::codegen::neohookean_ogden_tri3_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 extern "C" int neohookean_ogden_tri3_gradient_affine_mesh_soa_float(
@@ -659,7 +659,7 @@ extern "C" int neohookean_ogden_tri3_gradient_affine_mesh_soa_float(
         float *const RSTR outx,
         float *const RSTR outy
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+  return sfem::codegen::neohookean_ogden_tri3_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 
@@ -667,128 +667,128 @@ namespace sfem {
 namespace codegen {
 
 static const KernelDiagnostics neohookean_ogden_tri3_apply_soa_diagnostics_data = {
-    "neohookean_ogden_tri3_apply_soa",
-    "TRI3",
-    2,
-    1,
-    3,
-    16,
-    1,
-    36,
-    75,
-    1,
-    0,
-    6,
-    0,
-    1,
-    0,
-    2,
-    34,
-    145,
-    0,
-    0,
-    30,
-    20,
-    5,
-    6,
-    1,
-    2,
-    6,
-    6,
-    6,
-    6,
-    6,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+  "neohookean_ogden_tri3_apply_soa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  36,
+  75,
+  1,
+  0,
+  6,
+  0,
+  1,
+  0,
+  2,
+  34,
+  145,
+  0,
+  0,
+  30,
+  20,
+  5,
+  6,
+  1,
+  2,
+  6,
+  6,
+  6,
+  6,
+  6,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tri3_apply_soa_diagnostics(void) {
-    return &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data;
+  return &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data;
 }
 
 extern "C" double neohookean_ogden_tri3_apply_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    const ptrdiff_t nelements,
+    const size_t scalar_bytes,
+    const size_t real_bytes,
+    const size_t accumulator_bytes) {
+  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
 extern "C" void neohookean_ogden_tri3_apply_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "neohookean_ogden_tri3_apply_soa",
-            &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "neohookean_ogden_tri3_apply_soa",
+      &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_apply_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "neohookean_ogden_tri3_apply_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate(
+      "neohookean_ogden_tri3_apply_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void neohookean_ogden_tri3_apply_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "neohookean_ogden_tri3_apply_affine_mesh_soa",
-            &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "neohookean_ogden_tri3_apply_affine_mesh_soa",
+      &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_apply_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "neohookean_ogden_tri3_apply_affine_mesh_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
+      "neohookean_ogden_tri3_apply_affine_mesh_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void neohookean_ogden_tri3_apply_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "neohookean_ogden_tri3_apply_isoparametric_mesh_soa",
-            &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "neohookean_ogden_tri3_apply_isoparametric_mesh_soa",
+      &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void neohookean_ogden_tri3_apply_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "neohookean_ogden_tri3_apply_isoparametric_mesh_soa_float",
-            &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+    const double elapsed,
+    const ptrdiff_t nelements,
+    const ptrdiff_t ndofs) {
+  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
+      "neohookean_ogden_tri3_apply_isoparametric_mesh_soa_float",
+      &sfem::codegen::neohookean_ogden_tri3_apply_soa_diagnostics_data,
+      elapsed, nelements, ndofs,
+      sizeof(float), sizeof(float), sizeof(float));
 }
 
 
@@ -817,93 +817,93 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_affine_mesh_soa_impl(
         s_t *const RSTR outx,
         s_t *const RSTR outy
 ) {
-    static constexpr int NC = 2;
-    static constexpr int NQ = 1;
-    static constexpr int NS = 3;
-    static constexpr int VS = 16;
-    (void)nnodes;
-    const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tri3_affine_reference_data<s_t>::q_weight();
+  static constexpr int NC = 2;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 3;
+  static constexpr int VS = 16;
+  (void)nnodes;
+  const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tri3_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        idx_t ev[VS * NS];
-        s_t bu_data[NS * NC][VS];
-        s_t bh_data[NS * NC][VS];
-        s_t bout_data[NS * NC][VS];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
 
-        for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const RSTR element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evb + lane];
-            }
-        }
-        const s_t *const u_components[NC] = {ux, uy};
-        const s_t *const h_components[NC] = {hx, hy};
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev[element_node * VS + lane] = element_shape[evb + lane];
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy};
+    const s_t *const h_components[NC] = {hx, hy};
 
-        for (int shape = 0; shape < NS; ++shape) {
-            for (int d = 0; d < NC; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < ne; ++lane) {
-                    const idx_t node = ev[shape * VS + lane];
-                    bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-                    bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
-                }
-            }
+    for (int shape = 0; shape < NS; ++shape) {
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev[shape * VS + lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
         }
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                bout_data[stream][lane] = s_t(0);
-            }
-        }
-
-        const s_t *bu_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bu_streams[stream] = bu_data[stream];
-        }
-        const s_t *bh_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bh_streams[stream] = bh_data[stream];
-        }
-        s_t *bout_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bout_streams[stream] = bout_data[stream];
-        }
-        s_t badj0_data[VS];
-        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-        s_t badj1_data[VS];
-        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-        s_t badj2_data[VS];
-        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-        s_t badj3_data[VS];
-        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-        s_t bdet0_data[VS];
-        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
-
-        neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
-
-        s_t *const out_components[NC] = {outx, outy};
-
-        for (int shape = 0; shape < NS; ++shape) {
-            for (int d = 0; d < NC; ++d) {
-                {
-                    for (int scatter = 0; scatter < ne; ++scatter) {
-                        #pragma omp atomic update
-                        out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
-                    }
-                }
-            }
-        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      for (int d = 0; d < NC; ++d) {
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
@@ -930,7 +930,7 @@ extern "C" int neohookean_ogden_tri3_apply_affine_mesh_soa(
         double *const RSTR outx,
         double *const RSTR outy
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+  return sfem::codegen::neohookean_ogden_tri3_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 extern "C" int neohookean_ogden_tri3_apply_affine_mesh_soa_float(
@@ -954,7 +954,7 @@ extern "C" int neohookean_ogden_tri3_apply_affine_mesh_soa_float(
         float *const RSTR outx,
         float *const RSTR outy
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+  return sfem::codegen::neohookean_ogden_tri3_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 
@@ -962,215 +962,215 @@ namespace sfem {
 namespace codegen {
 
 static SFEM_INLINE void neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_find_cols(
-        const idx_t *const RSTR targets,
-        const idx_t *const RSTR row,
-        const int lenrow,
-        idx_t *const RSTR ks) {
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(3)
+  for (int d = 0; d < 3; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
 #pragma unroll(3)
     for (int d = 0; d < 3; ++d) {
-        ks[d] = 0;
+      ks[d] += row[k] < targets[d];
     }
-    for (int k = 0; k < lenrow; ++k) {
-#pragma unroll(3)
-        for (int d = 0; d < 3; ++d) {
-            ks[d] += row[k] < targets[d];
-        }
-    }
+  }
 }
 
 template <typename s_t>
 static SFEM_INLINE void neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_scatter_bsr(
-        const idx_t *const RSTR ev,
-        const s_t *const RSTR element_matrix,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        s_t *const RSTR values) {
-    static constexpr int NC = 2;
-    static constexpr int NS = 3;
-    count_t entries[NS * NS];
-    idx_t ks[NS];
-    for (int i = 0; i < NS; ++i) {
-        const idx_t dof_i = ev[i];
-        const count_t row_begin = rowptr[dof_i];
-        const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
-        const idx_t *const RSTR cols = &colidx[row_begin];
-        neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
-        for (int j = 0; j < NS; ++j) {
-            entries[i * NS + j] = row_begin + ks[j];
-        }
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 2;
+  static constexpr int NS = 3;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
     }
-    for (int i = 0; i < NS; ++i) {
-        for (int j = 0; j < NS; ++j) {
-            s_t *const block = &values[entries[i * NS + j] * NC * NC];
-            for (int bi = 0; bi < NC; ++bi) {
-                const int row = bi * NS + i;
-                for (int bj = 0; bj < NC; ++bj) {
-                    const int col = bj * NS + j;
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
 #pragma omp atomic update
-                    block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
-                }
-            }
+          block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
         }
+      }
     }
+  }
 }
 
 template <typename s_t, typename g_t, int FORMAT>
 static int neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const g_t *const *const RSTR points,
-        const s_t lmbda,
-        const s_t mu,
-        const ptrdiff_t u_stride,
-        const s_t *const RSTR ux,
-        const s_t *const RSTR uy,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        s_t *const RSTR values,
-        const int *const RSTR diag_offsets,
-        const ptrdiff_t ndiag,
-        const ptrdiff_t coo_nnz,
-        const idx_t *const RSTR coo_rows,
-        const idx_t *const RSTR coo_cols,
-        idx_t *const RSTR coo_triplet_rows,
-        idx_t *const RSTR coo_triplet_cols) {
-    static constexpr int NC = 2;
-    static constexpr int ND = 2;
-    static constexpr int NQ = 1;
-    static constexpr int NS = 3;
-    static constexpr int VS = 1;
-    static constexpr int NDOFS = NC * NS;
-    (void)nnodes;
-    const s_t *const u_components[NC] = {ux, uy};
-    const g_t *const RSTR x = points[0];
-    const g_t *const RSTR y = points[1];
-    const s_t *const isoparametric_grad_ref_x = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const isoparametric_grad_ref_y = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
-    const s_t *const isoparametric_q_weight = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight();
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const g_t *const *const RSTR points,
+    const s_t lmbda,
+    const s_t mu,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values,
+    const int *const RSTR diag_offsets,
+    const ptrdiff_t ndiag,
+    const ptrdiff_t coo_nnz,
+    const idx_t *const RSTR coo_rows,
+    const idx_t *const RSTR coo_cols,
+    idx_t *const RSTR coo_triplet_rows,
+    idx_t *const RSTR coo_triplet_cols) {
+  static constexpr int NC = 2;
+  static constexpr int ND = 2;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 3;
+  static constexpr int VS = 1;
+  static constexpr int NDOFS = NC * NS;
+  (void)nnodes;
+  const s_t *const u_components[NC] = {ux, uy};
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const s_t *const isoparametric_grad_ref_x = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
+  const s_t *const isoparametric_grad_ref_y = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
+  const s_t *const isoparametric_q_weight = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight();
 
-    int unsupported_matrix_format = 0;
+  int unsupported_matrix_format = 0;
 #pragma omp parallel for schedule(static) reduction(|:unsupported_matrix_format)
-    for (ptrdiff_t element = 0; element < nelements; ++element) {
-        idx_t ev[NS];
-        s_t element_matrix[NDOFS * NDOFS];
-        s_t bh_data[NS * NC][VS];
-        s_t bout_data[NS * NC][VS];
-        s_t bcoordinate_data[NS * ND][VS];
-        static constexpr int ne = VS;
-        s_t bu_data[NS * NC][VS];
-        s_t badj0[NQ * VS];
-        s_t badj1[NQ * VS];
-        s_t badj2[NQ * VS];
-        s_t badj3[NQ * VS];
-        s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-        const s_t *bu_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bu_streams[stream] = bu_data[stream];
-        }
-        const s_t *bh_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bh_streams[stream] = bh_data[stream];
-        }
-        s_t *bout_streams[NS * NC];
-        for (int stream = 0; stream < NS * NC; ++stream) {
-            bout_streams[stream] = bout_data[stream];
-        }
-
-        for (int shape = 0; shape < NS; ++shape) {
-            const idx_t node = elements[shape][element];
-            ev[shape] = node;
-            for (int d = 0; d < ND; ++d) {
-                bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
-                bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-            }
-        }
-
-
-        for (int q = 0; q < NQ; ++q) {
-            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-            s_t J00_values[VS];
-            s_t J01_values[VS];
-            s_t J10_values[VS];
-            s_t J11_values[VS];
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                J00_values[lane] = s_t(0);
-            }
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                J01_values[lane] = s_t(0);
-            }
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                J10_values[lane] = s_t(0);
-            }
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                J11_values[lane] = s_t(0);
-            }
-            for (int shape = 0; shape < NS; ++shape) {
-                const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
-                const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
-                #pragma omp simd
-                for (int lane = 0; lane < ne; ++lane) {
-                    J00_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g0;
-                }
-                #pragma omp simd
-                for (int lane = 0; lane < ne; ++lane) {
-                    J01_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g1;
-                }
-                #pragma omp simd
-                for (int lane = 0; lane < ne; ++lane) {
-                    J10_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g0;
-                }
-                #pragma omp simd
-                for (int lane = 0; lane < ne; ++lane) {
-                    J11_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g1;
-                }
-            }
-            #pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                const s_t J00 = J00_values[lane];
-                const s_t J01 = J01_values[lane];
-                const s_t J10 = J10_values[lane];
-                const s_t J11 = J11_values[lane];
-                geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
-            }
-        }
-
-        for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {
-            element_matrix[entry] = s_t(0);
-        }
-
-        for (int trial_component = 0; trial_component < NC; ++trial_component) {
-            for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
-                for (int stream = 0; stream < NS * NC; ++stream) {
-                    bh_data[stream][0] = s_t(0);
-                    bout_data[stream][0] = s_t(0);
-                }
-                bh_data[trial_shape * NC + trial_component][0] = s_t(1);
-                neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(1, 1, badj0, badj1, badj2, badj3, bdet0, isoparametric_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
-                const int col = trial_component * NS + trial_shape;
-                for (int test_component = 0; test_component < NC; ++test_component) {
-                    for (int test_shape = 0; test_shape < NS; ++test_shape) {
-                        const int row = test_component * NS + test_shape;
-                        element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];
-                    }
-                }
-            }
-        }
-
-        if constexpr (FORMAT == 1) {
-            neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
-        } else {
-            unsupported_matrix_format |= 1;
-        }
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t bh_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
+    s_t bcoordinate_data[NS * ND][VS];
+    static constexpr int ne = VS;
+    s_t bu_data[NS * NC][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t bdet0[NQ * VS];
+    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
     }
 
-    return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+      for (int d = 0; d < ND; ++d) {
+        bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
+        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+      }
+    }
+
+
+    for (int q = 0; q < NQ; ++q) {
+      s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+      s_t J00_values[VS];
+      s_t J01_values[VS];
+      s_t J10_values[VS];
+      s_t J11_values[VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        J00_values[lane] = s_t(0);
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        J01_values[lane] = s_t(0);
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        J10_values[lane] = s_t(0);
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        J11_values[lane] = s_t(0);
+      }
+      for (int shape = 0; shape < NS; ++shape) {
+        const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
+        const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          J00_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g0;
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          J01_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g1;
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          J10_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g0;
+        }
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          J11_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g1;
+        }
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t J00 = J00_values[lane];
+        const s_t J01 = J01_values[lane];
+        const s_t J10 = J10_values[lane];
+        const s_t J11 = J11_values[lane];
+        geometry_jacobian_adjugate_and_determinant_2<s_t>(
+            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
+      }
+    }
+
+    for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {
+      element_matrix[entry] = s_t(0);
+    }
+
+    for (int trial_component = 0; trial_component < NC; ++trial_component) {
+      for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bh_data[stream][0] = s_t(0);
+          bout_data[stream][0] = s_t(0);
+        }
+        bh_data[trial_shape * NC + trial_component][0] = s_t(1);
+        neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(1, 1, badj0, badj1, badj2, badj3, bdet0, isoparametric_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+        const int col = trial_component * NS + trial_shape;
+        for (int test_component = 0; test_component < NC; ++test_component) {
+          for (int test_shape = 0; test_shape < NS; ++test_shape) {
+            const int row = test_component * NS + test_shape;
+            element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];
+          }
+        }
+      }
+    }
+
+    if constexpr (FORMAT == 1) {
+      neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    } else {
+      unsupported_matrix_format |= 1;
+    }
+  }
+
+  return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;
 }
 
 } // namespace codegen
@@ -1190,7 +1190,7 @@ extern "C" int neohookean_ogden_tri3_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  return sfem::codegen::neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
 
 extern "C" int neohookean_ogden_tri3_hessian_bsr_isoparametric_mesh_soa_float(
@@ -1207,5 +1207,5 @@ extern "C" int neohookean_ogden_tri3_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  return sfem::codegen::neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }

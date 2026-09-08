@@ -12,690 +12,690 @@
 #endif
 
 extern "C" int navier_stokes_form_1_p_tri6_tri3_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[2],
-        const double *const RSTR p_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[2],
+    const double *const RSTR p_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_p_tri6_tri3_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[2],
-        const float *const RSTR p_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[2],
+    const float *const RSTR p_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[3],
-        const double *const RSTR p_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[3],
+    const double *const RSTR p_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[3],
-        const float *const RSTR p_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[3],
+    const float *const RSTR p_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_p_tet10_tet4_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[3],
-        const double *const RSTR p_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[3],
+    const double *const RSTR p_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_p_tet10_tet4_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[3],
-        const float *const RSTR p_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[3],
+    const float *const RSTR p_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_u_tri6_tri3_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double f0,
-        const double f1,
-        const double nu,
-        const double rho,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[2],
-        const double *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[2],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double f0,
+    const double f1,
+    const double nu,
+    const double rho,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[2],
+    const double *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[2],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_u_tri6_tri3_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float f0,
-        const float f1,
-        const float nu,
-        const float rho,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[2],
-        const float *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[2],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float f0,
+    const float f1,
+    const float nu,
+    const float rho,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[2],
+    const float *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[2],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_u_hex27_hex8_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double f0,
-        const double f1,
-        const double f2,
-        const double nu,
-        const double rho,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[3],
-        const double *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[3],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double f0,
+    const double f1,
+    const double f2,
+    const double nu,
+    const double rho,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[3],
+    const double *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[3],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_u_hex27_hex8_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float f0,
-        const float f1,
-        const float f2,
-        const float nu,
-        const float rho,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[3],
-        const float *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[3],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float f0,
+    const float f1,
+    const float f2,
+    const float nu,
+    const float rho,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[3],
+    const float *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[3],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double f0,
-        const double f1,
-        const double f2,
-        const double nu,
-        const double rho,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[3],
-        const double *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[3],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double f0,
+    const double f1,
+    const double f2,
+    const double nu,
+    const double rho,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[3],
+    const double *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[3],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float f0,
-        const float f1,
-        const float f2,
-        const float nu,
-        const float rho,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[3],
-        const float *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[3],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float f0,
+    const float f1,
+    const float f2,
+    const float nu,
+    const float rho,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[3],
+    const float *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[3],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[2],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[2],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[2],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[2],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[3],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[3],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[3],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[3],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[3],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[3],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[3],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[3],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[2],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[2],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[2],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[2],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[3],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[3],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[3],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[3],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[3],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[3],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[3],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[3],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double nu,
-        const double rho,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[2],
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[2],
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double nu,
+    const double rho,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2]
 );
 extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float nu,
-        const float rho,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[2],
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[2],
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float nu,
+    const float rho,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2]
 );
 extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double nu,
-        const double rho,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[3],
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[3],
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double nu,
+    const double rho,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[3],
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[3],
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3]
 );
 extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float nu,
-        const float rho,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[3],
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[3],
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float nu,
+    const float rho,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[3],
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[3],
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3]
 );
 extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double nu,
-        const double rho,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[3],
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[3],
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double nu,
+    const double rho,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[3],
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[3],
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3]
 );
 extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float nu,
-        const float rho,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[3],
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[3],
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3]
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float nu,
+    const float rho,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[3],
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[3],
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3]
 );
 extern "C" int navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double nu,
-        const double rho,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[2],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[2],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double nu,
+    const double rho,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[2],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[2],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float nu,
-        const float rho,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[2],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[2],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float nu,
+    const float rho,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[2],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[2],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double nu,
-        const double rho,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[3],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[3],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double nu,
+    const double rho,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[3],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[3],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float nu,
-        const float rho,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[3],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[3],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float nu,
+    const float rho,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[3],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[3],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double nu,
-        const double rho,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[3],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t direction_stride,
-        const double *const RSTR u_direction_data[3],
-        const double *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double nu,
+    const double rho,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[3],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const double *const RSTR u_direction_data[3],
+    const double *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float nu,
-        const float rho,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[3],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u_direction_data[3],
-        const float *const RSTR p_direction_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float nu,
+    const float rho,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[3],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const float *const RSTR u_direction_data[3],
+    const float *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_tri6_tri3_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double f0,
-        const double f1,
-        const double nu,
-        const double rho,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[2],
-        const double *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[2],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[2],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double f0,
+    const double f1,
+    const double nu,
+    const double rho,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[2],
+    const double *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[2],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[2],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_tri6_tri3_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float f0,
-        const float f1,
-        const float nu,
-        const float rho,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[2],
-        const float *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[2],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[2],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float f0,
+    const float f1,
+    const float nu,
+    const float rho,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[2],
+    const float *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[2],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[2],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_hex27_hex8_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double f0,
-        const double f1,
-        const double f2,
-        const double nu,
-        const double rho,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[3],
-        const double *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[3],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double f0,
+    const double f1,
+    const double f2,
+    const double nu,
+    const double rho,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[3],
+    const double *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[3],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_hex27_hex8_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float f0,
-        const float f1,
-        const float f2,
-        const float nu,
-        const float rho,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[3],
-        const float *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[3],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float f0,
+    const float f1,
+    const float f2,
+    const float nu,
+    const float rho,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[3],
+    const float *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[3],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 extern "C" int navier_stokes_tet10_tet4_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const double convection_scale,
-        const double dt,
-        const double f0,
-        const double f1,
-        const double f2,
-        const double nu,
-        const double rho,
-        const ptrdiff_t current_stride,
-        const double *const RSTR u_data[3],
-        const double *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const double *const RSTR u_old_data[3],
-        const double *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        double *const RSTR u_out[3],
-        double *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double convection_scale,
+    const double dt,
+    const double f0,
+    const double f1,
+    const double f2,
+    const double nu,
+    const double rho,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u_data[3],
+    const double *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u_old_data[3],
+    const double *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    double *const RSTR u_out[3],
+    double *const RSTR p_out
 );
 extern "C" int navier_stokes_tet10_tet4_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float convection_scale,
-        const float dt,
-        const float f0,
-        const float f1,
-        const float f2,
-        const float nu,
-        const float rho,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u_data[3],
-        const float *const RSTR p_data,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u_old_data[3],
-        const float *const RSTR p_old_data,
-        const ptrdiff_t out_stride,
-        float *const RSTR u_out[3],
-        float *const RSTR p_out
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float convection_scale,
+    const float dt,
+    const float f0,
+    const float f1,
+    const float f2,
+    const float nu,
+    const float rho,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u_data[3],
+    const float *const RSTR p_data,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u_old_data[3],
+    const float *const RSTR p_old_data,
+    const ptrdiff_t out_stride,
+    float *const RSTR u_out[3],
+    float *const RSTR p_out
 );
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_2d_isoparametric_mesh_soa(
@@ -712,30 +712,30 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_2d_isop
         void *const RSTR u_out[2],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_1_p_tri6_tri3_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_1_p_tri6_tri3_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_1_p_tri6_tri3_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_1_p_tri6_tri3_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_1_p_residual_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_1_p_residual_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_3d_isoparametric_mesh_soa(
@@ -752,41 +752,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_3d_isop
         void *const RSTR u_out[3],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_1_p_tet10_tet4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_1_p_tet10_tet4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_1_p_residual_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_1_p_tet10_tet4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_1_p_tet10_tet4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_1_p_residual_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_2d_isoparametric_mesh_soa(
@@ -812,30 +812,30 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_2d_isop
         void *const RSTR u_out[2],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_1_u_tri6_tri3_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_1_u_tri6_tri3_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_1_u_tri6_tri3_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_1_u_tri6_tri3_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_1_u_residual_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_1_u_residual_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_3d_isoparametric_mesh_soa(
@@ -862,41 +862,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_3d_isop
         void *const RSTR u_out[3],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_1_u_hex27_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_1_u_hex27_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_1_u_hex27_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_1_u_hex27_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_1_u_residual_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_1_u_residual_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_2d_isoparametric_mesh_soa(
@@ -913,30 +913,30 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
         void *const RSTR u_out[2],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_2_p_u_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_2_p_u_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa(
@@ -953,41 +953,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
         void *const RSTR u_out[3],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa(
@@ -1004,30 +1004,30 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
         void *const RSTR u_out[2],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa(
@@ -1044,41 +1044,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
         void *const RSTR u_out[3],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_isoparametric_mesh_soa(
@@ -1099,30 +1099,30 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
         const ptrdiff_t out_stride,
         void *const RSTR u_out[2]
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_2_u_u_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_2_u_u_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa(
@@ -1143,41 +1143,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
         const ptrdiff_t out_stride,
         void *const RSTR u_out[3]
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_u_u_hex27_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_u_u_hex27_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_u_u_hex27_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_u_u_hex27_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_isoparametric_mesh_soa(
@@ -1201,30 +1201,30 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_isopar
         void *const RSTR u_out[2],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_isoparametric_mesh_soa(
@@ -1248,41 +1248,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_isopar
         void *const RSTR u_out[3],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_2d_isoparametric_mesh_soa(
@@ -1308,30 +1308,30 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_2d_isoparametric
         void *const RSTR u_out[2],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_tri6_tri3_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_tri6_tri3_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_tri6_tri3_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_tri6_tri3_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_residual_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_residual_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_3d_isoparametric_mesh_soa(
@@ -1358,39 +1358,39 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_3d_isoparametric
         void *const RSTR u_out[3],
         void *const RSTR p_out
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_hex27_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_hex27_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return navier_stokes_tet10_tet4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
-                case smesh::SMESH_FLOAT32:
-                    return navier_stokes_tet10_tet4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_hex27_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_hex27_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "navier_stokes_residual_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return navier_stokes_tet10_tet4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+        case smesh::SMESH_FLOAT32:
+          return navier_stokes_tet10_tet4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "navier_stokes_residual_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }

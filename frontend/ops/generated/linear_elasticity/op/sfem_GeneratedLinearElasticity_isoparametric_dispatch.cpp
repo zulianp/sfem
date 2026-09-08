@@ -794,41 +794,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_2d_isoparametri
         void *const RSTR outx,
         void *const RSTR outy
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_apply_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_apply_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_isoparametric_mesh_soa(
@@ -849,52 +849,52 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_isoparametri
         void *const RSTR outy,
         void *const RSTR outz
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tet10_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tet10_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_apply_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::PROTEUS_HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet10_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet10_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_apply_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_2d_isoparametric_mesh_soa(
@@ -913,41 +913,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_2d_isoparame
         void *const RSTR outx,
         void *const RSTR outy
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_gradient_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_gradient_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_isoparametric_mesh_soa(
@@ -968,52 +968,52 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_isoparame
         void *const RSTR outy,
         void *const RSTR outz
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tet10_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tet10_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_gradient_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::PROTEUS_HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet10_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet10_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_gradient_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(
@@ -1027,52 +1027,52 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_block_diag_sy
         const real_t mu,
         void *const RSTR values
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_quad4_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_quad4_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_quad4_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_quad4_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TRI3: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tri3_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tri3_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_quad4_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_quad4_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_quad4_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_quad4_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TRI3: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tri3_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tri3_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa(
@@ -1086,63 +1086,63 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_block_diag_sy
         const real_t mu,
         void *const RSTR values
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_hex8_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_hex8_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_hex8_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_hex8_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tet10_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tet10_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tet4_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tet4_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_hex8_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_hex8_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::PROTEUS_HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_hex8_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_hex8_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet10_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet10_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet4_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet4_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa(
@@ -1158,52 +1158,52 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_2d_isopar
         const idx_t *const RSTR colidx,
         void *const RSTR values
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TRI3: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tri3_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tri3_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TRI3: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tri3_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tri3_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa(
@@ -1219,63 +1219,63 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_3d_isopar
         const idx_t *const RSTR colidx,
         void *const RSTR values
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tet10_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tet10_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::PROTEUS_HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet10_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet10_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_2d_isoparametric_mesh_soa(
@@ -1297,41 +1297,41 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_2d_is
         const void *const RSTR steps,
         void *const RSTR value
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_objective_steps_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::QUAD4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_objective_steps_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_3d_isoparametric_mesh_soa(
@@ -1355,50 +1355,50 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_3d_is
         const void *const RSTR steps,
         void *const RSTR value
 ) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         default:
-            break;
+          break;
+      }
+      break;
     }
-    std::fprintf(stderr,
-            "linear_elasticity_objective_steps_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
+    case smesh::PROTEUS_HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_objective_steps_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }

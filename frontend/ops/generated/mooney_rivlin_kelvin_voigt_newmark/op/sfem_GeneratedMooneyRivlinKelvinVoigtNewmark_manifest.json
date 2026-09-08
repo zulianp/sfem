@@ -9,7 +9,7 @@
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_soa_diagnostics"
     },
     {
@@ -21,7 +21,7 @@
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_soa_diagnostics"
     },
     {
@@ -49,7 +49,7 @@
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_soa_diagnostics"
     },
     {
@@ -61,7 +61,7 @@
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_soa_diagnostics"
     },
     {
@@ -81,11 +81,11 @@
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_objective_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_objective_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_objective_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_3d_soa_diagnostics"
     },
     {

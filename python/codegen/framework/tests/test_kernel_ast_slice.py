@@ -62,7 +62,7 @@ class QuadratureLaneKernelTest(unittest.TestCase):
     """The helper that turns lane-scoped statements into a printed loop nest."""
 
     def _render(self, body):
-        return residual_codegen._quadrature_lane_kernel_lines(body, indent="    ")
+        return residual_codegen._quadrature_lane_kernel_lines(body, indent="  ")
 
     def test_emits_the_expected_loop_nest(self):
         lines = self._render(
@@ -71,12 +71,12 @@ class QuadratureLaneKernelTest(unittest.TestCase):
         self.assertEqual(
             lines,
             [
-                "    for (int q = 0; q < NQ; ++q) {",
-                "        #pragma omp simd",
-                "        for (int lane = 0; lane < ne; ++lane) {",
-                "            const s_t x = current[0][lane];",
-                "        }",
+                "  for (int q = 0; q < NQ; ++q) {",
+                "    #pragma omp simd",
+                "    for (int lane = 0; lane < ne; ++lane) {",
+                "      const s_t x = current[0][lane];",
                 "    }",
+                "  }",
             ],
         )
 
@@ -177,17 +177,17 @@ class StatementHelpersProduceNodesTest(unittest.TestCase):
     def test_physical_gradient_lines_are_those_nodes_printed(self):
         nodes = residual_codegen._physical_gradient_nodes("u", 3)
         self.assertEqual(
-            residual_codegen._physical_gradient_lines("u", 3, "        "),
-            residual_codegen._print_statement_nodes(nodes, "        "),
+            residual_codegen._physical_gradient_lines("u", 3, "    "),
+            residual_codegen._print_statement_nodes(nodes, "    "),
         )
 
     def test_the_printed_view_still_matches_the_original_spelling(self):
         """Byte-identity of the whole tree depends on this exact text."""
         self.assertEqual(
-            residual_codegen._physical_gradient_lines("u", 2, "    "),
+            residual_codegen._physical_gradient_lines("u", 2, "  "),
             [
-                "    const s_t u_grad_0 = (u_grad_0_ref * adj0 + u_grad_1_ref * adj2) / det;",
-                "    const s_t u_grad_1 = (u_grad_0_ref * adj1 + u_grad_1_ref * adj3) / det;",
+                "  const s_t u_grad_0 = (u_grad_0_ref * adj0 + u_grad_1_ref * adj2) / det;",
+                "  const s_t u_grad_1 = (u_grad_0_ref * adj1 + u_grad_1_ref * adj3) / det;",
             ],
         )
 
