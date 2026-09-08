@@ -3044,7 +3044,14 @@ def _sfem_soa_operator_source(
             variants = geometry_variant_plan(
                 form.weak_form,
                 quadrature_rule,
-                assembles_matrix=matrix_format_plan is not None and not matrix_format_plan.is_empty,
+                # The form-role test lives here rather than as a branch around
+                # the emission: only the 2-form assembles, and the plan is where
+                # that belongs.
+                assembles_matrix=(
+                    form.name == "apply"
+                    and matrix_format_plan is not None
+                    and not matrix_format_plan.is_empty
+                ),
             )
             # Iterated, not tested.  A constant-P1 simplex yields no
             # isoparametric mode -- its affine kernel computes the same numbers
@@ -3145,25 +3152,29 @@ def _sfem_soa_operator_source(
                             source_builder=source_builder,
                         )
                     )
-                if form.name == "apply":
-                    lines.append("")
-                    lines.extend(
-                        _sfem_soa_hessian_matrix_assembly_function(
-                            form,
-                            prefix,
-                            dim,
-                            n_nodes,
-                            n_qp,
-                            local_prefix,
-                            array_inputs,
-                            quadrature_rule,
-                            basis_family,
-                            geometry_family,
-                            use_shared_weak_local,
-                            matrix_format_plan,
-                            source_builder=source_builder,
-                        )
+            # Assembly has its own axis: a form that publishes no
+            # isoparametric matrix-free kernel still assembles a matrix if it
+            # was asked to.  This used to sit inside the isoparametric loop,
+            # which is why the P1 rule had to keep that mode alive.
+            for _assembly_mode in variants.assembly_modes:
+                lines.append("")
+                lines.extend(
+                    _sfem_soa_hessian_matrix_assembly_function(
+                        form,
+                        prefix,
+                        dim,
+                        n_nodes,
+                        n_qp,
+                        local_prefix,
+                        array_inputs,
+                        quadrature_rule,
+                        basis_family,
+                        geometry_family,
+                        use_shared_weak_local,
+                        matrix_format_plan,
+                        source_builder=source_builder,
                     )
+                )
         lines.append("")
 
     return "\n".join(lines)
