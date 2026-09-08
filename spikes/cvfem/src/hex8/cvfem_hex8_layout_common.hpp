@@ -75,6 +75,14 @@ static constexpr int N_FIELDS = 4;
 
 #include "cvfem_hex8_ns_upwind_kernels.hpp"
 #include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+
+// The boundary sub-control-surface terms, for --boundary. The benchmark closes no control
+// volumes by default and this header contributes nothing unless a face mask is supplied,
+// so including it costs an unused function per kernel and nothing at run time. It also
+// supplies cvfem_hex8_grad_scalar, which the nodal pressure gradient below needs, so it
+// must precede cvfem_hex8_pack_helpers.hpp.
+#include "cvfem_hex8_boundary_scs.hpp"
+
 #include "cvfem_hex8_pack_helpers.hpp"
 
 // The rowwise and facewise CSE arrangements lost the saturated evaluation (see
@@ -167,6 +175,26 @@ struct MeshData {
     std::vector<scalar_t> rx, ry, rz, rc;
     std::vector<scalar_t> jacobian_adjugate[9];
     std::vector<scalar_t> jacobian_determinant;
+
+    // --- optional physics, off unless the corresponding option is passed ---------------
+    //
+    // The benchmark measures the element kernel in isolation by default, which is why
+    // these are empty and zero rather than always present: a residual with no Rhie-Chow
+    // and no closed control volumes is a smaller, faster operator than the one the solver
+    // runs, and isolating it is the point of this driver. See the note at the top of
+    // cvfem_hex8_ns_core.hpp on why the two families differ in physics and not only in
+    // layout.
+    //
+    // --rhie-chow fills pgx/pgy/pgz and sets rhie_chow_scale, at which point
+    // cvfem_hex8_rhie_chow_active() starts returning true inside the element kernels and
+    // the pressure-pressure coupling appears. --boundary fills face_mask and Lx/Ly/Lz, at
+    // which point the boundary sub-control-surface terms close the boundary control
+    // volumes. Both together are the operator the solver actually evaluates.
+    std::vector<scalar_t> pgx, pgy, pgz;   // nodal pressure gradient (Rhie-Chow)
+    scalar_t              rhie_chow_scale{0};
+
+    std::vector<uint8_t>  face_mask;       // per element, bits 0..5 = the six CVFEM faces
+    scalar_t              Lx{0}, Ly{0}, Lz{0};
 };
 
 struct BSR4 {
@@ -354,6 +382,49 @@ static SFEM_INLINE void gather_element_coords(const MeshData               &d,
         z[a]                 = scalar_t(pz[g]);
     }
 }
+
+// ---- optional terms: --rhie-chow and --boundary ------------------------------
+//
+// Both are off by default, and the default path must stay exactly as fast as it was --
+// the throughput regression gate compares against numbers measured without them. So the
+// coordinate and pressure-gradient gathers they need sit behind a flag hoisted out of the
+// element loop rather than being done unconditionally. This is the same `with_pg` idiom
+// the solver uses in cvfem_hex8_ns_packed.hpp.
+//
+// With both off, `rc` keeps its null pointers, cvfem_hex8_rhie_chow_active() is false and
+// the element kernel's Rhie-Chow branch folds away, `fmask` stays 0 and the caller skips
+// the boundary term entirely. Nothing is gathered and nothing is written.
+struct Hex8Extras {
+    int with_rc{0};
+    int with_bnd{0};
+
+    explicit Hex8Extras(const MeshData &d)
+        : with_rc(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0)), with_bnd(!d.face_mask.empty()) {}
+};
+
+// Per-element scratch for the above. Declared inside the element loop; `rc` points into
+// this object, so it must outlive the kernel call -- which it does, being a local.
+struct Hex8ExtraScratch {
+    scalar_t     x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
+    scalar_t     pgx[CVFEM_HEX8_N_NODES], pgy[CVFEM_HEX8_N_NODES], pgz[CVFEM_HEX8_N_NODES];
+    Hex8RhieChow rc{};
+    int          fmask{0};
+
+    SFEM_INLINE void load(const MeshData &d, const Hex8Extras &opt, const ptrdiff_t e) {
+        if (!opt.with_rc && !opt.with_bnd) return;
+        gather_element_coords(d, e, x, y, z);
+        if (opt.with_bnd) fmask = (int)d.face_mask[(size_t)e];
+        if (opt.with_rc) {
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                pgx[a]               = d.pgx[g];
+                pgy[a]               = d.pgy[g];
+                pgz[a]               = d.pgz[g];
+            }
+            rc = Hex8RhieChow{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+        }
+    }
+};
 
 
 static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,

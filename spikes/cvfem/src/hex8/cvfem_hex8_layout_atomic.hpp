@@ -73,14 +73,22 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
 
 static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho, const scalar_t mu) {
     reset_residual(d);
+    const Hex8Extras opt(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
         gather_element_fields(d, e, ux, uy, uz, p);
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
         scalar_t adj[9], det;
         load_hex8_adj(d, e, adj, &det);
+        // No rc: the hand-written `current` kernel carries no Rhie-Chow term. --rhie-chow
+        // is rejected for this kernel at the CLI, so reaching here with it on is a bug.
         cvfem_hex8_ns_upwind_residual(rho, mu, adj, det, ux, uy, uz, p, r);
+        if (ex.fmask)
+            boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, ex.x, ex.y, ex.z,
+                                      ux, uy, uz, p, r, ex.fmask, 0);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -94,14 +102,20 @@ static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho,
 
 static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu) {
     reset_residual(d);
+    const Hex8Extras opt(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
         gather_element_fields(d, e, ux, uy, uz, p);
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
         scalar_t adj[9], det;
         load_hex8_adj(d, e, adj, &det);
-        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r);
+        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, ex.rc);
+        if (ex.fmask)
+            boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, ex.x, ex.y, ex.z,
+                                      ux, uy, uz, p, r, ex.fmask, 0);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -338,16 +352,26 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT                 values = b.values->data();
     const smesh::count_t *const SFEM_RESTRICT     slots  = b.element_slots.data();
+    const Hex8Extras                              opt(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
         scalar_t adj[9], det;
         load_hex8_adj(d, e, adj, &det);
+        // rc and p go through the same upwind switch the residual uses, so this matches
+        // the matrix-free action. Without --rhie-chow the pressure-pressure block of this
+        // matrix is structurally zero, which is the saddle-point structure the solver's
+        // block-Jacobi cannot invert -- see cvfem_hex8_ns_core.hpp on why the benchmark's
+        // assembly is a different operator from the solver's.
         cvfem_hex8_ns_upwind_jacobian_add_slots<true>(
-                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
-        (void)p;
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
+        if (ex.fmask)
+            boundary_scs_add_jacobian<true>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, ex.x, ex.y, ex.z,
+                                            ux, uy, uz, slots + (size_t)e * 64, values, ex.fmask, 0);
     }
 }
 
