@@ -82,8 +82,8 @@ class InexactApplyGenerationTest(unittest.TestCase):
         for expected in (
             "g_jacobian_adjugate8",
             "g_jacobian_determinant0",
-            "const scalar_t mu",
-            "const scalar_t lmbda",
+            "const s_t mu",
+            "const s_t lmbda",
             "tangent_t *const SFEM_RESTRICT tangent",
         ):
             with self.subTest(assembly=expected):
@@ -94,8 +94,8 @@ class InexactApplyGenerationTest(unittest.TestCase):
         for absent in (
             "g_jacobian_adjugate",
             "g_jacobian_determinant",
-            "const scalar_t mu",
-            "const scalar_t lmbda",
+            "const s_t mu",
+            "const s_t lmbda",
             "u_stride",
         ):
             with self.subTest(absent_from_apply=absent):
@@ -103,7 +103,7 @@ class InexactApplyGenerationTest(unittest.TestCase):
         for expected in (
             "const tangent_t *const SFEM_RESTRICT tangent",
             "const ptrdiff_t h_stride",
-            "scalar_t *const SFEM_RESTRICT outz",
+            "s_t *const SFEM_RESTRICT outz",
         ):
             with self.subTest(apply=expected):
                 self.assertIn(expected, body)

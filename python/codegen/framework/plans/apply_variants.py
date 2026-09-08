@@ -121,7 +121,7 @@ PRECISIONS = (Precision.SCALAR, Precision.FLOAT)
 #:
 #: This is the same axis as ``PRECISIONS``, read for the opposite purpose.  As
 #: ``PRECISIONS`` it multiplies symbols: every kernel touching scalar data is
-#: emitted once per entry, the second copy differing only in ``using scalar_t =
+#: emitted once per entry, the second copy differing only in ``using s_t =
 #: float`` and its parameter types.  As runtime cases it multiplies nothing --
 #: one entry point takes ``void *`` buffers and a ``const enum
 #: smesh::PrimitiveType``, switches, casts, and calls a template.

@@ -60,7 +60,7 @@ def _manifest_runtime_variants(metadata, operation):
 
 def _static_function_body(source, signature):
     begin = source.index(signature)
-    next_function = source.find("template <typename scalar_t>", begin + len(signature))
+    next_function = source.find("template <typename s_t>", begin + len(signature))
     if next_function < 0:
         return source[begin:]
     return source[begin:next_function]
@@ -101,20 +101,20 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertNotIn("TENSOR_SHAPE_INDEX", hessian_source)
         self.assertNotIn("STREAM_SHAPE_ORDER", hessian_source)
         self.assertIn(
-            "neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>",
+            "neohookean_ogden_d3_tensor_product_apply_block<s_t, NQ, NS, VS>",
             hessian_source,
         )
         self.assertIn(
-            "neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>",
+            "neohookean_ogden_d3_tensor_product_apply_block<s_t, NQ, NS, VS>",
             source,
         )
-        self.assertIn("static constexpr int VECTOR_SIZE = 1;", hessian_source)
+        self.assertIn("static constexpr int VS = 1;", hessian_source)
         self.assertNotIn("ordered_shape_index", hessian_source)
         self.assertNotIn("matrix_coordinate_streams", hessian_source)
         self.assertNotIn("block_coordinate_streams", hessian_source)
         self.assertNotIn("coordinate_value", hessian_source)
         self.assertIn(
-            "tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>",
+            "tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>",
             hessian_source,
         )
         self.assertIn("isoparametric_grad_1d, block_coordinate_data,", hessian_source)
@@ -124,7 +124,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             source,
             "static SFEM_INLINE void neohookean_ogden_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_bsr",
         )
-        self.assertIn("count_t entries[N_SHAPE * N_SHAPE];", bsr_scatter)
+        self.assertIn("count_t entries[NS * NS];", bsr_scatter)
         # The scatter no longer reports a malformed graph: it returns void, and
         # the graph is settled once at Op::initialize instead of being retested
         # per element.  What is pinned here is that the check has not crept back
@@ -132,18 +132,18 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertNotIn("valid_block_graph", bsr_scatter)
         self.assertNotIn("missing block graph entry", bsr_scatter)
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);", bsr_scatter)
-        self.assertIn("entries[i * N_SHAPE + j] = row_begin + ks[j];", bsr_scatter)
-        self.assertIn("scalar_t *const block = &values[entries[i * N_SHAPE + j] * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];", bsr_scatter)
-        self.assertIn("block[bi * N_FIELD_COMPONENTS + bj] += element_matrix[row * (N_FIELD_COMPONENTS * N_SHAPE) + col];", bsr_scatter)
+        self.assertIn("entries[i * NS + j] = row_begin + ks[j];", bsr_scatter)
+        self.assertIn("s_t *const block = &values[entries[i * NS + j] * NC * NC];", bsr_scatter)
+        self.assertIn("block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];", bsr_scatter)
         self.assertLess(
-            bsr_scatter.index("entries[i * N_SHAPE + j] = row_begin + ks[j];"),
-            bsr_scatter.index("scalar_t *const block = &values[entries[i * N_SHAPE + j] * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];"),
+            bsr_scatter.index("entries[i * NS + j] = row_begin + ks[j];"),
+            bsr_scatter.index("s_t *const block = &values[entries[i * NS + j] * NC * NC];"),
         )
         self.assertNotIn("std::vector", bsr_scatter)
         self.assertIn("int unsupported_matrix_format = 0;", source)
         self.assertIn("reduction(|:unsupported_matrix_format)", source)
         self.assertIn("return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;", source)
-        self.assertIn("values[entries[i * N_SHAPE + j] * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS]", source)
+        self.assertIn("values[entries[i * NS + j] * NC * NC]", source)
         for matrix_format in ("crs", "dia", "coo", "patch"):
             self.assertNotIn(
                 "neohookean_ogden_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_%s"
@@ -236,9 +236,9 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                     assembly_base = "%s_tet4_hessian_isoparametric_mesh_soa" % material_name
                     public_name = "%s_hessian_block_diag_sym_3d_isoparametric_mesh_soa" % material_name
                     self.assertIn("%s_scatter_block_diag_sym" % assembly_base, source)
-                    self.assertIn("static constexpr int SYM_DIM = (N_FIELD_COMPONENTS * (N_FIELD_COMPONENTS + 1)) / 2;", source)
+                    self.assertIn("static constexpr int SYM_DIM = (NC * (NC + 1)) / 2;", source)
                     self.assertIn("values[(ptrdiff_t)ev[i] * SYM_DIM]", source)
-                    self.assertIn("for (int bj = bi; bj < N_FIELD_COMPONENTS; ++bj)", source)
+                    self.assertIn("for (int bj = bi; bj < NC; ++bj)", source)
                     self.assertIn("block[sym++] += element_matrix[row * NDOFS + col];", source)
                     self.assertNotIn("%s_scatter_bsr" % assembly_base, source)
                     self.assertIn(public_name, c_abi_header)
@@ -443,12 +443,12 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 / "d2/tri3/two_phase_flow_form_2_p_w_p_w_tri3_operator.cpp"
             ).read_text()
             wrapper = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow.cpp").read_text()
-            self.assertIn("static constexpr int N_FIELDS = 2;", source)
+            self.assertIn("static constexpr int NC = 2;", source)
             self.assertIn("static constexpr int N_ROW_STREAMS = 3;", source)
             self.assertIn("static constexpr int N_COL_STREAMS = 3;", source)
-            self.assertIn("block_current[0 * N_SHAPE + shape][0] = p_w[node * current_stride];", source)
-            self.assertIn("block_current[1 * N_SHAPE + shape][0] = p_c[node * current_stride];", source)
-            self.assertIn("block[bi * N_FIELDS + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];", source)
+            self.assertIn("block_current[0 * NS + shape][0] = p_w[node * current_stride];", source)
+            self.assertIn("block_current[1 * NS + shape][0] = p_c[node * current_stride];", source)
+            self.assertIn("block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];", source)
             self.assertNotIn("ROW_STREAMS[", source)
             self.assertNotIn("COL_STREAMS[", source)
             self.assertNotIn("ROW_TENSOR_STREAMS[", source)
@@ -605,7 +605,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 packed_apply_begin,
             )
             packed_apply = operator_source[packed_apply_begin:packed_apply_end]
-            self.assertIn("sfem::codegen::thread_scratch<scalar_t>", packed_apply)
+            self.assertIn("sfem::codegen::thread_scratch<s_t>", packed_apply)
             self.assertNotIn("std::malloc", packed_apply)
             self.assertNotIn("std::free", packed_apply)
             self.assertIn(
@@ -632,7 +632,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 packed_fill_begin,
             )
             packed_fill = operator_source[packed_fill_begin:packed_fill_end]
-            self.assertIn("sfem::codegen::thread_scratch<scalar_t>", packed_fill)
+            self.assertIn("sfem::codegen::thread_scratch<s_t>", packed_fill)
             self.assertNotIn("std::malloc", packed_fill)
             self.assertNotIn("std::free", packed_fill)
             # Which local kernel the packed fill reuses is the closed-form

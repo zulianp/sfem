@@ -172,7 +172,7 @@ class BufferAccess:
 @dataclass(frozen=True)
 class VectorizationStrategy:
     name: str = "simd_lane"
-    vector_width_symbol: str = "VECTOR_SIZE"
+    vector_width_symbol: str = "VS"
     lane_index: str = "lane"
 
     def to_dict(self):

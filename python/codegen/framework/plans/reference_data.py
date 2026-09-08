@@ -58,7 +58,7 @@ class ReferenceBasisDataPlan:
     def accessors(self):
         return (self.shape_accessor,) + self.gradient_accessors
 
-    def accessor_call(self, struct_name, accessor, scalar_type="scalar_t"):
+    def accessor_call(self, struct_name, accessor, scalar_type="s_t"):
         return "sfem::codegen::%s<%s>::%s()" % (
             str(struct_name),
             str(scalar_type),
@@ -157,7 +157,7 @@ class ReferenceDataSetPlan:
     def is_mixed_order(self):
         return len(self.unique_element_types) > 1
 
-    def accessor_call(self, accessor, scalar_type="scalar_t"):
+    def accessor_call(self, accessor, scalar_type="s_t"):
         return "sfem::codegen::%s<%s>::%s()" % (
             self.struct_name,
             str(scalar_type),
@@ -304,7 +304,7 @@ def _validate_reference_dataset(dataset, stage, rule, family):
         )
     if dataset.is_tensor_product and dataset.n_qp_1d != rule.tensor_product_n_qp_1d:
         raise ValueError(
-            "reference-data tensor-product N_QP_1D %d does not match %d"
+            "reference-data tensor-product NQ1 %d does not match %d"
             % (dataset.n_qp_1d, rule.tensor_product_n_qp_1d)
         )
 

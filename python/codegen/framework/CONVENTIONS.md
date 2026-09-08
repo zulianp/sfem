@@ -43,8 +43,8 @@ Two rules keep this from re-entering emission as a decision, which
 
 | Concept | Name | Note |
 |---|---|---|
-| kernel scalar | `S` | the template parameter is named `S`; no alias is emitted |
-| geometry scalar, internal | `G` | template parameter |
+| kernel scalar | `s_t` | the template parameter is named `s_t`; no alias is emitted |
+| geometry scalar, internal | `g_t` | template parameter |
 | geometry scalar, at the C ABI | `geom_t` | SFEM-wide typedef, not ours to rename |
 | index, count, pointer difference | `idx_t` · `count_t` · `ptrdiff_t` | SFEM / POSIX, unchanged |
 | vector width | `VS` | |
@@ -52,6 +52,14 @@ Two rules keep this from re-entering emission as a decision, which
 | shape functions | `NS` | per-dimension: `NS1`; per-field: `U_NS` |
 | field components | `NC` | |
 | spatial dimension | `ND` | |
+
+**Why the type names keep SFEM's `_t` suffix.** A bare capital would be shorter, and it is
+the wrong economy here: `S` is the second Piola-Kirchhoff stress and `G` the shear modulus in
+standard continuum-mechanics notation, `two_phase_flow` already declares parameters `T`, `R` and
+`Z`, and this document says in the same breath that bare capitals belong to the material author.
+Claiming `S` would mean refusing a material that spells its stress the conventional way. `s_t` and
+`g_t` are unmistakably types by the suffix SFEM already uses, cost two characters more, and take
+nothing from the material's namespace.
 
 **Why the scalar type is a renamed template parameter and not an alias.** Callers pass template
 arguments positionally — `operators/hex8/hex8_linear_elasticity.cpp:290` writes
@@ -62,8 +70,8 @@ aliases. An alias appears in exactly one place: the non-template `extern "C"` bo
 concrete type is `double` or `float`.
 
 **Constants are never a bare single capital.** Single capitals belong to the material author:
-`two_phase_flow` publishes parameters named `T`, `R` and `Z`. `NQ1` and `NS1` exist rather than `Q`
-and `S` for this reason — and because `S` is the kernel scalar.
+`two_phase_flow` publishes parameters named `T`, `R` and `Z`. `NQ1` and `NS1` exist rather than the
+`constexpr int Q` and `int S` the tensor-product and Neumann kernels declare today.
 
 ## Function names
 
@@ -160,7 +168,7 @@ recorded with its number so it reads as a decision rather than an oversight.
 The generator reserves, and materials may not declare:
 
 ```
-types        S  G
+types        s_t  g_t
 constants    NQ NS NC ND VS NQ1 NS1 U_NS
 indices      lane q s sx sy sz e k
 prefixes     g_ gl_ sh_ lo_ rg_ pk_ b ev

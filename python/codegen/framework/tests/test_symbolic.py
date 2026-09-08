@@ -192,7 +192,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertTrue(openmp_loop.vectorize_lane_loop)
         self.assertTrue(openmp_loop.parallel_element_loop)
         self.assertEqual(openmp_loop.lane_index, "lane")
-        self.assertEqual(openmp_loop.vector_size_symbol, "VECTOR_SIZE")
+        self.assertEqual(openmp_loop.vector_size_symbol, "VS")
         self.assertEqual(avx512.loop_lowering_policy().vector_isa, "avx512")
         self.assertEqual(avx512.loop_lowering_policy().preferred_vector_bits, 512)
         self.assertIn("-mavx512f", avx512.target_compile_flags())

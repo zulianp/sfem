@@ -39,13 +39,13 @@ from codegen.framework.plans.emission import emission_plan_for_element
 #: Streams that are geometry.  `grad_ref` is reference basis data and is excluded.
 GEOMETRY_STREAM_NAMES = ("jacobian_adjugate", "jacobian_determinant")
 
-VECTOR_SIZE = 8
+VS = 8
 
 
 def _emission_plans():
     for element_type in sfem_supported_element_types():
         try:
-            yield element_type, emission_plan_for_element(element_type, VECTOR_SIZE, None)
+            yield element_type, emission_plan_for_element(element_type, VS, None)
         except (ValueError, TypeError, KeyError):
             # Elements with no affine/isoparametric pair are out of scope here.
             continue

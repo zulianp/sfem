@@ -18,7 +18,7 @@ _SFEM_CCODE_PRINTERS = {}
 
 
 class _SfemCCodePrinter(C99CodePrinter):
-    def __init__(self, scalar_type="scalar_t", *args, **kwargs):
+    def __init__(self, scalar_type="s_t", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._scalar_type = scalar_type
 
@@ -51,7 +51,7 @@ class _SfemCCodePrinter(C99CodePrinter):
         return super()._print_Pow(expr)
 
 
-def _sfem_ccode(expression, scalar_type="scalar_t"):
+def _sfem_ccode(expression, scalar_type="s_t"):
     printer = _SFEM_CCODE_PRINTERS.get(scalar_type)
     if printer is None:
         printer = _SfemCCodePrinter(scalar_type)
@@ -218,8 +218,8 @@ def parameter_list_lines(params, indent=8):
 def runtime_typed_entry_point(function_name, params, body, return_type="int"):
     """A kernel body emitted once, behind one runtime-typed entry point.
 
-    ``params`` are spelled in terms of ``scalar_t`` and ``body`` is the block
-    that used to follow ``using scalar_t = double;`` -- the same text for every
+    ``params`` are spelled in terms of ``s_t`` and ``body`` is the block
+    that used to follow ``using s_t = double;`` -- the same text for every
     precision, which is why it was being written out twice.  It becomes a
     template, and the ``extern "C"`` symbol becomes the switch that selects an
     instantiation, the shape ``cu_tet4_laplacian_apply`` uses in
@@ -234,7 +234,7 @@ def runtime_typed_entry_point(function_name, params, body, return_type="int"):
     from codegen.framework.plans.apply_variants import runtime_scalar_cases
 
     implementation = "%s_tpl" % function_name
-    lines = ["template <typename scalar_t>", "static %s %s(" % (return_type, implementation)]
+    lines = ["template <typename s_t>", "static %s %s(" % (return_type, implementation)]
     lines.extend(parameter_list_lines(params))
     lines.append(") {")
     lines.extend(body)
@@ -278,17 +278,17 @@ def runtime_typed_entry_point(function_name, params, body, return_type="int"):
 
 def _runtime_typed_param(param):
     """One template parameter, as the runtime-typed entry point declares it."""
-    if "scalar_t" not in param:
+    if "s_t" not in param:
         return param
     if "*" in param:
-        return param.replace("scalar_t", "void", 1)
-    return param.replace("scalar_t", "real_t", 1)
+        return param.replace("s_t", "void", 1)
+    return param.replace("s_t", "real_t", 1)
 
 
 def _runtime_typed_arg(param, scalar_type):
     """The same parameter, cast back at the call into the template."""
     name = param.split()[-1].strip("*&").split("[")[0]
-    if "scalar_t" not in param or "*" not in param:
+    if "s_t" not in param or "*" not in param:
         return name
     const = "const " if param.lstrip().startswith("const ") else ""
     if param.rstrip().endswith("]"):

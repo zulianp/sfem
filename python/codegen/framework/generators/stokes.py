@@ -27,10 +27,10 @@ def _default_out_dir():
 
 
 def _operator_dim(path, contents):
-    match = re.search(r"static constexpr int DIM = ([0-9]+);", contents)
+    match = re.search(r"static constexpr int ND = ([0-9]+);", contents)
     if match is None:
         raise RuntimeError(
-            "Stokes operator '%s' does not declare generated DIM"
+            "Stokes operator '%s' does not declare generated ND"
             % os.path.basename(path)
         )
     return int(match.group(1))

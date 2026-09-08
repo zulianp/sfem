@@ -277,7 +277,7 @@ class GenApiTest(unittest.TestCase):
                         iteration_range(0, expr_ref("nelements", "element_count")),
                         add_assign_increment(
                             iterator("evbegin", "ptrdiff_t"),
-                            expr_ref("VECTOR_SIZE", "vector_width"),
+                            expr_ref("VS", "vector_width"),
                         ),
                     )
                 ),
@@ -285,7 +285,7 @@ class GenApiTest(unittest.TestCase):
                     "const int",
                     "nelems",
                     (),
-                    "(int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin)",
+                    "(int)MIN((ptrdiff_t)VS, nelements - evbegin)",
                 ),
                 LoopNode(
                     LoopKind.SIMD,
@@ -295,7 +295,7 @@ class GenApiTest(unittest.TestCase):
                     (
                         AssignmentNode(
                             buffer_access("block_value", expr_ref("lane", "lane_index")),
-                            expr_ref("scalar_t(0)", "zero_value"),
+                            expr_ref("s_t(0)", "zero_value"),
                         ),
                     ),
                     vectorized=True,
@@ -316,11 +316,11 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(
             printer.print_ast(ast),
             (
-                "for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
-                "const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+                "for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {",
+                "const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);",
                 "#pragma omp simd",
                 "for (int lane = 0; lane < nelems; ++lane) {",
-                "    block_value[lane] = scalar_t(0);",
+                "    block_value[lane] = s_t(0);",
                 "}",
                 "#pragma omp atomic update",
                 "out[node * out_stride] += block_out[lane];",
@@ -343,7 +343,7 @@ class GenApiTest(unittest.TestCase):
             "geometry_pa",
             partial_assembly_strategy=PartialAssemblyStrategy.ISOPARAMETRIC_GEOMETRY_PA,
             nodes=(
-                BufferDeclNode("scalar_t", "block_adjugate", ("N_QP", "DIM * DIM", "VECTOR_SIZE")),
+                BufferDeclNode("s_t", "block_adjugate", ("NQ", "ND * ND", "VS")),
                 GeometryNode(
                     GeometryNodeKind.TRANSIENT_JACOBIAN,
                     inputs=("block_coordinate_data", "grad_ref"),
@@ -432,7 +432,7 @@ class GenApiTest(unittest.TestCase):
                     LoopKind.TILE,
                     tile,
                     iteration_range(0, expr_ref("nelements", "element_count")),
-                    add_assign_increment(tile, expr_ref("VECTOR_SIZE", "vector_width")),
+                    add_assign_increment(tile, expr_ref("VS", "vector_width")),
                     (
                         LoopNode(
                             LoopKind.SIMD,
@@ -456,7 +456,7 @@ class GenApiTest(unittest.TestCase):
             self.assertTrue(result.success)
             self.assertIn("generated C with pystencils", result.diagnostics[-1])
             self.assertIn(
-                "for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE)",
+                "for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS)",
                 result.lowered,
             )
             self.assertIn("for (int lane = 0; lane < nelems; lane += 1)", result.lowered)
@@ -498,7 +498,7 @@ class GenApiTest(unittest.TestCase):
                     "const int",
                     "nelems",
                     (),
-                    "(int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin)",
+                    "(int)MIN((ptrdiff_t)VS, nelements - evbegin)",
                 ),
             ),
         )
@@ -537,8 +537,8 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(
             OpenMPEnergySoASourceBuilder().mesh_loop_lines(),
             (
-                "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {",
-                "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
+                "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {",
+                "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);",
             ),
         )
 
@@ -1118,11 +1118,11 @@ class GenApiTest(unittest.TestCase):
                 source.index("if (ret->initialize(block_names)"),
             )
             self.assertIn(
-                "template <typename scalar_t, typename jacobian_t>",
+                "template <typename s_t, typename g_t>",
                 operator_source,
             )
             self.assertIn(
-                "affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>",
+                "affine_geometry_stream<s_t, g_t, VS>",
                 operator_source,
             )
             self.assertNotIn("generated_neohookean_ogden", source)
@@ -1292,7 +1292,7 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
                         generated_parts.append(input_file.read())
             generated = "\n".join(generated_parts)
 
-        self.assertIn("const scalar_t mu", generated)
+        self.assertIn("const s_t mu", generated)
         self.assertNotIn("unused", generated)
 
     def test_linear_elasticity_hessian_apply_prunes_current_state(self):
@@ -1430,10 +1430,10 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             self.assertNotIn("u_streams", le_hessian)
             self.assertIn("u_streams", nh_hessian)
             self.assertIn("linear_elasticity_proteus_hex8_hessian_element_soa", le_hex8_header)
-            self.assertIn("SHAPE_ORDER[N_SHAPE] = {0, 1, 3, 2, 4, 5, 7, 6}", le_hex8_header)
+            self.assertIn("SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6}", le_hex8_header)
             self.assertIn("neohookean_ogden_hex8_hessian_element_soa", nh_hex8_header)
             self.assertIn("q * nelements + evbegin + lane", le_header)
-            self.assertIn("template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>", le_dispatch)
+            self.assertIn("template <typename s_t, int VS = 16, typename elem_type_t>", le_dispatch)
             self.assertNotIn("smesh_mesh.hpp", le_dispatch)
             self.assertNotIn("smesh_elem_type.hpp", le_dispatch)
 
@@ -1588,17 +1588,17 @@ int main() {
         tet4_apply = local[local.index("linear_elasticity_d3_simplex_tet4_apply_block") :]
 
         for block in (generic_objective, generic_gradient, generic_apply):
-            self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-            self.assertIn("for (int shape = 0; shape < N_SHAPE; ++shape)", block)
-            self.assertIn("grad_ref_x[q * N_SHAPE + shape]", block)
+            self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+            self.assertIn("for (int shape = 0; shape < NS; ++shape)", block)
+            self.assertIn("grad_ref_x[q * NS + shape]", block)
             self.assertIn("_ref0_values", block)
 
         self.assertIn(
-            "const scalar_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+            "const s_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
             tet4_objective,
         )
         self.assertIn(
-            "const scalar_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+            "const s_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
             tet4_gradient,
         )
         self.assertIn(
@@ -1606,15 +1606,15 @@ int main() {
             tet4_gradient,
         )
         self.assertIn(
-            "const scalar_t grad_h_ref0 = -(h_streams[0 * 3 + 0][lane]) + h_streams[1 * 3 + 0][lane];",
+            "const s_t grad_h_ref0 = -(h_streams[0 * 3 + 0][lane]) + h_streams[1 * 3 + 0][lane];",
             tet4_apply,
         )
         for block in (tet4_objective, tet4_gradient, tet4_apply):
-            self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-            self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
-            self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_z", block)
-            self.assertNotIn("for (int shape = 0; shape < N_SHAPE; ++shape)", block)
-            self.assertNotIn("grad_ref_x[q * N_SHAPE + shape]", block)
+            self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+            self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
+            self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
+            self.assertNotIn("for (int shape = 0; shape < NS; ++shape)", block)
+            self.assertNotIn("grad_ref_x[q * NS + shape]", block)
             self.assertNotIn("_ref0_values", block)
             self.assertNotIn("loperand0_values", block)
         self.assertIn("linear_elasticity_d3_simplex_tet4_objective_block<", operator)
@@ -1644,9 +1644,9 @@ int main() {
         self.assertIn("linear_elasticity_d3_simplex_tet4_gradient_block", local)
         self.assertIn("linear_elasticity_d3_simplex_apply_block", tet10_operator)
         self.assertNotIn("linear_elasticity_d3_simplex_tet4_apply_block", tet10_operator)
-        self.assertIn("ev[element_node * VECTOR_SIZE + lane]", tet10_operator)
-        self.assertNotIn("ev[lane * N_SHAPE", tet10_operator)
-        self.assertNotIn("ev[scatter * N_SHAPE", tet10_operator)
+        self.assertIn("ev[element_node * VS + lane]", tet10_operator)
+        self.assertNotIn("ev[lane * NS", tet10_operator)
+        self.assertNotIn("ev[scatter * NS", tet10_operator)
 
     def test_generates_factory_registration_aggregate_from_op_manifests(self):
         manifests = []
@@ -1823,7 +1823,7 @@ int main() {
                 source.index("if (ret->initialize(block_names)"),
             )
             self.assertIn(
-                "affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>",
+                "affine_geometry_stream<s_t, g_t, VS>",
                 operator_source,
             )
             self.assertNotIn("two_phase_flow_tri3_residual_isoparametric_mesh_aos", source)
@@ -2126,18 +2126,18 @@ int main() {
         # TET10: four points affine, eleven isoparametric.  The numbers are the
         # element's, not the point -- what is pinned is that the two modes do
         # not share a quadrature rule.
-        self.assertIn("static constexpr int N_QP = 4;", contents[affine:isoparametric])
-        self.assertIn("const scalar_t *const affine_grad_ref_x", contents[affine:isoparametric])
-        self.assertIn("const scalar_t *const affine_q_weight", contents[affine:isoparametric])
+        self.assertIn("static constexpr int NQ = 4;", contents[affine:isoparametric])
+        self.assertIn("const s_t *const affine_grad_ref_x", contents[affine:isoparametric])
+        self.assertIn("const s_t *const affine_q_weight", contents[affine:isoparametric])
         self.assertIn(
-            "neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_x()",
+            "neohookean_ogden_tet10_affine_reference_data<s_t>::grad_ref_x()",
             contents[affine:isoparametric],
         )
-        self.assertIn("static constexpr int N_QP = 11;", contents[isoparametric:])
-        self.assertIn("const scalar_t *const isoparametric_grad_ref_x", contents[isoparametric:])
-        self.assertIn("const scalar_t *const isoparametric_q_weight", contents[isoparametric:])
+        self.assertIn("static constexpr int NQ = 11;", contents[isoparametric:])
+        self.assertIn("const s_t *const isoparametric_grad_ref_x", contents[isoparametric:])
+        self.assertIn("const s_t *const isoparametric_q_weight", contents[isoparametric:])
         self.assertIn(
-            "neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_x()",
+            "neohookean_ogden_tet10_isoparametric_reference_data<s_t>::grad_ref_x()",
             contents[isoparametric:],
         )
 
@@ -2420,10 +2420,10 @@ int main() {
                 determinant_target=lambda index: "det[%s]" % index,
             )
         )
-        self.assertIn("tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>", residual_lines)
-        self.assertIn("scalar_t coordinate_value[DIM * N_QP * VECTOR_SIZE];", residual_lines)
-        self.assertIn("adj0[q * VECTOR_SIZE + lane] = J11 * J22 - J12 * J21;", residual_lines)
-        self.assertIn("det[q * VECTOR_SIZE + lane] = J00 * (J11 * J22 - J12 * J21)", residual_lines)
+        self.assertIn("tensor_evaluate<s_t, NQ, NS, VS, ND, ND>", residual_lines)
+        self.assertIn("s_t coordinate_value[ND * NQ * VS];", residual_lines)
+        self.assertIn("adj0[q * VS + lane] = J11 * J22 - J12 * J21;", residual_lines)
+        self.assertIn("det[q * VS + lane] = J00 * (J11 * J22 - J12 * J21)", residual_lines)
 
         hyper_lines = "\n".join(
             tensor_product_gradient_isoparametric_geometry_lines(
@@ -2436,8 +2436,8 @@ int main() {
                 determinant_target=lambda index: "det[%s]" % index,
             )
         )
-        self.assertIn("tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>", hyper_lines)
-        self.assertIn("coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE", hyper_lines)
+        self.assertIn("tensor_gradient<s_t, NQ, NS, VS, 3, 3>", hyper_lines)
+        self.assertIn("coordinate_grad_ref + 2 * NQ * ND * VS", hyper_lines)
         self.assertNotIn("coordinate_value", hyper_lines)
 
     def test_generation_plan_schema_validates_kernel_blocks_and_streams(self):
@@ -2748,7 +2748,7 @@ int main() {
         self.assertIn(
             "#pragma omp simd\n"
             "        for (int lane = 0; lane < nelems; ++lane) {\n"
-            "            block_value[lane] = scalar_t(0);",
+            "            block_value[lane] = s_t(0);",
             contents,
         )
 
@@ -2831,10 +2831,10 @@ int main() {
         self.assertEqual(
             energy_signatures[0].template_parameters,
             (
-                "typename scalar_t",
-                "int N_QP",
-                "int N_SHAPE",
-                "int VECTOR_SIZE",
+                "typename s_t",
+                "int NQ",
+                "int NS",
+                "int VS",
             ),
         )
         self.assertIn("shape_1d", energy_signatures[0].argument_names)
@@ -2849,7 +2849,7 @@ int main() {
             energy_input.element_contexts[0],
         )
         self.assertIsInstance(energy_mesh_signature, MeshKernelSignature)
-        self.assertEqual(energy_mesh_signature.template_parameters, ("typename scalar_t",))
+        self.assertEqual(energy_mesh_signature.template_parameters, ("typename s_t",))
         self.assertIn("nelements", energy_mesh_signature.argument_names)
         self.assertIn("nnodes", energy_mesh_signature.argument_names)
         self.assertIn("elements", energy_mesh_signature.argument_names)
@@ -2890,7 +2890,7 @@ int main() {
             block_unit,
             residual_input.element_contexts[0],
         )
-        self.assertTrue(all("N_SHAPE" in signature.arguments[-1].declaration for signature in block_signatures))
+        self.assertTrue(all("NS" in signature.arguments[-1].declaration for signature in block_signatures))
 
         stokes_element = next(element for element in stokes.elements if element.name == "TRI6_TRI3")
         mixed_input = gen.UserInputStage.create(stokes, (stokes_element,), 16, None)
@@ -2944,7 +2944,7 @@ int main() {
             self.assertFalse(dataset.is_mixed_order)
             self.assertEqual(
                 dataset.accessor_call("shape_1d"),
-                "sfem::codegen::neohookean_ogden_hex8_%s_reference_data<scalar_t>::shape_1d()"
+                "sfem::codegen::neohookean_ogden_hex8_%s_reference_data<s_t>::shape_1d()"
                 % dataset.stage,
             )
 
@@ -3625,8 +3625,8 @@ int main() {
             )
             end = contents.index("} // namespace codegen", start)
             block = contents[start:end]
-            self.assertNotIn("const scalar_t det = determinant[geometry_offset];", block)
-            self.assertNotIn("for (int q = 0; q < N_QP; ++q)", block)
+            self.assertNotIn("const s_t det = determinant[geometry_offset];", block)
+            self.assertNotIn("for (int q = 0; q < NQ; ++q)", block)
             self.assertNotIn("#pragma omp simd", block)
             mesh = os.path.join(
                 out_dir,
@@ -3694,10 +3694,10 @@ int main() {
                 "stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float_print_rate",
                 contents,
             )
-            self.assertIn("scalar_t *const SFEM_RESTRICT u_out[2]", contents)
+            self.assertIn("s_t *const SFEM_RESTRICT u_out[2]", contents)
             self.assertNotIn("u0_out", contents)
             self.assertNotIn("u1_out", contents)
-            self.assertIn("static constexpr int N_FIELDS = 2;", contents)
+            self.assertIn("static constexpr int NC = 2;", contents)
             wrapper = os.path.join(out_dir, "op", "sfem_GeneratedStokes.cpp")
             with open(wrapper, encoding="utf-8") as input_file:
                 wrapper_contents = input_file.read()
@@ -3807,7 +3807,7 @@ int main() {
             self.assertIn("field_grad_1d", contents)
             self.assertIn("tensor_evaluate<", contents)
             self.assertIn("tensor_integrate<", contents)
-            self.assertIn("N_QP_1D", contents)
+            self.assertIn("NQ1", contents)
             self.assertNotIn("field_shape[", contents)
             self.assertNotIn("field_grad_ref[", contents)
             self.assertNotIn("for (int trial", contents)
@@ -3829,15 +3829,15 @@ int main() {
             with open(operator) as input_file:
                 contents = input_file.read()
             self.assertIn("struct stokes_isoparametric_reference_data", contents)
-            self.assertIn("static const scalar_t *hex27_shape_1d()", contents)
-            self.assertIn("static const scalar_t *hex27_grad_1d()", contents)
-            self.assertIn("static const scalar_t *hex8_shape_1d()", contents)
-            self.assertIn("static const scalar_t *hex8_grad_1d()", contents)
-            self.assertIn("static const scalar_t data[", contents)
-            self.assertIn("scalar_t(", contents)
+            self.assertIn("static const s_t *hex27_shape_1d()", contents)
+            self.assertIn("static const s_t *hex27_grad_1d()", contents)
+            self.assertIn("static const s_t *hex8_shape_1d()", contents)
+            self.assertIn("static const s_t *hex8_grad_1d()", contents)
+            self.assertIn("static const s_t data[", contents)
+            self.assertIn("s_t(", contents)
             self.assertIn(
-                "field_shape_1d[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex27_shape_1d(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::hex8_shape_1d()}",
+                "field_shape_1d[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::hex27_shape_1d(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<s_t>::hex8_shape_1d()}",
                 contents,
             )
             self.assertIn(
@@ -3852,8 +3852,8 @@ int main() {
             self.assertNotIn("block_current_streams[89]", contents)
             self.assertNotIn("block_direction_streams[89]", contents)
             self.assertNotIn("block_output_streams[89]", contents)
-            self.assertIn("static constexpr int N_FIELDS = 2;", contents)
-            self.assertIn("scalar_t *const SFEM_RESTRICT u_out[3]", contents)
+            self.assertIn("static constexpr int NC = 2;", contents)
+            self.assertIn("s_t *const SFEM_RESTRICT u_out[3]", contents)
             self.assertNotIn("u0_out", contents)
             self.assertNotIn("u1_out", contents)
             self.assertNotIn("u2_out", contents)
@@ -3863,8 +3863,8 @@ int main() {
             self.assertNotIn("stokes_u1_shape_", contents)
             self.assertNotIn("stokes_u2_shape_", contents)
             self.assertNotIn("stokes_u0_grad_ref", contents)
-            self.assertNotIn("static const scalar_t shape_1d[", contents)
-            self.assertNotIn("static const scalar_t grad_1d[", contents)
+            self.assertNotIn("static const s_t shape_1d[", contents)
+            self.assertNotIn("static const s_t grad_1d[", contents)
 
     def test_stokes_simplex_operator_deduplicates_reference_data(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -3907,36 +3907,36 @@ int main() {
                 tet_local = input_file.read()
 
             self.assertIn("struct stokes_isoparametric_reference_data", tri)
-            self.assertIn("static const scalar_t *tri6_shape()", tri)
-            self.assertIn("static const scalar_t *tri6_grad_ref_x()", tri)
-            self.assertIn("static const scalar_t *tri3_shape()", tri)
-            self.assertIn("static const scalar_t *tri3_grad_ref_y()", tri)
-            self.assertIn("static const scalar_t data[", tri)
-            self.assertIn("scalar_t(", tri)
+            self.assertIn("static const s_t *tri6_shape()", tri)
+            self.assertIn("static const s_t *tri6_grad_ref_x()", tri)
+            self.assertIn("static const s_t *tri3_shape()", tri)
+            self.assertIn("static const s_t *tri3_grad_ref_y()", tri)
+            self.assertIn("static const s_t data[", tri)
+            self.assertIn("s_t(", tri)
             self.assertIn(
-                "field_shape[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri6_shape(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri3_shape()}",
+                "field_shape[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::tri6_shape(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<s_t>::tri3_shape()}",
                 tri,
             )
             self.assertIn(
-                "isoparametric_cell_grad_ref_0 = sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tri6_grad_ref_x()",
+                "isoparametric_cell_grad_ref_0 = sfem::codegen::stokes_isoparametric_reference_data<s_t>::tri6_grad_ref_x()",
                 tri,
             )
 
             self.assertIn("struct stokes_isoparametric_reference_data", tet)
-            self.assertIn("static const scalar_t *tet10_shape()", tet)
-            self.assertIn("static const scalar_t *tet10_grad_ref_z()", tet)
-            self.assertIn("static const scalar_t *tet4_shape()", tet)
-            self.assertIn("static const scalar_t *tet4_grad_ref_z()", tet)
-            self.assertIn("static const scalar_t data[", tet)
-            self.assertIn("scalar_t(", tet)
+            self.assertIn("static const s_t *tet10_shape()", tet)
+            self.assertIn("static const s_t *tet10_grad_ref_z()", tet)
+            self.assertIn("static const s_t *tet4_shape()", tet)
+            self.assertIn("static const s_t *tet4_grad_ref_z()", tet)
+            self.assertIn("static const s_t data[", tet)
+            self.assertIn("s_t(", tet)
             self.assertIn(
-                "field_shape[N_FIELDS] = {sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_shape(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet4_shape()}",
+                "field_shape[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::tet10_shape(), "
+                "sfem::codegen::stokes_isoparametric_reference_data<s_t>::tet4_shape()}",
                 tet,
             )
             self.assertIn(
-                "isoparametric_cell_grad_ref_2 = sfem::codegen::stokes_isoparametric_reference_data<scalar_t>::tet10_grad_ref_z()",
+                "isoparametric_cell_grad_ref_2 = sfem::codegen::stokes_isoparametric_reference_data<s_t>::tet10_grad_ref_z()",
                 tet,
             )
 
@@ -3974,14 +3974,14 @@ int main() {
             self.assertIn("const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];", operator_source)
             self.assertIn("const idx_t node = element_shape[evbegin + lane];", operator_source)
             self.assertIn("out[element_shape[evbegin + scatter] * out_stride]", operator_source)
-            self.assertNotIn("idx_t ev[VECTOR_SIZE * CELL_N_SHAPE]", operator_source)
-            self.assertNotIn("ev[lane * CELL_N_SHAPE", operator_source)
-            self.assertNotIn("ev[scatter * CELL_N_SHAPE", operator_source)
-            self.assertIn("const jacobian_t *const affine_geometry_sources", operator_source)
+            self.assertNotIn("idx_t ev[VS * CELL_NS]", operator_source)
+            self.assertNotIn("ev[lane * CELL_NS", operator_source)
+            self.assertNotIn("ev[scatter * CELL_NS", operator_source)
+            self.assertIn("const g_t *const affine_geometry_sources", operator_source)
             self.assertIn("for (int geometry_stream = 0;", operator_source)
             self.assertIn("block_affine_geometry_streams[geometry_stream]", operator_source)
             self.assertNotIn("block_jacobian_adjugate0_data", operator_source)
-            self.assertNotIn("const scalar_t *const block_jacobian_adjugate0", operator_source)
+            self.assertNotIn("const s_t *const block_jacobian_adjugate0", operator_source)
             self.assertIn("block_direction, mu, block_output", operator_source)
             self.assertNotIn("ContiguousBlockStreams", operator_source)
             self.assertNotIn("block_direction_streams[stream] = block_direction[stream]", operator_source)
@@ -4107,31 +4107,31 @@ int main() {
             ]
 
             for block in (generic_residual, generic_action):
-                self.assertIn("const scalar_t *const SFEM_RESTRICT determinant", block)
-                self.assertIn("const scalar_t *const SFEM_RESTRICT adjugate[9]", block)
-                self.assertIn("const scalar_t *const SFEM_RESTRICT shape", block)
-                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertIn("for (int trial = 0; trial < N_SHAPE; ++trial)", block)
-                self.assertIn("grad_ref_x[q * N_SHAPE + trial]", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT determinant", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT adjugate[9]", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT shape", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertIn("for (int trial = 0; trial < NS; ++trial)", block)
+                self.assertIn("grad_ref_x[q * NS + trial]", block)
                 self.assertIn("test_grad0", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT geom_metric[6]", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT geom_metric[6]", block)
 
             for block in (tet4_residual, tet4_action):
                 self.assertIn("geom_metric00", block)
                 self.assertIn("geom_metric01", block)
                 self.assertIn("geom_metric22", block)
-                self.assertIn("const scalar_t *const SFEM_RESTRICT geom_metric[6]", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT shape", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_z", block)
-                self.assertIn("const scalar_t metric_factor = q_weight[q] * (kappa);", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT geom_metric[6]", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT shape", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
+                self.assertIn("const s_t metric_factor = q_weight[q] * (kappa);", block)
                 self.assertIn("metric_factor * geom_metric[0][geometry_offset]", block)
-                self.assertNotIn("for (int trial = 0; trial < N_SHAPE; ++trial)", block)
-                self.assertNotIn("grad_ref_x[q * N_SHAPE + trial]", block)
+                self.assertNotIn("for (int trial = 0; trial < NS; ++trial)", block)
+                self.assertNotIn("grad_ref_x[q * NS + trial]", block)
                 self.assertNotIn("test_grad0", block)
             self.assertIn(
-                "const scalar_t u_grad_0_ref_value = -(coeff_current_u_0) + coeff_current_u_1;",
+                "const s_t u_grad_0_ref_value = -(coeff_current_u_0) + coeff_current_u_1;",
                 tet4_residual,
             )
             self.assertIn("u_metric_grad_0_ref_value", tet4_residual)
@@ -4147,9 +4147,9 @@ int main() {
             self.assertIn("const idx_t *const SFEM_RESTRICT element_shape = elements[shape];", operator_source)
             self.assertIn("const idx_t node = element_shape[evbegin + lane];", operator_source)
             self.assertIn("out[element_shape[evbegin + scatter] * out_stride]", operator_source)
-            self.assertNotIn("idx_t ev[VECTOR_SIZE * N_SHAPE]", operator_source)
-            self.assertNotIn("ev[lane * N_SHAPE", operator_source)
-            self.assertNotIn("ev[scatter * N_SHAPE", operator_source)
+            self.assertNotIn("idx_t ev[VS * NS]", operator_source)
+            self.assertNotIn("ev[lane * NS", operator_source)
+            self.assertNotIn("ev[scatter * NS", operator_source)
             affine_begin = operator_source.index(
                 "laplace_tet4_residual_affine_mesh_soa_impl"
             )
@@ -4161,13 +4161,13 @@ int main() {
             self.assertIn("for (ptrdiff_t i = 0; i < nelements; ++i)", affine_source)
             self.assertIn("const idx_t ev0 = elements[0][i];", affine_source)
             self.assertIn("const idx_t ev3 = elements[3][i];", affine_source)
-            self.assertIn("const scalar_t metric_factor = kappa;", affine_source)
+            self.assertIn("const s_t metric_factor = kappa;", affine_source)
             self.assertIn(
-                "const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);",
+                "const s_t fff0 = metric_factor * s_t(g_geom_metric0[i]);",
                 affine_source,
             )
             self.assertIn(
-                "const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;",
+                "const s_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;",
                 affine_source,
             )
             self.assertIn("u_out[ev0 * out_stride] += e0;", affine_source)
@@ -4183,7 +4183,7 @@ int main() {
             self.assertIn("laplace_tet4_residual_affine_mesh_soa_aos", operator_source)
             self.assertIn("laplace_tet4_residual_affine_mesh_soa_aos_unit", operator_source)
             self.assertIn(
-                "fff[k] = scalar_t(g_geom_metric[i * 6 + k]);",
+                "fff[k] = s_t(g_geom_metric[i * 6 + k]);",
                 operator_source,
             )
 
@@ -4270,22 +4270,22 @@ int main() {
                 "laplace_d2_simplex_tri3_jacobian_action_block",
             )
             for block in (generic_residual, generic_action):
-                self.assertIn("const scalar_t *const SFEM_RESTRICT determinant", block)
-                self.assertIn("const scalar_t *const SFEM_RESTRICT adjugate[4]", block)
-                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertIn("for (int trial = 0; trial < N_SHAPE; ++trial)", block)
-                self.assertIn("grad_ref_x[q * N_SHAPE + trial]", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT determinant", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT adjugate[4]", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertIn("for (int trial = 0; trial < NS; ++trial)", block)
+                self.assertIn("grad_ref_x[q * NS + trial]", block)
             for block in (tri3_residual, tri3_action):
-                self.assertIn("const scalar_t *const SFEM_RESTRICT geom_metric[3]", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT geom_metric[3]", block)
                 self.assertIn("geom_metric00", block)
                 self.assertIn("geom_metric01", block)
                 self.assertIn("geom_metric11", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
-                self.assertNotIn("for (int trial = 0; trial < N_SHAPE; ++trial)", block)
-                self.assertNotIn("grad_ref_x[q * N_SHAPE + trial]", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("for (int trial = 0; trial < NS; ++trial)", block)
+                self.assertNotIn("grad_ref_x[q * NS + trial]", block)
             self.assertIn(
-                "const scalar_t u_grad_0_ref_value = -(coeff_current_u_0) + coeff_current_u_1;",
+                "const s_t u_grad_0_ref_value = -(coeff_current_u_0) + coeff_current_u_1;",
                 tri3_residual,
             )
             self.assertIn("u_metric_grad_0_ref_value", tri3_residual)
@@ -4309,13 +4309,13 @@ int main() {
             self.assertIn("for (ptrdiff_t i = 0; i < nelements; ++i)", affine_source)
             self.assertIn("const idx_t ev0 = elements[0][i];", affine_source)
             self.assertIn("const idx_t ev2 = elements[2][i];", affine_source)
-            self.assertIn("const scalar_t metric_factor = kappa;", affine_source)
+            self.assertIn("const s_t metric_factor = kappa;", affine_source)
             self.assertIn(
-                "const scalar_t fff0 = metric_factor * scalar_t(g_geom_metric0[i]);",
+                "const s_t fff0 = metric_factor * s_t(g_geom_metric0[i]);",
                 affine_source,
             )
             self.assertIn(
-                "const scalar_t e2 = fff1 * grad0 + fff2 * grad1;",
+                "const s_t e2 = fff1 * grad0 + fff2 * grad1;",
                 affine_source,
             )
             self.assertIn("u_out[ev0 * out_stride] += e0;", affine_source)
@@ -4399,33 +4399,33 @@ int main() {
             )
 
             for block in (generic_objective, generic_gradient, generic_apply):
-                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
-                self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_z", block)
-                self.assertIn("for (int shape = 0; shape < N_SHAPE; ++shape)", block)
-                self.assertIn("grad_ref_x[q * N_SHAPE + shape]", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
+                self.assertIn("for (int shape = 0; shape < NS; ++shape)", block)
+                self.assertIn("grad_ref_x[q * NS + shape]", block)
 
             for block in (tet4_objective, tet4_gradient, tet4_apply):
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_z", block)
-                self.assertNotIn("for (int shape = 0; shape < N_SHAPE; ++shape)", block)
-                self.assertNotIn("grad_ref_x[q * N_SHAPE + shape]", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
+                self.assertNotIn("for (int shape = 0; shape < NS; ++shape)", block)
+                self.assertNotIn("grad_ref_x[q * NS + shape]", block)
 
             self.assertIn(
-                "const scalar_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+                "const s_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
                 tet4_objective,
             )
             self.assertIn(
-                "const scalar_t grad_u_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];",
+                "const s_t grad_u_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];",
                 tet4_gradient,
             )
             self.assertIn(
-                "const scalar_t grad_h_ref0 = -(h_streams[0 * 3 + 0][lane]) + h_streams[1 * 3 + 0][lane];",
+                "const s_t grad_h_ref0 = -(h_streams[0 * 3 + 0][lane]) + h_streams[1 * 3 + 0][lane];",
                 tet4_apply,
             )
             self.assertIn(
-                "const scalar_t grad_h_ref8 = -(h_streams[0 * 3 + 2][lane]) + h_streams[3 * 3 + 2][lane];",
+                "const s_t grad_h_ref8 = -(h_streams[0 * 3 + 2][lane]) + h_streams[3 * 3 + 2][lane];",
                 tet4_apply,
             )
 
@@ -4463,7 +4463,7 @@ int main() {
                 'extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit',
             )
             self.assertIn("g_jacobian_adjugate_aos + element * 9", fast_apply)
-            self.assertIn("const scalar_t q0 = a0 * m5 + a1 * m1 + a2 * m2;", fast_apply)
+            self.assertIn("const s_t q0 = a0 * m5 + a1 * m1 + a2 * m2;", fast_apply)
             self.assertNotIn("block_h_data", fast_apply)
             self.assertNotIn("linear_elasticity_d3_simplex_tet4_apply_block<", fast_apply)
             self.assertIn(
@@ -4553,19 +4553,19 @@ int main() {
                 "linear_elasticity_d2_simplex_tri3_apply_block",
             )
 
-            self.assertIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", generic_apply)
-            self.assertIn("for (int shape = 0; shape < N_SHAPE; ++shape)", generic_apply)
+            self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", generic_apply)
+            self.assertIn("for (int shape = 0; shape < NS; ++shape)", generic_apply)
             for block in (tri3_objective, tri3_gradient, tri3_apply):
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertNotIn("const scalar_t *const SFEM_RESTRICT grad_ref_y", block)
-                self.assertNotIn("for (int shape = 0; shape < N_SHAPE; ++shape)", block)
-                self.assertNotIn("grad_ref_x[q * N_SHAPE + shape]", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("for (int shape = 0; shape < NS; ++shape)", block)
+                self.assertNotIn("grad_ref_x[q * NS + shape]", block)
             self.assertIn(
-                "const scalar_t grad_u_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];",
+                "const s_t grad_u_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];",
                 tri3_objective,
             )
             self.assertIn(
-                "const scalar_t grad_h_ref3 = -(h_streams[0 * 2 + 1][lane]) + h_streams[2 * 2 + 1][lane];",
+                "const s_t grad_h_ref3 = -(h_streams[0 * 2 + 1][lane]) + h_streams[2 * 2 + 1][lane];",
                 tri3_apply,
             )
 
@@ -4698,7 +4698,7 @@ int main() {
                 boundary_context,
             )
             self.assertEqual(len(boundary_signatures), 1)
-            self.assertEqual(boundary_signatures[0].template_parameters[0], "typename scalar_t")
+            self.assertEqual(boundary_signatures[0].template_parameters[0], "typename s_t")
             self.assertIn("shape", boundary_signatures[0].argument_names)
             self.assertIn("output", boundary_signatures[0].argument_names)
             boundary_mesh_signature = gen.OPENMP_SOA_BACKEND.mesh_signature(
@@ -4729,11 +4729,11 @@ int main() {
             with open(source_path, encoding="utf-8") as input_file:
                 source = input_file.read()
 
-        self.assertIn("const scalar_t tx", source)
+        self.assertIn("const s_t tx", source)
         self.assertNotIn("unused", source)
         self.assertNotIn("_old", source)
         self.assertNotIn("_direction", source)
-        self.assertNotRegex(source, r"const (?:real_t|float|scalar_t) u[0-9]")
+        self.assertNotRegex(source, r"const (?:real_t|float|s_t) u[0-9]")
 
     def test_generates_neumann_boundary_integral_kernel(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -4815,7 +4815,7 @@ int main() {
             ) as input_file:
                 proteus_source = input_file.read()
             self.assertIn("neumann_quad4_edgeshell2_boundary_residual_sideset_soa", quad_source)
-            self.assertNotIn("for (int qy = 0; qy < Q; ++qy)", quad_source)
+            self.assertNotIn("for (int qy = 0; qy < NQ1; ++qy)", quad_source)
             self.assertIn("idx_t *proteus_elements[4] = {", quad_source)
             self.assertIn("neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa", quad_source)
             self.assertIn("#pragma omp simd", proteus_quad_source)
@@ -4824,19 +4824,19 @@ int main() {
             self.assertIn("neumann_proteus_hex27_proteus_quadshell9_boundary_residual_soa", proteus_source)
             self.assertIn("#pragma omp simd", source)
             self.assertIn("#pragma omp simd", proteus_source)
-            self.assertIn("static const scalar_t *shape_1d()", source)
-            self.assertIn("static const scalar_t *grad_1d()", source)
-            self.assertIn("static const scalar_t *weight_1d()", source)
-            self.assertIn("static const scalar_t *shape_1d()", proteus_source)
+            self.assertIn("static const s_t *shape_1d()", source)
+            self.assertIn("static const s_t *grad_1d()", source)
+            self.assertIn("static const s_t *weight_1d()", source)
+            self.assertIn("static const s_t *shape_1d()", proteus_source)
             self.assertIn('#include "../../kernel_math.hpp"', source)
-            self.assertIn("for (int qy = 0; qy < Q; ++qy)", source)
-            self.assertIn("for (int qx = 0; qx < Q; ++qx)", source)
+            self.assertIn("for (int qy = 0; qy < NQ1; ++qy)", source)
+            self.assertIn("for (int qx = 0; qx < NQ1; ++qx)", source)
             self.assertIn("const element_idx_t *const SFEM_RESTRICT parent", source)
             self.assertIn("const int16_t *const SFEM_RESTRICT side_idx", source)
             self.assertIn("elements[side_nodes[side * n_shape + i]][parent_element]", source)
-            self.assertIn("const scalar_t coeff0 = -t0;", source)
-            self.assertIn("const scalar_t coeff1 = -t1;", source)
-            self.assertIn("const scalar_t coeff2 = -t2;", source)
+            self.assertIn("const s_t coeff0 = -t0;", source)
+            self.assertIn("const s_t coeff1 = -t1;", source)
+            self.assertIn("const s_t coeff2 = -t2;", source)
             self.assertIn("return sqrt(c0 * c0 + c1 * c1 + c2 * c2);", source)
             self.assertIn(
                 os.path.join("op", "sfem_GeneratedNeumann.cpp"),
@@ -4931,13 +4931,13 @@ int main() {
             with open(source_path, encoding="utf-8") as input_file:
                 source = input_file.read()
 
-        self.assertIn("x0 += scalar_t(points[0][node]) * phi;", source)
-        self.assertIn("x1 += scalar_t(points[1][node]) * phi;", source)
+        self.assertIn("x0 += s_t(points[0][node]) * phi;", source)
+        self.assertIn("x1 += s_t(points[1][node]) * phi;", source)
         self.assertIn('#include "../../kernel_math.hpp"', source)
-        self.assertIn("const scalar_t coeff0 = -pow_2(x0);", source)
-        self.assertIn("const scalar_t coeff1 = -x1;", source)
+        self.assertIn("const s_t coeff0 = -pow_2(x0);", source)
+        self.assertIn("const s_t coeff1 = -x1;", source)
         self.assertNotIn("static SFEM_INLINE T pow_2", source)
-        self.assertNotIn("const scalar_t x0,", source)
+        self.assertNotIn("const s_t x0,", source)
 
     def test_neumann_general_polynomial_order_controls_coefficients(self):
         from ..materials.neumann_general import create_material
@@ -4961,7 +4961,7 @@ int main() {
             with open(source_path, encoding="utf-8") as input_file:
                 source = input_file.read()
 
-        self.assertIn("const scalar_t coeff0 = t0 + t0_010*x1 + t0_100*x0;", source)
+        self.assertIn("const s_t coeff0 = t0 + t0_010*x1 + t0_100*x0;", source)
         self.assertNotIn("pow_2", source)
         self.assertNotIn("t0_020", source)
 

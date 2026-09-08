@@ -66,15 +66,15 @@ class QuadratureLaneKernelTest(unittest.TestCase):
 
     def test_emits_the_expected_loop_nest(self):
         lines = self._render(
-            [BufferDeclNode("const scalar_t", "x", (), expr_ref("current[0][lane]"))]
+            [BufferDeclNode("const s_t", "x", (), expr_ref("current[0][lane]"))]
         )
         self.assertEqual(
             lines,
             [
-                "    for (int q = 0; q < N_QP; ++q) {",
+                "    for (int q = 0; q < NQ; ++q) {",
                 "        #pragma omp simd",
                 "        for (int lane = 0; lane < nelems; ++lane) {",
-                "            const scalar_t x = current[0][lane];",
+                "            const s_t x = current[0][lane];",
                 "        }",
                 "    }",
             ],
@@ -186,16 +186,16 @@ class StatementHelpersProduceNodesTest(unittest.TestCase):
         self.assertEqual(
             residual_codegen._physical_gradient_lines("u", 2, "    "),
             [
-                "    const scalar_t u_grad_0 = (u_grad_0_ref * adj0 + u_grad_1_ref * adj2) / det;",
-                "    const scalar_t u_grad_1 = (u_grad_0_ref * adj1 + u_grad_1_ref * adj3) / det;",
+                "    const s_t u_grad_0 = (u_grad_0_ref * adj0 + u_grad_1_ref * adj2) / det;",
+                "    const s_t u_grad_1 = (u_grad_0_ref * adj1 + u_grad_1_ref * adj3) / det;",
             ],
         )
 
     def test_print_statement_nodes_honours_indent(self):
-        node = BufferDeclNode("const scalar_t", "x", (), expr_ref("y"))
+        node = BufferDeclNode("const s_t", "x", (), expr_ref("y"))
         self.assertEqual(
             residual_codegen._print_statement_nodes([node], "      "),
-            ["      const scalar_t x = y;"],
+            ["      const s_t x = y;"],
         )
 
 

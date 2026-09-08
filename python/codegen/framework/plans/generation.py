@@ -201,7 +201,7 @@ class DataStreamPlan:
     name: str
     role: DataStreamRole
     layout: DataStreamLayout
-    scalar_type: str = "scalar_t"
+    scalar_type: str = "s_t"
     components: int = 1
     n_items: int = 1
     source: str = ""

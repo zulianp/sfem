@@ -43,7 +43,7 @@ class LoopLoweringPolicy:
     supports_shared_memory: bool = False
     lane_index: str = "lane"
     lane_index_type: str = "int"
-    vector_size_symbol: str = "VECTOR_SIZE"
+    vector_size_symbol: str = "VS"
     thread_index: str = "threadIdx.x"
     block_index: str = "blockIdx.x"
     block_dim: str = "blockDim.x"

@@ -219,11 +219,11 @@ def _assignment_lines(assignments, prefix, indent="        "):
         expressions, symbols=sp.numbered_symbols("%s_t" % prefix)
     )
     lines = [
-        "%sconst scalar_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
+        "%sconst s_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
         for symbol, expression in temporaries
     ]
     lines.extend(
-        "%sconst scalar_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
+        "%sconst s_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
         for symbol, expression in zip(symbols, reduced)
     )
     return lines
@@ -239,7 +239,7 @@ def _element_lines(n_nodes, indent="        "):
 def _gather_lines(role, component, n_nodes, wanted, indent="        "):
     """Element gathers for one role, restricted to the values that are read."""
     return [
-        "%sconst scalar_t %s%s_%d = %s%s[ev%d * %s_stride];"
+        "%sconst s_t %s%s_%d = %s%s[ev%d * %s_stride];"
         % (indent, role, name, node, role, name, node, role)
         for name in component
         for node in range(n_nodes)
@@ -249,12 +249,12 @@ def _gather_lines(role, component, n_nodes, wanted, indent="        "):
 
 def _geometry_lines(dim, indent="        "):
     lines = [
-        "%sconst scalar_t adjugate%d = scalar_t(g_jacobian_adjugate%d[element]);"
+        "%sconst s_t adjugate%d = s_t(g_jacobian_adjugate%d[element]);"
         % (indent, index, index)
         for index in range(dim * dim)
     ]
     lines.append(
-        "%sconst scalar_t determinant = scalar_t(g_jacobian_determinant0[element]);"
+        "%sconst s_t determinant = s_t(g_jacobian_determinant0[element]);"
         % indent
     )
     return lines
@@ -262,17 +262,17 @@ def _geometry_lines(dim, indent="        "):
 
 def _geometry_arguments(dim):
     lines = [
-        "        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d," % index
+        "        const g_t *const SFEM_RESTRICT g_jacobian_adjugate%d," % index
         for index in range(dim * dim)
     ]
-    lines.append("        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,")
+    lines.append("        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,")
     return lines
 
 
 def _stream_arguments(role, component):
     lines = ["        const ptrdiff_t %s_stride," % role]
     lines.extend(
-        "        const scalar_t *const SFEM_RESTRICT %s%s," % (role, name)
+        "        const s_t *const SFEM_RESTRICT %s%s," % (role, name)
         for name in component
     )
     return lines
@@ -281,7 +281,7 @@ def _stream_arguments(role, component):
 def _output_arguments(component):
     lines = ["        const ptrdiff_t out_stride,"]
     lines.extend(
-        "        scalar_t *const SFEM_RESTRICT out%s%s"
+        "        s_t *const SFEM_RESTRICT out%s%s"
         % (name, "," if index + 1 < len(component) else "")
         for index, name in enumerate(component)
     )
@@ -326,7 +326,7 @@ def _tangent_lines(
 
     signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
     signature.extend(_geometry_arguments(dim))
-    signature.extend("        const scalar_t %s," % name for name in parameters)
+    signature.extend("        const s_t %s," % name for name in parameters)
     signature.extend(_stream_arguments("u", component))
     signature.extend(_PREVIOUS_STREAMS_BY_USE[bool(used_previous)](component))
     signature.extend(
@@ -338,7 +338,7 @@ def _tangent_lines(
     )
     return _function_lines(
         "%s_inexact_apply_tangent_affine_mesh_soa" % prefix,
-        "template <typename scalar_t, typename jacobian_t, typename tangent_t>",
+        "template <typename s_t, typename g_t, typename tangent_t>",
         signature,
         body,
     )
@@ -349,7 +349,7 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     body = _element_lines(n_nodes)
     body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
     body.extend(
-        "        const scalar_t tangent%d = scalar_t(tangent[%s]);"
+        "        const s_t tangent%d = s_t(tangent[%s]);"
         % (slot, _TANGENT_ADDRESS % slot)
         for slot in range(plan.tangent_components)
     )
@@ -368,7 +368,7 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     signature.extend(_output_arguments(component))
     return _function_lines(
         "%s_inexact_apply_stored_affine_mesh_soa" % prefix,
-        "template <typename scalar_t, typename tangent_t>",
+        "template <typename s_t, typename tangent_t>",
         signature,
         body,
     )
@@ -383,9 +383,9 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     """
     body = _element_lines(n_nodes)
     body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
-    body.append("        const scalar_t scale = scalar_t(scaling[element]);")
+    body.append("        const s_t scale = s_t(scaling[element]);")
     body.extend(
-        "        const scalar_t tangent%d = scalar_t(tangent[%s]);"
+        "        const s_t tangent%d = s_t(tangent[%s]);"
         % (slot, _TANGENT_ADDRESS % slot)
         for slot in range(plan.tangent_components)
     )
@@ -405,7 +405,7 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     signature.extend(_output_arguments(component))
     return _function_lines(
         "%s_inexact_apply_compressed_affine_mesh_soa" % prefix,
-        "template <typename scalar_t, typename tangent_t, typename scale_t>",
+        "template <typename s_t, typename tangent_t, typename scale_t>",
         signature,
         body,
     )

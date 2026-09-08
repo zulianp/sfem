@@ -1270,9 +1270,9 @@ namespace sfem {
     // is earned.
     //
     // It used to be earned per element instead: every scatter walked its
-    // N_SHAPE x N_SHAPE candidates, tested each with a three-condition branch
+    // NS x NS candidates, tested each with a three-condition branch
     // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x N_SHAPE^2) on every assembly for a
+    // region.  That paid O(elements x NS^2) on every assembly for a
     // property of the mesh and the graph together, which cannot change between
     // elements or between calls.  Here it is O(nnz), once.
     //
@@ -2582,9 +2582,9 @@ namespace sfem {
     // is earned.
     //
     // It used to be earned per element instead: every scatter walked its
-    // N_SHAPE x N_SHAPE candidates, tested each with a three-condition branch
+    // NS x NS candidates, tested each with a three-condition branch
     // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x N_SHAPE^2) on every assembly for a
+    // region.  That paid O(elements x NS^2) on every assembly for a
     // property of the mesh and the graph together, which cannot change between
     // elements or between calls.  Here it is O(nnz), once.
     //
@@ -3316,9 +3316,9 @@ namespace sfem {
     // is earned.
     //
     // It used to be earned per element instead: every scatter walked its
-    // N_SHAPE x N_SHAPE candidates, tested each with a three-condition branch
+    // NS x NS candidates, tested each with a three-condition branch
     // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x N_SHAPE^2) on every assembly for a
+    // region.  That paid O(elements x NS^2) on every assembly for a
     // property of the mesh and the graph together, which cannot change between
     // elements or between calls.  Here it is O(nnz), once.
     //
@@ -3763,9 +3763,9 @@ namespace sfem {
     // is earned.
     //
     // It used to be earned per element instead: every scatter walked its
-    // N_SHAPE x N_SHAPE candidates, tested each with a three-condition branch
+    // NS x NS candidates, tested each with a three-condition branch
     // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x N_SHAPE^2) on every assembly for a
+    // region.  That paid O(elements x NS^2) on every assembly for a
     // property of the mesh and the graph together, which cannot change between
     // elements or between calls.  Here it is O(nnz), once.
     //
@@ -5034,7 +5034,7 @@ def _element_api_function_params(source, function_name):
 
 def _element_api_dispatch_function_lines(function_name, operation, suffix, entries, params, material_name):
     lines = [
-        "template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>",
+        "template <typename s_t, int VS = 16, typename elem_type_t>",
         "static SFEM_INLINE int %s(" % function_name,
         "        const elem_type_t element_type%s" % ("," if params else ""),
     ]
@@ -5058,7 +5058,7 @@ def _element_api_dispatch_function_lines(function_name, operation, suffix, entri
         lines.extend(
             [
                 "        case %d:" % _smesh_elem_type_value(_mesh_element_name(entry["element"])),
-                "            return %s<scalar_t, VECTOR_SIZE>(%s);" % (element_function, arg_names),
+                "            return %s<s_t, VS>(%s);" % (element_function, arg_names),
             ]
         )
     lines.extend(

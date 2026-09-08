@@ -115,10 +115,10 @@ QUADRATURE_SCOPE_LINES = {
         "%(indent)s    const int q = 0;  // %(element)s evaluates in closed form",
     ),
     EvaluationStrategy.SUM_FACTORIZED: (
-        "%(indent)sfor (int q = 0; q < N_QP; ++q) {",
+        "%(indent)sfor (int q = 0; q < NQ; ++q) {",
     ),
     EvaluationStrategy.QUADRATURE: (
-        "%(indent)sfor (int q = 0; q < N_QP; ++q) {",
+        "%(indent)sfor (int q = 0; q < NQ; ++q) {",
     ),
 }
 
@@ -129,7 +129,7 @@ def quadrature_scope_lines(element_type, indent=""):
     A lowest-order simplex has one quadrature point and constant basis
     gradients, so the loop has one trip and collapses to the point itself.
     ``const int q = 0`` rather than substituting zero throughout: the bodies
-    index reference tables as ``[q * N_SHAPE + shape]`` at a dozen sites, and
+    index reference tables as ``[q * NS + shape]`` at a dozen sites, and
     the compiler folds that where rewriting each site would not be worth the
     churn.  What leaves the emitted source is the loop.
     """
