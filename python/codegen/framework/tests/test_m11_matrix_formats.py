@@ -553,7 +553,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             result = gen.generate(
                 neohookean_ogden,
                 out_dir,
-                elements=("TRI3",),
+                elements=("TET4",),
                 clean=True,
                 matrix_formats=("crs", "bsr", "block_diag_sym"),
                 matrix_mesh_layouts=("standard", "packed"),
@@ -584,21 +584,21 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
 
             operator_source = (
                 Path(out_dir)
-                / "d2"
-                / "tri3"
-                / "neohookean_ogden_tri3_operator.cpp"
+                / "d3"
+                / "tet4"
+                / "neohookean_ogden_tet4_operator.cpp"
             ).read_text()
             for matrix_format in ("bsr",):
                 self.assertNotIn("_%s_apply_" % matrix_format, operator_source)
             self.assertIn(
-                'extern "C" int neohookean_ogden_tri3_apply_isoparametric_mesh_soa(',
+                'extern "C" int neohookean_ogden_tet4_apply_isoparametric_mesh_soa(',
                 operator_source,
             )
             packed_apply_begin = operator_source.index(
-                "neohookean_ogden_tri3_apply_packed_isoparametric_mesh_soa"
+                "neohookean_ogden_tet4_apply_packed_isoparametric_mesh_soa"
             )
             packed_apply_end = operator_source.index(
-                'extern "C" int neohookean_ogden_tri3_apply_packed_isoparametric_mesh_soa_float',
+                'extern "C" int neohookean_ogden_tet4_apply_packed_isoparametric_mesh_soa_float',
                 packed_apply_begin,
             )
             packed_apply = operator_source[packed_apply_begin:packed_apply_end]
@@ -606,33 +606,33 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             self.assertNotIn("std::malloc", packed_apply)
             self.assertNotIn("std::free", packed_apply)
             self.assertIn(
-                "neohookean_ogden_tri3_hessian_crs_packed_one_pass_isoparametric_mesh_soa",
+                "neohookean_ogden_tet4_hessian_crs_packed_one_pass_isoparametric_mesh_soa",
                 operator_source,
             )
             self.assertIn(
-                "neohookean_ogden_tri3_hessian_crs_packed_two_pass_isoparametric_mesh_soa",
+                "neohookean_ogden_tet4_hessian_crs_packed_two_pass_isoparametric_mesh_soa",
                 operator_source,
             )
             self.assertIn(
-                "neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_packed_global_node",
+                "neohookean_ogden_tet4_hessian_isoparametric_mesh_soa_packed_global_node",
                 operator_source,
             )
             self.assertIn(
-                "neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_scatter_packed_crs_entries",
+                "neohookean_ogden_tet4_hessian_isoparametric_mesh_soa_scatter_packed_crs_entries",
                 operator_source,
             )
             packed_fill_begin = operator_source.index(
-                "neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_packed_fill_impl"
+                "neohookean_ogden_tet4_hessian_isoparametric_mesh_soa_packed_fill_impl"
             )
             packed_fill_end = operator_source.index(
-                'extern "C" int neohookean_ogden_tri3_hessian_crs_isoparametric_mesh_soa',
+                'extern "C" int neohookean_ogden_tet4_hessian_crs_isoparametric_mesh_soa',
                 packed_fill_begin,
             )
             packed_fill = operator_source[packed_fill_begin:packed_fill_end]
             self.assertIn("sfem::codegen::thread_scratch<scalar_t>", packed_fill)
             self.assertNotIn("std::malloc", packed_fill)
             self.assertNotIn("std::free", packed_fill)
-            self.assertIn("neohookean_ogden_d2_simplex_tri3_apply_block", packed_fill)
+            self.assertIn("neohookean_ogden_d3_simplex_tet4_apply_block", packed_fill)
             self.assertIn("scatter_packed_crs_entries(element_matrix, entries, values);", packed_fill)
             self.assertNotIn("find_col", packed_fill)
             hessian_crs_functions = {
@@ -640,11 +640,11 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 for variant in _manifest_runtime_variants(manifest, "hessian_crs")
             }
             self.assertIn(
-                "neohookean_ogden_hessian_crs_packed_one_pass_2d_isoparametric_mesh_soa",
+                "neohookean_ogden_hessian_crs_packed_one_pass_3d_isoparametric_mesh_soa",
                 hessian_crs_functions,
             )
             self.assertIn(
-                "neohookean_ogden_hessian_crs_packed_two_pass_2d_isoparametric_mesh_soa",
+                "neohookean_ogden_hessian_crs_packed_two_pass_3d_isoparametric_mesh_soa",
                 hessian_crs_functions,
             )
 
