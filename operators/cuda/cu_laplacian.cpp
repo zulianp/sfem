@@ -19,6 +19,19 @@ int cu_laplacian_apply(const smesh::ElemType             element_type,
                        void *const SFEM_RESTRICT       y,
                        void                           *stream) {
     if (sfem::is_semistructured_type(element_type)) {
+        if (!smesh::is_hex_ss_family(element_type)) {
+            if (smesh::is_wedge_ss_family(element_type)) {
+                SFEM_ERROR("cu_laplacian_apply: no kernel for WEDGE family (%s); hex-dominant apply is not implemented\n",
+                           type_to_string(element_type));
+            } else if (smesh::is_pyramid_ss_family(element_type)) {
+                SFEM_ERROR("cu_laplacian_apply: no kernel for PYRAMID family (%s); hex-dominant apply is not implemented\n",
+                           type_to_string(element_type));
+            } else {
+                SFEM_ERROR("cu_laplacian_apply: DEVICE SS Laplacian is HEX-family only (got %s)\n",
+                           type_to_string(element_type));
+            }
+            return SFEM_FAILURE;
+        }
         const int level = smesh::semistructured_level(element_type);
         return cu_affine_sshex8_laplacian_apply(level, nelements, elements, fff_stride, fff, real_type_xy, x, y, stream);
     }

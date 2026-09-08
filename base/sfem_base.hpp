@@ -74,6 +74,23 @@
 #define SFEM_FORCE_INLINE
 #endif
 
+// Marks a function as callable from both host and device. Expands to nothing on
+// a host-only compiler, so the same header serves the CPU and CUDA/HIP builds.
+#if defined(__CUDACC__) || defined(__HIPCC__)
+#define SFEM_HOST_DEVICE __host__ __device__
+#else
+#define SFEM_HOST_DEVICE
+#endif
+
+// Beware: SFEM_INLINE above expands to *nothing* unless NDEBUG is set, so it
+// cannot by itself give a header function internal linkage or inline semantics.
+// Device-callable functions defined in headers must therefore be spelled either
+//     static SFEM_INLINE SFEM_HOST_DEVICE ...   (the `static` does the work)
+// or
+//     SFEM_DEVICE_INLINE ...                    (carries a real `inline`)
+// Never rely on `SFEM_INLINE SFEM_HOST_DEVICE` alone.
+#define SFEM_DEVICE_INLINE SFEM_HOST_DEVICE inline
+
 #define SFEM_UNUSED(var) (void)var
 #ifndef _WIN32
 #define SFEM_RESTRICT __restrict__

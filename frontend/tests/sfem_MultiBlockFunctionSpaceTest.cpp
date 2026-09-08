@@ -2,14 +2,18 @@
 
 #include "sfem_FunctionSpace.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_semistructured.hpp"
 
 #include <iostream>
 #include <memory>
+#include <vector>
 
 int test_single_block_mesh() {
     
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     auto space = sfem::FunctionSpace::create(mesh, 1);
+
+    SFEM_TEST_ASSERT(!mesh->is_distributed());
     
     // Test basic properties
     SFEM_TEST_ASSERT(space->n_blocks() == 1);
@@ -33,7 +37,7 @@ int test_single_block_mesh() {
 
 int test_multi_block_fallback() {
     
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     
     // Test with different block sizes
     auto space1 = sfem::FunctionSpace::create(mesh, 1);
@@ -54,7 +58,7 @@ int test_multi_block_fallback() {
 
 int test_semi_structured_promotion() {
     
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
@@ -79,7 +83,7 @@ int test_semi_structured_promotion() {
 
 int test_vector_creation() {
     
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
     ptrdiff_t nlocal, nglobal;
@@ -90,7 +94,7 @@ int test_vector_creation() {
     SFEM_TEST_ASSERT(result == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(values != nullptr);
     SFEM_TEST_ASSERT(nlocal == space->n_dofs());
-    SFEM_TEST_ASSERT(nglobal == space->n_dofs());
+    SFEM_TEST_ASSERT(nglobal == space->n_dofs_global());
     
     // Test vector destruction
     result = space->destroy_vector(values);
@@ -99,29 +103,37 @@ int test_vector_creation() {
     return SFEM_TEST_SUCCESS;
 }
 
-// int test_lor_function_space() {
-    
-//     MPI_Comm comm = MPI_COMM_WORLD;
-//     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
-//     auto space = sfem::FunctionSpace::create(mesh, 1);
-    
-//     // Create LOR function space
-//     auto lor_space = space->lor();
-//     SFEM_TEST_ASSERT(lor_space != nullptr);
-    
-//     // LOR space should have same mesh and block size
-//     SFEM_TEST_ASSERT(lor_space->mesh_ptr() == space->mesh_ptr());
-//     SFEM_TEST_ASSERT(lor_space->block_size() == space->block_size());
-    
-//     // Element type should be different (macro variant)
-//     SFEM_TEST_ASSERT(lor_space->element_type(0) != space->element_type(0));
-    
-//     return SFEM_TEST_SUCCESS;
-// }
+int test_lor_function_space() {
+    auto mesh  = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto space = sfem::FunctionSpace::create(mesh, 1);
+    SFEM_TEST_ASSERT(space->n_blocks() == 2);
+    SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
+    SFEM_TEST_ASSERT(space->element_type(1) == smesh::HEX8);
+
+    auto lor_space = space->lor();
+    SFEM_TEST_ASSERT(lor_space != nullptr);
+    SFEM_TEST_ASSERT(lor_space->mesh_ptr() == space->mesh_ptr());
+    SFEM_TEST_ASSERT(lor_space->block_size() == space->block_size());
+    SFEM_TEST_EQ(lor_space->n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_EQ(lor_space->element_type(0), smesh::HEX8);
+    SFEM_TEST_EQ(lor_space->element_type(1), smesh::HEX8);
+
+    auto mixed       = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto mixed_space = sfem::FunctionSpace::create(mixed, 1);
+    auto mixed_lor   = mixed_space->lor();
+    SFEM_TEST_ASSERT(mixed_lor != nullptr);
+    SFEM_TEST_EQ(mixed_lor->n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_EQ(mixed_lor->element_type(0), mixed_space->element_type(0));
+    SFEM_TEST_EQ(mixed_lor->element_type(1), mixed_space->element_type(1));
+    SFEM_TEST_EQ(mixed_lor->element_type(0), smesh::HEX8);
+    SFEM_TEST_EQ(mixed_lor->element_type(1), smesh::TET4);
+
+    return SFEM_TEST_SUCCESS;
+}
 
 int test_derefine_function_space() {
     
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     mesh = smesh::to_semistructured(2, mesh, true, false);
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
@@ -139,7 +151,7 @@ int test_derefine_function_space() {
 
 int test_edge_cases() {
     
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 1, 1, 1);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 1, 1, 1);
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
     // Test with minimal mesh
@@ -157,19 +169,148 @@ int test_edge_cases() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_checkerboard_function_space() {
+    auto mesh  = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto space = sfem::FunctionSpace::create(mesh, 1);
+
+    SFEM_TEST_ASSERT(space->n_blocks() == 2);
+    SFEM_TEST_ASSERT(space->is_multi_block());
+    SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
+    SFEM_TEST_ASSERT(space->element_type(1) == smesh::HEX8);
+
+    const ptrdiff_t expected = mesh->n_nodes();
+    SFEM_TEST_ASSERT(space->n_dofs() == expected);
+    SFEM_TEST_ASSERT(space->n_owned_dofs() == expected);
+    SFEM_TEST_ASSERT(space->n_dofs_global() == expected);
+
+    auto space3 = sfem::FunctionSpace::create(mesh, 3);
+    SFEM_TEST_ASSERT(space3->n_dofs() == expected * 3);
+    SFEM_TEST_ASSERT(space3->n_owned_dofs() == expected * 3);
+    SFEM_TEST_ASSERT(space3->n_dofs_global() == expected * 3);
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_hex8_tet4_function_space() {
+    auto mesh  = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto space = sfem::FunctionSpace::create(mesh, 1);
+
+    SFEM_TEST_ASSERT(space->n_blocks() == 2);
+    SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
+    SFEM_TEST_ASSERT(space->element_type(1) == smesh::TET4);
+
+    const ptrdiff_t expected = mesh->n_nodes();
+    SFEM_TEST_ASSERT(space->n_dofs() == expected);
+    SFEM_TEST_ASSERT(space->n_owned_dofs() == expected);
+    SFEM_TEST_ASSERT(space->n_dofs_global() == expected);
+    SFEM_TEST_ASSERT(space->n_dofs() != mesh->n_elements());
+
+    auto space3 = sfem::FunctionSpace::create(mesh, 3);
+    SFEM_TEST_ASSERT(space3->n_dofs() == expected * 3);
+    SFEM_TEST_ASSERT(space3->element_type(0) == smesh::HEX8);
+    SFEM_TEST_ASSERT(space3->element_type(1) == smesh::TET4);
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_packed_mesh_function_space() {
+    auto mesh        = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true);
+    SFEM_TEST_ASSERT(packed_mesh != nullptr);
+
+    auto space = sfem::FunctionSpace::create(packed_mesh, 1);
+    SFEM_TEST_ASSERT(space->n_blocks() == 2);
+    SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
+    SFEM_TEST_ASSERT(space->element_type(1) == smesh::HEX8);
+    SFEM_TEST_ASSERT(space->n_dofs() == mesh->n_nodes());
+    SFEM_TEST_ASSERT(space->n_owned_dofs() == mesh->n_nodes());
+    SFEM_TEST_ASSERT(space->n_dofs_global() == mesh->n_nodes());
+
+    auto mixed        = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto packed_mixed = sfem::FunctionSpace::PackedMesh::create(mixed, {}, true);
+    SFEM_TEST_ASSERT(packed_mixed != nullptr);
+    auto mixed_space = sfem::FunctionSpace::create(packed_mixed, 2);
+    SFEM_TEST_ASSERT(mixed_space->n_blocks() == 2);
+    SFEM_TEST_ASSERT(mixed_space->element_type(0) == smesh::HEX8);
+    SFEM_TEST_ASSERT(mixed_space->element_type(1) == smesh::TET4);
+    SFEM_TEST_ASSERT(mixed_space->n_dofs() == mixed->n_nodes() * 2);
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_hex8_tet4_ss_derefine_keeps_ss() {
+    auto mesh = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    SFEM_TEST_ASSERT(mesh != nullptr);
+    auto ss = smesh::to_semistructured(2, mesh, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+    SFEM_TEST_EQ(ss->n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_ASSERT(smesh::is_hex_ss_family(ss->element_type(0)));
+    SFEM_TEST_ASSERT(smesh::is_tet_ss_family(ss->element_type(1)));
+
+    auto space = sfem::FunctionSpace::create(ss, 1);
+    SFEM_TEST_ASSERT(space->has_semi_structured_mesh());
+
+    auto coarse = space->derefine(1);
+    SFEM_TEST_ASSERT(coarse != nullptr);
+    SFEM_TEST_ASSERT(coarse->has_semi_structured_mesh());
+    SFEM_TEST_EQ(coarse->n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_ASSERT(smesh::is_semistructured_type(coarse->element_type(0)));
+    SFEM_TEST_ASSERT(smesh::is_semistructured_type(coarse->element_type(1)));
+    SFEM_TEST_ASSERT(smesh::is_hex_ss_family(coarse->element_type(0)));
+    SFEM_TEST_ASSERT(smesh::is_tet_ss_family(coarse->element_type(1)));
+    SFEM_TEST_ASSERT(coarse->element_type(0) != smesh::HEX8);
+    SFEM_TEST_ASSERT(coarse->element_type(1) != smesh::TET4);
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_checkerboard_ss_node_to_node_graph() {
+    auto hex = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto ss  = smesh::to_semistructured(2, hex, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+    SFEM_TEST_EQ(ss->n_blocks(), static_cast<size_t>(2));
+
+    auto space = sfem::FunctionSpace::create(ss, 1);
+    auto graph = space->node_to_node_graph();
+    SFEM_TEST_ASSERT(graph != nullptr);
+    SFEM_TEST_EQ(graph->n_nodes(), space->n_dofs());
+    SFEM_TEST_ASSERT(graph->nnz() > graph->n_nodes());
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_override_element_types_multi_block() {
+    auto mesh  = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto space = sfem::FunctionSpace::create(mesh, 1, smesh::HEX8);
+
+    SFEM_TEST_ASSERT(space->n_blocks() == 2);
+    SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
+    SFEM_TEST_ASSERT(space->element_type(1) == smesh::HEX8);
+    SFEM_TEST_ASSERT(space->n_dofs() == mesh->n_nodes());
+    SFEM_TEST_ASSERT(space->n_owned_dofs() == mesh->n_nodes());
+    SFEM_TEST_ASSERT(space->n_dofs_global() == mesh->n_nodes());
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-    
-    
+
     SFEM_RUN_TEST(test_single_block_mesh);
     SFEM_RUN_TEST(test_multi_block_fallback);
     SFEM_RUN_TEST(test_semi_structured_promotion);
     SFEM_RUN_TEST(test_vector_creation);
-    // SFEM_RUN_TEST(test_lor_function_space); // TODO: Implement LOR function space
+    SFEM_RUN_TEST(test_lor_function_space);
     SFEM_RUN_TEST(test_derefine_function_space);
     SFEM_RUN_TEST(test_edge_cases);
-    
-    
+    SFEM_RUN_TEST(test_checkerboard_function_space);
+    SFEM_RUN_TEST(test_hex8_tet4_function_space);
+    SFEM_RUN_TEST(test_packed_mesh_function_space);
+    SFEM_RUN_TEST(test_hex8_tet4_ss_derefine_keeps_ss);
+    SFEM_RUN_TEST(test_checkerboard_ss_node_to_node_graph);
+    SFEM_RUN_TEST(test_override_element_types_multi_block);
+
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
-} 
+}
+

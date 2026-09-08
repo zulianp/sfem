@@ -1,0 +1,72 @@
+# The same scenario with inertia, through sfem::BDF2InertiaPotential.
+#
+# Quasi-static is the right regime for a relaxation experiment and is the default, but the
+# release is a step change and a real body rings after one. dt is an order of magnitude
+# smaller here and the run much shorter, because the interesting time scale is now the
+# oscillation rather than the relaxation.
+#
+# Note that the inertia term also regularises the tangent, which is how the defects this
+# spike found stayed hidden in SFEM's own dynamic tests. Do not gate the operator on this.
+
+mesh: mesh
+verbose: false
+material:
+  C10: 0.3
+  C01: 0.05
+  K: 50.0
+  prony:
+  - g: 0.4
+    tau: 1.0
+  - g: 0.3
+    tau: 10.0
+  wlf:
+    enabled: false
+time:
+  dt: 0.05
+  t_end: 6.0
+dynamics:
+  type: bdf2
+  density: 1.0
+torsion:
+  sideset: mesh/surface/sidesets/right
+  axis: x
+  rotation_center:
+  - 0.0
+  - 0.1
+  - 0.1
+  angle: 0.6
+  ramp_time: 1.0
+  release:
+    mode: free
+    time: 3.0
+solver:
+  newton:
+    max_it: 300
+    tol: 1.0e-08
+    alpha: 1.0
+    line_search: true
+  linear:
+    type: cg
+    rtol: 1.0e-10
+    max_it: 4000
+    preconditioner: true
+output:
+  path: results_bdf2
+  export_freq: 4
+  control_point:
+  - 1.0
+  - 0.2
+  - 0.2
+  history_csv: history.csv
+dirichlet_conditions:
+- type: sideset
+  format: file
+  path: mesh/surface/sidesets/left
+  value:
+  - 0
+  - 0
+  - 0
+  component:
+  - 0
+  - 1
+  - 2

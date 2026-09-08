@@ -1,0 +1,11 @@
+dirichlet_conditions:
+  - type: sideset
+    format: file
+    path: "{mesh}/surface/sidesets/theta0"
+    value: 0
+    component: 1
+  - type: sideset
+    format: file
+    path: "{mesh}/surface/sidesets/theta90"
+    value: 0
+    component: 0

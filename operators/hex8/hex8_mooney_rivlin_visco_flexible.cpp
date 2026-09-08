@@ -715,10 +715,16 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
         }
 
         // Extract diagonal
+        // The element matrix is component-major: the generated kernels index it as
+        // (comp * 8 + node), which is what hex8_local_to_global_bsr3 reads back and what
+        // affine_hex8_linear_elasticity_diag uses. Indexing it as (node * 3 + comp) still lands
+        // inside the 24 diagonal entries, so it returns the right set of values assigned to the
+        // wrong degrees of freedom -- a permutation that preserves the trace and silently
+        // degrades every diagonal preconditioner built from it.
         for (int v = 0; v < 8; ++v) {
-            eoutx[v] = element_matrix[(v * 3 + 0) * 24 + (v * 3 + 0)];
-            eouty[v] = element_matrix[(v * 3 + 1) * 24 + (v * 3 + 1)];
-            eoutz[v] = element_matrix[(v * 3 + 2) * 24 + (v * 3 + 2)];
+            eoutx[v] = element_matrix[(0 * 8 + v) * 24 + (0 * 8 + v)];
+            eouty[v] = element_matrix[(1 * 8 + v) * 24 + (1 * 8 + v)];
+            eoutz[v] = element_matrix[(2 * 8 + v) * 24 + (2 * 8 + v)];
         }
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {

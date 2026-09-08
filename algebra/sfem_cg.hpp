@@ -12,66 +12,10 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
 #include "sfem_openmp_blas.hpp"
-
-#ifdef _OPENMP
-#include <omp.h>
-#endif
+#include "sfem_openmp_cg_impl.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
-
-    namespace cg_host_ {
-
-        // x ← x + alpha p;  r ← r − alpha Ap;  return (r, r)
-        template <typename T>
-        static T update_x_r_and_rtr(const ptrdiff_t n,
-                                    const T         alpha,
-                                    const T* const  p,
-                                    const T* const  Ap,
-                                    T* const        x,
-                                    T* const        r) {
-            T rtr = 0;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+ : rtr)
-#endif
-            for (ptrdiff_t i = 0; i < n; i++) {
-                x[i] += alpha * p[i];
-                const T ri = r[i] - alpha * Ap[i];
-                r[i]       = ri;
-                rtr += ri * ri;
-            }
-            return rtr;
-        }
-
-        // x ← x + alpha p;  r ← r − alpha Ap  (no residual reduction)
-        template <typename T>
-        static void update_x_r(const ptrdiff_t n,
-                               const T         alpha,
-                               const T* const  p,
-                               const T* const  Ap,
-                               T* const        x,
-                               T* const        r) {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-            for (ptrdiff_t i = 0; i < n; i++) {
-                x[i] += alpha * p[i];
-                r[i] -= alpha * Ap[i];
-            }
-        }
-
-        // p ← z + beta p
-        template <typename T>
-        static void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p) {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-            for (ptrdiff_t i = 0; i < n; i++) {
-                p[i] = z[i] + beta * p[i];
-            }
-        }
-
-    }  // namespace cg_host_
 
     template <typename T>
     static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
@@ -84,6 +28,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>> preconditioner_op;
 
         std::shared_ptr<BLAS<T>> blas;
+        CG_Tpl<T>                impl;
 
         std::function<void(T*)> interceptor;
 
@@ -98,8 +43,8 @@ namespace sfem {
         // If true, apply_op / preconditioner overwrite their output.
         // Default false: most ops accumulate (y += Ax).
         bool           apply_overwrites_output{false};
-        // Host: fuse x/r/(r,r) and p updates. Set false to use separate BLAS calls (A/B baseline).
-        bool           host_fusion{true};
+        // Use fused CG vector kernels from impl (OpenMP / CUDA). Set false for separate BLAS baseline.
+        bool           fusion{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
@@ -114,7 +59,10 @@ namespace sfem {
 
         void set_apply_overwrites_output(const bool val) { apply_overwrites_output = val; }
 
-        void set_host_fusion(const bool val) { host_fusion = val; }
+        void set_fusion(const bool val) { fusion = val; }
+
+        /// \deprecated Use set_fusion
+        void set_host_fusion(const bool val) { set_fusion(val); }
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -176,10 +124,11 @@ namespace sfem {
 
         void default_init() {
             blas             = make_openmp_blas<T>();
+            OpenMP_CG<T>::build(impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        bool good() const { return blas->good() && apply_op; }
+        bool good() const { return blas && blas->good() && apply_op && (!fusion || impl.good()); }
 
         void monitor(const int iter, const T residual, const T relative_residual, const T alpha) {
             if (!verbose) return;
@@ -221,7 +170,7 @@ namespace sfem {
         T*        work_Ap_{nullptr};
         ptrdiff_t work_n_{-1};
 
-        bool use_host_kernels() const { return host_fusion && execution_space_ == EXECUTION_SPACE_HOST; }
+        bool use_fusion() const { return fusion && impl.good(); }
 
         void ensure_apply_buffer(const ptrdiff_t n, T* const y) const {
             if (!apply_overwrites_output) {
@@ -277,11 +226,11 @@ namespace sfem {
                      T* const        x,
                      T* const        r,
                      const bool      with_rtr) const {
-            if (use_host_kernels()) {
+            if (use_fusion()) {
                 if (with_rtr) {
-                    return cg_host_::update_x_r_and_rtr(n, alpha, p, Ap, x, r);
+                    return impl.update_x_r_and_rtr(n, alpha, p, Ap, x, r);
                 }
-                cg_host_::update_x_r(n, alpha, p, Ap, x, r);
+                impl.update_x_r(n, alpha, p, Ap, x, r);
                 return T(0);
             }
 
@@ -291,8 +240,8 @@ namespace sfem {
         }
 
         void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p) const {
-            if (use_host_kernels()) {
-                cg_host_::update_p(n, beta, z, p);
+            if (use_fusion()) {
+                impl.update_p(n, beta, z, p);
             } else {
                 blas->axpby(n, T(1), z, beta, p);
             }
@@ -339,7 +288,7 @@ namespace sfem {
                 assert(rtr != 0);
                 assert(rtr == rtr);
 
-                // Fuse x/r updates + (r,r) into one host pass
+                // Fuse x/r updates + (r,r) into one backend pass
                 const T rtr_new = update_x_r(n, alpha, p, Ap, x, r, true);
                 const T beta    = rtr_new / rtr;
                 rtr             = rtr_new;
@@ -454,4 +403,3 @@ namespace sfem {
 }  // namespace sfem
 
 #endif  // SFEM_CG_HPP
-

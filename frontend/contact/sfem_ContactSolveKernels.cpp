@@ -105,7 +105,7 @@ namespace sfem {
                                const real_t* const SFEM_RESTRICT                      agumentation,
                                const real_t* const* const SFEM_RESTRICT               normals,
                                const real_t* const SFEM_RESTRICT                      mass,
-                               const real_t                                           penalty,
+                               const real_t* const SFEM_RESTRICT penalty,
                                const ptrdiff_t                                        in_stride,
                                const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
                                real_t* const                                          macaulay) {
@@ -142,7 +142,7 @@ namespace sfem {
                 }
 
                 const real_t normal_diff = n0[i] * (in0[dof1] - u20) + n1[i] * (in1[dof1] - u21) + n2[i] * (in2[dof1] - u22);
-                macaulay[i]              = std::max(normal_diff - distances[i] + agumentation[i] / penalty, real_t(0));
+                macaulay[i]              = std::max(normal_diff - distances[i] + agumentation[i] / penalty[i], real_t(0));
             }
         } else {
 #pragma omp parallel for
@@ -168,14 +168,14 @@ namespace sfem {
                     normal_diff += normals[d][i] * (in[d][dof1] - u2);
                 }
 
-                macaulay[i] = std::max(normal_diff - distances[i] + agumentation[i] / penalty, real_t(0));
+                macaulay[i] = std::max(normal_diff - distances[i] + agumentation[i] / penalty[i], real_t(0));
             }
         }
     }
 
     void assemble_contact_gradient(const int                                dim,
                                    const ptrdiff_t                          nnodes,
-                                   const real_t                             penalty,
+                                   const real_t* const SFEM_RESTRICT penalty,
                                    const count_t* const SFEM_RESTRICT       cm_rowptr,
                                    const idx_t* const SFEM_RESTRICT         cm_colidx,
                                    const real_t* const SFEM_RESTRICT        cm_vals,
@@ -206,7 +206,7 @@ namespace sfem {
             real_t force[3] = {0, 0, 0};
             for (int d = 0; d < dim; d++) {
                 // Point-force we scale it by the mass-density at the contact point
-                force[d] = mass[i] * penalty * macaulay[i] * normal[d];
+                force[d] = mass[i] * penalty[i] * macaulay[i] * normal[d];
             }
 
             for (int d = 0; d < dim; d++) {
@@ -232,7 +232,7 @@ namespace sfem {
                                              const real_t* const SFEM_RESTRICT        agumentation,
                                              const real_t* const* const SFEM_RESTRICT normals,
                                              const real_t* const SFEM_RESTRICT        mass,
-                                             const real_t                             penalty,
+                                             const real_t* const SFEM_RESTRICT penalty,
                                              const real_t* const SFEM_RESTRICT        macaulay,
                                              //  Output
                                              const ptrdiff_t                                  diag_stride,
@@ -256,7 +256,7 @@ namespace sfem {
             real_t nnT[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
             for (int d1 = 0; d1 < dim; d1++) {
                 for (int d2 = 0; d2 < dim; d2++) {
-                    nnT[d1 * dim + d2] = mass[i] * penalty * normal[d1] * normal[d2];
+                    nnT[d1 * dim + d2] = mass[i] * penalty[i] * normal[d1] * normal[d2];
                 }
             }
 
@@ -283,7 +283,7 @@ namespace sfem {
                                              const real_t* const SFEM_RESTRICT                cm_vals,
                                              const real_t* const* const SFEM_RESTRICT         normals,
                                              const real_t* const SFEM_RESTRICT                mass,
-                                             const real_t                                     penalty,
+                                             const real_t* const SFEM_RESTRICT penalty,
                                              const real_t* const SFEM_RESTRICT                active,
                                              const ptrdiff_t                                  diag_stride,
                                              real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values) {
@@ -309,7 +309,7 @@ namespace sfem {
             const count_t row_end   = cm_rowptr[i + 1];
             if (row_begin == row_end) continue;
 
-            const real_t s  = mass[i] * penalty;
+            const real_t s  = mass[i] * penalty[i];
             const real_t n0 = nx[i];
             const real_t n1 = ny[i];
             const real_t n2 = nz[i];
@@ -364,7 +364,7 @@ namespace sfem {
                                const real_t* const SFEM_RESTRICT                      cm_vals,
                                const real_t* const* const SFEM_RESTRICT               normals,
                                const real_t* const SFEM_RESTRICT                      mass,
-                               const real_t                                           penalty,
+                               const real_t* const SFEM_RESTRICT penalty,
                                const real_t* const SFEM_RESTRICT                      macaulay,
                                const ptrdiff_t                                        in_stride,
                                const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
@@ -412,7 +412,7 @@ namespace sfem {
             real_t applied[3] = {0, 0, 0};
             for (int d = 0; d < dim; d++) {
                 // Point-applied we scale it by the density at the contact point
-                applied[d] = penalty * mass[i] * normal_diff * normal[d];
+                applied[d] = penalty[i] * mass[i] * normal_diff * normal[d];
             }
 
             for (int d = 0; d < dim; d++) {
@@ -436,7 +436,7 @@ namespace sfem {
                              const real_t* const SFEM_RESTRICT        cm_vals,
                              const real_t* const* const SFEM_RESTRICT normals,
                              const real_t* const SFEM_RESTRICT        mass,
-                             const real_t                             penalty,
+                             const real_t* const SFEM_RESTRICT penalty,
                              const real_t* const SFEM_RESTRICT        macaulay,
                              const count_t* const SFEM_RESTRICT       rowptr,
                              const idx_t* const SFEM_RESTRICT         colidx,
@@ -454,7 +454,7 @@ namespace sfem {
                 const count_t contact_end   = cm_rowptr[i + 1];
                 if (contact_begin == contact_end) continue;
 
-                const real_t s  = penalty * mass[i];
+                const real_t s  = penalty[i] * mass[i];
                 const real_t n0 = nx[i];
                 const real_t n1 = ny[i];
                 const real_t n2 = nz[i];
@@ -510,7 +510,7 @@ namespace sfem {
                 const count_t contact_end   = cm_rowptr[i + 1];
                 if (contact_begin == contact_end) continue;
 
-                const real_t s = penalty * mass[i];
+                const real_t s = penalty[i] * mass[i];
                 real_t       b[9];
                 for (int d1 = 0; d1 < dim; ++d1) {
                     const real_t sn = s * normals[d1][i];
@@ -567,7 +567,7 @@ namespace sfem {
                                const real_t* const* const SFEM_RESTRICT normals,
                                const real_t* const SFEM_RESTRICT        mass,
                                const real_t* const SFEM_RESTRICT        active,
-                               const real_t                             penalty,
+                               const real_t* const SFEM_RESTRICT penalty,
                                const real_t* const SFEM_RESTRICT        x,
                                real_t* const SFEM_RESTRICT              y) {
         assert(dim == 3);
@@ -607,7 +607,7 @@ namespace sfem {
             const real_t n0 = nx[i];
             const real_t n1 = ny[i];
             const real_t n2 = nz[i];
-            const real_t s  = a * penalty * mass[i] * (n0 * (x10 - x20) + n1 * (x11 - x21) + n2 * (x12 - x22));
+            const real_t s  = a * penalty[i] * mass[i] * (n0 * (x10 - x20) + n1 * (x11 - x21) + n2 * (x12 - x22));
             const real_t f0 = s * n0;
             const real_t f1 = s * n1;
             const real_t f2 = s * n2;
@@ -751,16 +751,29 @@ namespace sfem {
         }
     }
 
+    // `reference` may be null, in which case the undeformed configuration is used.
     void contact_gather_displacement(const int                                        dim,
                                      const ptrdiff_t                                  n_contact,
                                      const idx_t* const SFEM_RESTRICT                 node_mapping,
                                      const real_t* const SFEM_RESTRICT                in,
+                                     const real_t* const SFEM_RESTRICT                reference,
                                      real_t* const SFEM_RESTRICT* const SFEM_RESTRICT out) {
+        if (!reference) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                const ptrdiff_t dof = node_mapping[i] * dim;
+                for (int d = 0; d < dim; ++d) {
+                    out[d][i] = in[dof + d];
+                }
+            }
+            return;
+        }
+
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n_contact; ++i) {
             const ptrdiff_t dof = node_mapping[i] * dim;
             for (int d = 0; d < dim; ++d) {
-                out[d][i] = in[dof + d];
+                out[d][i] = in[dof + d] - reference[dof + d];
             }
         }
     }
@@ -788,7 +801,7 @@ namespace sfem {
                                  const real_t* const SFEM_RESTRICT        agumentation,
                                  const real_t* const* const SFEM_RESTRICT normals,
                                  const real_t* const SFEM_RESTRICT        mass,
-                                 const real_t                             penalty,
+                                 const real_t* const SFEM_RESTRICT penalty,
                                  const real_t* const SFEM_RESTRICT        disp,
                                  const real_t* const SFEM_RESTRICT        inc,
                                  const int                                nsteps,
@@ -797,9 +810,6 @@ namespace sfem {
         SFEM_TRACE_SCOPE("contact_objective_steps");
 
         if (nsteps <= 0) return;
-
-        const real_t half_penalty = real_t(0.5) * penalty;
-        const real_t inv_penalty  = real_t(1) / penalty;
 
         if (dim == 3) {
             const real_t* const n0 = normals[0];
@@ -846,11 +856,12 @@ namespace sfem {
                             nx * (disp[dof1 + 0] - d20) + ny * (disp[dof1 + 1] - d21) + nz * (disp[dof1 + 2] - d22);
                     const real_t inc_normal =
                             nx * (inc[dof1 + 0] - c20) + ny * (inc[dof1 + 1] - c21) + nz * (inc[dof1 + 2] - c22);
-                    const real_t m     = mass[i];
-                    const real_t aug   = agumentation[i];
-                    const real_t shift = -distances[i] + aug * inv_penalty;
-                    const real_t c     = -real_t(0.5) * m * aug * aug * inv_penalty;
-                    const real_t scale = m * half_penalty;
+                    const real_t m           = mass[i];
+                    const real_t aug         = agumentation[i];
+                    const real_t inv_penalty = real_t(1) / penalty[i];
+                    const real_t shift       = -distances[i] + aug * inv_penalty;
+                    const real_t c           = -real_t(0.5) * m * aug * aug * inv_penalty;
+                    const real_t scale       = m * real_t(0.5) * penalty[i];
 
                     for (int s = 0; s < nsteps; ++s) {
                         const real_t v = disp_normal + steps[s] * inc_normal + shift;
@@ -898,11 +909,12 @@ namespace sfem {
                         inc_normal += normal * (inc[dof1 + d] - inc_secondary);
                     }
 
-                    const real_t m     = mass[i];
-                    const real_t aug   = agumentation[i];
-                    const real_t shift = -distances[i] + aug * inv_penalty;
-                    const real_t c     = -real_t(0.5) * m * aug * aug * inv_penalty;
-                    const real_t scale = m * half_penalty;
+                    const real_t m           = mass[i];
+                    const real_t aug         = agumentation[i];
+                    const real_t inv_penalty = real_t(1) / penalty[i];
+                    const real_t shift       = -distances[i] + aug * inv_penalty;
+                    const real_t c           = -real_t(0.5) * m * aug * aug * inv_penalty;
+                    const real_t scale       = m * real_t(0.5) * penalty[i];
 
                     for (int s = 0; s < nsteps; ++s) {
                         const real_t v = disp_normal + steps[s] * inc_normal + shift;
@@ -925,7 +937,7 @@ namespace sfem {
     public:
         std::shared_ptr<ContactData> cd;
 
-        real_t penalty{100};
+        SharedBuffer<real_t> penalty;
         int    n_loops{10};
         bool   enable_augmentation{false};
         real_t relaxation_parameter{1. / 3};
@@ -996,6 +1008,8 @@ namespace sfem {
             assert(constraints_mask);
 
             const idx_t* const nm        = cd->surface->node_mapping()->data();
+            const real_t* const reference =
+                    cd->reference_displacement ? cd->reference_displacement->data() : nullptr;
             auto               cm        = cd->coupling_matrix;
             const count_t*     cm_rowptr = cm->row_ptr->data();
             const idx_t*       cm_colidx = cm->col_idx->data();
@@ -1031,7 +1045,7 @@ namespace sfem {
                 const real_t* const eg = material_grad->data();
                 const real_t* const ed = elast_diag_values->data();
 
-                contact_gather_displacement(dim, n_contact, nm, x->data(), displacement->data());
+                contact_gather_displacement(dim, n_contact, nm, x->data(), reference, displacement->data());
 
                 blas->values(contact_grad->size(), 0, contact_grad->data());
                 for (int d = 0; d < dim * dim; ++d) {
@@ -1047,14 +1061,14 @@ namespace sfem {
                                       aug,
                                       normals,
                                       mass,
-                                      penalty,
+                                      penalty->data(),
                                       1,
                                       displacement->data(),
                                       macaulay->data());
 
                 assemble_contact_gradient(dim,
                                           n_contact,
-                                          penalty,
+                                          penalty->data(),
                                           cm_rowptr,
                                           cm_colidx,
                                           cm_vals,
@@ -1074,7 +1088,7 @@ namespace sfem {
                                                     aug,
                                                     normals,
                                                     mass,
-                                                    penalty,
+                                                    penalty->data(),
                                                     macaulay->data(),
                                                     1,
                                                     diag_values->data());
@@ -1220,7 +1234,7 @@ namespace sfem {
 
                 real_t* const aug = cd->agumentation->data();
                 if ((loop + 1) % each == 0 && enable_augmentation) {
-                    contact_gather_displacement(dim, n_contact, nm, x->data(), displacement->data());
+                    contact_gather_displacement(dim, n_contact, nm, x->data(), reference, displacement->data());
                     compute_macaulay_term(dim,
                                           n_contact,
                                           cm_rowptr,
@@ -1230,7 +1244,7 @@ namespace sfem {
                                           aug,
                                           normals,
                                           mass,
-                                          penalty,
+                                          penalty->data(),
                                           1,
                                           displacement->data(),
                                           macaulay->data());
@@ -1238,7 +1252,7 @@ namespace sfem {
                     const real_t* const m = macaulay->data();
 #pragma omp parallel for
                     for (ptrdiff_t i = 0; i < n_contact; ++i) {
-                        aug[i] = penalty * m[i];
+                        aug[i] = penalty->data()[i] * m[i];
                     }
                 }
             }
@@ -1250,7 +1264,20 @@ namespace sfem {
 
     void ContactJacobi::smooth(const SharedBuffer<real_t>& x) { impl_->smooth(x); }
 
-    void ContactJacobi::set_penalty(real_t penalty) { impl_->penalty = penalty; }
+    void ContactJacobi::set_penalty(const SharedBuffer<real_t>& penalty) { impl_->penalty = penalty; }
+
+    void ContactJacobi::set_penalty(const real_t penalty) {
+        const ptrdiff_t n    = impl_->cd->surface->node_mapping()->size();
+        auto            buff = sfem::create_buffer<real_t>(n, impl_->cd->f->execution_space());
+        real_t* const   d    = buff->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            d[i] = penalty;
+        }
+
+        impl_->penalty = buff;
+    }
 
     void ContactJacobi::set_n_loops(int n_loops) { impl_->n_loops = n_loops; }
 

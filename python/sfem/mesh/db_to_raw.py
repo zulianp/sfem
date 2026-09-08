@@ -16,6 +16,26 @@ except NameError:
     real_t = np.float64
 
 
+def flatten_cell_data(data, cells, elem_type_filter):
+    """meshio cell_data is a list of arrays, one per cell block."""
+    if data is None:
+        return None
+    if isinstance(data, np.ndarray) and data.dtype != object:
+        return np.asarray(data)
+
+    seq = data if isinstance(data, (list, tuple)) else [data]
+    parts = []
+    for i, block in enumerate(cells):
+        if elem_type_filter is not None and block.type != elem_type_filter:
+            continue
+        if i >= len(seq):
+            break
+        parts.append(np.asarray(seq[i]))
+    if not parts:
+        return None
+    return np.concatenate(parts, axis=0)
+
+
 def db_to_raw(argv):
     if len(argv) < 3:
         print(f"usage: {argv[0]} <input_mesh> <output_folder>")
@@ -132,14 +152,14 @@ def db_to_raw(argv):
 
     print("Cell data:")
     for key in mesh.cell_data:
-        print(f"\t- {key}")
-        data = mesh.cell_data[key]
-        # pdb.set_trace()
-        try:
-            d = data[:].astype(real_t)
-            d.tofile(f"{cell_data}/{key}.raw")
-        except:
-            print(f"Unable to convert {key}")
+        arr = flatten_cell_data(mesh.cell_data[key], mesh.cells, elem_type_filter)
+        if arr is None:
+            print(f"\t- {key} (unable to convert)")
+            continue
+        d = np.ascontiguousarray(arr.astype(real_t, copy=False))
+        path = f"{cell_data}/{key}.raw"
+        d.tofile(path)
+        print(f"\t- {key} {arr.shape} {arr.dtype} -> {path}")
 
 
 if __name__ == "__main__":

@@ -64,6 +64,21 @@ namespace sfem {
                          geom_t **const SFEM_RESTRICT points,
                          real_t *const SFEM_RESTRICT  gap) override;
 
+        // Local assembly only (no lumped-mass divide / unit normalize). MPI callers
+        // scatter-add then finish the average themselves.
+        int sample_normals_accumulate(smesh::ElemType              element_type,
+                                      const ptrdiff_t              nelements,
+                                      const ptrdiff_t              nnodes,
+                                      idx_t **const SFEM_RESTRICT  elements,
+                                      geom_t **const SFEM_RESTRICT points,
+                                      real_t **const SFEM_RESTRICT normals);
+        int sample_value_accumulate(smesh::ElemType              element_type,
+                                    const ptrdiff_t              nelements,
+                                    const ptrdiff_t              nnodes,
+                                    idx_t **const SFEM_RESTRICT  elements,
+                                    geom_t **const SFEM_RESTRICT points,
+                                    real_t *const SFEM_RESTRICT  gap);
+
         static std::shared_ptr<SDFObstacle> create_from_file(const std::shared_ptr<Communicator>& comm,
                                                              const std::string        &path,
                                                              const enum ExecutionSpace es);

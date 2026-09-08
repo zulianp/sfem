@@ -2,20 +2,175 @@
 
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"
+#include "smesh_ssedge_restriction.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
 #include "smesh_ssquad4_restriction.hpp"
+#include "smesh_sstet4.hpp"
+#include "smesh_sstri_restriction.hpp"
 
 #include "lumped_ptdp.hpp"
 
 #include "smesh_device_buffer.hpp"
+#include "smesh_exchange.hpp"
+
+#include <algorithm>
+#include <cstring>
+#include <unordered_map>
+#include <vector>
 
 #ifdef SFEM_ENABLE_CUDA
 // #include "cu_ssquad4_interpolate.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
+#include "sfem_cuda_blas.hpp"
+#include "sfem_ssmgc_kernels.hpp"
 #endif
 
 namespace sfem {
+    static bool is_root_rank(const std::shared_ptr<Communicator> &comm) { return !comm || comm->rank() == 0; }
+
+    // Packed 3x3 SPD block: [xx, xy, xz, yy, yz, zz]. hessian_diag is AOS (xx,yy,zz) per node.
+    static void pack_nodal_diag_to_block_sym6(const ptrdiff_t      n_nodes,
+                                              const real_t *const  d3,
+                                              real_t *const        d6,
+                                              const ExecutionSpace es) {
+        if (n_nodes <= 0 || !d3 || !d6) {
+            return;
+        }
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            pack_nodal_diag_to_block_sym6_device(n_nodes, d3, d6);
+            return;
+        }
+#endif
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+            d6[i * 6 + 0] = d3[i * 3 + 0];
+            d6[i * 6 + 1] = real_t(0);
+            d6[i * 6 + 2] = real_t(0);
+            d6[i * 6 + 3] = d3[i * 3 + 1];
+            d6[i * 6 + 4] = real_t(0);
+            d6[i * 6 + 5] = d3[i * 3 + 2];
+        }
+    }
+
+    static void refill_block_jacobi_diag(const std::shared_ptr<Function> &f,
+                                         const real_t *const              x,
+                                         const SharedBuffer<real_t>      &block6,
+                                         const SharedBuffer<real_t>      &scratch3,
+                                         const ExecutionSpace             es) {
+        if (!block6) {
+            return;
+        }
+        if (f->is_linear()) {
+            f->hessian_block_diag_sym(x, block6->data());
+            return;
+        }
+        if (!scratch3 || !x) {
+            return;
+        }
+        auto b = sfem::blas<real_t>(es);
+        b->zeros(scratch3->size(), scratch3->data());
+        f->hessian_diag(x, scratch3->data());
+        pack_nodal_diag_to_block_sym6(static_cast<ptrdiff_t>(block6->size() / 6), scratch3->data(), block6->data(), es);
+    }
+
+    static bool hierarchical_state_is_prefix(const std::shared_ptr<FunctionSpace> &fine,
+                                             const std::shared_ptr<FunctionSpace> &coarse) {
+        if (!fine || !coarse) {
+            return false;
+        }
+        if (mesh_is_mpi(fine->mesh_ptr())) {
+            return false;
+        }
+        return coarse->n_owned_dofs() <= fine->n_owned_dofs();
+    }
+
+    static void inject_fine_state_host(const std::shared_ptr<FunctionSpace> &fine_space,
+                                       const std::shared_ptr<FunctionSpace> &coarse_space,
+                                       const real_t *const                   x_fine,
+                                       real_t *const                         x_coarse) {
+        const int       bs             = fine_space->block_size();
+        const ptrdiff_t n_coarse_dofs  = coarse_space->n_dofs();
+        const ptrdiff_t n_coarse_nodes = n_coarse_dofs / bs;
+
+        auto fm = fine_space->mesh_ptr();
+        auto cm = coarse_space->mesh_ptr();
+        if (!mesh_is_mpi(fm) || !cm || !cm->distributed() || !fm->distributed() || !fm->distributed()->node_mapping() ||
+            !cm->distributed()->node_mapping()) {
+            auto b = sfem::blas<real_t>(EXECUTION_SPACE_HOST);
+            b->zeros(n_coarse_dofs, x_coarse);
+            b->copy(n_coarse_dofs, x_fine, x_coarse);
+            return;
+        }
+
+        auto b = sfem::blas<real_t>(EXECUTION_SPACE_HOST);
+        b->zeros(n_coarse_dofs, x_coarse);
+
+        const ptrdiff_t n_fine_local   = fm->n_nodes();
+        const ptrdiff_t n_coarse_local = cm->n_nodes();
+        const ptrdiff_t n_coarse_owned = coarse_space->n_owned_dofs() / bs;
+        auto            fmap           = fm->distributed()->node_mapping()->data();
+        auto            cmap           = cm->distributed()->node_mapping()->data();
+
+        std::unordered_map<smesh::large_idx_t, idx_t> gid_to_fine;
+        gid_to_fine.reserve(static_cast<size_t>(n_fine_local));
+        for (ptrdiff_t i = 0; i < n_fine_local; ++i) {
+            gid_to_fine.emplace(fmap[i], static_cast<idx_t>(i));
+        }
+
+        for (ptrdiff_t j = 0; j < n_coarse_local && j < n_coarse_nodes; ++j) {
+            auto it = gid_to_fine.find(cmap[j]);
+            if (it == gid_to_fine.end()) {
+                if (j < n_coarse_owned) {
+                    SFEM_ERROR("NL SPMG: coarse owned node %ld has no fine local counterpart\n", (long)j);
+                }
+                continue;
+            }
+            const ptrdiff_t fi = it->second;
+            for (int d = 0; d < bs; ++d) {
+                x_coarse[j * bs + d] = x_fine[fi * bs + d];
+            }
+        }
+
+        auto ex = smesh::Exchange::create_nodal(cm, smesh::Exchange::ExchangeScope::GhostsAndAura);
+        if (ex) {
+            ex->gather(x_coarse, bs);
+        }
+    }
+
+    static void inject_fine_state(const std::shared_ptr<FunctionSpace> &fine_space,
+                                  const std::shared_ptr<FunctionSpace> &coarse_space,
+                                  const real_t *const                   x_fine,
+                                  real_t *const                         x_coarse,
+                                  const ExecutionSpace                  es) {
+        if (!fine_space || !coarse_space || !x_fine || !x_coarse) {
+            return;
+        }
+
+        if (hierarchical_state_is_prefix(fine_space, coarse_space)) {
+            auto            b             = sfem::blas<real_t>(es);
+            const ptrdiff_t n_coarse_dofs = coarse_space->n_dofs();
+            b->copy(n_coarse_dofs, x_fine, x_coarse);
+            return;
+        }
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            auto            fm    = fine_space->mesh_ptr();
+            const int       bs    = fine_space->block_size();
+            const ptrdiff_t n_f   = static_cast<ptrdiff_t>(fm->n_nodes()) * bs;
+            const ptrdiff_t n_c   = coarse_space->n_dofs();
+            auto            x_f_h = sfem::create_host_buffer<real_t>(n_f);
+            auto            x_c_h = sfem::create_host_buffer<real_t>(n_c);
+            device_to_host(static_cast<size_t>(n_f), x_fine, x_f_h->data());
+            inject_fine_state_host(fine_space, coarse_space, x_f_h->data(), x_c_h->data());
+            host_to_device(static_cast<size_t>(n_c), x_c_h->data(), x_coarse);
+            return;
+        }
+#endif
+        inject_fine_state_host(fine_space, coarse_space, x_fine, x_coarse);
+    }
     std::shared_ptr<ShiftedPenalty<real_t>> create_shifted_penalty(const std::shared_ptr<Function>         &f,
                                                                    const std::shared_ptr<ContactConditions> contact_conds,
 
@@ -113,8 +268,8 @@ namespace sfem {
 
         void check() {
             for (auto &l : levels) {
-                if (l->mapping->size() != l->count->size()) {
-                    SFEM_ERROR("Mapping and count inconsistent sizes! %ld != %ld\n", l->mapping->size(), l->count->size());
+                if (l->count && l->mapping->size() > static_cast<ptrdiff_t>(l->count->size())) {
+                    SFEM_ERROR("Mapping larger than incidence count! %ld > %ld\n", l->mapping->size(), (long)l->count->size());
                 }
             }
 
@@ -128,14 +283,171 @@ namespace sfem {
             }
         }
 
+        static ptrdiff_t surface_n_nodes(const SharedBuffer<idx_t *> &sides, const ptrdiff_t n_owned) {
+            if (!sides || sides->extent(1) == 0) {
+                return n_owned;
+            }
+            const ptrdiff_t max_id = sfem::ss_elements_max_node_id(sides);
+            if (max_id < 0) {
+                return n_owned;
+            }
+            const ptrdiff_t n_geom = max_id + 1;
+            return n_geom > n_owned ? n_geom : n_owned;
+        }
+
+        static ptrdiff_t owned_prefix_from_sides(const SharedBuffer<idx_t *> &sides, const ptrdiff_t n_owned) {
+            if (n_owned <= 0 || !sides || sides->extent(1) == 0) {
+                return 0;
+            }
+            ptrdiff_t n_prefix = 0;
+            auto      data     = sides->data();
+            for (int r = 0; r < static_cast<int>(sides->extent(0)); ++r) {
+                for (ptrdiff_t e = 0; e < sides->extent(1); ++e) {
+                    const idx_t id = data[r][e];
+                    if (id >= 0 && static_cast<ptrdiff_t>(id) < n_owned && static_cast<ptrdiff_t>(id) + 1 > n_prefix) {
+                        n_prefix = static_cast<ptrdiff_t>(id) + 1;
+                    }
+                }
+            }
+            return n_prefix;
+        }
+
+        static std::shared_ptr<Operator<T>> maybe_pad_surface_restrict(const std::shared_ptr<Operator<T>> &op,
+                                                                       const ptrdiff_t                     n_from_owned,
+                                                                       const ptrdiff_t                     n_from_geom,
+                                                                       const ptrdiff_t                     n_to_owned,
+                                                                       const ptrdiff_t                     n_to_geom,
+                                                                       const int                           block_size,
+                                                                       const ExecutionSpace                es) {
+            if (n_from_geom == n_from_owned && n_to_geom == n_to_owned) {
+                return op;
+            }
+            auto from_pad = create_host_buffer<T>(n_from_geom * block_size);
+            auto to_pad   = create_host_buffer<T>(n_to_geom * block_size);
+            return make_op<T>(
+                    n_to_owned * block_size,
+                    n_from_owned * block_size,
+                    [=](const T *const x, T *const y) {
+                        std::memset(from_pad->data(), 0, sizeof(T) * static_cast<size_t>(n_from_geom * block_size));
+                        if (n_from_owned > 0) {
+                            std::memcpy(from_pad->data(), x, sizeof(T) * static_cast<size_t>(n_from_owned * block_size));
+                        }
+                        std::memset(to_pad->data(), 0, sizeof(T) * static_cast<size_t>(n_to_geom * block_size));
+                        op->apply(from_pad->data(), to_pad->data());
+                        if (n_to_owned > 0) {
+                            std::memcpy(y, to_pad->data(), sizeof(T) * static_cast<size_t>(n_to_owned * block_size));
+                        }
+                    },
+                    es);
+        }
+
+        static SharedBuffer<idx_t> filter_owned_volume_idx(const SharedBuffer<idx_t> &mapping, const ptrdiff_t n_owned) {
+            if (!mapping || mapping->size() == 0 || n_owned <= 0) {
+                return mapping;
+            }
+            auto            md          = mapping->data();
+            const ptrdiff_t n           = mapping->size();
+            ptrdiff_t       first_ghost = n;
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                if (md[i] >= n_owned) {
+                    first_ghost = i;
+                    break;
+                }
+            }
+            for (ptrdiff_t i = first_ghost; i < n; ++i) {
+                if (md[i] < n_owned) {
+                    SFEM_ERROR("create_ssmgc: coarse contact mapping is not an owned prefix (idx %ld is owned after ghost)\n",
+                               (long)i);
+                }
+            }
+            if (first_ghost == n) {
+                return mapping;
+            }
+            return view(mapping, 0, first_ghost);
+        }
+
+        static SharedBuffer<idx_t> remap_contact_mapping_to_coarse(const SharedBuffer<idx_t>            &fine_mapping,
+                                                                   const ptrdiff_t                       n_coarse_contact,
+                                                                   const std::shared_ptr<FunctionSpace> &fine_space,
+                                                                   const std::shared_ptr<FunctionSpace> &coarse_space) {
+            if (n_coarse_contact <= 0) {
+                return create_host_buffer<idx_t>(0);
+            }
+            if (static_cast<ptrdiff_t>(fine_mapping->size()) < n_coarse_contact) {
+                SFEM_ERROR("create_ssmgc: fine mapping size %ld smaller than coarse contact nodes %ld\n",
+                           (long)fine_mapping->size(),
+                           (long)n_coarse_contact);
+            }
+
+            auto       fm  = fine_space ? fine_space->mesh_ptr() : nullptr;
+            auto       cm  = coarse_space ? coarse_space->mesh_ptr() : nullptr;
+            const bool mpi = fm && fm->is_distributed() && fm->comm() && fm->comm()->size() > 1 && fm->distributed() &&
+                             fm->distributed()->node_mapping() && cm && cm->is_distributed() && cm->distributed() &&
+                             cm->distributed()->node_mapping();
+            if (!mpi) {
+                return view(fine_mapping, 0, n_coarse_contact);
+            }
+
+            const ptrdiff_t n_fine_local   = fm->n_nodes();
+            const ptrdiff_t n_coarse_local = cm->n_nodes();
+            auto            fmap           = fm->distributed()->node_mapping()->data();
+            auto            cmap           = cm->distributed()->node_mapping()->data();
+
+            std::unordered_map<smesh::large_idx_t, idx_t> gid_to_coarse;
+            gid_to_coarse.reserve(static_cast<size_t>(n_coarse_local));
+            for (ptrdiff_t j = 0; j < n_coarse_local; ++j) {
+                gid_to_coarse.emplace(cmap[j], static_cast<idx_t>(j));
+            }
+
+            auto out     = create_host_buffer<idx_t>(n_coarse_contact);
+            auto od      = out->data();
+            auto fm_data = fine_mapping->data();
+            for (ptrdiff_t i = 0; i < n_coarse_contact; ++i) {
+                const idx_t fl = fm_data[i];
+                if (fl < 0 || static_cast<ptrdiff_t>(fl) >= n_fine_local) {
+                    SFEM_ERROR("create_ssmgc: fine contact mapping index %ld is out of range (n_nodes=%ld)\n",
+                               (long)fl,
+                               (long)n_fine_local);
+                }
+                auto it = gid_to_coarse.find(fmap[fl]);
+                if (it == gid_to_coarse.end()) {
+                    SFEM_ERROR("create_ssmgc: coarse contact node is missing on the derefined mesh (fine local %ld)\n", (long)fl);
+                }
+                od[i] = it->second;
+            }
+            return out;
+        }
+
+        static void zero_sbv_data(const std::shared_ptr<SparseBlockVector<T>> &sbv) {
+            auto data = sbv->data();
+#ifdef SFEM_ENABLE_CUDA
+            if (data->mem_space() == MEMORY_SPACE_DEVICE) {
+                d_memset(data->data(), 0, data->size() * sizeof(T));
+                return;
+            }
+#endif
+            std::memset(data->data(), 0, data->size() * sizeof(T));
+        }
+
         void restrict_contact_constraints() {
             SFEM_TRACE_SCOPE("SPMG::restrict_contact_constraints");
             const int nlevels = levels.size();
             for (int i = 1; i < nlevels; i++) {
                 auto fine   = levels[i - 1];
                 auto coarse = levels[i];
+                // Surface restriction accumulates with += / atomicAdd.
+                zero_sbv_data(coarse->sbv);
                 restrict_sbv[i - 1]->apply(fine->sbv->data()->data(), coarse->sbv->data()->data());
             }
+        }
+
+        void rebuild_contact_constraints() {
+            SFEM_TRACE_SCOPE("SPMG::rebuild_contact_constraints");
+            // Keep penalty SBV normals consistent with live constraint ops after NL obstacle update.
+            auto fine = levels[0];
+            zero_sbv_data(fine->sbv);
+            contact_conds->hessian_block_diag_sym(nullptr, fine->sbv->data()->data());
+            restrict_contact_constraints();
         }
 
         void init_discretization(const std::shared_ptr<Function> f) {
@@ -170,28 +482,8 @@ namespace sfem {
 
         int update_contact(const T *const disp) {
             SFEM_TRACE_SCOPE("SPMG::update_contact");
-            auto                      f  = levels[0]->function;
-            const enum ExecutionSpace es = f->execution_space();
-
-#ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == es) {
-                // FIXME avoid copies from/to device
-
-                auto wdisp = Buffer<const T>::wrap(f->space()->n_dofs(), disp, MEMORY_SPACE_DEVICE);
-                auto hdisp = smesh::to_host(wdisp);
-
-                contact_conds->update(hdisp->data());
-
-                auto hg = sfem::create_host_buffer<T>(upper_bound->size());
-                contact_conds->update_signed_distance(hdisp->data(), hg->data());
-                buffer_host_to_device(hg->size() * sizeof(T), (void *)hg->data(), (void *)upper_bound->data());
-            } else
-#endif
-            {
-                contact_conds->update(disp);
-                contact_conds->update_signed_distance(disp, upper_bound->data());
-            }
-
+            contact_conds->update(disp);
+            contact_conds->update_signed_distance(disp, upper_bound->data());
             return SFEM_SUCCESS;
         }
 
@@ -200,19 +492,14 @@ namespace sfem {
             contact_conds->init();
             linear_constraints_op           = contact_conds->linear_constraints_op();
             linear_constraints_op_transpose = contact_conds->linear_constraints_op_transpose();
-            upper_bound = sfem::create_buffer<T>(contact_conds->n_constrained_dofs(), sfem::MEMORY_SPACE_HOST);
 
+            const ExecutionSpace es = levels[0]->function->execution_space();
+            upper_bound             = sfem::create_buffer<T>(contact_conds->n_constrained_dofs(), es);
             contact_conds->signed_distance(upper_bound->data());
-            const ExecutionSpace es             = levels[0]->function->execution_space();
-            const int            block_size     = levels[0]->function->space()->block_size();
-            const int            sym_block_size = (block_size == 3 ? 6 : 3);
-            const int            nlevels        = levels.size();
 
-#ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == es) {
-                upper_bound = smesh::to_device(upper_bound);
-            }
-#endif
+            const int block_size     = levels[0]->function->space()->block_size();
+            const int sym_block_size = (block_size == 3 ? 6 : 3);
+            const int nlevels        = levels.size();
 
             std::vector<std::shared_ptr<Buffer<idx_t *>>> host_sides;
             {
@@ -245,20 +532,53 @@ namespace sfem {
                 const int coarse_level =
                         coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(coarse_space->mesh()) : 1;
 
-                auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
-                coarse->sides     = coarse_sides;
+                auto coarse_sides = fine->sides;
+                {
+                    const auto fam = smesh::ss_source_family(fine_space->element_type());
+                    if (fam == smesh::TET4) {
+                        coarse_sides = sfem::sstri_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
+                    } else if (fam == smesh::QUAD4) {
+                        coarse_sides = sfem::ssedge_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
+                    } else {
+                        coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
+                    }
+                }
+                coarse->sides = coarse_sides;
                 host_sides.push_back(coarse->sides);
 
-                const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
-                coarse->mapping                        = sfem::view(fine->mapping, 0, n_coarse_contact_nodes);
+                const ptrdiff_t n_fine_owned           = fine->mapping->size();
+                const ptrdiff_t n_coarse_contact_nodes = owned_prefix_from_sides(coarse_sides, n_fine_owned);
+                coarse->mapping =
+                        remap_contact_mapping_to_coarse(fine->mapping, n_coarse_contact_nodes, fine_space, coarse_space);
+                {
+                    auto cm = coarse_space->mesh_ptr();
+                    if (cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1 && cm->distributed()) {
+                        coarse->mapping = filter_owned_volume_idx(coarse->mapping, cm->distributed()->n_nodes_owned());
+                    }
+                }
 
                 auto coarse_normal_prod =
                         sfem::create_buffer<T>(sym_block_size * coarse->mapping->size(), sfem::MEMORY_SPACE_HOST);
                 coarse->sbv = sfem::create_sparse_block_vector(coarse->mapping, coarse_normal_prod);
 
-                fine->count = sfem::create_host_buffer<uint16_t>(fine->mapping->size());
-                smesh::ssquad4_element_node_incidence_count(
-                        level, 1, fine->sides->extent(1), host_sides[i - 1]->data(), fine->count->data());
+                const ptrdiff_t n_from_geom = surface_n_nodes(fine->sides, n_fine_owned);
+                const ptrdiff_t n_to_owned  = coarse->mapping->size();
+                const ptrdiff_t n_to_geom   = surface_n_nodes(coarse_sides, n_to_owned);
+
+                fine->count = sfem::create_host_buffer<uint16_t>(n_from_geom);
+                {
+                    const auto fam = smesh::ss_source_family(fine_space->element_type());
+                    if (fam == smesh::TET4) {
+                        smesh::sstri_element_node_incidence_count(
+                                level, 1, fine->sides->extent(1), host_sides[i - 1]->data(), fine->count->data());
+                    } else if (fam == smesh::QUAD4) {
+                        smesh::ssedge_element_node_incidence_count(
+                                level, 1, fine->sides->extent(1), host_sides[i - 1]->data(), fine->count->data());
+                    } else {
+                        smesh::ssquad4_element_node_incidence_count(
+                                level, 1, fine->sides->extent(1), host_sides[i - 1]->data(), fine->count->data());
+                    }
+                }
 
 #ifdef SFEM_ENABLE_CUDA
                 if (es == EXECUTION_SPACE_DEVICE) {
@@ -268,29 +588,33 @@ namespace sfem {
                 }
 #endif
 
-                restrict_sbv.push_back(make_op(smesh::SurfaceRestrict<real_t>::create(level,
-                                                                                      fine_space->element_type(),
-                                                                                      fine->mapping->size(),
-                                                                                      fine->sides,
-                                                                                      fine->count,
-                                                                                      coarse_level,
-                                                                                      coarse_space->element_type(),
-                                                                                      coarse->mapping->size(),
-                                                                                      coarse->sides,
-                                                                                      es,
-                                                                                      sym_block_size)));
+                auto sbv_rest = make_op(smesh::SurfaceRestrict<real_t>::create(level,
+                                                                               fine_space->element_type(),
+                                                                               n_from_geom,
+                                                                               fine->sides,
+                                                                               fine->count,
+                                                                               coarse_level,
+                                                                               coarse_space->element_type(),
+                                                                               n_to_geom,
+                                                                               coarse->sides,
+                                                                               es,
+                                                                               sym_block_size));
+                restrict_sbv.push_back(maybe_pad_surface_restrict(
+                        sbv_rest, n_fine_owned, n_from_geom, n_to_owned, n_to_geom, sym_block_size, es));
 
-                restrict_penalization.push_back(make_op(smesh::SurfaceRestrict<real_t>::create(level,
-                                                                                               fine_space->element_type(),
-                                                                                               fine->mapping->size(),
-                                                                                               fine->sides,
-                                                                                               fine->count,
-                                                                                               coarse_level,
-                                                                                               coarse_space->element_type(),
-                                                                                               coarse->mapping->size(),
-                                                                                               coarse->sides,
-                                                                                               es,
-                                                                                               1)));
+                auto pen_rest = make_op(smesh::SurfaceRestrict<real_t>::create(level,
+                                                                               fine_space->element_type(),
+                                                                               n_from_geom,
+                                                                               fine->sides,
+                                                                               fine->count,
+                                                                               coarse_level,
+                                                                               coarse_space->element_type(),
+                                                                               n_to_geom,
+                                                                               coarse->sides,
+                                                                               es,
+                                                                               1));
+                restrict_penalization.push_back(
+                        maybe_pad_surface_restrict(pen_rest, n_fine_owned, n_from_geom, n_to_owned, n_to_geom, 1, es));
             }
         }
 
@@ -308,8 +632,8 @@ namespace sfem {
             bool enable_mixed_precision             = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", true);
 
             bool collect_energy_norm_correction = true;
-            bool coarse_solver_verbose          = false;
-            bool debug                          = false;
+            bool coarse_solver_verbose          = smesh::Env::read("SFEM_COARSE_SOLVER_VERBOSE", false);
+            bool debug                          = smesh::Env::read("SFEM_SSMGC_DEBUG", false);
             bool enable_shift                   = true;
             bool enable_line_search             = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", false);
             bool project_coarse_correction      = false;
@@ -321,7 +645,7 @@ namespace sfem {
             int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 4);
             int    max_it               = smesh::Env::read("SFEM_MAX_IT", 100);
             int    nlsmooth_steps       = smesh::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
-            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 400000);
+            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 40000);
             real_t omega_factor         = smesh::Env::read("SFEM_OMEGA_FACTOR", 100.);
             real_t stagnation_threshold = smesh::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
 
@@ -333,7 +657,7 @@ namespace sfem {
                     "SFEM_MAX_PENALTY_PARAM", (enable_mixed_precision ? (is_double ? 1e5 : 1e4) : (is_double ? 1e6 : 1e4)));
             real_t penalty_param          = smesh::Env::read("SFEM_PENALTY_PARAM", 1e4);
             real_t penalty_param_increase = 10;
-            real_t coarse_rtol            = 1e-6;
+            real_t coarse_rtol            = smesh::Env::read("SFEM_COARSE_RTOL", 1e-6);
 
             std::string coarse_op_type = smesh::Env::read_string(
                     "SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? op_type::BSR : op_type::MATRIX_FREE);
@@ -341,7 +665,9 @@ namespace sfem {
             std::string fine_op_type = op_type::MATRIX_FREE;
 
             if (in) {
-                printf("SPMG: Reading Input\n");
+                if (is_root_rank(f->space()->mesh_ptr()->comm())) {
+                    printf("SPMG: Reading Input\n");
+                }
                 in->get("atol", atol);
                 in->get("rtol", rtol);
                 in->get("coarse_linear_smoothing_steps", coarse_linear_smoothing_steps);
@@ -376,8 +702,38 @@ namespace sfem {
             const int block_size     = fs->block_size();
             const int sym_block_size = (block_size == 3 ? 6 : 3);
 
+            // Assembled BSR is serial-only. MPI coarse contact must be matrix-free so the
+            // coarse solver is ParallelCG with allocation-sized (owned+ghost) buffers.
+            if (fs->mesh_ptr()->comm() && fs->mesh_ptr()->comm()->size() > 1) {
+                if (coarse_op_type == op_type::BSR || coarse_op_type == op_type::BSR_SYM) {
+                    coarse_op_type = op_type::MATRIX_FREE;
+                }
+            }
+
+            const bool nonlinear = !f->is_linear();
+            if (nonlinear) {
+                coarse_op_type = op_type::MATRIX_FREE;
+                fine_op_type   = op_type::MATRIX_FREE;
+            }
+
             std::vector<std::shared_ptr<Operator<real_t>>>               operators;
             std::vector<std::shared_ptr<MatrixFreeLinearSolver<real_t>>> smoothers_or_solver;
+            std::vector<SharedBuffer<real_t>>                            jacobi_block6(nlevels);
+            std::vector<SharedBuffer<real_t>>                            jacobi_scratch3(nlevels);
+
+            auto fill_jacobi_diag = [&](const int li, const std::shared_ptr<Function> &fi) {
+                auto fsi          = fi->space();
+                jacobi_block6[li] = sfem::create_buffer<real_t>(fsi->n_dofs() / fsi->block_size() * sym_block_size, es);
+                if (nonlinear) {
+                    jacobi_scratch3[li] = sfem::create_buffer<real_t>(fsi->n_dofs(), es);
+                    auto x0             = sfem::create_buffer<real_t>(fsi->n_dofs(), es);
+                    auto b              = sfem::blas<real_t>(es);
+                    b->zeros(x0->size(), x0->data());
+                    refill_block_jacobi_diag(fi, x0->data(), jacobi_block6[li], jacobi_scratch3[li], es);
+                } else {
+                    fi->hessian_block_diag_sym(nullptr, jacobi_block6[li]->data());
+                }
+            };
 
             for (int i = 0; i < nlevels - 1; i++) {
                 auto fi        = levels[i]->function;
@@ -385,33 +741,34 @@ namespace sfem {
                 auto linear_op = sfem::create_linear_operator(fine_op_type.c_str(), fi, nullptr, es);
                 operators.push_back(linear_op);
 
-                auto diag = sfem::create_buffer<real_t>(fsi->n_dofs() / fsi->block_size() * sym_block_size, es);
-                auto mask = sfem::create_buffer<mask_t>(mask_count(fsi->n_dofs()), es);
+                if (block_size == 3) {
+                    auto mask = sfem::create_buffer<mask_t>(mask_count(fsi->n_dofs()), es);
 
-                fi->constraints_mask(mask->data());
-                fi->hessian_block_diag_sym(nullptr, diag->data());
+                    fi->constraints_mask(mask->data());
+                    fill_jacobi_diag(i, fi);
 
-                std::shared_ptr<sfem::Operator<real_t>> sj;
+                    std::shared_ptr<sfem::Operator<real_t>> sj;
+                    if (enable_mixed_precision) {
+                        sj = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(
+                                fsi->block_size(), jacobi_block6[i], mask, es);
+                    } else {
+                        sj = sfem::create_shiftable_block_sym_jacobi(fsi->block_size(), jacobi_block6[i], mask, es);
+                    }
 
-                if (enable_mixed_precision) {
-                    sj = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(
-                            fsi->block_size(), diag, mask, es);
+                    auto smoother = sfem::create_stationary<real_t>(linear_op, sj, es);
+                    if (i == 0) {
+                        smoother->set_max_it(linear_smoothing_steps);
+                        smoother->use_arg_as_first_residual = true;
+                    } else {
+                        smoother->set_max_it(coarse_linear_smoothing_steps);
+                    }
+                    smoothers_or_solver.push_back(smoother);
                 } else {
-                    sj = sfem::create_shiftable_block_sym_jacobi(fsi->block_size(), diag, mask, es);
+                    auto smoother     = sfem::create_cg<real_t>(linear_op, es);
+                    smoother->verbose = false;
+                    smoother->set_max_it(i == 0 ? linear_smoothing_steps : coarse_linear_smoothing_steps);
+                    smoothers_or_solver.push_back(smoother);
                 }
-
-                auto smoother = sfem::create_stationary<real_t>(linear_op, sj, es);
-
-                if (i == 0) {
-                    smoother->set_max_it(linear_smoothing_steps);
-
-                    // Avoid recomputing the residual and just apply preconditioner
-                    smoother->use_arg_as_first_residual = true;
-                } else {
-                    smoother->set_max_it(coarse_linear_smoothing_steps);
-                }
-
-                smoothers_or_solver.push_back(smoother);
             }
 
             // ----------------------------------
@@ -422,39 +779,56 @@ namespace sfem {
             auto linear_op = sfem::create_linear_operator(coarse_op_type.c_str(), f_coarse, nullptr, es);
             operators.push_back(linear_op);
 
-            // Coarse-grid solver
-            auto coarse_solver = sfem::create_cg<real_t>(operators.back(), es);
-            coarse_solver->set_max_it(max_coarse_it);
-            coarse_solver->verbose = coarse_solver_verbose;
-            coarse_solver->set_rtol(coarse_rtol);
-
-            if (enable_coarse_space_preconditioner) {
-                auto f_coarse  = levels.back()->function;
+            // Coarse-grid solver. MPI uses ParallelCG on matrix-free A; serial uses CG on BSR.
+            // Both get the same block-Jacobi PC so the coarse correction matches serial rates.
+            std::shared_ptr<sfem::Operator<real_t>> sj_coarse;
+            if (enable_coarse_space_preconditioner && block_size == 3) {
                 auto fs_coarse = f_coarse->space();
-                auto diag      = sfem::create_buffer<real_t>(fs_coarse->n_dofs() / fs_coarse->block_size() * sym_block_size, es);
-                f_coarse->hessian_block_diag_sym(nullptr, diag->data());
+                fill_jacobi_diag(nlevels - 1, f_coarse);
 
                 auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
                 f_coarse->constraints_mask(mask->data());
 
-                std::shared_ptr<sfem::Operator<real_t>> sj_coarse;
                 if (enable_mixed_precision) {
                     sj_coarse = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(
-                            fs_coarse->block_size(), diag, mask, es);
+                            fs_coarse->block_size(), jacobi_block6[nlevels - 1], mask, es);
                 } else {
-                    sj_coarse = sfem::create_shiftable_block_sym_jacobi(fs_coarse->block_size(), diag, mask, es);
+                    sj_coarse = sfem::create_shiftable_block_sym_jacobi(
+                            fs_coarse->block_size(), jacobi_block6[nlevels - 1], mask, es);
                 }
+            }
 
-                coarse_solver->set_preconditioner_op(sj_coarse);
+            std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> coarse_solver;
+            auto coarse_pop = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(linear_op);
+            if (coarse_pop && coarse_pop->comm() && coarse_pop->comm()->size() > 1) {
+                auto pcg = sfem::create_parallel_cg<real_t>(coarse_pop);
+                pcg->set_max_it(max_coarse_it);
+                pcg->verbose = coarse_solver_verbose;
+                pcg->set_rtol(coarse_rtol);
+                if (sj_coarse) {
+                    pcg->set_preconditioner_op(sj_coarse);
+                }
+                coarse_solver = pcg;
+            } else {
+                auto cg = sfem::create_cg<real_t>(operators.back(), es);
+                cg->set_max_it(max_coarse_it);
+                cg->verbose = coarse_solver_verbose;
+                cg->set_rtol(coarse_rtol);
+                if (sj_coarse) {
+                    cg->set_preconditioner_op(sj_coarse);
+                }
+                coarse_solver = cg;
             }
 
             smoothers_or_solver.push_back(coarse_solver);
 
-            for (int i = 0; i < nlevels; i++) {
-                auto s = levels[i]->function->space();
-                printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(s->mesh()) : 1);
+            if (is_root_rank(fs->mesh_ptr()->comm())) {
+                for (int i = 0; i < nlevels; i++) {
+                    auto s = levels[i]->function->space();
+                    printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(s->mesh()) : 1);
 
-                levels[i]->function->describe(std::cout);
+                    levels[i]->function->describe(std::cout);
+                }
             }
 
             mg = std::make_shared<ShiftedPenaltyMultigrid<real_t>>();
@@ -514,7 +888,7 @@ namespace sfem {
                 auto prolongation = sfem::make_op<real_t>(
                         prolong_unconstr->rows(),
                         prolong_unconstr->cols(),
-                        [prolong_unconstr, f = levels.back()->function](const real_t *const from, real_t *const to) {
+                        [prolong_unconstr, f = levels[nlevels - 2]->function](const real_t *const from, real_t *const to) {
                             prolong_unconstr->apply(from, to);
                             f->apply_zero_constraints(to);
                         },
@@ -536,6 +910,62 @@ namespace sfem {
 #endif
             {
                 mg->default_init();
+            }
+
+            mg->set_nodal_block_size(block_size);
+            for (int i = 0; i < nlevels; i++) {
+                auto                             mesh = levels[i]->function->space()->mesh_ptr();
+                std::shared_ptr<smesh::Exchange> ex;
+                if (mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1) {
+                    ex = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
+                }
+                mg->add_level_exchange(ex);
+                auto f = levels[i]->function;
+                mg->add_level_apply_zero_constraints([f](real_t *const x) { f->apply_zero_constraints(x); });
+            }
+
+            if (nonlinear) {
+                auto f0  = levels[0]->function;
+                auto fs0 = f0->space();
+                mg->set_eval_material_residual([f0](const real_t *const x, real_t *const r) { f0->gradient(x, r); });
+
+                std::vector<SharedBuffer<real_t>> nl_state(nlevels);
+                std::vector<char>                 use_prefix(nlevels, 0);
+                use_prefix[0] = 1;
+                for (int i = 1; i < nlevels; ++i) {
+                    auto fi = levels[i]->function;
+                    if (hierarchical_state_is_prefix(fs0, fi->space())) {
+                        use_prefix[i] = 1;
+                    } else {
+                        nl_state[i] = sfem::create_buffer<real_t>(fi->space()->n_dofs(), es);
+                    }
+                }
+
+                for (int i = 0; i < nlevels; ++i) {
+                    auto       fi     = levels[i]->function;
+                    auto       st     = nl_state[i];
+                    const bool prefix = use_prefix[i] != 0;
+                    mg->set_apply_jacobian(i,
+                                           [fi, st, prefix](const real_t *const x_lin, const real_t *const h, real_t *const y) {
+                                               const real_t *x = (prefix || !st) ? x_lin : st->data();
+                                               fi->apply(x, h, y);
+                                           });
+                }
+
+                auto level_fns = levels;
+                mg->set_linearize([level_fns, jacobi_block6, jacobi_scratch3, nl_state, use_prefix, fs0, nlevels, es](
+                                          const real_t *const x_fine) {
+                    for (int l = 0; l < nlevels; ++l) {
+                        auto          fi = level_fns[l]->function;
+                        const real_t *x  = x_fine;
+                        if (!use_prefix[l] && nl_state[l]) {
+                            inject_fine_state(fs0, fi->space(), x_fine, nl_state[l]->data(), es);
+                            x = nl_state[l]->data();
+                        }
+                        fi->update(x);
+                        refill_block_jacobi_diag(fi, x, jacobi_block6[l], jacobi_scratch3[l], es);
+                    }
+                });
             }
 
             // ----------------------------------
@@ -579,8 +1009,9 @@ namespace sfem {
 
             if (SFEM_ENABLE_NL_OBSTACLE) {
                 mg->set_update_constraints([that = this](const T *const disp) {
+                    SFEM_TRACE_SCOPE("SSMGC::update_constraints");
                     that->update_contact(disp);
-                    that->restrict_contact_constraints();
+                    that->rebuild_contact_constraints();
                 });
             }
         }
@@ -608,11 +1039,13 @@ namespace sfem {
                                                const std::shared_ptr<Input>            &in) {
         auto ret = std::make_shared<SSMGC<T>>();
         ret->impl_->init(f, contact_conds, in);
-        int ll = 0;
-        for (auto l : ret->impl_->levels) {
-            std::cout << "-----------------------\n";
-            std::cout << "level " << ll++ << "\n";
-            l->print();
+        if (is_root_rank(f->space()->mesh_ptr()->comm())) {
+            int ll = 0;
+            for (auto l : ret->impl_->levels) {
+                std::cout << "-----------------------\n";
+                std::cout << "level " << ll++ << "\n";
+                l->print();
+            }
         }
         // ret->impl_->mg = create_ssmgc(f, contact_conds, in);
         return ret;
@@ -625,7 +1058,12 @@ namespace sfem {
 
     template <typename T>
     int SSMGC<T>::update(const T *const disp) {
-        return impl_->update_contact(disp);
+        const int err = impl_->update_contact(disp);
+        if (err != SFEM_SUCCESS) {
+            return err;
+        }
+        impl_->rebuild_contact_constraints();
+        return SFEM_SUCCESS;
     }
 
     template <typename T>

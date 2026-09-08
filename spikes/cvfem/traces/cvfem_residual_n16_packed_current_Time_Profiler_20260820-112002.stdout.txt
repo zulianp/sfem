@@ -1,0 +1,45 @@
+2026-08-20 11:21:13.883835+0200 cvfem_tet4_ns_upwind_bench[37563:5414332] [CL_INVALID_OPERATION] : OpenCL Error : Failed to retrieve device information! Invalid enumerated value!
+
+2026-08-20 11:21:13.883854+0200 cvfem_tet4_ns_upwind_bench[37563:5414332] [CL_INVALID_OPERATION] : OpenCL Error : Failed to retrieve device information! Invalid enumerated value!
+
+2026-08-20 11:21:13.883862+0200 cvfem_tet4_ns_upwind_bench[37563:5414332] [CL_INVALID_OPERATION] : OpenCL Error : Failed to retrieve device information! Invalid enumerated value!
+
+2026-08-20 11:21:13.883870+0200 cvfem_tet4_ns_upwind_bench[37563:5414332] [CL_INVALID_OPERATION] : OpenCL Error : Failed to retrieve device information! Invalid enumerated value!
+
+--------------------
+| PackedMesh |
+n_packs: 24
+elements_per_pack: 2048
+Memory PackedMesh: 373.056 KB
+Original:      653.183 KB
+--------------------
+cvfem_tet4_ns_upwind_smesh_packed_two_pass
+  mesh_manager: smesh::Mesh::create_tet4_cube
+  kernel: current
+  OpenMP_threads: 10
+  LANE_PACK_BYTES: 128
+  LANES_PER_PACK: 16
+  ALIGN_BYTES: 64
+  geom_t_bytes: 4
+  jacobian_t_bytes: 4
+  sfc_reorder: 1
+  pack_size: 2048
+  n_packs: 24
+  n_elements_per_pack: 2048
+  mean_nodes_per_pack: 483
+  max_actual_nodes_per_pack: 507
+  scratch_nodes: 507
+  max_nodes_per_pack_capacity: 65536
+  cube_n: 16
+  nodes: 9009
+  elements: 49152
+  repeat: 3
+  seconds_per_apply: 3.873473e-04
+  MELEM/s: 126.894
+  MDOF/s_element_visits: 2030.302
+  MDOF/s_unique_mesh_dofs: 93.033
+  GFLOP/s_model: 71.314
+  GB/s_gather_scatter_model: 57.864
+  flops_per_element_model: 562.0
+  bytes_per_element_model: 456.0
+  checksum: -3.1889746647864925e+00

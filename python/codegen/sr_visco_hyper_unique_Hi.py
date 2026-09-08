@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+#
+# Emits the HEX8 Prony-series viscoelastic Mooney-Rivlin kernels to stdout. Nothing in the build
+# runs this: the two headers it produces are committed, and regenerating them is a manual step.
+# Run it from this directory, with the venv interpreter -- the system python has no sympy:
+#
+#   ../../venv/bin/python sr_visco_hyper_unique_Hi.py \
+#       > ../../operators/hex8/hex8_mooney_rivlin_visco_unique_Hi_local.hpp
+#
+#   sed 's/USE_STANDARD = False/USE_STANDARD = True/' sr_visco_hyper_unique_Hi.py \
+#     | ../../venv/bin/python - \
+#     > ../../operators/hex8/hex8_mooney_rivlin_visco_unique_Hi_standard.hpp
+#
+# The sed-into-stdin form is how the standard variant is produced without editing USE_STANDARD
+# in place; __name__ is still "__main__" and the sibling imports resolve because cwd is here.
+# Roughly 90 s for the local header and 45 s for the standard one.
+#
+# Only the local (unimodular) header is compiled -- see the #include in
+# operators/hex8/hex8_mooney_rivlin_visco_flexible.cpp -- but regenerate both so they do not
+# drift. Before changing anything here, check that the committed headers still reproduce
+# byte-for-byte; if they do not, someone edited emitted code by hand and regenerating would
+# silently discard it.
 
 from ctypes import Array, Array
 from sfem_codegen import *
@@ -1515,7 +1536,7 @@ static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
         """Compute geometric stiffness contribution for single Prony term.
         
         Geometric stiffness: dP/dF|_S = I ⊗ S
-        H[test*3+i, trial*3+k] += delta_ik * (grad[test] · S · grad[trial]) * dV
+        H[i*nfun+test, k*nfun+trial] += delta_ik * (grad[test] · S · grad[trial]) * dV
         
         Uses symbolic placeholders for S_single.
         """
@@ -1532,19 +1553,25 @@ static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
         nfun = fe.n_nodes()
         
         # Compute physical gradients symbolically
-        # phys_grad[node][d] = sum_k Jinv[d,k] * refgrad[node][k]
+        # phys_grad[node][d] = sum_k Jinv[k,d] * refgrad[node][k]
+        #
+        # That is J^-T applied to the reference gradient, the convention used everywhere else:
+        # FE.physical_grad is `J_inv.T * rg`, __compute_disp_grad is `disp_grad * Jinv`, and the
+        # algorithmic metric tensor contracts Jinv's first index against the reference gradient.
+        # Contracting the second index instead is invisible on axis-aligned elements, where J is
+        # diagonal and J^-1 is its own transpose, and wrong on every other mesh.
         phys_grads = []
         for node in range(nfun):
             pg = []
             for d in range(dim):
                 pg_d = 0
                 for k in range(dim):
-                    pg_d += Jinv[d, k] * refgrad[node][0, k]
+                    pg_d += Jinv[k, d] * refgrad[node][0, k]
                 pg.append(pg_d)
             phys_grads.append(pg)
         
         # Build geometric stiffness matrix
-        # H[test*3+i, trial*3+k] += delta_ik * (grad[test]^T * S * grad[trial]) * dV
+        # H[i*nfun+test, k*nfun+trial] += delta_ik * (grad[test]^T * S * grad[trial]) * dV
         H_geom = sp.zeros(nfun * dim, nfun * dim)
         
         for test_node in range(nfun):
@@ -1557,9 +1584,14 @@ static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
                 grad_S_grad = grad_S_grad * dV
                 
                 # Add to diagonal blocks (i == k)
+                # Component-major (SoA), matching FE.SoA in grad_tensorize, the algorithmic
+                # hessian above, and hex8_local_to_global_bsr3 which reads this matrix back as
+                # (comp * nfun + node). Node-major indexing here still lands inside the matrix,
+                # so it produces a permutation of the correct entries rather than an obvious
+                # failure -- symmetric, right trace, wrong tangent.
                 for d in range(dim):
-                    row = test_node * dim + d
-                    col = trial_node * dim + d
+                    row = d * nfun + test_node
+                    col = d * nfun + trial_node
                     H_geom[row, col] = grad_S_grad
         
         self.expression_table["geom_stiff_single"] = H_geom

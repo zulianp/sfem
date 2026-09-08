@@ -85,11 +85,16 @@ void add_matrix_free_scalar_ops(smesh::ElemType                 element_type,
 
     if (semi_structured) {
         ops.push_back({.name = "em:Laplacian", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            ops.push_back({.name = "EMWarpOp", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
+        }
     } else {
-        ops.push_back({.name = "PackedLaplacian", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
+        if (es == sfem::EXECUTION_SPACE_HOST) {
+            ops.push_back({.name = "PackedLaplacian", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
+        }
     }
 
-    if (element_type == smesh::HEX8 && !semi_structured) {
+    if (es == sfem::EXECUTION_SPACE_HOST && element_type == smesh::HEX8 && !semi_structured) {
         ops.push_back({.name = "Mass", .type = sfem::op_type::MATRIX_FREE, .block_size = 1});
     }
 }
@@ -116,19 +121,24 @@ void add_matrix_free_vector_ops(const int                       dim,
 
     if (semi_structured) {
         ops.push_back({.name = "em:LinearElasticity", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            ops.push_back({.name = "EMMultiVectorWarpOp", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
+        }
     }
 
-    // if ((element_type == smesh::TET4 && !semi_structured) || element_type == smesh::HEX8) {
-    ops.push_back({.name = "NeoHookeanOgden", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
-    // }
+    if (es == sfem::EXECUTION_SPACE_HOST) {
+        // if ((element_type == smesh::TET4 && !semi_structured) || element_type == smesh::HEX8) {
+        ops.push_back({.name = "NeoHookeanOgden", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
+        // }
 
-    if (!semi_structured && (element_type == smesh::HEX8 || element_type == smesh::TET10)) {
-        ops.push_back({.name = "NeoHookeanOgdenPacked", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
-    }
+        if (!semi_structured && (element_type == smesh::HEX8 || element_type == smesh::TET10)) {
+            ops.push_back({.name = "NeoHookeanOgdenPacked", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
+        }
 
-    if (!semi_structured && element_type == smesh::HEX8 || element_type == smesh::TET10 || element_type == smesh::TET4 ||
-        element_type == smesh::QUAD4 || element_type == smesh::TRI3) {
-        ops.push_back({.name = "GeneratedNeoHookeanOgden", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
+        if ((!semi_structured && element_type == smesh::HEX8) || element_type == smesh::TET10 || element_type == smesh::TET4 ||
+            element_type == smesh::QUAD4 || element_type == smesh::TRI3) {
+            ops.push_back({.name = "GeneratedNeoHookeanOgden", .type = sfem::op_type::MATRIX_FREE, .block_size = dim});
+        }
     }
 }
 
@@ -244,7 +254,19 @@ int main(int argc, char *argv[]) {
             auto f = sfem::Function::create(fs);
 
             auto op = sfem::create_op(fs, op_desc.name.c_str(), es);
-            op->initialize();
+            if (!op) {
+                SFEM_ERROR("Failed to create op %s for execution_space=%s block_size=%d\n",
+                           op_desc.name.c_str(),
+                           es == sfem::EXECUTION_SPACE_DEVICE ? "device" : "host",
+                           op_desc.block_size);
+                return SFEM_FAILURE;
+            }
+
+            int err = op->initialize();
+            if (err != SFEM_SUCCESS) {
+                SFEM_ERROR("Failed to initialize op %s\n", op_desc.name.c_str());
+                return err;
+            }
             f->add_operator(op);
 
             auto x      = sfem::create_buffer<real_t>(op->n_dofs_domain(), es);

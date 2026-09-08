@@ -5,24 +5,10 @@
 #include <memory>
 
 #include "sfem_aliases.hpp"
-// 
-// #include "smesh_semistructured.hpp"
-// 
+#include "smesh_mesh.hpp"
 #include "smesh_packed_mesh.hpp"
 
 namespace sfem {
-
-    template <typename idx_t>
-    ptrdiff_t max_node_id(const enum smesh::ElemType type, const ptrdiff_t nelements, idx_t **const SMESH_RESTRICT elements) {
-        const int nxe = elem_num_nodes(type);
-        idx_t     ret = 0;
-        for (int i = 0; i < nxe; i++) {
-            for (ptrdiff_t e = 0; e < nelements; e++) {
-                ret = std::max(ret, elements[i][e]);
-            }
-        }
-        return ret;
-    }
 
     class FunctionSpace::Impl {
     public:
@@ -31,8 +17,8 @@ namespace sfem {
         // Multi-block support: dedicated element type for each block
         std::vector<smesh::ElemType> element_types;
 
-        // Number of nodes of function-space (TODO)
         ptrdiff_t nlocal{0};
+        ptrdiff_t nowned{0};
         ptrdiff_t nglobal{0};
 
         // CRS graph
@@ -85,20 +71,77 @@ namespace sfem {
             }
         }
 
+        void initialize_dof_counts() {
+            if (!mesh) {
+                nlocal  = 0;
+                nowned  = 0;
+                nglobal = 0;
+                return;
+            }
+
+            const ptrdiff_t bs = block_size;
+            if (mesh->is_distributed()) {
+                auto dist = mesh->distributed();
+                nlocal    = dist->n_nodes_local() * bs;
+                nowned    = dist->n_nodes_owned() * bs;
+                nglobal   = dist->n_nodes_global() * bs;
+            } else {
+                nlocal = nowned = nglobal = mesh->n_nodes() * bs;
+            }
+        }
+
+        static bool mesh_all_semistructured(const Mesh &m) {
+            if (m.n_blocks() == 0) {
+                return false;
+            }
+            for (size_t b = 0; b < m.n_blocks(); ++b) {
+                if (!smesh::is_semistructured_type(m.element_type(static_cast<smesh::block_idx_t>(b)))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        static bool mesh_all_proteus_hex8(const Mesh &m) {
+            if (m.n_blocks() == 0) {
+                return false;
+            }
+            for (size_t b = 0; b < m.n_blocks(); ++b) {
+                if (m.element_type(static_cast<smesh::block_idx_t>(b)) != smesh::PROTEUS_HEX8) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         int initialize_dof_to_dof_graph(const int block_size) {
-            if (mesh && smesh::is_semistructured_type(mesh->element_type(0))) {
+            if (mesh && mesh_all_semistructured(*mesh)) {
                 if (!node_to_node_graph) {
                     node_to_node_graph = mesh->node_to_node_graph();
                 }
-                dof_to_dof_graph = node_to_node_graph;
+                if (block_size == 1) {
+                    dof_to_dof_graph = node_to_node_graph;
+                } else if (!dof_to_dof_graph) {
+                    dof_to_dof_graph = node_to_node_graph->block_to_scalar(block_size);
+                }
                 return SFEM_SUCCESS;
             }
 
             // This is for nodal discretizations (CG)
             if (!node_to_node_graph) {
-                // Use the default element type for graph creation
-                node_to_node_graph = mesh->create_node_to_node_graph(
-                        static_cast<smesh::ElemType>(get_element_type_for_block(0)));
+                bool types_match_mesh = true;
+                for (size_t b = 0; b < element_types.size(); ++b) {
+                    if (element_types[b] != mesh->element_type(static_cast<smesh::block_idx_t>(b))) {
+                        types_match_mesh = false;
+                        break;
+                    }
+                }
+                if (types_match_mesh) {
+                    node_to_node_graph = mesh->node_to_node_graph();
+                } else {
+                    node_to_node_graph = mesh->create_node_to_node_graph(
+                            static_cast<smesh::ElemType>(get_element_type_for_block(0)));
+                }
             }
 
             if (block_size == 1) {
@@ -132,33 +175,39 @@ namespace sfem {
 
     smesh::ElemType FunctionSpace::element_type(const int block) const { return impl_->get_element_type_for_block(block); }
 
-std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
-    if (!has_semi_structured_mesh()) {
-        // return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, impl_->get_element_type_for_block(0));
-        SMESH_ERROR("Cannot derfine mesh!\n");
+    std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
+        if (!has_semi_structured_mesh()) {
+            SMESH_ERROR("Cannot derefine mesh!\n");
+            return nullptr;
+        }
+
+        auto derefined_mesh = smesh::derefine(impl_->mesh, to_level);
+        if (!derefined_mesh) {
+            SMESH_ERROR("FunctionSpace::derefine: smesh::derefine failed\n");
+            return nullptr;
+        }
+
+        // Homogeneous HEX SS at level 1 becomes HEX8. Mixed HEX+TET stays SS (B5.6).
+        if (Impl::mesh_all_proteus_hex8(*derefined_mesh)) {
+            derefined_mesh = smesh::sshex_to_hex8(derefined_mesh);
+            if (!derefined_mesh) {
+                SMESH_ERROR("FunctionSpace::derefine: sshex_to_hex8 failed\n");
+                return nullptr;
+            }
+        }
+
+        return std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size);
     }
-
-    auto derefined_mesh = smesh::derefine(impl_->mesh, to_level);
-
-    // FIXME remove me once PROTEUS_HEX8 assemblies are supported
-    if (derefined_mesh && derefined_mesh->element_type(0) == smesh::PROTEUS_HEX8) {
-        derefined_mesh = smesh::sshex_to_hex8(derefined_mesh);
-    }
-
-    return std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size, derefined_mesh->element_type(0));
-}
 
     FunctionSpace::FunctionSpace() : impl_(std::make_unique<Impl>()) {}
 
     std::shared_ptr<FunctionSpace> FunctionSpace::create(const std::shared_ptr<FunctionSpace::PackedMesh> &mesh, const int block_size) {
-        auto ret                         = std::make_shared<FunctionSpace>();
-        ret->impl_->mesh                 = mesh->mesh();
-        ret->impl_->block_size           = block_size;
-        ret->impl_->packed_mesh          = mesh;
-        ret->impl_->nlocal               = mesh->mesh()->n_nodes() * block_size;
-        ret->impl_->nglobal              = ret->impl_->nlocal;
-
-        ret->impl_->element_types.push_back(mesh->mesh()->element_type(0));
+        auto ret               = std::make_shared<FunctionSpace>();
+        ret->impl_->mesh       = mesh->mesh();
+        ret->impl_->block_size = block_size;
+        ret->impl_->packed_mesh = mesh;
+        ret->impl_->initialize_element_types();
+        ret->impl_->initialize_dof_counts();
         return ret;
     }
 
@@ -170,29 +219,16 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
 
         if (element_type == smesh::INVALID) {
             impl_->initialize_element_types();
-
         } else {
             impl_->override_element_types(element_type);
         }
 
-        if (element_type == smesh::INVALID) {
-            impl_->nlocal  = mesh->n_nodes() * block_size;
-            impl_->nglobal = mesh->n_nodes() * block_size;
-        } else {
-            assert(mesh->n_blocks() == 1);
-            // FIXME in parallel it will not work
-            impl_->nlocal =
-                    (max_node_id<idx_t>(impl_->get_element_type_for_block(0), mesh->n_elements(), mesh->elements(0)->data()) + 1) *
-                    block_size;
-            impl_->nglobal = impl_->nlocal;
-        }
-
-        // Initialize element types for multi-block support
+        impl_->initialize_dof_counts();
     }
     FunctionSpace::~FunctionSpace() = default;
 
     bool FunctionSpace::has_semi_structured_mesh() const {
-        return impl_->mesh && smesh::is_semistructured_type(impl_->mesh->element_type(0));
+        return impl_->mesh && Impl::mesh_all_semistructured(*impl_->mesh);
     }
 
     Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
@@ -203,11 +239,21 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
 
+    ptrdiff_t FunctionSpace::n_owned_dofs() const { return impl_->nowned; }
+
+    ptrdiff_t FunctionSpace::n_dofs_global() const { return impl_->nglobal; }
+
     SharedBuffer<geom_t *> FunctionSpace::points() { return impl_->mesh->points(); }
 
     std::shared_ptr<FunctionSpace> FunctionSpace::lor() const {
-        return std::make_shared<FunctionSpace>(
-                impl_->mesh, impl_->block_size, macro_type_variant(impl_->get_element_type_for_block(0)));
+        auto ret = std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size);
+        for (size_t i = 0; i < ret->impl_->element_types.size(); ++i) {
+            const auto t = ret->impl_->element_types[i];
+            if (t == smesh::TET10 || t == smesh::TRI6) {
+                ret->impl_->element_types[i] = macro_type_variant(t);
+            }
+        }
+        return ret;
     }
 
     int FunctionSpace::create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values) {
@@ -242,3 +288,4 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
 
     std::shared_ptr<FunctionSpace::PackedMesh> FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
 }  // namespace sfem
+

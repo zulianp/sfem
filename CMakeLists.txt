@@ -134,8 +134,12 @@ list(APPEND SFEM_MODULES
     frontend/ops/generated/laplace/op
     frontend/ops/generated/linear_elasticity
     frontend/ops/generated/linear_elasticity/op
+    frontend/ops/generated/saint_venant_kirchhoff
+    frontend/ops/generated/saint_venant_kirchhoff/op
     frontend/ops/generated/neohookean_ogden
     frontend/ops/generated/neohookean_ogden/op
+    frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark
+    frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark/op
     frontend/ops/generated/two_phase_flow
     frontend/ops/generated/two_phase_flow/op
     frontend/mesh
@@ -475,14 +479,29 @@ if(SFEM_ENABLE_TESTING)
         set_tests_properties(sfem_ParallelLaplacianApplyTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelLaplacianApplyTest)
 
-        # Temporarily disabled: frontend/tests/mpi/sfem_ParallelCGTest.cpp is missing.
-        # add_executable(sfem_ParallelCGTest frontend/tests/mpi/sfem_ParallelCGTest.cpp)
-        # target_link_libraries(sfem_ParallelCGTest PRIVATE sfem)
-        # add_test(
-        #     NAME sfem_ParallelCGTest
-        #     COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelCGTest>)
-        # set_tests_properties(sfem_ParallelCGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
-        # list(APPEND SFEM_TARGETS sfem_ParallelCGTest)
+        add_executable(sfem_ParallelCGTest frontend/tests/mpi/sfem_ParallelCGTest.cpp)
+        target_link_libraries(sfem_ParallelCGTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelCGTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelCGTest>)
+        set_tests_properties(sfem_ParallelCGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelCGTest)
+
+        add_executable(sfem_ParallelFunctionSpaceTest frontend/tests/mpi/sfem_ParallelFunctionSpaceTest.cpp)
+        target_link_libraries(sfem_ParallelFunctionSpaceTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelFunctionSpaceTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelFunctionSpaceTest>)
+        set_tests_properties(sfem_ParallelFunctionSpaceTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelFunctionSpaceTest)
+
+        add_executable(sfem_ParallelSSGMGTest frontend/tests/mpi/sfem_ParallelSSGMGTest.cpp)
+        target_link_libraries(sfem_ParallelSSGMGTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelSSGMGTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelSSGMGTest>)
+        set_tests_properties(sfem_ParallelSSGMGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelSSGMGTest)
     endif()
 endif()
 

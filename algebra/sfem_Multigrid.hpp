@@ -1,6 +1,7 @@
 #ifndef SFEM_MULTIGRID_HPP
 #define SFEM_MULTIGRID_HPP
 
+#include <algorithm>
 #include <math.h>
 #include <cassert>
 #include <cmath>
@@ -13,7 +14,7 @@
 #include <vector>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
 
 #include "sfem_openmp_blas.hpp"
@@ -58,9 +59,9 @@ namespace sfem {
 
             // Wrap input arrays into fine level of mg
             if (wrap_input_) {
-                memory_[finest_level()]->solution = Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
-
-                memory_[finest_level()]->rhs = Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
+                const std::ptrdiff_t n_alloc = level_alloc(finest_level());
+                memory_[finest_level()]->solution = Buffer<T>::wrap(n_alloc, x);
+                memory_[finest_level()]->rhs      = Buffer<T>::wrap(n_alloc, (T*)rhs);
             }
 
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
@@ -211,6 +212,43 @@ namespace sfem {
             }
         }
 
+        T reduce_norm2(const int level, const T* const x) {
+            const std::ptrdiff_t n     = level_owned(level);
+            T                    local = this->blas()->dot(n, x, x);
+            auto                 pop   = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                local = pop->comm()->sum(local);
+            }
+            return std::sqrt(local);
+        }
+
+        bool verbose_rank0() const {
+            if (operator_.empty()) {
+                return true;
+            }
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[finest_level()]);
+            if (pop && pop->comm()) {
+                return pop->comm()->rank() == 0;
+            }
+            return true;
+        }
+
+        std::ptrdiff_t level_owned(const int l) const {
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[l]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return pop->rows();
+            }
+            return smoother_[l]->rows();
+        }
+
+        std::ptrdiff_t level_alloc(const int l) const {
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[l]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return std::max(pop->row_allocation_size(), pop->col_allocation_size());
+            }
+            return smoother_[l]->rows();
+        }
+
         int init() {
             assert(prolongation_.size() == restriction_.size());
             assert(operator_.size() == smoother_.size());
@@ -221,7 +259,7 @@ namespace sfem {
             for (int l = 0; l < n_levels(); l++) {
                 memory_[l] = std::make_shared<Memory>();
 
-                size_t n = smoother_[l]->rows();
+                size_t n = static_cast<size_t>(level_alloc(l));
                 if (l != finest_level() || !wrap_input_) {
                     auto x               = this->blas()->allocate(n);
                     auto blas_impl       = this->blas();
@@ -247,10 +285,10 @@ namespace sfem {
                 this->blas()->zeros(mem->solution->size(), mem->solution->data());
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
                     if (debug) {
-                        this->blas()->zeros(mem->size(), mem->work->data());
+                        this->blas()->zeros(mem->work->size(), mem->work->data());
                         operator_[level]->apply(mem->solution->data(), mem->work->data());
-                        this->blas()->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
-                        printf("|| r_H || = %g\n", this->blas()->norm2(mem->work->size(), mem->work->data()));
+                        this->blas()->axpby(level_owned(level), 1, mem->rhs->data(), -1, mem->work->data());
+                        printf("|| r_H || = %g\n", (double)reduce_norm2(level, mem->work->data()));
                     }
                     return CYCLE_CONTINUE;
                 } else {
@@ -268,24 +306,24 @@ namespace sfem {
 
                 {
                     // Compute residual
-                    this->blas()->zeros(mem->size(), mem->work->data());
+                    this->blas()->zeros(mem->work->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
-                    this->blas()->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    this->blas()->axpby(level_owned(level), 1, mem->rhs->data(), -1, mem->work->data());
 
                     if (finest_level() == level) {
-                        T norm_residual = this->blas()->norm2(mem->work->size(), mem->work->data());
+                        T norm_residual = reduce_norm2(level, mem->work->data());
 
                         if (iterations_ == 0) {
                             norm_residual_0        = norm_residual;
                             norm_residual_previous = norm_residual;
 
-                            if (verbose) {
+                            if (verbose && verbose_rank0()) {
                                 printf("Multigrid\n");
                                 printf("iter\tabs\t\trel\t\trate\n");
                                 printf("%d\t%g\t-\t\t-\n", iterations_, (double)(norm_residual));
                             }
                         } else {
-                            if (verbose) {
+                            if (verbose && verbose_rank0()) {
                                 printf("%d\t%g\t%g\t%g\n",
                                        iterations_,
                                        (double)(norm_residual),
@@ -316,8 +354,7 @@ namespace sfem {
 
                 {
                     if (debug) {
-                        printf("|| c_H || = %g\n",
-                               (double)this->blas()->norm2(mem_coarse->solution->size(), mem_coarse->solution->data()));
+                        printf("|| c_H || = %g\n", (double)reduce_norm2(coarser_level(level), mem_coarse->solution->data()));
                     }
 
                     // Prolongation
@@ -325,18 +362,18 @@ namespace sfem {
                     prolongation->apply(mem_coarse->solution->data(), mem->work->data());
 
                     if (debug) {
-                        printf("|| c_h || = %g\n", (double)this->blas()->norm2(mem->work->size(), mem->work->data()));
+                        printf("|| c_h || = %g\n", (double)reduce_norm2(level, mem->work->data()));
                     }
 
                     // Apply coarse space correction
-                    this->blas()->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                    this->blas()->axpby(level_owned(level), 1, mem->work->data(), 1, mem->solution->data());
                 }
 
                 if (debug) {
-                    this->blas()->zeros(mem->size(), mem->work->data());
+                    this->blas()->zeros(mem->work->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
-                    this->blas()->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
-                    printf("|| r_h || = %g\n", this->blas()->norm2(mem->work->size(), mem->work->data()));
+                    this->blas()->axpby(level_owned(level), 1, mem->rhs->data(), -1, mem->work->data());
+                    printf("|| r_h || = %g\n", (double)reduce_norm2(level, mem->work->data()));
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());

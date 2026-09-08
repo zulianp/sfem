@@ -10,6 +10,7 @@
 
 #include "sfem_Constraint.hpp"
 #include "sfem_ForwardDeclarations.hpp"
+#include "sfem_LoadProfile.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
@@ -28,8 +29,12 @@ namespace sfem {
             std::vector<std::shared_ptr<Sideset>> sidesets;  /// Maybe undefined in certain cases
             SharedBuffer<idx_t>                   nodeset;
             SharedBuffer<real_t>                  values;
+            SharedBuffer<real_t>                  base_values;
             real_t                                value{0};
+            real_t                                base_value{0};
             int                                   component{0};
+            LoadProfile                           profile;
+            bool                                  profile_initialized{false};
         };
 
         DirichletConditions(const std::shared_ptr<FunctionSpace> &space);
@@ -90,6 +95,7 @@ namespace sfem {
                            real_t *const   values);
 
         int n_conditions() const;
+        int set_time(real_t time, real_t global_scale = 1);
 
         std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                              const bool                            as_zero) const override;

@@ -18,6 +18,25 @@ do
     fi
 done
 
+MPISORT_DIR="${REPO_ROOT}/external/smesh/external/mpi-sort"
+for required_file in \
+    "include/mpi-sort.h" \
+    "lib/radix.cxx" \
+    "lib/sparse.c" \
+    "lib/dispatch.c" \
+    "lib/common.c" \
+    "lib/drange.c" \
+    "lib/xtract.c" \
+    "lib/lsort.cxx" \
+    "lib/a2av.c"
+do
+    if [[ ! -f "${MPISORT_DIR}/${required_file}" ]]; then
+        echo "Missing ${MPISORT_DIR}/${required_file}" >&2
+        echo "Run: git -C ${REPO_ROOT} submodule update --init --recursive --force external/smesh/external/mpi-sort" >&2
+        exit 1
+    fi
+done
+
 RSYNC_EXCLUDES=(
     --exclude 'api'
     --exclude 'venv'

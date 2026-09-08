@@ -697,7 +697,7 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
             hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
 
             sshex8_SoA_pack_elements(level, eu, X);
-            packed_elements_matmul(24, txe, 24, element_matrix, X, Y);
+            packed_elements_matmul_sym(24, txe, 24, element_matrix, X, Y);
             for (int d = 0; d < 3; d++) {
                 memset(v[d], 0, nxe * sizeof(accumulator_t));
             }
@@ -818,7 +818,7 @@ int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int              
             hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
 
             sshex8_SoA_pack_elements(level, eu, X);
-            packed_elements_matmul(24, txe, 24, element_matrix, X, Y);
+            packed_elements_matmul_sym(24, txe, 24, element_matrix, X, Y);
             for (int d = 0; d < 3; d++) {
                 memset(v[d], 0, nxe * sizeof(accumulator_t));
             }

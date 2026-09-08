@@ -1,6 +1,9 @@
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
+#include <string>
 
 #include "sfem_test.hpp"
 
@@ -23,7 +26,7 @@ static real_t contact_objective(const ptrdiff_t     nnodes,
                                 const real_t*       agumentation,
                                 const real_t* const normals[3],
                                 const real_t*       mass,
-                                const real_t        penalty,
+                                const real_t*       penalty,
                                 const real_t*       x) {
     static const real_t zero_step[1] = {0};
     real_t              value[1]     = {0};
@@ -41,7 +44,7 @@ static void contact_gradient(const ptrdiff_t     nnodes,
                              const real_t*       agumentation,
                              const real_t* const normals[3],
                              const real_t*       mass,
-                             const real_t        penalty,
+                             const real_t*       penalty,
                              const real_t*       x,
                              real_t*             macaulay,
                              real_t*             grad) {
@@ -64,7 +67,7 @@ static void contact_hessian_apply_aos(const ptrdiff_t     nnodes,
                                       const real_t*       vals,
                                       const real_t* const normals[3],
                                       const real_t*       mass,
-                                      const real_t        penalty,
+                                      const real_t*       penalty,
                                       const real_t*       macaulay,
                                       const real_t*       x,
                                       real_t*             y) {
@@ -94,7 +97,7 @@ int test_contact_objective_gradient_hessian_finite_differences() {
     const real_t        mass[nnodes]         = {1.20, 0.85, 1.10, 0.95};
     const real_t        distances[nnodes]    = {-0.35, -0.28, -0.31, -0.25};
     const real_t        agumentation[nnodes] = {0.40, -0.15, 0.20, -0.10};
-    const real_t        penalty              = 17.0;
+    const real_t        penalty[nnodes]      = {17.0, 11.0, 23.0, 8.0};
 
     const real_t x[ndofs] = {0.12, -0.08, 0.05, -0.03, 0.11, -0.06, 0.07, 0.04, -0.02, -0.09, 0.06, 0.10};
     const real_t p[ndofs] = {0.31, -0.17, 0.23, -0.29, 0.19, -0.11, 0.13, 0.07, -0.37, 0.21, -0.05, 0.09};
@@ -204,6 +207,23 @@ std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::Ex
     return f;
 }
 
+static int write_mamal_vcycle_xdmf(const smesh::Path& root) {
+    const smesh::Path repo   = smesh::Path(__FILE__).parent().parent().parent();
+    const smesh::Path python = repo / "venv" / "bin" / "python";
+    const smesh::Path writer = smesh::Path(__FILE__).parent() / "write_mamal_vcycle_xdmf.py";
+
+    char cmd[4096];
+    snprintf(cmd, sizeof(cmd), "'%s' '%s' '%s'", python.c_str(), writer.c_str(), root.c_str());
+    if (std::system(cmd) != 0) {
+        fprintf(stderr, "write_mamal_vcycle_xdmf: failed to write %s/mamal.xdmf\n", root.c_str());
+        return SFEM_FAILURE;
+    }
+
+    printf("MaMAL V-cycle XDMF: %s\n", (root / "mamal.xdmf").c_str());
+    fflush(stdout);
+    return SFEM_SUCCESS;
+}
+
 int test_mamal_nonlinear_cycle() {
     auto es    = sfem::EXECUTION_SPACE_HOST;
     auto f     = create_touching_two_body_function(es);
@@ -213,6 +233,10 @@ int test_mamal_nonlinear_cycle() {
     auto blas = sfem::blas<real_t>(es);
     blas->values(x->size(), 0, x->data());
     f->apply_constraints(x->data());
+
+    // Per-V-cycle output is opt-in: on a large mesh it writes the full solution
+    // field once per iteration. Set SFEM_MAMAL_OUTPUT_DIR to enable it.
+    const bool write_output = smesh::Env::read_string("SFEM_MAMAL_OUTPUT_DIR", std::string()).size() > 0;
 
     auto mamal = sfem::MaMAL::create(f);
     auto impl  = mamal->impl_.get();
@@ -237,14 +261,16 @@ int test_mamal_nonlinear_cycle() {
         }
     }
 
-    const smesh::Path output_dir("mamal_output");
-    smesh::create_directory(output_dir);
+    if (!write_output) {
+        return SFEM_TEST_SUCCESS;
+    }
+
+    const smesh::Path output_dir(smesh::Env::read_string("SFEM_MAMAL_OUTPUT_DIR", std::string()));
 
     auto out = f->output();
     out->enable_AoS_to_SoA(true);
     out->set_output_dir(output_dir);
 
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(space->mesh_ptr(), output_dir) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(impl->contact_eval_surface->write(smesh::Path("mamal_contact_surface")) == SFEM_SUCCESS);
 
     auto lagr_mult_normal = sfem::create_buffer<real_t>(space->n_dofs(), es);
@@ -274,6 +300,7 @@ int test_mamal_nonlinear_cycle() {
     SFEM_TEST_ASSERT(out->write("distance", impl->contact->distances_whole()->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(out->write("directors", impl->contact->directors()->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(out->write("lagr_mult_normal", lagr_mult_normal->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(write_mamal_vcycle_xdmf(output_dir) == SFEM_SUCCESS);
 
     return SFEM_TEST_SUCCESS;
 }
@@ -285,3 +312,4 @@ int main(int argc, char* argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

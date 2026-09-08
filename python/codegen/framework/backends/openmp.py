@@ -95,6 +95,11 @@ class OpenMPSoABackend:
         unit.validate_for_context(context)
         return self._traversal(unit, context).diagnostics_plan
 
+    @staticmethod
+    def _diagnostics_enabled(unit):
+        payload = getattr(unit, "payload", None) or {}
+        return bool(payload.get("diagnostics", True))
+
     def _traversal(self, unit, context):
         kind = _kind_value(unit.kind)
         if kind == "energy_soa":
@@ -182,14 +187,18 @@ class OpenMPSoABackend:
                 mesh_kernel.name,
                 kind,
             )
-            diagnostics_plan = kernel_diagnostics_plan_from_plan(
-                unit,
-                model.emission_plan,
-                mesh_kernel.name,
-                kind,
-                reference_data_plan,
-                mesh_signature,
-                local_signatures,
+            diagnostics_plan = (
+                kernel_diagnostics_plan_from_plan(
+                    unit,
+                    model.emission_plan,
+                    mesh_kernel.name,
+                    kind,
+                    reference_data_plan,
+                    mesh_signature,
+                    local_signatures,
+                )
+                if self._diagnostics_enabled(unit)
+                else None
             )
             return _OpenMPTraversal(
                 kind,
@@ -247,14 +256,18 @@ class OpenMPSoABackend:
                 mesh_kernel.name,
                 kind,
             )
-            diagnostics_plan = kernel_diagnostics_plan_from_plan(
-                unit,
-                emission_plan,
-                mesh_kernel.name,
-                kind,
-                reference_data_plan,
-                mesh_signature,
-                local_signatures,
+            diagnostics_plan = (
+                kernel_diagnostics_plan_from_plan(
+                    unit,
+                    emission_plan,
+                    mesh_kernel.name,
+                    kind,
+                    reference_data_plan,
+                    mesh_signature,
+                    local_signatures,
+                )
+                if self._diagnostics_enabled(unit)
+                else None
             )
             return _OpenMPTraversal(
                 kind,
@@ -302,14 +315,18 @@ class OpenMPSoABackend:
             mesh_kernel.name,
             kind,
         )
-        diagnostics_plan = kernel_diagnostics_plan_from_plan(
-            unit,
-            emission_plan,
-            mesh_kernel.name,
-            kind,
-            reference_data_plan,
-            mesh_signature,
-            local_signatures,
+        diagnostics_plan = (
+            kernel_diagnostics_plan_from_plan(
+                unit,
+                emission_plan,
+                mesh_kernel.name,
+                kind,
+                reference_data_plan,
+                mesh_signature,
+                local_signatures,
+            )
+            if self._diagnostics_enabled(unit)
+            else None
         )
         return _OpenMPTraversal(
             kind,
@@ -355,14 +372,18 @@ class OpenMPSoABackend:
             mesh_kernel.name,
             kind,
         )
-        diagnostics_plan = kernel_diagnostics_plan_from_plan(
-            unit,
-            emission_plan,
-            mesh_kernel.name,
-            kind,
-            reference_data_plan,
-            mesh_signature,
-            local_signatures,
+        diagnostics_plan = (
+            kernel_diagnostics_plan_from_plan(
+                unit,
+                emission_plan,
+                mesh_kernel.name,
+                kind,
+                reference_data_plan,
+                mesh_signature,
+                local_signatures,
+            )
+            if self._diagnostics_enabled(unit)
+            else None
         )
         return _OpenMPTraversal(
             kind,

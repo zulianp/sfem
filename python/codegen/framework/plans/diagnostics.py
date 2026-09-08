@@ -282,13 +282,11 @@ def _boundary_diagnostics_entries(unit, operator_prefix, mesh_signature, local_b
 
 def _diagnostic_block_names(unit, action_plan):
     system = getattr(unit.form_collection, "source", None)
-    if getattr(unit, "is_block", False) and system is not None and hasattr(system, "jacobian_blocks"):
+    if system is not None and hasattr(system, "jacobian_blocks"):
         return tuple(block.name for block in system.jacobian_blocks())
     names = tuple(getattr(block, "name", str(block)) for block in action_plan.blocks)
     if names:
         return names
-    if system is not None and hasattr(system, "jacobian_blocks"):
-        return tuple(block.name for block in system.jacobian_blocks())
     return ()
 
 

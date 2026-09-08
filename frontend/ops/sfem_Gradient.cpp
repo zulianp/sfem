@@ -56,9 +56,20 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        if (mesh->n_blocks() != 1) {
+            SFEM_ERROR("Gradient: multi-block meshes are not implemented\n");
+            return SFEM_FAILURE;
+        }
+
+        const auto et = mesh->element_type(0);
+        if (et != smesh::TET4 && et != smesh::MACRO_TET4) {
+            SFEM_ERROR("Gradient: only TET4 is implemented (got %s)\n", smesh::type_to_string(et));
+            return SFEM_FAILURE;
+        }
+
         count_t       *d_n2e_ptr;
         element_idx_t *d_n2e_idx;
-        smesh::create_n2e(mesh->n_elements(),
+        smesh::create_n2e(mesh->n_elements(0),
                   mesh->n_nodes(),
                   mesh->n_nodes_per_element(0),
                   mesh->elements(0)->data(),
@@ -215,6 +226,11 @@ namespace sfem {
         //                        out);
         // });
 
+        if (mesh->n_blocks() != 1) {
+            SFEM_ERROR("Gradient::apply: multi-block meshes are not implemented\n");
+            return SFEM_FAILURE;
+        }
+
         auto block   = mesh->block(0);
         auto n2e_ptr = impl_->n2e_ptr;
         auto n2e_idx = impl_->n2e_idx;
@@ -265,3 +281,4 @@ namespace sfem {
         impl_->domains->override_element_types(element_types);
     }
 }  // namespace sfem
+

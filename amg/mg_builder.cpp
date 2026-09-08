@@ -53,7 +53,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
                 prev_mat->offdiag_colidx->data(),
                 diag_smoother->data());
     auto amg_smoother = sfem::create_shiftable_jacobi(diag_smoother, es);
-    amg_smoother->relaxation_parameter = 1.0;
+    amg_smoother->set_relaxation_parameter(1.0);
 
     ptrdiff_t ndofs = fine_ndofs;
     count_t fine_memory = fine_ndofs + offdiag_nnz;
@@ -147,7 +147,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
                     prev_mat->offdiag_colidx->data(),
                     diag_smoother->data());
         amg_smoother = sfem::create_shiftable_jacobi(diag_smoother, es);
-        amg_smoother->relaxation_parameter = 1.0;
+        amg_smoother->set_relaxation_parameter(1.0);
     }
 
     // Create a coarsest level solver, could also just smooth here if coarsest problem isn't

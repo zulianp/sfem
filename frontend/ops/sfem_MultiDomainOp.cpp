@@ -34,6 +34,36 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int MultiDomainOp::require_supported_types(const char                                      *op_name,
+                                               const std::function<bool(smesh::ElemType)> &has_kernel) const {
+        for (const auto &kv : domains_) {
+            const auto et = kv.second.element_type;
+            if (has_kernel(et)) {
+                continue;
+            }
+
+            if (smesh::is_wedge_ss_family(et)) {
+                SFEM_ERROR("%s: no kernel for WEDGE family on block '%s' (%s); hex-dominant apply is not implemented\n",
+                           op_name,
+                           kv.first.c_str(),
+                           smesh::type_to_string(et));
+            } else if (smesh::is_pyramid_ss_family(et)) {
+                SFEM_ERROR("%s: no kernel for PYRAMID family on block '%s' (%s); hex-dominant apply is not implemented\n",
+                           op_name,
+                           kv.first.c_str(),
+                           smesh::type_to_string(et));
+            } else {
+                SFEM_ERROR("%s: no kernel for block '%s' element type %s\n",
+                           op_name,
+                           kv.first.c_str(),
+                           smesh::type_to_string(et));
+            }
+            return SFEM_FAILURE;
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     void MultiDomainOp::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         size_t i = 0;
         for (auto &domain : domains_) {
@@ -80,3 +110,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

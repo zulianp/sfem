@@ -1,0 +1,70 @@
+diff --git a/src/mesh/semistructured/hierarchy/sshex8/smesh_sshex8_restriction.impl.hpp b/src/mesh/semistructured/hierarchy/sshex8/smesh_sshex8_restriction.impl.hpp
+index a52db41..16401c6 100644
+--- a/src/mesh/semistructured/hierarchy/sshex8/smesh_sshex8_restriction.impl.hpp
++++ b/src/mesh/semistructured/hierarchy/sshex8/smesh_sshex8_restriction.impl.hpp
+@@ -6,6 +6,7 @@
+ #include "smesh_sshex8_restriction.hpp"
+ 
+ #include <string.h>
++#include <vector>
+ #include <stdlib.h>
+ 
+ namespace smesh {
+@@ -177,14 +178,31 @@ namespace smesh {
+             const int to_nxe      = sshex8_nxe(to_level);
+             const int step_factor = from_level / to_level;
+ 
+-            scalar_t **from_coeffs = (scalar_t **)SMESH_ALLOC(vec_size * sizeof(scalar_t *));
++            // Thread-private scratch that persists across calls.
++            //
++            // This used to malloc and free 2 + 2*vec_size buffers on every call, per thread
++            // once this is built with OpenMP. The buffers carry no data from one call to the
++            // next, and a multigrid cycle calls this once per level per sweep, so a solve ran
++            // hundreds of thousands of allocations for nothing.
++            //
++            // thread_local keeps the storage per thread for the process lifetime; resize() is
++            // a no-op once the buffers are large enough, so the steady state allocates
++            // nothing. Declared inside the parallel region, so each thread gets its own.
++            static thread_local std::vector<scalar_t>  from_scratch;
++            static thread_local std::vector<scalar_t>  to_scratch;
++            static thread_local std::vector<scalar_t *> from_ptrs;
++            static thread_local std::vector<scalar_t *> to_ptrs;
++
++            from_scratch.resize((size_t)vec_size * (size_t)from_nxe);
++            to_scratch.resize((size_t)vec_size * (size_t)to_nxe);
++            from_ptrs.resize((size_t)vec_size);
++            to_ptrs.resize((size_t)vec_size);
++
++            scalar_t **from_coeffs = from_ptrs.data();
++            scalar_t **to_coeffs   = to_ptrs.data();
+             for (int d = 0; d < vec_size; d++) {
+-                from_coeffs[d] = (scalar_t *)SMESH_ALLOC(from_nxe * sizeof(scalar_t));
+-            }
+-
+-            scalar_t **to_coeffs = (scalar_t **)SMESH_ALLOC(vec_size * sizeof(scalar_t *));
+-            for (int d = 0; d < vec_size; d++) {
+-                to_coeffs[d] = (scalar_t *)SMESH_ALLOC(to_nxe * sizeof(scalar_t));
++                from_coeffs[d] = from_scratch.data() + (size_t)d * (size_t)from_nxe;
++                to_coeffs[d]   = to_scratch.data() + (size_t)d * (size_t)to_nxe;
+             }
+ 
+ #pragma omp for
+@@ -273,17 +291,7 @@ namespace smesh {
+                 }
+             }
+ 
+-            for (int d = 0; d < vec_size; d++) {
+-                SMESH_FREE(from_coeffs[d]);
+-            }
+-
+-            SMESH_FREE(from_coeffs);
+-
+-            for (int d = 0; d < vec_size; d++) {
+-                SMESH_FREE(to_coeffs[d]);
+-            }
+-
+-            SMESH_FREE(to_coeffs);
++            // scratch is thread_local and persists across calls; nothing to free
+         }
+ 
+         return SMESH_SUCCESS;

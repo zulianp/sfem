@@ -6,6 +6,14 @@ set(SFEM_SMESH_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/smesh")
 # treat .cu sources as CUDA and smesh CUDA kernels (e.g. macrotet4 prolongation)
 # are never compiled into libsmesh.
 if(SFEM_ENABLE_CUDA)
+    if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
+        set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "CUDA host compiler")
+    endif()
+
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 90 CACHE STRING "CUDA architectures")
+    endif()
+
     enable_language(CUDA)
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
         set(CMAKE_CUDA_STANDARD 17)
@@ -193,13 +201,19 @@ if(SFEM_ENABLE_CUDA)
         include_directories($ENV{CRAY_CUDATOOLKIT_INCLUDE_OPTS})
     endif()
 
-    #https://github.com/NVIDIA/thrust/blob/main/thrust/cmake/README.md
+    # Thrust is header-only (ships with the CUDA toolkit). Do not add it to
+    # SFEM_DEP_LIBRARIES: install(EXPORT) serializes the INTERFACE target as
+    # -lThrust, which does not exist and breaks downstream links.
     find_package(Thrust CONFIG)
     if(Thrust_FOUND)
         thrust_create_target(Thrust)
-        list(APPEND SFEM_DEP_LIBRARIES Thrust)
+        get_target_property(_SFEM_THRUST_INCLUDES Thrust INTERFACE_INCLUDE_DIRECTORIES)
+        if(_SFEM_THRUST_INCLUDES)
+            list(APPEND SFEM_DEP_INCLUDES ${_SFEM_THRUST_INCLUDES})
+        endif()
+        unset(_SFEM_THRUST_INCLUDES)
     else()
-        message(WARNING "Thrust not found!")
+        message(STATUS "Thrust CMake package not found; using CUDA toolkit includes")
     endif()
 endif()
 

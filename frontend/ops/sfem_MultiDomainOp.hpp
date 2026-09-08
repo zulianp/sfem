@@ -67,6 +67,14 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func);
 
         /**
+         * @brief Abort if any selected domain has no operator kernel
+         *
+         * WEDGE / PYRAMID (unstructured or SS) get an explicit hex-dominant message.
+         * Do not concatenate mixed SoA as a substitute for a missing kernel.
+         */
+        int require_supported_types(const char *op_name, const std::function<bool(smesh::ElemType)> &has_kernel) const;
+
+        /**
          * @brief Override element types for all domains
          * @param element_types Vector of element types (must match domain count)
          */

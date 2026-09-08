@@ -29,7 +29,7 @@ namespace sfem {
      * - Automatic operator creation by name
      * - Support for both regular and boundary operators
      * - GPU operator variants (with "gpu:" prefix)
-     * - Semi-structured mesh operator variants (with "ss:" prefix)
+     * - Semi-structured mesh operator variants
      *
      * Usage example:
      * @code
@@ -79,7 +79,7 @@ namespace sfem {
          * @param name Operator name
          * @return Shared pointer to the created operator, or nullptr if not found
          *
-         * The factory automatically adds "ss:" prefix for semi-structured meshes.
+         * The factory resolves the requested operator name directly.
          */
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const char *name);
 
@@ -141,9 +141,13 @@ namespace sfem {
     }
 
 #ifdef SFEM_ENABLE_RYAML
-    static std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
-                                                   const ryml::ConstNodeRef             &node,
-                                                   const ExecutionSpace                  es);
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            const ryml::ConstNodeRef             &node,
+                                            const ExecutionSpace                  es);
+
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            std::string                           yaml,
+                                            const ExecutionSpace                  es);
 #endif  // SFEM_ENABLE_RYAML
 
 }  // namespace sfem

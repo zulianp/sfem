@@ -8,7 +8,7 @@ namespace sfem {
         std::shared_ptr<Op>        lor_op(const std::shared_ptr<FunctionSpace> &space) override;
         std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
         const char                *name() const override { return "NeoHookeanOgden"; }
-        inline bool                is_linear() const override { return true; }
+        inline bool                is_linear() const override { return false; }
         ptrdiff_t                  n_dofs_domain() const override;
         ptrdiff_t                  n_dofs_image() const override;
         int                        initialize(const std::vector<std::string> &block_names = {}) override;

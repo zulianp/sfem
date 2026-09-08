@@ -57,6 +57,8 @@ namespace sfem {
 
         int       block_size() const;
         ptrdiff_t n_dofs() const;
+        ptrdiff_t n_owned_dofs() const;
+        ptrdiff_t n_dofs_global() const;
 
         smesh::ElemType element_type(const int block = 0) const;
         std::vector<smesh::ElemType> element_types() const;

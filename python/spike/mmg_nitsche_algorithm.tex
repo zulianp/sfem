@@ -1,0 +1,598 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  citecolor=blue!55!black,
+  urlcolor=blue!55!black
+}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calC}{\mathcal{C}}
+\newcommand{\calD}{\mathcal{D}}
+\newcommand{\calM}{\mathcal{M}}
+\newcommand{\calT}{\mathcal{T}}
+\newcommand{\ud}{\boldsymbol{u}}
+\newcommand{\du}{\boldsymbol{\delta u}}
+\newcommand{\vv}{\boldsymbol{v}}
+\newcommand{\rr}{\boldsymbol{r}}
+\newcommand{\bb}{\boldsymbol{b}}
+\newcommand{\HH}{\boldsymbol{H}}
+\newcommand{\II}{\boldsymbol{I}}
+\newcommand{\RR}{\boldsymbol{R}}
+\newcommand{\ZZ}{\boldsymbol{Z}}
+\newcommand{\PP}{\boldsymbol{P}}
+\newcommand{\nn}{\boldsymbol{n}}
+\newcommand{\xx}{\boldsymbol{x}}
+\newcommand{\dd}{\boldsymbol{d}}
+\newcommand{\FF}{\boldsymbol{F}}
+\newcommand{\SSig}{\boldsymbol{\sigma}}
+\newcommand{\Pio}{\boldsymbol{P}}
+\newcommand{\JJ}{J}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\supp}{\operatorname{supp}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\negpart}[1]{\left[#1\right]_-}
+
+\title{A Filtered Nonlinear Multigrid Method for Stabilized Dual-Pass Mortar Contact}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe a nonlinear multigrid method for unilateral, frictionless contact
+based on the stabilized dual-pass mortar discretization of Puso and Solberg.
+The contact pressure is represented by localized nodal multiplier fields on
+both potential contact surfaces.  For contact, these scalar nodal pressures
+are converted into vector tractions by nodal normals, and stability is obtained
+by penalizing the jump of the resulting traction vectors across the interface.
+The displacement equation is solved by a shifted-penalty multigrid skeleton in
+which nonlinear fine-level smoothing is combined with a recursively computed
+coarse correction.  The central multigrid construction is a filtered coarse
+active space: coarse corrections are excluded from the displacement supports
+of currently active contact multipliers and their stabilization neighbors,
+while the fine nonlinear relaxation remains free to update the active set.
+For finite-strain elasticity, the same framework is combined with compressible
+Neo--Hookean stresses, optional quasi-Newton material linearization during a
+multigrid cycle, rediscretized coarse material tangents evaluated at projected
+coarse displacements, and an inversion-aware globalization based on the
+positivity of the deformation Jacobian.
+\end{abstract}
+
+\section{Introduction}
+
+Multigrid methods for contact mechanics must reconcile two conflicting
+requirements.  Coarse levels are needed to eliminate long-wavelength elastic
+error components, yet the unilateral contact constraint is geometrically local,
+state-dependent, and often nonsmooth.  A naive coarse correction may introduce
+normal jumps across an active contact interface, thereby exciting precisely
+the high-stiffness modes that the contact stabilization is meant to control.
+Conversely, over-constraining the fine problem would prevent the nonlinear
+iteration from adapting the contact set.
+
+The approach considered here follows a conservative principle.  The fine
+problem is solved with the full stabilized active-set mortar residual and
+tangent.  The coarse correction, however, is computed in a filtered active
+space that is jump-free on the displacement supports of the current active
+contact multipliers.  In its present form the filter removes both Cartesian
+displacement components at active contact-adjacent nodes.  This is stronger
+than the minimal normal-component filter, but it has the practical advantage
+of being independent of a normal-tangential basis and therefore provides a
+simple baseline for experiments.
+
+The paper is organized as follows.  Section~\ref{sec:model} states the
+finite-strain elastic model.  Section~\ref{sec:sp-contact} gives the
+stabilized dual-pass mortar contact formulation.  Section~\ref{sec:filtered-space}
+defines the filtered coarse active space and explains why it removes active
+contact modes from the coarse correction.  Section~\ref{sec:mg} presents the
+nonlinear multigrid algorithm.  Section~\ref{sec:coarse-tangents} discusses
+coarse tangent construction, including rediscretization at projected coarse
+displacements.  Section~\ref{sec:globalization} describes material
+linearization, inversion-aware damping, and incremental loading.
+
+\section{Elastic Model}
+\label{sec:model}
+
+Let $\Omega_0\subset\R^2$ be the reference configuration and let
+$\ud:\Omega_0\to\R^2$ denote the displacement.  The deformation map is
+\[
+    \boldsymbol{\varphi}(X)=X+\ud(X),
+    \qquad
+    \FF(\ud)=\II+\nabla_X\ud,
+    \qquad
+    \JJ(\ud)=\det\FF(\ud).
+\]
+The finite-strain variant uses the compressible Neo--Hookean energy density
+\[
+    W(\FF)
+    =
+    \frac{\mu}{2}
+    \left(
+        \tr(\FF^T\FF)-2-2\log\JJ
+    \right)
+    +
+    \frac{\lambda}{2}
+    \left(\log\JJ\right)^2 ,
+\]
+where $\mu$ and $\lambda$ are the Lam'e parameters.  The first
+Piola--Kirchhoff stress entering the reference-domain weak form is
+\[
+    \Pio(\FF)
+    =
+    \mu(\FF-\FF^{-T})
+    +
+    \lambda\log(\JJ)\FF^{-T}.
+\]
+For a test function $\vv$ in the homogeneous Dirichlet space, the elastic
+residual is
+\[
+    \langle \rr_e(\ud),\vv\rangle
+    =
+    \int_{\Omega_0}
+    \Pio(\FF(\ud)):\nabla_X\vv\,dX
+    -
+    \langle \ell_{\mathrm{ext}},\vv\rangle .
+\]
+The Cauchy stress used to evaluate physical normal stresses is
+\[
+    \SSig(\FF)
+    =
+    \frac{\mu}{\JJ}
+    \left(\FF\FF^T-\II\right)
+    +
+    \frac{\lambda\log(\JJ)}{\JJ}\II .
+\]
+Admissible finite-strain states must satisfy $\JJ>0$ elementwise.  This
+condition is not merely a diagnostic: it is required for the energy, stress,
+and tangent to remain well defined.
+
+\section{Stabilized Dual-Pass Mortar Contact}
+\label{sec:sp-contact}
+
+Let $\Gamma_c^1$ and $\Gamma_c^2$ denote the two potential contact traces.
+Following Puso and Solberg, the multiplier space is not chosen from one
+privileged mortar side.  Instead,
+\[
+    M_h=M_h^1\times M_h^2,
+    \qquad
+    \lambda_h=(\lambda_h^1,\lambda_h^2),
+\]
+where each $M_h^i$ is the localized trace space on $\Gamma_c^i$.  For the
+linear triangular prototype this gives a continuous piecewise-linear scalar
+pressure on each contact edge trace.  If $N_{b,h}^i$ is the set of contact
+boundary nodes on side $i$, then
+\[
+    \lambda_h^i(x)
+    =
+    \sum_{A\in N_{b,h}^i}
+    \varphi_A^i(x)\lambda_A^i\nn_A^i ,
+    \qquad x\in\Gamma_c^i .
+\]
+The unknown $\lambda_A^i\in\R$ is non-negative for unilateral frictionless
+contact, and $\nn_A^i$ is a nodal normal obtained by averaging adjacent
+oriented edge normals and normalizing.  Thus the unknown field is scalar, but
+the physical traction entering the weak form is vector-valued.
+
+For every overlapping pair of contact edges the method performs two directed
+integrations.  In the first pass, side $1$ supplies the multiplier test
+function and side $2$ supplies the opposing displacement trace; in the second
+pass the roles are reversed.  The resulting discrete coupling can be written
+as
+\[
+    b(\lambda_h,\vv_h)=\lambda^T B^T v,
+\]
+where $B^T u-g_0$ is the vector of physical normal gap moments associated
+with the localized multiplier basis.  In the present sign convention, positive
+gap means separation and negative gap means penetration.
+
+The dual-pass multiplier space contains two pressure descriptions of the same
+contact traction.  Stability is obtained by the Solberg-Puso traction-jump
+term
+\[
+    j(\mu_h,\lambda_h)
+    =
+    \frac{1}{2}
+    \sum_p
+    \gamma_p h_p
+    \left[
+    \int_{\Gamma^{p,12}}
+    \mu_h^1\cdot(\lambda_h^1+\lambda_h^2)\,d\Gamma
+    +
+    \int_{\Gamma^{p,21}}
+    \mu_h^2\cdot(\lambda_h^2+\lambda_h^1)\,d\Gamma
+    \right],
+\]
+which has the matrix form $\mu^T J\lambda$.  Because the normal directions on
+the two sides are opposite in the continuum limit, equal scalar pressures on
+the two sides produce equal and opposite vector tractions and therefore a
+small stabilized jump.  The stabilization parameter is written
+$\gamma_p=\alpha/E_p$ with a dimensionless $\alpha$ of order one and a
+representative pair modulus $E_p$.
+
+With geometry frozen during one nonlinear contact evaluation, the stabilized
+unilateral conditions are
+\[
+    R_u(u,\lambda)=R_e(u)-B\lambda=0,
+\]
+\[
+    g(u,\lambda)=B^T u+J\lambda-g_0\ge 0,
+    \qquad
+    \lambda\ge 0,
+    \qquad
+    \lambda\cdot g(u,\lambda)=0 .
+\]
+The augmented-Lagrangian displacement residual used by the nonlinear
+multigrid smoother replaces $\lambda$ by the projected active pressure
+\[
+    p_\rho(u,\lambda)
+    =
+    \max\{0,\lambda-\rho\,g(u,\lambda)\},
+\]
+with row-wise penalty $\rho>0$.  Active multiplier nodes are those for which
+$p_\rho>0$.  The associated displacement tangent contains the positive
+semidefinite active contribution
+\[
+    H_c
+    =
+    \sum_{A\in\calA}
+    m_A\rho_A\,B_A B_A^T ,
+\]
+where $m_A$ is the lumped contact mass of the multiplier basis function and
+$B_A$ is the frozen gap derivative.  The multiplier update is a damped
+projected augmentation,
+\[
+    \lambda^{k+1}
+    =
+    \max\{0,\lambda^k-\omega_\lambda\rho\,g(u^{k+1},\lambda^k)\},
+\]
+and therefore the active release condition includes the stabilization term
+$J\lambda$, as required by the stabilized KKT system.
+
+\section{Filtered Coarse Active Space}
+\label{sec:filtered-space}
+
+Let level $\ell=0$ denote the finest discretization and let increasing
+$\ell$ denote coarser levels.  The nodal displacement space on level $\ell$ is
+$V_\ell\subset [H^1(\Omega_0)]^2$, with nodal vector
+$\ud_\ell\in\R^{2n_\ell}$.  The geometric prolongation from level $\ell+1$ to
+level $\ell$ is denoted by
+\[
+    \II_{\ell+1}^{\ell}:\R^{2n_{\ell+1}}\to\R^{2n_\ell},
+    \qquad
+    \RR_{\ell}^{\ell+1}=(\II_{\ell+1}^{\ell})^T .
+\]
+
+For a frozen active set on level $\ell$, define the side-one active node set
+and the side-two active support set by
+\[
+    \calA_{1,\ell}
+    =
+    \{a(c):c\in\calC_\ell,\ \alpha_c=1\},
+\]
+\[
+    \calA_{2,\ell}
+    =
+    \{j:j\in\supp \PP_\ell^c,\ c\in\calC_\ell,\ \alpha_c=1\},
+\]
+where $\PP_\ell^c$ is the interpolation row for the opposite trace.  In an
+unbiased contact description the side labels are local to a row, and both
+sides must therefore be treated symmetrically.  The active nodal set is
+\[
+    \calA_\ell = \calA_{1,\ell}\cup\calA_{2,\ell}.
+\]
+The present filtered space removes all displacement components at these
+nodes:
+\[
+    d_\ell^a =
+    \begin{cases}
+    0, & a\in\calA_\ell,\\
+    1, & a\notin\calA_\ell,
+    \end{cases}
+    \qquad
+    \ZZ_\ell=\diag(\dd_\ell)\otimes \II_2 .
+\]
+Dirichlet degrees of freedom are included in the constrained set as usual.
+The admissible coarse correction space is
+\[
+    \widetilde V_\ell
+    =
+    \{\ZZ_\ell\vv_\ell:\vv_\ell\in V_\ell\}.
+\]
+
+This construction is deliberately conservative.  A minimal contact filter
+would rotate each active nodal correction into a normal-tangential coordinate
+system, eliminate only the active normal component, and rotate the resulting
+correction back to physical coordinates.  Such a construction preserves
+tangential motion and reflects the fact that the coarse level does not lose
+``$x$ and $y$'' as physical directions; it loses the active normal component.
+The Cartesian filter studied here is stronger: it eliminates both physical
+components at active contact-adjacent nodes.  It is nevertheless a useful
+baseline because it is simple, symmetric with respect to the two contact
+sides, and independent of normal averaging ambiguities at nodes shared by
+several contact rows.
+
+\subsection{Vanishing of Active Contact Modes}
+
+The purpose of the filter is to ensure that the coarse correction carries no
+active normal jump.  For any active row $c$ and any vector $\vv_\ell$, the
+filtered vector satisfies
+\[
+    (\ZZ_\ell\vv_\ell)_1^c=\boldsymbol{0},
+    \qquad
+    (\ZZ_\ell\vv_\ell)_2^j=\boldsymbol{0}
+    \quad \forall j\in\supp\PP_\ell^c .
+\]
+Consequently,
+\[
+    {\nn^c}^{T}
+    \left(
+        (\ZZ_\ell\vv_\ell)_2^c
+        -
+        (\ZZ_\ell\vv_\ell)_1^c
+    \right)
+    =
+    0,
+\]
+where the second trace is understood through the interpolation row
+$\PP_\ell^c$.  Since $\delta P_n^c$ vanishes for corrections in
+$\widetilde V_\ell$, the active contact Hessian has no action on this space:
+\[
+    \ZZ_\ell^T\HH_{c,\ell}\ZZ_\ell=\boldsymbol{0}
+\]
+for the frozen active-set, frozen-geometry correction problem.  The coarse
+operator can therefore focus on the elastic error components that remain
+compatible with the current contact constraints.
+
+\subsection{Transfer of Active Information}
+
+The active mask is detected on the finest level from the current Nitsche
+state.  Coarser masks are obtained by the support of the transpose
+prolongation,
+\[
+    s_{\ell+1}
+    =
+    \chi\!\left((\II_{\ell+1}^{\ell})^T s_\ell\right),
+    \qquad
+    d_{\ell+1}=1-s_{\ell+1},
+\]
+where $\chi(z)=1$ for positive entries and $\chi(z)=0$ otherwise.  Thus a
+coarse node is filtered if its basis function overlaps any filtered fine
+node.  This choice is intentionally one-sided: the multigrid hierarchy does
+not recompute a different coarse active set from a coarse contact problem.
+Only the active supports and their connected neighbors are filtered, while the
+elastic operator is transferred or rediscretized according to the tangent
+strategy described below.
+
+\section{Nonlinear Multigrid Algorithm}
+\label{sec:mg}
+
+The finest-level nonlinear equation is
+\[
+    \rr_0(\ud_0)=\rr_{e,0}(\ud_0)+\rr_{c,0}(\ud_0)=\boldsymbol{0}.
+\]
+An outer nonlinear iteration applies a bounded number of nonlinear multigrid
+cycles until the residual norm reaches the desired tolerance.  A cycle begins
+by refreshing the fine residual, tangent, active set, and filtered hierarchy.
+It then performs nonlinear pre-smoothing, computes a restricted residual,
+solves a recursive masked coarse correction problem, applies the prolongated
+coarse correction, and finishes with nonlinear post-smoothing.
+
+Let $\nu_1$ and $\nu_2$ be the number of pre- and post-smoothing steps.  On
+the fine level, one nonlinear smoothing step computes
+\[
+    \rr_0^k=\rr_0(\ud_0^k),
+    \qquad
+    \HH_0^k=\nabla\rr_0(\ud_0^k),
+\]
+and applies a fixed number of stationary linear relaxation sweeps to
+\[
+    \HH_0^k\boldsymbol{s}^k\approx -\rr_0^k,
+    \qquad
+    \ud_0^{k+1}=\ud_0^k+\boldsymbol{s}^k .
+\]
+The fine smoother is constrained only by Dirichlet conditions.  Active contact
+nodes remain free on the fine level, so that the nonlinear iteration can
+change the active set.
+
+The recursive correction on a generic level $\ell$ is linear with respect to
+the tangent available for the current cycle.  Given a masked right-hand side
+$\bb_\ell$ and tangent $\HH_\ell$, the correction satisfies
+\[
+    \du_\ell|_{\calM_\ell}=0,
+    \qquad
+    \HH_\ell\du_\ell \approx \bb_\ell
+    \quad\text{on unconstrained degrees of freedom}.
+\]
+The multigrid recursion is
+\[
+    \du_\ell^{(0)}=\boldsymbol{0},
+\]
+\[
+    \du_\ell^{(1)}
+    =
+    S_\ell^{\nu_1}(\HH_\ell,\bb_\ell,\du_\ell^{(0)}),
+\]
+\[
+    \boldsymbol{\rho}_\ell
+    =
+    \bb_\ell-\HH_\ell\du_\ell^{(1)},
+    \qquad
+    \boldsymbol{\rho}_\ell|_{\calM_\ell}=0,
+\]
+\[
+    \bb_{\ell+1}
+    =
+    (\II_{\ell+1}^{\ell})^T\boldsymbol{\rho}_\ell,
+    \qquad
+    \du_{\ell+1}
+    =
+    \operatorname{cycle}_{\ell+1}(\bb_{\ell+1}),
+\]
+\[
+    \du_\ell^{(2)}
+    =
+    \du_\ell^{(1)}
+    +
+    \II_{\ell+1}^{\ell}\du_{\ell+1},
+    \qquad
+    \du_\ell^{(2)}|_{\calM_\ell}=0,
+\]
+\[
+    \du_\ell
+    =
+    S_\ell^{\nu_2}(\HH_\ell,\bb_\ell,\du_\ell^{(2)}).
+\]
+On the coarsest level the masked system is solved directly on the
+unconstrained degrees of freedom.  Repeating the coarse-correction stage gives
+a W-cycle; a single recursive visit gives a V-cycle.
+
+\section{Coarse Tangent Construction}
+\label{sec:coarse-tangents}
+
+Two coarse tangent constructions are relevant.
+
+\paragraph{Inherited tangent.}
+For a fixed fine-level tangent, the Galerkin hierarchy is
+\[
+    \HH_{\ell+1}
+    =
+    (\II_{\ell+1}^{\ell})^T
+    \HH_\ell
+    \II_{\ell+1}^{\ell}.
+\]
+This is the variationally consistent coarse representation of the current
+linearized problem.  It requires no additional material or contact
+reassembly.  Once the active space has been filtered, the Galerkin operator is
+used only on the compatible correction space.
+
+\paragraph{Rediscretized tangent.}
+For nonlinear finite-strain problems, the coarse tangent may instead be
+assembled directly on level $\ell+1$ at a projected coarse displacement:
+\[
+    \HH_{\ell+1}
+    =
+    \nabla\rr_{\ell+1}(\ud_{\ell+1}),
+    \qquad
+    \ud_{\ell+1}=Q_\ell\ud_\ell .
+\]
+The inexpensive projection used in the present experiments is nodal
+injection.  For nested meshes,
+\[
+    \ud_{\ell+1}(X_{\ell+1}^a)
+    =
+    \ud_\ell(X_{\ell+1}^a).
+\]
+No mesh-volume scaling is applied.  Displacement is a pointwise kinematic
+quantity, so the injected coarse value has the same physical units as the
+fine value.  Scaling would be appropriate for transferred residuals or
+integrated loads, not for nodal displacement values.  Strong Dirichlet values
+are imposed after the projection.
+
+Rediscretization changes the mathematical coarse problem: it no longer
+represents the exact Galerkin projection of the fine tangent.  Its purpose is
+to provide a cheaper nonlinear coarse model of the current deformed state,
+especially when material stiffness changes substantially with deformation.
+The filtered active space is retained in either case; only the construction
+of the elastic and contact tangent differs.
+
+\section{Material Linearization and Globalization}
+\label{sec:globalization}
+
+For hyperelasticity, the residual is always evaluated at the current
+displacement.  The material tangent may be refreshed at every residual/tangent
+evaluation or frozen for the duration of a nonlinear multigrid cycle.  The
+latter gives a quasi-Newton cycle:
+\[
+    \HH_{e,0}^{\mathrm{cycle}}
+    =
+    \nabla\rr_{e,0}(\ud_0^{\mathrm{start}}),
+    \qquad
+    \rr_{e,0}=\rr_{e,0}(\ud_0)
+    \text{ at each current iterate}.
+\]
+This avoids repeatedly rebuilding the finite-strain material tangent during
+the internal smoothing steps, while still measuring the nonlinear residual at
+the updated state.
+
+Large coarse corrections can invalidate the finite-strain model by producing
+elements with $\JJ\le0$.  The coarse correction is therefore optionally
+damped by an inversion-aware line search.  Given a proposed correction
+$\du_0$, the accepted step is
+\[
+    \ud_0^+ = \ud_0+\alpha\du_0,
+    \qquad
+    \alpha\in\{1,\beta,\beta^2,\ldots\},
+\]
+where the largest tested $\alpha$ satisfying
+\[
+    \min_{K\in\calT_0}\det\FF_K(\ud_0+\alpha\du_0)
+    >
+    J_{\min}
+\]
+is chosen.  This globalization enforces admissibility of the deformation but
+does not require monotone residual decrease.  It is therefore less restrictive
+than a residual Armijo search and is targeted specifically at preventing
+inverted hyperelastic elements.
+
+The same admissibility test is useful outside the nonlinear solver through
+incremental loading.  Let $\bar \ud_D$ be the target imposed displacement.
+The loading process solves a sequence of problems with
+\[
+    \ud_D^{(m)} = t_m\bar\ud_D,
+    \qquad
+    0=t_0<t_1<\cdots<t_M=1 .
+\]
+Each converged solution initializes the next load level.  If a load step
+causes loss of admissibility, the increment is reduced and retried.  This
+continuation strategy separates global deformation robustness from the local
+multigrid correction mechanism.
+
+\section{Expected Diagnostics}
+
+The primary convergence measure is the norm of the finest-level nonlinear
+residual after applying Dirichlet constraints.  For the contact problem, this
+residual should be interpreted together with the active pressure $p_c$, the
+gap field, and the minimum element Jacobian.  A nonzero elastic normal stress
+outside the active region is not necessarily a contact-force error; the
+inactive contact contribution is zero by construction.  The relevant contact
+quantity outside the active set is the active pressure, which should vanish
+there.
+
+Several mechanisms can obstruct residual reduction.  Insufficient nonlinear
+smoothing leaves high-frequency active-set changes unresolved before the
+coarse correction is applied.  A coarse space that is too restrictive may
+remove legitimate low-frequency elastic modes near the contact zone.  A
+rediscretized coarse tangent may depart from the fine Galerkin correction
+enough to reduce coarse-grid efficiency.  A frozen material tangent can
+behave like a weak quasi-Newton approximation under large deformation.
+Finally, damping based only on element invertibility may accept steps that are
+admissible but not residual reducing; this is a robustness device, not a
+convergence guarantee.
+
+\section{Conclusions}
+
+The method combines three ideas: a Nitsche active-set formulation of
+frictionless contact, a jump-free filtered coarse active space, and a
+nonlinear multigrid cycle with optional finite-strain globalization.  The
+filtered space gives a clear algebraic mechanism for preventing active
+contact jumps from entering the coarse correction.  Galerkin coarsening
+preserves the current fine linearization, whereas rediscretized coarse
+tangents provide a deformation-dependent alternative for hyperelasticity.
+For larger deformations, inversion-aware damping and incremental loading are
+natural safeguards because they enforce the fundamental admissibility
+condition $\det\FF>0$.  A normal-tangential filtered space remains the next
+mathematically sharper refinement: it would remove only the active normal
+component while preserving tangential coarse motion.
+
+\end{document}
