@@ -4,13 +4,16 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import json
 import os
+import shutil
 import sys
 
 import numpy as np
 import pandas as pd
 import yaml
 
-from run_torsion_history_compare import CASE, POLICIES, RESOLUTIONS, compare_runs, load_case, read_history, run, scalar_errors
+from run_torsion_history_compare import (
+    CASE, POLICIES, RESOLUTIONS, collect_runs, compare_runs, load_case, plot_results, read_history, run, scalar_errors,
+)
 
 
 def check(root):
@@ -38,6 +41,28 @@ def check(root):
                        for call in launch.call_args_list)
         assert json.loads((folder / "manifest.json").read_text())["history_check"] == expected
         assert json.loads((folder / "manifest.json").read_text())["resolution"] == resolution
+
+    with patch("run_torsion_history_compare.subprocess.run") as launch, \
+         patch("run_torsion_history_compare.subprocess.check_output", return_value="test-commit"), \
+         patch("run_torsion_history_compare.read_history"), \
+         patch("run_torsion_history_compare.compare_runs") as compare:
+        launch.return_value.returncode = 0
+        selected = root / "selected_element"
+        run(selected, Path(sys.executable), 0.025, "coarse", "per_elem", ["fp16_tensor"], True)
+        assert launch.call_count == 2 and not compare.called
+        assert launch.call_args.kwargs["env"]["SFEM_HISTORY_MODE"] == "per_elem"
+        assert launch.call_args.kwargs["env"]["SFEM_HISTORY_SCALING"] == "tensor"
+        saved = json.loads((selected / "manifest.json").read_text())
+        assert saved["requested_cases"] == ["fp16_tensor"]
+        assert saved["runs"]["fp16_tensor"]["complete"]
+
+    for mode, cases in (("wrong", ["fp64"]), ("per_qp", ["fp64", "fp64"]), ("per_elem", [])):
+        try:
+            run(root / "invalid", Path(sys.executable), history_mode=mode, cases=cases, run_only=True)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Reject invalid mode/cases before launching")
 
     original = yaml.safe_load(CASE.read_text())
     assert original["time"] == {"dt": 0.005, "t_end": 30.0}
@@ -89,6 +114,73 @@ def check(root):
     assert np.allclose(summary.peak_control_error_percent_of_ref_peak, range(5))
     for name in ("torsion_comparison.pdf", "coupled_comparison.pdf", "torsion_errors.csv"):
         assert (root / "compare" / name).stat().st_size > 0
+
+    # Only compact CSV/JSON files travel to the local machine; plotting cannot read raw fields.
+    portable = root / "portable"
+    (portable / "compare").mkdir(parents=True)
+    for path in (root / "compare").iterdir():
+        if path.suffix in (".csv", ".json"):
+            shutil.copy2(path, portable / "compare" / path.name)
+    plot_results(portable)
+    assert (portable / "compare/torsion_comparison.png").is_file()
+
+    # Non-overlapping debug jobs can be combined, but not different grids, YAMLs or failed jobs.
+    split = []
+    for index, names in enumerate((list(POLICIES)[:2], list(POLICIES)[2:])):
+        job = root / f"split_{index}"
+        job.mkdir()
+        shutil.copy2(root / "case.yaml", job / "case.yaml")
+        for name in names:
+            (job / name).symlink_to(root / name, target_is_directory=True)
+        manifest = {"history_mode": "per_qp", "mesh_command": ["python", "mesh.py", "mesh", "--cell_type=HEX8", "-x", "3"],
+                    "executable_sha256": "same-executable", "requested_cases": names,
+                    "runs": {name: {"storage": POLICIES[name][0], "scaling": POLICIES[name][1],
+                                    "returncode": 0, "complete": True} for name in names}}
+        (job / "manifest.json").write_text(json.dumps(manifest))
+        split.append(job)
+    compare_runs(root / "merged", split, make_plots=False)
+    assert not (root / "merged/compare/torsion_comparison.png").exists()
+    merged = pd.read_csv(root / "merged/compare/torsion_summary.csv")
+    assert np.allclose(merged.peak_control_error_percent_of_ref_peak, summary.peak_control_error_percent_of_ref_peak)
+    try:
+        compare_runs(root / "merged", split, make_plots=False)
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("Preserve completed comparison tables")
+    try:
+        collect_runs([split[0], split[0]])
+    except ValueError as error:
+        assert "Duplicate" in str(error)
+    else:
+        raise AssertionError("Reject duplicate case jobs")
+    path_manifest = split[1] / "manifest.json"
+    good_manifest = json.loads(path_manifest.read_text())
+    for mutation, message in (("mesh", "mesh"), ("failed", "failed"), ("missing", "incomplete")):
+        broken = json.loads(json.dumps(good_manifest))
+        if mutation == "mesh":
+            broken["mesh_command"][-1] = "4"
+        elif mutation == "failed":
+            broken["runs"]["fp16"]["returncode"] = 1
+        else:
+            del broken["runs"]["fp16"]
+        path_manifest.write_text(json.dumps(broken))
+        try:
+            collect_runs(split)
+        except ValueError as error:
+            assert message in str(error)
+        else:
+            raise AssertionError(f"Reject {mutation}")
+    path_manifest.write_text(json.dumps(good_manifest))
+    element = root / "element_fixture"
+    shutil.copytree(split[0], element, symlinks=True)
+    element_manifest = json.loads((element / "manifest.json").read_text())
+    element_manifest["history_mode"] = "per_elem"
+    (element / "manifest.json").write_text(json.dumps(element_manifest))
+    _, modes, reference = collect_runs([split[0], element])
+    assert reference == "per_qp_fp64" and "per_elem_fp64" in modes
+    _, _, reference = collect_runs([element])
+    assert reference == "fp64"
 
     path = root / "fp64/results_newmark/history.csv"
     for bad, message in ((ref.iloc[:1], "incomplete"),

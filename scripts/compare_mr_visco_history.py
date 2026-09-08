@@ -75,7 +75,7 @@ def plot_temporal_error(temporal, out_dir, comparison_label):
 
 
 def compare_displacement(reference_dir, candidate_dir, out_dir, output_subdir, reference_label, candidate_label,
-                         tip_mask=None, end_time=None):
+                         tip_mask=None, end_time=None, make_plots=True):
     reference_out = reference_dir / output_subdir
     candidate_out = candidate_dir / output_subdir
     comparison_label = f"{candidate_label} - {reference_label}"
@@ -153,8 +153,9 @@ def compare_displacement(reference_dir, candidate_dir, out_dir, output_subdir, r
     }
 
     pd.DataFrame([summary]).to_csv(out_dir / "displacement_diff_summary.csv", index=False)
-    plot_spatial_error(final_diffs, out_dir, comparison_label)
-    plot_temporal_error(temporal, out_dir, comparison_label)
+    if make_plots:
+        plot_spatial_error(final_diffs, out_dir, comparison_label)
+        plot_temporal_error(temporal, out_dir, comparison_label)
 
     with (out_dir / "summary.txt").open("w") as f:
         f.write(f"MooneyRivlinVisco comparison: {comparison_label}\n")

@@ -1,5 +1,139 @@
 # Newmark torsion history-storage comparison
 
+## CSCS: SBATCH → experiment script → YAML → local plots
+
+The workflow is:
+
+```text
+scripts/run_torsion.sbatch             resources, environment, one MPI rank
+  → scripts/run_torsion_study.sh       resolution(s), mode(s), cases, optional short T
+    → run_torsion_history_compare.py   mesh, independent case runs, validation, CSV reduction
+      → newmark_torsion_release.yaml  material, loading, dynamics, solver, T=30, dt=0.005
+```
+
+No C++ changes or rebuild are needed for these script changes if the current mixed-precision
+torsion executable is already built on CSCS. Do not transfer the macOS executable to CSCS.
+
+### 1. Environment and debug pilot
+
+Run on CSCS from the repository root:
+
+```bash
+cd /capstor/store/cscs/pasc/c40/hyang/sfem
+# Only start a uenv if you are not already inside the matching build environment.
+uenv start prgenv-gnu/25.6:v2 --view=default
+source .venv/bin/activate
+python3 -c 'import numpy, pandas, matplotlib, yaml; print("Python dependencies OK")'
+ls -lh spikes/prony-series/build/prony_visco_torsion
+ldd spikes/prony-series/build/prony_visco_torsion
+```
+
+All runtime libraries must resolve (no `not found`). The SBATCH repeats Python and library
+checks on the compute node. It activates `$ROOT_DIR/.venv`; set `TORSION_VENV` if yours is
+elsewhere. `PRONY_EXE` overrides the executable path. No username-specific executable path
+is hard-coded in the scripts. The SBATCH does not install packages, compile or start a nested uenv.
+
+Short coarse-grid pilot, both modes and all five cases:
+
+```bash
+TORSION_RESOLUTIONS=coarse TORSION_MODES="per_qp per_elem" TORSION_END_TIME=0.025 \
+  sbatch --uenv-passthrough=use --partition=debug --time=00:30:00 \
+  --cpus-per-task=8 scripts/run_torsion.sbatch
+```
+
+The `debug` partition changes the wall-clock limit, NOT the simulated end time.
+Only `TORSION_END_TIME` shortens the saved YAML copy. Use `TORSION_END_TIME=5.1` for a
+release-crossing pilot; 0.025 only tests startup. A time limit can still interrupt either pilot.
+
+The default SBATCH requests one exclusive node, one MPI rank, 72 OpenMP CPUs and 6 hours in
+`normal`, account `c40`. Adjust the resource directives or override them on the `sbatch`
+command line. 72 threads is a starting allocation, not a measured optimal thread count.
+The driver is single-rank; never launch 72 MPI tasks. Local tests do not verify CSCS scheduling.
+
+### 2. Full experiment: six jobs, 30 solves
+
+`run_torsion_study.sh` is the place to edit experiment defaults. Its `TORSION_*` settings can
+also be overridden when submitting. This submits six independent jobs; do it after the pilot:
+
+```bash
+for resolution in coarse medium fine; do
+  for mode in per_qp per_elem; do
+    TORSION_RESOLUTIONS="$resolution" TORSION_MODES="$mode" TORSION_END_TIME=30 \
+      TORSION_CASES="fp64 fp32 fp16 fp16_tensor fp16_element_prony" \
+      TORSION_POSTPROCESS=1 \
+      sbatch --uenv-passthrough=use scripts/run_torsion.sbatch
+  done
+done
+```
+
+Each job sequentially runs five cases, then reduces their raw displacement fields to error
+CSVs against that mode's FP64 reference. It does not draw plots. To run all groups in one
+allocation instead, use `TORSION_RESOLUTIONS="coarse medium fine" TORSION_MODES="per_qp per_elem"`;
+they will run sequentially and share the job's wall-clock limit, so separate jobs are preferable.
+
+Output: `build_torsion_runs/study_JOBID/coarse_per_qp/` (and corresponding other groups).
+Each group contains a YAML snapshot, mesh, manifest, per-case logs/fields and `compare/`.
+The top-level base can be changed with `TORSION_OUT_BASE`; existing directories are refused.
+Nothing automatically resumes or deletes previous results. A timeout preserves completed
+cases and partial files but does not count as a successful experiment.
+
+```bash
+squeue -j JOBID
+sacct -j JOBID --format=JobID,State,ExitCode,Elapsed
+tail -n 80 torsion-JOBID.out
+```
+
+The Slurm log is created in the submission directory; simulation output is under the repo root.
+
+### 3. Split cases and compute comparisons later
+
+For debug, select cases, e.g. `TORSION_CASES="fp64 fp32"` in one job and
+`TORSION_CASES="fp16 fp16_tensor fp16_element_prony"` in another. Each receives a distinct job
+directory. Without FP64 plus at least one candidate, automatic reduction is skipped.
+Set `TORSION_POSTPROCESS=0` to skip reduction explicitly. Partial case selection does not
+resume a truncated time trajectory: a resubmitted case starts from time zero.
+
+Once both jobs finish, combine their complete, non-overlapping results on CSCS, using a
+compute allocation for large-field reduction:
+
+```bash
+python3 scripts/run_torsion_history_compare.py --compare-only \
+  --runs build_torsion_runs/study_JOB1/coarse_per_qp \
+         build_torsion_runs/study_JOB2/coarse_per_qp \
+  --out build_torsion_runs/coarse_per_qp_merged
+```
+
+Inputs must have identical YAML settings, mesh parameters and executable hash. Duplicate
+mode/case pairs, incomplete jobs and failed cases are rejected rather than silently selected.
+Completed comparison tables are also preserved: use `--plot-only` to redraw, or a new `--out`
+with `--runs` to recompute them. An interrupted reduction without `comparison.json` may be retried.
+Do not include a failed job alongside its replacement. For a comparison of both history
+modes, pass a complete `coarse_per_qp` directory and a complete `coarse_per_elem` directory
+to the same `--runs` command, with a new `--out`. The reference then becomes `per_qp_fp64`:
+this measures combined spatial-representation and storage-precision differences. Per-mode
+comparisons remain referenced to each mode's own FP64. Never combine different resolutions.
+
+### 4. Transfer compact results and plot locally
+
+The `compare/` directory contains all scalar histories and whole-field error time series needed
+for the summary plots. Raw mesh, displacement, velocity and acceleration fields stay on CSCS.
+Run this on your LOCAL machine; replace JOBID and the SSH host alias as appropriate:
+
+```bash
+mkdir -p build_torsion_runs/from_cscs/coarse_per_qp/compare
+rsync -av \
+  daint:/capstor/store/cscs/pasc/c40/hyang/sfem/build_torsion_runs/study_JOBID/coarse_per_qp/compare/ \
+  build_torsion_runs/from_cscs/coarse_per_qp/compare/
+venv/bin/python scripts/run_torsion_history_compare.py --plot-only \
+  --out build_torsion_runs/from_cscs/coarse_per_qp
+```
+
+Use `.venv/bin/python` instead if that is your local environment. No solver or CSCS paths are
+needed for cached-CSV plotting. For new spatial visualizations not represented in the cached
+tables, retain/download the relevant raw fields. Do not delete raw results until analysis is complete.
+
+## Direct Python entry point
+
 Run from the SFEM repository root, after building `spikes/prony-series/build/prony_visco_torsion`:
 
 ```bash
@@ -12,7 +146,10 @@ runs. The old `build_torsion_runs/fp64` is not modified or reused. `--exe` (or `
 select a different torsion executable; use the Python environment with NumPy, pandas,
 matplotlib and PyYAML installed (`.venv/bin/python` on CSCS if that is your environment).
 
-The runner executes these five policies sequentially, with `SFEM_HISTORY_MODE=per_qp`:
+The runner executes these five policies sequentially. `--history-mode per_qp` is the default;
+use `--history-mode per_elem` for one history tensor per element per Prony branch. `--cases`
+selects a subset by directory names below; `--run-only` skips comparison (also permits no FP64).
+Without `--run-only`, a direct Python run computes tables and plots after simulation.
 
 | Directory | History storage | Scaling |
 | --- | --- | --- |
@@ -41,8 +178,9 @@ venv/bin/python scripts/run_torsion_history_compare.py \
   --resolution coarse --out build_torsion_runs/coarse_per_qp_T30_01
 ```
 
-Use `medium` or `fine` with a separate output directory for the other meshes. These presets
-do not add per-element runs; this runner still executes the five per-QP policies only.
+Use `medium` or `fine` with a separate output directory for the other meshes, and
+`--history-mode per_elem` to run the other history mode. Under `per_elem`, the tensor and
+element-Prony scale groups coincide; both policies are retained in the requested five-case matrix.
 
 `SFEM_T` and the old cantilever material environment variables do not configure this driver:
 the physics comes from the YAML. The script does not build or modify the solver.
@@ -86,6 +224,8 @@ remain for diagnosis. A successful process exit alone is not treated as proof of
   and their precision errors.
 - `compare/torsion_errors.csv`: absolute and peak-normalized scalar errors over time.
 - `compare/torsion_summary.csv`: peak scalar errors, iteration counts and maximum residual.
+- `compare/torsion_responses.csv`: scalar responses for every selected case, including FP64.
+- `compare/comparison.json`: saved case settings, reference label and source-run paths for provenance.
 - `compare/coupled_comparison.pdf` / `.png` / `.csv`: whole-field displacement errors,
   reusing the existing comparison functions. Per-policy details are in `compare/<policy>/`.
 
@@ -108,9 +248,9 @@ An instantaneous field-relative error can grow when the reference displacement n
 small during recovery; read it together with absolute and peak-normalized errors.
 
 The runner does not invoke the unavailable XDMF export helper. CSV and raw-field comparisons
-work without it. It does not submit Slurm jobs or change the old cantilever scripts.
+work without it. The new SBATCH is only a wrapper; the old cantilever submission scripts are unchanged.
 
-To recreate plots without rerunning the solver:
+To recreate plots from compact tables without rerunning the solver:
 
 ```bash
 venv/bin/python scripts/run_torsion_history_compare.py \
