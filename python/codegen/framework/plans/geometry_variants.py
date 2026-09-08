@@ -65,6 +65,33 @@ class GeometryVariantPlan:
     def emits_metric(self):
         return self.cached_metric is not None
 
+    @property
+    def packed_mesh_layouts(self):
+        """The packed layouts to emit, as a sequence rather than a flag.
+
+        Emission iterates this; it does not test it.  A branch reading a plan
+        is still emission choosing what to emit, which is the distinction
+        `test_emission_is_a_printer` measures and the reason this is a tuple:
+        an empty one emits nothing without anybody deciding anything at the
+        point of emission.
+        """
+        return ("packed",) if self.emits_packed else ()
+
+    @property
+    def geometry_modes(self):
+        """The geometry kernels to emit, in the order they are emitted.
+
+        Same reasoning as `packed_mesh_layouts`.  A constant-P1 simplex yields
+        one mode where every other element yields two, which is the whole of
+        the "no need for both kernels" rule expressed as data.
+        """
+        modes = []
+        if self.emits_affine:
+            modes.append("affine")
+        if self.emits_isoparametric:
+            modes.append("isoparametric")
+        return tuple(modes)
+
     def to_dict(self):
         return {
             "emits_affine": self.emits_affine,

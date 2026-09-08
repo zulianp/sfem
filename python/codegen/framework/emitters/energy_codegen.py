@@ -4934,35 +4934,41 @@ def _sfem_soa_mesh_operator_function(
                 "",
             ]
         )
-    _append_mesh_operator_packed_entry_points(
-        general_block_name,
-        dim,
-        effective_vector_size,
-        form,
-        function_name,
-        geometry_mode,
-        identity_stream_shape_order,
-        lines,
-        local_prefix,
-        material_parameter_names,
-        n_nodes,
-        n_qp,
-        omit_reference_basis_inputs,
-        prefix,
-        quadrature_rule,
-        reference_inputs,
-        source_builder,
-        stream_shape_order,
-        use_reference_gradient_vectors,
-        use_tensor_product_geometry,
-        use_tensor_product_reference,
-        uses_current,
-        uses_direction,
-        n_field_components=n_field_components,
-        metric=metric,
-        metric_block_name=block_name,
-        expanded_plan=expanded_plan,
-    )
+    # Iterated, not tested: the plan says which packed layouts this element
+    # publishes, and an element that publishes none simply does not enter the
+    # loop.  A branch here would be emission choosing what to emit.
+    for _packed_layout in geometry_variant_plan(
+        form.weak_form, quadrature_rule
+    ).packed_mesh_layouts:
+        _append_mesh_operator_packed_entry_points(
+            general_block_name,
+            dim,
+            effective_vector_size,
+            form,
+            function_name,
+            geometry_mode,
+            identity_stream_shape_order,
+            lines,
+            local_prefix,
+            material_parameter_names,
+            n_nodes,
+            n_qp,
+            omit_reference_basis_inputs,
+            prefix,
+            quadrature_rule,
+            reference_inputs,
+            source_builder,
+            stream_shape_order,
+            use_reference_gradient_vectors,
+            use_tensor_product_geometry,
+            use_tensor_product_reference,
+            uses_current,
+            uses_direction,
+            n_field_components=n_field_components,
+            metric=metric,
+            metric_block_name=block_name,
+            expanded_plan=expanded_plan,
+        )
     return lines
 
 

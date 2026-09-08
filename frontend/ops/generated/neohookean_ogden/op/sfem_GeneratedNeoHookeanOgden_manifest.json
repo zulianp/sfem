@@ -25,28 +25,12 @@
       "name": "neohookean_ogden_apply_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int neohookean_ogden_apply_packed_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const void *const SFEM_RESTRICT hx,\n        const void *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy\n);",
-      "name": "neohookean_ogden_apply_packed_2d_affine_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int neohookean_ogden_apply_packed_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const void *const SFEM_RESTRICT hx,\n        const void *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy\n);",
-      "name": "neohookean_ogden_apply_packed_2d_isoparametric_mesh_soa"
-    },
-    {
       "declaration": "extern \"C\" int neohookean_ogden_apply_packed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const void *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const void *const SFEM_RESTRICT hx,\n        const void *const SFEM_RESTRICT hy,\n        const void *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy,\n        void *const SFEM_RESTRICT outz\n);",
       "name": "neohookean_ogden_apply_packed_3d_affine_mesh_soa"
     },
     {
       "declaration": "extern \"C\" int neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const void *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const void *const SFEM_RESTRICT hx,\n        const void *const SFEM_RESTRICT hy,\n        const void *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy,\n        void *const SFEM_RESTRICT outz\n);",
       "name": "neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int neohookean_ogden_apply_packed_two_pass_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        void *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const void *const SFEM_RESTRICT hx,\n        const void *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy\n);",
-      "name": "neohookean_ogden_apply_packed_two_pass_2d_affine_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int neohookean_ogden_apply_packed_two_pass_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        void *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const void *const SFEM_RESTRICT hx,\n        const void *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy\n);",
-      "name": "neohookean_ogden_apply_packed_two_pass_2d_isoparametric_mesh_soa"
     },
     {
       "declaration": "extern \"C\" int neohookean_ogden_apply_packed_two_pass_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        void *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const void *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const void *const SFEM_RESTRICT hx,\n        const void *const SFEM_RESTRICT hy,\n        const void *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy,\n        void *const SFEM_RESTRICT outz\n);",
@@ -81,28 +65,12 @@
       "name": "neohookean_ogden_gradient_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy\n);",
-      "name": "neohookean_ogden_gradient_packed_2d_affine_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy\n);",
-      "name": "neohookean_ogden_gradient_packed_2d_isoparametric_mesh_soa"
-    },
-    {
       "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const void *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy,\n        void *const SFEM_RESTRICT outz\n);",
       "name": "neohookean_ogden_gradient_packed_3d_affine_mesh_soa"
     },
     {
       "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const void *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy,\n        void *const SFEM_RESTRICT outz\n);",
       "name": "neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_two_pass_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        void *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy\n);",
-      "name": "neohookean_ogden_gradient_packed_two_pass_2d_affine_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_two_pass_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        void *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy\n);",
-      "name": "neohookean_ogden_gradient_packed_two_pass_2d_isoparametric_mesh_soa"
     },
     {
       "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_two_pass_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        void *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const void *const SFEM_RESTRICT uy,\n        const void *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT outx,\n        void *const SFEM_RESTRICT outy,\n        void *const SFEM_RESTRICT outz\n);",
@@ -375,19 +343,7 @@
           "variant": "affine"
         },
         {
-          "function": "neohookean_ogden_apply_packed_2d_affine_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "neohookean_ogden",
-          "variant": "affine"
-        },
-        {
           "function": "neohookean_ogden_apply_packed_3d_affine_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "neohookean_ogden",
-          "variant": "affine"
-        },
-        {
-          "function": "neohookean_ogden_apply_packed_two_pass_2d_affine_mesh_soa",
           "scalar_type": "real_t",
           "target": "neohookean_ogden",
           "variant": "affine"
@@ -411,19 +367,7 @@
           "variant": "isoparametric"
         },
         {
-          "function": "neohookean_ogden_apply_packed_2d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "neohookean_ogden",
-          "variant": "isoparametric"
-        },
-        {
           "function": "neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "neohookean_ogden",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "neohookean_ogden_apply_packed_two_pass_2d_isoparametric_mesh_soa",
           "scalar_type": "real_t",
           "target": "neohookean_ogden",
           "variant": "isoparametric"
@@ -452,19 +396,7 @@
           "variant": "affine"
         },
         {
-          "function": "neohookean_ogden_gradient_packed_2d_affine_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "neohookean_ogden",
-          "variant": "affine"
-        },
-        {
           "function": "neohookean_ogden_gradient_packed_3d_affine_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "neohookean_ogden",
-          "variant": "affine"
-        },
-        {
-          "function": "neohookean_ogden_gradient_packed_two_pass_2d_affine_mesh_soa",
           "scalar_type": "real_t",
           "target": "neohookean_ogden",
           "variant": "affine"
@@ -488,19 +420,7 @@
           "variant": "isoparametric"
         },
         {
-          "function": "neohookean_ogden_gradient_packed_2d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "neohookean_ogden",
-          "variant": "isoparametric"
-        },
-        {
           "function": "neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "neohookean_ogden",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "neohookean_ogden_gradient_packed_two_pass_2d_isoparametric_mesh_soa",
           "scalar_type": "real_t",
           "target": "neohookean_ogden",
           "variant": "isoparametric"
