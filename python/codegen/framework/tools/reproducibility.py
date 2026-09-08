@@ -1586,6 +1586,19 @@ def _packed_parity(measured):
     return disagreements
 
 
+def _is_maintained(name, digest):
+    """Whether this baseline entry belongs to a material that still generates.
+
+    An entry for a material outside `MATERIALS` can never be refreshed, because
+    nothing produces the kernel; counting it as missing would make the gate
+    permanently red for a scope decision taken deliberately elsewhere.
+    """
+    owned = digest.get("material") if isinstance(digest, dict) else None
+    if owned is not None:
+        return owned in MATERIALS
+    return any(name.startswith(material) for material in MATERIALS)
+
+
 def _compare(recorded, measured):
     """Kernels that moved, that appeared, and that went missing."""
     moved, appeared, missing = [], [], []
@@ -1826,6 +1839,27 @@ def main(argv=None):
 
     if args.record:
         merged = dict(recorded)
+        # Also drop entries owned by a material the snapshot no longer
+        # maintains.  Five materials left the default generation set with the
+        # scope reduction, and their digests cannot be refreshed by any run --
+        # nothing generates them -- so they would report as `missing` forever
+        # now that a changed population fails.  A baseline entry for a material
+        # that is not generated is history, not coverage.
+        unmaintained = []
+        for name, digest in merged.items():
+            owned = digest.get("material") if isinstance(digest, dict) else None
+            if owned is not None:
+                if owned not in MATERIALS:
+                    unmaintained.append(name)
+            elif not any(name.startswith(m) for m in MATERIALS):
+                unmaintained.append(name)
+        for name in unmaintained:
+            del merged[name]
+        if unmaintained:
+            print(
+                "dropped %d entries for materials the snapshot no longer maintains"
+                % len(unmaintained)
+            )
         # Drop this run's materials wholesale before re-adding what was
         # measured, so a kernel that no longer exists leaves the baseline.
         #
@@ -1885,7 +1919,9 @@ def main(argv=None):
         print("rename map applied to %d baseline entries" % len(renames))
 
     scoped = {
-        name: digest for name, digest in recorded.items() if name in key_scope
+        name: digest
+        for name, digest in recorded.items()
+        if name in key_scope and _is_maintained(name, digest)
     }
     moved, appeared, missing = _compare(scoped, measured)
 
