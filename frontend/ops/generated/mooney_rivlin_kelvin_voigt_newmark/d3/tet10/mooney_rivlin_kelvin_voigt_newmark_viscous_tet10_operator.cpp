@@ -29,24 +29,24 @@
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *affine_geometry_stream(
         const int,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT,
+        const g_t *const SFEM_RESTRICT source,
+        s_t *const SFEM_RESTRICT,
         std::true_type) {
     return source;
 }
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *affine_geometry_stream(
         const int nelems,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT converted,
+        const g_t *const SFEM_RESTRICT source,
+        s_t *const SFEM_RESTRICT converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
-        converted[lane] = scalar_t(source[lane]);
+        converted[lane] = s_t(source[lane]);
     }
     return converted;
 }
@@ -58,50 +58,50 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename scalar_t>
+template <typename s_t>
 struct mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data {
-    static const scalar_t *shape() {
-        static const scalar_t data[40] = {scalar_t(0.099999999999999936), scalar_t(-0.099999999999999992), scalar_t(-0.099999999999999992), scalar_t(-0.099999999999999992), scalar_t(0.32360679774997891), scalar_t(0.076393202250021025), scalar_t(0.32360679774997891), scalar_t(0.32360679774997891), scalar_t(0.076393202250021025), scalar_t(0.076393202250021025), scalar_t(-0.099999999999999978), scalar_t(0.10000000000000007), scalar_t(-0.099999999999999992), scalar_t(-0.099999999999999992), scalar_t(0.32360679774997886), scalar_t(0.32360679774997897), scalar_t(0.076393202250020983), scalar_t(0.076393202250020983), scalar_t(0.32360679774997897), scalar_t(0.076393202250021025), scalar_t(-0.099999999999999978), scalar_t(-0.099999999999999992), scalar_t(0.10000000000000007), scalar_t(-0.099999999999999992), scalar_t(0.076393202250020983), scalar_t(0.32360679774997897), scalar_t(0.32360679774997886), scalar_t(0.076393202250020983), scalar_t(0.076393202250021025), scalar_t(0.32360679774997897), scalar_t(-0.099999999999999964), scalar_t(-0.099999999999999992), scalar_t(-0.099999999999999992), scalar_t(0.10000000000000007), scalar_t(0.07639320225002097), scalar_t(0.076393202250021025), scalar_t(0.07639320225002097), scalar_t(0.3236067977499788), scalar_t(0.32360679774997897), scalar_t(0.32360679774997897)};
+    static const s_t *shape() {
+        static const s_t data[40] = {s_t(0.099999999999999936), s_t(-0.099999999999999992), s_t(-0.099999999999999992), s_t(-0.099999999999999992), s_t(0.32360679774997891), s_t(0.076393202250021025), s_t(0.32360679774997891), s_t(0.32360679774997891), s_t(0.076393202250021025), s_t(0.076393202250021025), s_t(-0.099999999999999978), s_t(0.10000000000000007), s_t(-0.099999999999999992), s_t(-0.099999999999999992), s_t(0.32360679774997886), s_t(0.32360679774997897), s_t(0.076393202250020983), s_t(0.076393202250020983), s_t(0.32360679774997897), s_t(0.076393202250021025), s_t(-0.099999999999999978), s_t(-0.099999999999999992), s_t(0.10000000000000007), s_t(-0.099999999999999992), s_t(0.076393202250020983), s_t(0.32360679774997897), s_t(0.32360679774997886), s_t(0.076393202250020983), s_t(0.076393202250021025), s_t(0.32360679774997897), s_t(-0.099999999999999964), s_t(-0.099999999999999992), s_t(-0.099999999999999992), s_t(0.10000000000000007), s_t(0.07639320225002097), s_t(0.076393202250021025), s_t(0.07639320225002097), s_t(0.3236067977499788), s_t(0.32360679774997897), s_t(0.32360679774997897)};
         return data;
     }
-    static const scalar_t *grad_ref_x() {
-        static const scalar_t data[40] = {scalar_t(-1.3416407864998741), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(0), scalar_t(1.7888543819998319), scalar_t(0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0), scalar_t(0.44721359549995832), scalar_t(1.3416407864998741), scalar_t(0), scalar_t(0), scalar_t(-1.7888543819998315), scalar_t(0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0), scalar_t(0.44721359549995832), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(2.3416407864998741), scalar_t(-2.3416407864998741), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0), scalar_t(0.44721359549995832), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(-0.55278640450004202), scalar_t(-2.3416407864998741), scalar_t(2.3416407864998741), scalar_t(0)};
+    static const s_t *grad_ref_x() {
+        static const s_t data[40] = {s_t(-1.3416407864998741), s_t(-0.44721359549995798), s_t(0), s_t(0), s_t(1.7888543819998319), s_t(0.55278640450004202), s_t(-0.55278640450004202), s_t(-0.55278640450004202), s_t(0.55278640450004202), s_t(0), s_t(0.44721359549995832), s_t(1.3416407864998741), s_t(0), s_t(0), s_t(-1.7888543819998315), s_t(0.55278640450004202), s_t(-0.55278640450004202), s_t(-0.55278640450004202), s_t(0.55278640450004202), s_t(0), s_t(0.44721359549995832), s_t(-0.44721359549995798), s_t(0), s_t(0), s_t(0), s_t(2.3416407864998741), s_t(-2.3416407864998741), s_t(-0.55278640450004202), s_t(0.55278640450004202), s_t(0), s_t(0.44721359549995832), s_t(-0.44721359549995798), s_t(0), s_t(0), s_t(0), s_t(0.55278640450004202), s_t(-0.55278640450004202), s_t(-2.3416407864998741), s_t(2.3416407864998741), s_t(0)};
         return data;
     }
-    static const scalar_t *grad_ref_y() {
-        static const scalar_t data[40] = {scalar_t(-1.3416407864998741), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(1.7888543819998319), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(-2.3416407864998741), scalar_t(2.3416407864998741), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(1.3416407864998741), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(-1.7888543819998315), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0), scalar_t(-2.3416407864998741), scalar_t(0), scalar_t(2.3416407864998741)};
+    static const s_t *grad_ref_y() {
+        static const s_t data[40] = {s_t(-1.3416407864998741), s_t(0), s_t(-0.44721359549995798), s_t(0), s_t(-0.55278640450004202), s_t(0.55278640450004202), s_t(1.7888543819998319), s_t(-0.55278640450004202), s_t(0), s_t(0.55278640450004202), s_t(0.44721359549995832), s_t(0), s_t(-0.44721359549995798), s_t(0), s_t(-2.3416407864998741), s_t(2.3416407864998741), s_t(0), s_t(-0.55278640450004202), s_t(0), s_t(0.55278640450004202), s_t(0.44721359549995832), s_t(0), s_t(1.3416407864998741), s_t(0), s_t(-0.55278640450004202), s_t(0.55278640450004202), s_t(-1.7888543819998315), s_t(-0.55278640450004202), s_t(0), s_t(0.55278640450004202), s_t(0.44721359549995832), s_t(0), s_t(-0.44721359549995798), s_t(0), s_t(-0.55278640450004202), s_t(0.55278640450004202), s_t(0), s_t(-2.3416407864998741), s_t(0), s_t(2.3416407864998741)};
         return data;
     }
-    static const scalar_t *grad_ref_z() {
-        static const scalar_t data[40] = {scalar_t(-1.3416407864998741), scalar_t(0), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(1.7888543819998319), scalar_t(0.55278640450004202), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(-2.3416407864998741), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(2.3416407864998741), scalar_t(0.55278640450004202), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(0), scalar_t(-0.44721359549995798), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(-2.3416407864998741), scalar_t(0), scalar_t(0.55278640450004202), scalar_t(2.3416407864998741), scalar_t(0.44721359549995832), scalar_t(0), scalar_t(0), scalar_t(1.3416407864998741), scalar_t(-0.55278640450004202), scalar_t(0), scalar_t(-0.55278640450004202), scalar_t(-1.7888543819998315), scalar_t(0.55278640450004202), scalar_t(0.55278640450004202)};
+    static const s_t *grad_ref_z() {
+        static const s_t data[40] = {s_t(-1.3416407864998741), s_t(0), s_t(0), s_t(-0.44721359549995798), s_t(-0.55278640450004202), s_t(0), s_t(-0.55278640450004202), s_t(1.7888543819998319), s_t(0.55278640450004202), s_t(0.55278640450004202), s_t(0.44721359549995832), s_t(0), s_t(0), s_t(-0.44721359549995798), s_t(-2.3416407864998741), s_t(0), s_t(-0.55278640450004202), s_t(0), s_t(2.3416407864998741), s_t(0.55278640450004202), s_t(0.44721359549995832), s_t(0), s_t(0), s_t(-0.44721359549995798), s_t(-0.55278640450004202), s_t(0), s_t(-2.3416407864998741), s_t(0), s_t(0.55278640450004202), s_t(2.3416407864998741), s_t(0.44721359549995832), s_t(0), s_t(0), s_t(1.3416407864998741), s_t(-0.55278640450004202), s_t(0), s_t(-0.55278640450004202), s_t(-1.7888543819998315), s_t(0.55278640450004202), s_t(0.55278640450004202)};
         return data;
     }
-    static const scalar_t *q_weight() {
-        static const scalar_t data[4] = {scalar_t(0.041666666666666664), scalar_t(0.041666666666666664), scalar_t(0.041666666666666664), scalar_t(0.041666666666666664)};
+    static const s_t *q_weight() {
+        static const s_t data[4] = {s_t(0.041666666666666664), s_t(0.041666666666666664), s_t(0.041666666666666664), s_t(0.041666666666666664)};
         return data;
     }
 };
 
-template <typename scalar_t>
+template <typename s_t>
 struct mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data {
-    static const scalar_t *shape() {
-        static const scalar_t data[110] = {scalar_t(-0.125), scalar_t(-0.125), scalar_t(-0.125), scalar_t(-0.125), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.25), scalar_t(0.44897959183673491), scalar_t(-0.061224489795918366), scalar_t(-0.061224489795918366), scalar_t(-0.061224489795918366), scalar_t(0.22448979591836737), scalar_t(0.020408163265306121), scalar_t(0.22448979591836737), scalar_t(0.22448979591836737), scalar_t(0.020408163265306121), scalar_t(0.020408163265306121), scalar_t(-0.061224489795918387), scalar_t(0.44897959183673464), scalar_t(-0.061224489795918366), scalar_t(-0.061224489795918366), scalar_t(0.22448979591836743), scalar_t(0.22448979591836732), scalar_t(0.020408163265306128), scalar_t(0.020408163265306128), scalar_t(0.22448979591836732), scalar_t(0.020408163265306121), scalar_t(-0.061224489795918401), scalar_t(-0.061224489795918366), scalar_t(0.44897959183673464), scalar_t(-0.061224489795918366), scalar_t(0.020408163265306135), scalar_t(0.22448979591836732), scalar_t(0.22448979591836751), scalar_t(0.020408163265306135), scalar_t(0.020408163265306121), scalar_t(0.22448979591836732), scalar_t(-0.061224489795918421), scalar_t(-0.061224489795918366), scalar_t(-0.061224489795918366), scalar_t(0.44897959183673464), scalar_t(0.020408163265306145), scalar_t(0.020408163265306121), scalar_t(0.020408163265306145), scalar_t(0.2244897959183676), scalar_t(0.22448979591836732), scalar_t(0.22448979591836732), scalar_t(-0.080357142857142821), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(0.16071428571428564), scalar_t(0.63809286661931275), scalar_t(0.16071428571428564), scalar_t(0.040478561952115862), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142849), scalar_t(0.1607142857142857), scalar_t(0.16071428571428573), scalar_t(0.040478561952115875), scalar_t(0.1607142857142857), scalar_t(0.63809286661931275), scalar_t(0.16071428571428573), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142849), scalar_t(0.040478561952115875), scalar_t(0.16071428571428573), scalar_t(0.1607142857142857), scalar_t(0.1607142857142857), scalar_t(0.16071428571428573), scalar_t(0.63809286661931275), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142863), scalar_t(0.63809286661931275), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(0.040478561952115882), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573), scalar_t(0.63809286661931275), scalar_t(0.16071428571428573), scalar_t(0.040478561952115882), scalar_t(0.16071428571428573), scalar_t(-0.080357142857142849), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142863), scalar_t(-0.080357142857142849), scalar_t(0.16071428571428573), scalar_t(0.040478561952115882), scalar_t(0.16071428571428573), scalar_t(0.63809286661931275), scalar_t(0.16071428571428573), scalar_t(0.16071428571428573)};
+    static const s_t *shape() {
+        static const s_t data[110] = {s_t(-0.125), s_t(-0.125), s_t(-0.125), s_t(-0.125), s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.44897959183673491), s_t(-0.061224489795918366), s_t(-0.061224489795918366), s_t(-0.061224489795918366), s_t(0.22448979591836737), s_t(0.020408163265306121), s_t(0.22448979591836737), s_t(0.22448979591836737), s_t(0.020408163265306121), s_t(0.020408163265306121), s_t(-0.061224489795918387), s_t(0.44897959183673464), s_t(-0.061224489795918366), s_t(-0.061224489795918366), s_t(0.22448979591836743), s_t(0.22448979591836732), s_t(0.020408163265306128), s_t(0.020408163265306128), s_t(0.22448979591836732), s_t(0.020408163265306121), s_t(-0.061224489795918401), s_t(-0.061224489795918366), s_t(0.44897959183673464), s_t(-0.061224489795918366), s_t(0.020408163265306135), s_t(0.22448979591836732), s_t(0.22448979591836751), s_t(0.020408163265306135), s_t(0.020408163265306121), s_t(0.22448979591836732), s_t(-0.061224489795918421), s_t(-0.061224489795918366), s_t(-0.061224489795918366), s_t(0.44897959183673464), s_t(0.020408163265306145), s_t(0.020408163265306121), s_t(0.020408163265306145), s_t(0.2244897959183676), s_t(0.22448979591836732), s_t(0.22448979591836732), s_t(-0.080357142857142821), s_t(-0.080357142857142849), s_t(-0.080357142857142849), s_t(-0.080357142857142863), s_t(0.16071428571428564), s_t(0.63809286661931275), s_t(0.16071428571428564), s_t(0.040478561952115862), s_t(0.16071428571428573), s_t(0.16071428571428573), s_t(-0.080357142857142849), s_t(-0.080357142857142849), s_t(-0.080357142857142863), s_t(-0.080357142857142849), s_t(0.1607142857142857), s_t(0.16071428571428573), s_t(0.040478561952115875), s_t(0.1607142857142857), s_t(0.63809286661931275), s_t(0.16071428571428573), s_t(-0.080357142857142849), s_t(-0.080357142857142863), s_t(-0.080357142857142849), s_t(-0.080357142857142849), s_t(0.040478561952115875), s_t(0.16071428571428573), s_t(0.1607142857142857), s_t(0.1607142857142857), s_t(0.16071428571428573), s_t(0.63809286661931275), s_t(-0.080357142857142849), s_t(-0.080357142857142849), s_t(-0.080357142857142863), s_t(-0.080357142857142863), s_t(0.63809286661931275), s_t(0.16071428571428573), s_t(0.16071428571428573), s_t(0.16071428571428573), s_t(0.16071428571428573), s_t(0.040478561952115882), s_t(-0.080357142857142849), s_t(-0.080357142857142863), s_t(-0.080357142857142849), s_t(-0.080357142857142863), s_t(0.16071428571428573), s_t(0.16071428571428573), s_t(0.63809286661931275), s_t(0.16071428571428573), s_t(0.040478561952115882), s_t(0.16071428571428573), s_t(-0.080357142857142849), s_t(-0.080357142857142863), s_t(-0.080357142857142863), s_t(-0.080357142857142849), s_t(0.16071428571428573), s_t(0.040478561952115882), s_t(0.16071428571428573), s_t(0.63809286661931275), s_t(0.16071428571428573), s_t(0.16071428571428573)};
         return data;
     }
-    static const scalar_t *grad_ref_x() {
-        static const scalar_t data[110] = {scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(1), scalar_t(-1), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-2.1428571428571428), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(0), scalar_t(2.8571428571428572), scalar_t(0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0), scalar_t(0.71428571428571397), scalar_t(2.1428571428571428), scalar_t(0), scalar_t(0), scalar_t(-2.8571428571428568), scalar_t(0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0), scalar_t(0.71428571428571397), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(3.1428571428571428), scalar_t(-3.1428571428571428), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0), scalar_t(0.71428571428571441), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(-0.2857142857142857), scalar_t(-3.1428571428571428), scalar_t(3.1428571428571428), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-1.1952286093343947), scalar_t(1.5976143046671969), scalar_t(-1.5976143046671969), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-1.1952286093343938), scalar_t(0.40238569533280322), scalar_t(-0.40238569533280322), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(1.5976143046671969), scalar_t(-1.5976143046671969), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0), scalar_t(-0.59761430466719689), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(-0.40238569533280322), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(0), scalar_t(-0.59761430466719689), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(0), scalar_t(1.1952286093343933), scalar_t(1.5976143046671969), scalar_t(-1.5976143046671969), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(0), scalar_t(-0.59761430466719645), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(0), scalar_t(1.1952286093343933), scalar_t(0.40238569533280322), scalar_t(-0.40238569533280322), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0)};
+    static const s_t *grad_ref_x() {
+        static const s_t data[110] = {s_t(0), s_t(0), s_t(0), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(-1), s_t(1), s_t(0), s_t(-2.1428571428571428), s_t(-0.7142857142857143), s_t(0), s_t(0), s_t(2.8571428571428572), s_t(0.2857142857142857), s_t(-0.2857142857142857), s_t(-0.2857142857142857), s_t(0.2857142857142857), s_t(0), s_t(0.71428571428571397), s_t(2.1428571428571428), s_t(0), s_t(0), s_t(-2.8571428571428568), s_t(0.2857142857142857), s_t(-0.2857142857142857), s_t(-0.2857142857142857), s_t(0.2857142857142857), s_t(0), s_t(0.71428571428571397), s_t(-0.7142857142857143), s_t(0), s_t(0), s_t(0), s_t(3.1428571428571428), s_t(-3.1428571428571428), s_t(-0.2857142857142857), s_t(0.2857142857142857), s_t(0), s_t(0.71428571428571441), s_t(-0.7142857142857143), s_t(0), s_t(0), s_t(0), s_t(0.2857142857142857), s_t(-0.2857142857142857), s_t(-3.1428571428571428), s_t(3.1428571428571428), s_t(0), s_t(0.59761430466719689), s_t(0.59761430466719689), s_t(0), s_t(0), s_t(-1.1952286093343947), s_t(1.5976143046671969), s_t(-1.5976143046671969), s_t(-0.40238569533280322), s_t(0.40238569533280322), s_t(0), s_t(0.59761430466719689), s_t(0.59761430466719689), s_t(0), s_t(0), s_t(-1.1952286093343938), s_t(0.40238569533280322), s_t(-0.40238569533280322), s_t(-1.5976143046671969), s_t(1.5976143046671969), s_t(0), s_t(0.59761430466719689), s_t(-0.59761430466719678), s_t(0), s_t(0), s_t(0), s_t(1.5976143046671969), s_t(-1.5976143046671969), s_t(-1.5976143046671969), s_t(1.5976143046671969), s_t(0), s_t(-0.59761430466719689), s_t(0.59761430466719689), s_t(0), s_t(0), s_t(0), s_t(0.40238569533280322), s_t(-0.40238569533280322), s_t(-0.40238569533280322), s_t(0.40238569533280322), s_t(0), s_t(-0.59761430466719689), s_t(-0.59761430466719678), s_t(0), s_t(0), s_t(1.1952286093343933), s_t(1.5976143046671969), s_t(-1.5976143046671969), s_t(-0.40238569533280322), s_t(0.40238569533280322), s_t(0), s_t(-0.59761430466719645), s_t(-0.59761430466719678), s_t(0), s_t(0), s_t(1.1952286093343933), s_t(0.40238569533280322), s_t(-0.40238569533280322), s_t(-1.5976143046671969), s_t(1.5976143046671969), s_t(0)};
         return data;
     }
-    static const scalar_t *grad_ref_y() {
-        static const scalar_t data[110] = {scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(-1), scalar_t(1), scalar_t(0), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(-2.1428571428571428), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(2.8571428571428572), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(0.71428571428571397), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(-3.1428571428571428), scalar_t(3.1428571428571428), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(0.71428571428571397), scalar_t(0), scalar_t(2.1428571428571428), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(-2.8571428571428568), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(0.71428571428571441), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0), scalar_t(-3.1428571428571428), scalar_t(0), scalar_t(3.1428571428571428), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(-1.1952286093343947), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(1.5976143046671969), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(-1.1952286093343938), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(1.5976143046671969), scalar_t(-0.59761430466719689), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(1.1952286093343933), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(-0.59761430466719689), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(-0.59761430466719645), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0.40238569533280322), scalar_t(1.1952286093343933), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(1.5976143046671969)};
+    static const s_t *grad_ref_y() {
+        static const s_t data[110] = {s_t(0), s_t(0), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(-2.1428571428571428), s_t(0), s_t(-0.7142857142857143), s_t(0), s_t(-0.2857142857142857), s_t(0.2857142857142857), s_t(2.8571428571428572), s_t(-0.2857142857142857), s_t(0), s_t(0.2857142857142857), s_t(0.71428571428571397), s_t(0), s_t(-0.7142857142857143), s_t(0), s_t(-3.1428571428571428), s_t(3.1428571428571428), s_t(0), s_t(-0.2857142857142857), s_t(0), s_t(0.2857142857142857), s_t(0.71428571428571397), s_t(0), s_t(2.1428571428571428), s_t(0), s_t(-0.2857142857142857), s_t(0.2857142857142857), s_t(-2.8571428571428568), s_t(-0.2857142857142857), s_t(0), s_t(0.2857142857142857), s_t(0.71428571428571441), s_t(0), s_t(-0.7142857142857143), s_t(0), s_t(-0.2857142857142857), s_t(0.2857142857142857), s_t(0), s_t(-3.1428571428571428), s_t(0), s_t(3.1428571428571428), s_t(0.59761430466719689), s_t(0), s_t(0.59761430466719689), s_t(0), s_t(-1.5976143046671969), s_t(1.5976143046671969), s_t(-1.1952286093343947), s_t(-0.40238569533280322), s_t(0), s_t(0.40238569533280322), s_t(0.59761430466719689), s_t(0), s_t(-0.59761430466719678), s_t(0), s_t(-1.5976143046671969), s_t(1.5976143046671969), s_t(0), s_t(-1.5976143046671969), s_t(0), s_t(1.5976143046671969), s_t(0.59761430466719689), s_t(0), s_t(0.59761430466719689), s_t(0), s_t(-0.40238569533280322), s_t(0.40238569533280322), s_t(-1.1952286093343938), s_t(-1.5976143046671969), s_t(0), s_t(1.5976143046671969), s_t(-0.59761430466719689), s_t(0), s_t(-0.59761430466719678), s_t(0), s_t(-1.5976143046671969), s_t(1.5976143046671969), s_t(1.1952286093343933), s_t(-0.40238569533280322), s_t(0), s_t(0.40238569533280322), s_t(-0.59761430466719689), s_t(0), s_t(0.59761430466719689), s_t(0), s_t(-0.40238569533280322), s_t(0.40238569533280322), s_t(0), s_t(-0.40238569533280322), s_t(0), s_t(0.40238569533280322), s_t(-0.59761430466719645), s_t(0), s_t(-0.59761430466719678), s_t(0), s_t(-0.40238569533280322), s_t(0.40238569533280322), s_t(1.1952286093343933), s_t(-1.5976143046671969), s_t(0), s_t(1.5976143046671969)};
         return data;
     }
-    static const scalar_t *grad_ref_z() {
-        static const scalar_t data[110] = {scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(-1), scalar_t(0), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(1), scalar_t(-2.1428571428571428), scalar_t(0), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(2.8571428571428572), scalar_t(0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0.71428571428571397), scalar_t(0), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(-3.1428571428571428), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(3.1428571428571428), scalar_t(0.2857142857142857), scalar_t(0.71428571428571397), scalar_t(0), scalar_t(0), scalar_t(-0.7142857142857143), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(-3.1428571428571428), scalar_t(0), scalar_t(0.2857142857142857), scalar_t(3.1428571428571428), scalar_t(0.71428571428571441), scalar_t(0), scalar_t(0), scalar_t(2.1428571428571428), scalar_t(-0.2857142857142857), scalar_t(0), scalar_t(-0.2857142857142857), scalar_t(-2.8571428571428568), scalar_t(0.2857142857142857), scalar_t(0.2857142857142857), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(1.5976143046671969), scalar_t(1.5976143046671969), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(-1.1952286093343947), scalar_t(1.5976143046671969), scalar_t(0.40238569533280322), scalar_t(0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(-1.1952286093343938), scalar_t(0.40238569533280322), scalar_t(1.5976143046671969), scalar_t(-0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(-1.5976143046671969), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(1.1952286093343933), scalar_t(1.5976143046671969), scalar_t(0.40238569533280322), scalar_t(-0.59761430466719689), scalar_t(0), scalar_t(0), scalar_t(-0.59761430466719678), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(-1.5976143046671969), scalar_t(1.1952286093343933), scalar_t(0.40238569533280322), scalar_t(1.5976143046671969), scalar_t(-0.59761430466719645), scalar_t(0), scalar_t(0), scalar_t(0.59761430466719689), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(-0.40238569533280322), scalar_t(0), scalar_t(0.40238569533280322), scalar_t(0.40238569533280322)};
+    static const s_t *grad_ref_z() {
+        static const s_t data[110] = {s_t(0), s_t(0), s_t(0), s_t(0), s_t(-1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(1), s_t(-2.1428571428571428), s_t(0), s_t(0), s_t(-0.7142857142857143), s_t(-0.2857142857142857), s_t(0), s_t(-0.2857142857142857), s_t(2.8571428571428572), s_t(0.2857142857142857), s_t(0.2857142857142857), s_t(0.71428571428571397), s_t(0), s_t(0), s_t(-0.7142857142857143), s_t(-3.1428571428571428), s_t(0), s_t(-0.2857142857142857), s_t(0), s_t(3.1428571428571428), s_t(0.2857142857142857), s_t(0.71428571428571397), s_t(0), s_t(0), s_t(-0.7142857142857143), s_t(-0.2857142857142857), s_t(0), s_t(-3.1428571428571428), s_t(0), s_t(0.2857142857142857), s_t(3.1428571428571428), s_t(0.71428571428571441), s_t(0), s_t(0), s_t(2.1428571428571428), s_t(-0.2857142857142857), s_t(0), s_t(-0.2857142857142857), s_t(-2.8571428571428568), s_t(0.2857142857142857), s_t(0.2857142857142857), s_t(0.59761430466719689), s_t(0), s_t(0), s_t(-0.59761430466719678), s_t(-1.5976143046671969), s_t(0), s_t(-1.5976143046671969), s_t(0), s_t(1.5976143046671969), s_t(1.5976143046671969), s_t(0.59761430466719689), s_t(0), s_t(0), s_t(0.59761430466719689), s_t(-1.5976143046671969), s_t(0), s_t(-0.40238569533280322), s_t(-1.1952286093343947), s_t(1.5976143046671969), s_t(0.40238569533280322), s_t(0.59761430466719689), s_t(0), s_t(0), s_t(0.59761430466719689), s_t(-0.40238569533280322), s_t(0), s_t(-1.5976143046671969), s_t(-1.1952286093343938), s_t(0.40238569533280322), s_t(1.5976143046671969), s_t(-0.59761430466719689), s_t(0), s_t(0), s_t(-0.59761430466719678), s_t(-1.5976143046671969), s_t(0), s_t(-0.40238569533280322), s_t(1.1952286093343933), s_t(1.5976143046671969), s_t(0.40238569533280322), s_t(-0.59761430466719689), s_t(0), s_t(0), s_t(-0.59761430466719678), s_t(-0.40238569533280322), s_t(0), s_t(-1.5976143046671969), s_t(1.1952286093343933), s_t(0.40238569533280322), s_t(1.5976143046671969), s_t(-0.59761430466719645), s_t(0), s_t(0), s_t(0.59761430466719689), s_t(-0.40238569533280322), s_t(0), s_t(-0.40238569533280322), s_t(0), s_t(0.40238569533280322), s_t(0.40238569533280322)};
         return data;
     }
-    static const scalar_t *q_weight() {
-        static const scalar_t data[11] = {scalar_t(-0.013155555555555556), scalar_t(0.0076222222222222221), scalar_t(0.0076222222222222221), scalar_t(0.0076222222222222221), scalar_t(0.0076222222222222221), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887), scalar_t(0.024888888888888887)};
+    static const s_t *q_weight() {
+        static const s_t data[11] = {s_t(-0.013155555555555556), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887)};
         return data;
     }
 };
@@ -144,62 +144,62 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_element
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
+template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t eta_b,
-        const scalar_t eta_s,
-        const scalar_t newmark_velocity_alpha,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const s_t eta_b,
+        const s_t eta_s,
+        const s_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT u0,
-        const scalar_t *const SFEM_RESTRICT u1,
-        const scalar_t *const SFEM_RESTRICT u2,
+        const s_t *const SFEM_RESTRICT u0,
+        const s_t *const SFEM_RESTRICT u1,
+        const s_t *const SFEM_RESTRICT u2,
         const ptrdiff_t previous_stride,
-        const scalar_t *const SFEM_RESTRICT u0_old,
-        const scalar_t *const SFEM_RESTRICT u1_old,
-        const scalar_t *const SFEM_RESTRICT u2_old,
+        const s_t *const SFEM_RESTRICT u0_old,
+        const s_t *const SFEM_RESTRICT u1_old,
+        const s_t *const SFEM_RESTRICT u2_old,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u0_out,
-        scalar_t *const SFEM_RESTRICT u1_out,
-        scalar_t *const SFEM_RESTRICT u2_out
+        s_t *const SFEM_RESTRICT u0_out,
+        s_t *const SFEM_RESTRICT u1_out,
+        s_t *const SFEM_RESTRICT u2_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 10;
-    static constexpr int N_FIELDS = 3;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int ND = 3;
+    static constexpr int NQ = 4;
+    static constexpr int NS = 10;
+    static constexpr int NC = 3;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::shape();
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::grad_ref_z();
-    const scalar_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::q_weight();
+    const s_t *const affine_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::shape();
+    const s_t *const affine_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_x();
+    const s_t *const affine_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_y();
+    const s_t *const affine_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_z();
+    const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        const scalar_t *const current_components[N_FIELDS] = {u0, u1, u2};
-        const scalar_t *const previous_components[N_FIELDS] = {u0_old, u1_old, u2_old};
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        s_t block_current[NC * NS][VS];
+        s_t block_previous[NC * NS][VS];
+        s_t block_output[NC * NS][VS];
+        const s_t *const current_components[NC] = {u0, u1, u2};
+        const s_t *const previous_components[NC] = {u0_old, u1_old, u2_old};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
@@ -212,30 +212,30 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
         for (int stream = 0; stream < 30; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
+                block_output[stream][lane] = s_t(0);
             }
         }
 
-        const jacobian_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
-        scalar_t block_affine_geometry_data[10][VECTOR_SIZE];
-        const scalar_t *block_affine_geometry_streams[10];
+        const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        s_t block_affine_geometry_data[10][VS];
+        const s_t *block_affine_geometry_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<s_t, g_t, VS>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const scalar_t *block_adjugate[9];
+        const s_t *block_adjugate[9];
         for (int component = 0; component < 9; ++component) {
             block_adjugate[component] = block_affine_geometry_streams[component];
         }
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
 
-        scalar_t *const output_components[N_FIELDS] = {u0_out, u1_out, u2_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
+                s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
@@ -319,68 +319,68 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_affine_
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t eta_b,
-        const scalar_t eta_s,
-        const scalar_t newmark_velocity_alpha,
+        const s_t eta_b,
+        const s_t eta_s,
+        const s_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT u0,
-        const scalar_t *const SFEM_RESTRICT u1,
-        const scalar_t *const SFEM_RESTRICT u2,
+        const s_t *const SFEM_RESTRICT u0,
+        const s_t *const SFEM_RESTRICT u1,
+        const s_t *const SFEM_RESTRICT u2,
         const ptrdiff_t previous_stride,
-        const scalar_t *const SFEM_RESTRICT u0_old,
-        const scalar_t *const SFEM_RESTRICT u1_old,
-        const scalar_t *const SFEM_RESTRICT u2_old,
+        const s_t *const SFEM_RESTRICT u0_old,
+        const s_t *const SFEM_RESTRICT u1_old,
+        const s_t *const SFEM_RESTRICT u2_old,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u0_out,
-        scalar_t *const SFEM_RESTRICT u1_out,
-        scalar_t *const SFEM_RESTRICT u2_out
+        s_t *const SFEM_RESTRICT u0_out,
+        s_t *const SFEM_RESTRICT u1_out,
+        s_t *const SFEM_RESTRICT u2_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 11;
-    static constexpr int N_SHAPE = 10;
-    static constexpr int N_FIELDS = 3;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int ND = 3;
+    static constexpr int NQ = 11;
+    static constexpr int NS = 10;
+    static constexpr int NC = 3;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const isoparametric_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::shape();
-    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const isoparametric_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::grad_ref_z();
-    const scalar_t *const isoparametric_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::q_weight();
+    const s_t *const isoparametric_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::shape();
+    const s_t *const isoparametric_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
+    const s_t *const isoparametric_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
+    const s_t *const isoparametric_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
+    const s_t *const isoparametric_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_coordinates[3 * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        s_t block_coordinates[3 * NS][VS];
+        s_t block_adjugate_data[9][NQ * VS];
+        s_t block_determinant[NQ * VS];
+        s_t block_current[NC * NS][VS];
+        s_t block_previous[NC * NS][VS];
+        s_t block_output[NC * NS][VS];
 
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int d = 0; d < DIM; ++d) {
+            for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
-                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                    block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
         }
-        const scalar_t *const current_components[N_FIELDS] = {u0, u1, u2};
-        const scalar_t *const previous_components[N_FIELDS] = {u0_old, u1_old, u2_old};
+        const s_t *const current_components[NC] = {u0, u1, u2};
+        const s_t *const previous_components[NC] = {u0_old, u1_old, u2_old};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
@@ -393,39 +393,39 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
         for (int stream = 0; stream < 30; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
+                block_output[stream][lane] = s_t(0);
             }
         }
 
-        scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        for (int q = 0; q < N_QP; ++q) {
+        s_t *block_adjugate_streams[ND * ND] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 9];
-                const scalar_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 9];
-                const scalar_t J02 = block_coordinates[0][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 9];
-                const scalar_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 9];
-                const scalar_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 9];
-                const scalar_t J12 = block_coordinates[1][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 9];
-                const scalar_t J20 = block_coordinates[2][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 9];
-                const scalar_t J21 = block_coordinates[2][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 9];
-                const scalar_t J22 = block_coordinates[2][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 9];
-                geometry_jacobian_adjugate_and_determinant_3<scalar_t>(
+                const s_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J02 = block_coordinates[0][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J12 = block_coordinates[1][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J20 = block_coordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J21 = block_coordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J22 = block_coordinates[2][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_adjugate_streams, block_determinant, q * VECTOR_SIZE + lane);
+                        block_adjugate_streams, block_determinant, q * VS + lane);
             }
         }
 
-        const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        const s_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, VS, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
 
-        scalar_t *const output_components[N_FIELDS] = {u0_out, u1_out, u2_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
+                s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
@@ -551,68 +551,68 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
+template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t eta_b,
-        const scalar_t eta_s,
-        const scalar_t newmark_velocity_alpha,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const s_t eta_b,
+        const s_t eta_s,
+        const s_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT u0,
-        const scalar_t *const SFEM_RESTRICT u1,
-        const scalar_t *const SFEM_RESTRICT u2,
+        const s_t *const SFEM_RESTRICT u0,
+        const s_t *const SFEM_RESTRICT u1,
+        const s_t *const SFEM_RESTRICT u2,
         const ptrdiff_t previous_stride,
-        const scalar_t *const SFEM_RESTRICT u0_old,
-        const scalar_t *const SFEM_RESTRICT u1_old,
-        const scalar_t *const SFEM_RESTRICT u2_old,
+        const s_t *const SFEM_RESTRICT u0_old,
+        const s_t *const SFEM_RESTRICT u1_old,
+        const s_t *const SFEM_RESTRICT u2_old,
         const ptrdiff_t direction_stride,
-        const scalar_t *const SFEM_RESTRICT u0_direction,
-        const scalar_t *const SFEM_RESTRICT u1_direction,
-        const scalar_t *const SFEM_RESTRICT u2_direction,
+        const s_t *const SFEM_RESTRICT u0_direction,
+        const s_t *const SFEM_RESTRICT u1_direction,
+        const s_t *const SFEM_RESTRICT u2_direction,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u0_out,
-        scalar_t *const SFEM_RESTRICT u1_out,
-        scalar_t *const SFEM_RESTRICT u2_out
+        s_t *const SFEM_RESTRICT u0_out,
+        s_t *const SFEM_RESTRICT u1_out,
+        s_t *const SFEM_RESTRICT u2_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 10;
-    static constexpr int N_FIELDS = 3;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int ND = 3;
+    static constexpr int NQ = 4;
+    static constexpr int NS = 10;
+    static constexpr int NC = 3;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::shape();
-    const scalar_t *const affine_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const affine_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const affine_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::grad_ref_z();
-    const scalar_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<scalar_t>::q_weight();
+    const s_t *const affine_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::shape();
+    const s_t *const affine_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_x();
+    const s_t *const affine_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_y();
+    const s_t *const affine_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_z();
+    const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        const scalar_t *const current_components[N_FIELDS] = {u0, u1, u2};
-        const scalar_t *const previous_components[N_FIELDS] = {u0_old, u1_old, u2_old};
-        const scalar_t *const direction_components[N_FIELDS] = {u0_direction, u1_direction, u2_direction};
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        s_t block_current[NC * NS][VS];
+        s_t block_previous[NC * NS][VS];
+        s_t block_direction[NC * NS][VS];
+        s_t block_output[NC * NS][VS];
+        const s_t *const current_components[NC] = {u0, u1, u2};
+        const s_t *const previous_components[NC] = {u0_old, u1_old, u2_old};
+        const s_t *const direction_components[NC] = {u0_direction, u1_direction, u2_direction};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
@@ -626,30 +626,30 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
         for (int stream = 0; stream < 30; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
+                block_output[stream][lane] = s_t(0);
             }
         }
 
-        const jacobian_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
-        scalar_t block_affine_geometry_data[10][VECTOR_SIZE];
-        const scalar_t *block_affine_geometry_streams[10];
+        const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        s_t block_affine_geometry_data[10][VS];
+        const s_t *block_affine_geometry_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<s_t, g_t, VS>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const scalar_t *block_adjugate[9];
+        const s_t *block_adjugate[9];
         for (int component = 0; component < 9; ++component) {
             block_adjugate[component] = block_affine_geometry_streams[component];
         }
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
 
-        scalar_t *const output_components[N_FIELDS] = {u0_out, u1_out, u2_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
+                s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
@@ -741,74 +741,74 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t eta_b,
-        const scalar_t eta_s,
-        const scalar_t newmark_velocity_alpha,
+        const s_t eta_b,
+        const s_t eta_s,
+        const s_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT u0,
-        const scalar_t *const SFEM_RESTRICT u1,
-        const scalar_t *const SFEM_RESTRICT u2,
+        const s_t *const SFEM_RESTRICT u0,
+        const s_t *const SFEM_RESTRICT u1,
+        const s_t *const SFEM_RESTRICT u2,
         const ptrdiff_t previous_stride,
-        const scalar_t *const SFEM_RESTRICT u0_old,
-        const scalar_t *const SFEM_RESTRICT u1_old,
-        const scalar_t *const SFEM_RESTRICT u2_old,
+        const s_t *const SFEM_RESTRICT u0_old,
+        const s_t *const SFEM_RESTRICT u1_old,
+        const s_t *const SFEM_RESTRICT u2_old,
         const ptrdiff_t direction_stride,
-        const scalar_t *const SFEM_RESTRICT u0_direction,
-        const scalar_t *const SFEM_RESTRICT u1_direction,
-        const scalar_t *const SFEM_RESTRICT u2_direction,
+        const s_t *const SFEM_RESTRICT u0_direction,
+        const s_t *const SFEM_RESTRICT u1_direction,
+        const s_t *const SFEM_RESTRICT u2_direction,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u0_out,
-        scalar_t *const SFEM_RESTRICT u1_out,
-        scalar_t *const SFEM_RESTRICT u2_out
+        s_t *const SFEM_RESTRICT u0_out,
+        s_t *const SFEM_RESTRICT u1_out,
+        s_t *const SFEM_RESTRICT u2_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 11;
-    static constexpr int N_SHAPE = 10;
-    static constexpr int N_FIELDS = 3;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int ND = 3;
+    static constexpr int NQ = 11;
+    static constexpr int NS = 10;
+    static constexpr int NC = 3;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const isoparametric_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::shape();
-    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::grad_ref_x();
-    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::grad_ref_y();
-    const scalar_t *const isoparametric_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::grad_ref_z();
-    const scalar_t *const isoparametric_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<scalar_t>::q_weight();
+    const s_t *const isoparametric_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::shape();
+    const s_t *const isoparametric_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
+    const s_t *const isoparametric_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
+    const s_t *const isoparametric_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
+    const s_t *const isoparametric_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_coordinates[3 * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        s_t block_coordinates[3 * NS][VS];
+        s_t block_adjugate_data[9][NQ * VS];
+        s_t block_determinant[NQ * VS];
+        s_t block_current[NC * NS][VS];
+        s_t block_previous[NC * NS][VS];
+        s_t block_direction[NC * NS][VS];
+        s_t block_output[NC * NS][VS];
 
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int d = 0; d < DIM; ++d) {
+            for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
-                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                    block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
         }
-        const scalar_t *const current_components[N_FIELDS] = {u0, u1, u2};
-        const scalar_t *const previous_components[N_FIELDS] = {u0_old, u1_old, u2_old};
-        const scalar_t *const direction_components[N_FIELDS] = {u0_direction, u1_direction, u2_direction};
+        const s_t *const current_components[NC] = {u0, u1, u2};
+        const s_t *const previous_components[NC] = {u0_old, u1_old, u2_old};
+        const s_t *const direction_components[NC] = {u0_direction, u1_direction, u2_direction};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
@@ -822,39 +822,39 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
         for (int stream = 0; stream < 30; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
+                block_output[stream][lane] = s_t(0);
             }
         }
 
-        scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        for (int q = 0; q < N_QP; ++q) {
+        s_t *block_adjugate_streams[ND * ND] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                const scalar_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 9];
-                const scalar_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 9];
-                const scalar_t J02 = block_coordinates[0][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 9];
-                const scalar_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 9];
-                const scalar_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 9];
-                const scalar_t J12 = block_coordinates[1][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 9];
-                const scalar_t J20 = block_coordinates[2][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 9];
-                const scalar_t J21 = block_coordinates[2][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 9];
-                const scalar_t J22 = block_coordinates[2][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 9];
-                geometry_jacobian_adjugate_and_determinant_3<scalar_t>(
+                const s_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J02 = block_coordinates[0][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J12 = block_coordinates[1][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J20 = block_coordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J21 = block_coordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J22 = block_coordinates[2][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_adjugate_streams, block_determinant, q * VECTOR_SIZE + lane);
+                        block_adjugate_streams, block_determinant, q * VS + lane);
             }
         }
 
-        const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        const s_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, VS, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
 
-        scalar_t *const output_components[N_FIELDS] = {u0_out, u1_out, u2_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
+                s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];

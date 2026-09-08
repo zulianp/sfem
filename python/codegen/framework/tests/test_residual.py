@@ -469,7 +469,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     "struct KernelDiagnostics",
                     diagnostics_source,
                 )
-                self.assertIn("for (int q = 0; q < N_QP; ++q)", local_source)
+                self.assertIn("for (int q = 0; q < NQ; ++q)", local_source)
                 self.assertIn("#pragma omp simd", local_source)
                 self.assertNotIn("two_phase", local_source)
                 self.assertIn(
@@ -503,7 +503,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn(
-                    "block_adjugate_data[%d][N_QP * VECTOR_SIZE]"
+                    "block_adjugate_data[%d][NQ * VS]"
                     % (dim * dim),
                     operator_source,
                 )
@@ -512,7 +512,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn(
-                    "block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE]",
+                    "block_current[NC * NS][VS]",
                     operator_source,
                 )
                 action_local = local_source.split(
@@ -599,11 +599,11 @@ class CoupledResidualSystemTest(unittest.TestCase):
                             1,
                         )[0]
                         self.assertIn(
-                            "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+                            "coordinate_grad_ref[ND * NQ * ND * VS]",
                             section,
                         )
                         self.assertIn(
-                            "tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>",
+                            "tensor_evaluate<s_t, NQ, NS, VS, ND, ND>",
                             section,
                         )
                         self.assertNotIn("geometry_grad_ref", section)
@@ -692,10 +692,10 @@ class CoupledResidualSystemTest(unittest.TestCase):
             1,
         )[0]
         self.assertIn(
-            "tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>",
+            "tensor_evaluate<s_t, NQ, NS, VS, ND, ND>",
             section,
         )
-        self.assertIn("static constexpr int N_SHAPE = 27;", section)
+        self.assertIn("static constexpr int NS = 27;", section)
         self.assertNotIn("geometry_grad_ref", section)
         self.assertNotIn("tensor_index", local_source)
         self.assertIn(

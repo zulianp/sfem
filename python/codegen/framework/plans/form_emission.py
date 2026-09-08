@@ -180,7 +180,7 @@ def objective_kernel_variants(form, emits_steps):
 def form_n_field_components(form, dim):
     """How many components the field this form acts on has.
 
-    The generated kernels call this `DIM`, because for a displacement it equals
+    The generated kernels call this `ND`, because for a displacement it equals
     the spatial dimension and every energy material the framework has is a
     displacement.  It is not the same number: it is the block size, the degrees
     of freedom per node, and a scalar field has one of them in any dimension.

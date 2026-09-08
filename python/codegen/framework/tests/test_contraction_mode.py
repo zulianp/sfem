@@ -11,7 +11,7 @@ different mathematical objects and contract them differently:
 The energy path contracts its strong form against the test functions later, in
 ``_append_transformed_loperand_lines`` and ``tensor_test``, and that contraction
 is sum-factorised: ``TensorProductResidualOps`` works through one-dimensional
-``shape_1d`` and ``grad_1d`` operators with ``integer_root(N_QP)`` per
+``shape_1d`` and ``grad_1d`` operators with ``integer_root(NQ)`` per
 dimension.  The residual path has already contracted symbolically by the time
 emission sees it, so there is nothing left to factorise.
 

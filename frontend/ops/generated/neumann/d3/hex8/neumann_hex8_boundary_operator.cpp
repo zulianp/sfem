@@ -7,39 +7,39 @@
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename s_t>
 struct neumann_hex8_quadshell4_boundary_residual_soa_reference_data {
-    static constexpr int N_SHAPE_1D = 2;
-    static constexpr int N_QP_1D = 2;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_QP = 4;
+    static constexpr int NS1 = 2;
+    static constexpr int NQ1 = 2;
+    static constexpr int NS = 4;
+    static constexpr int NQ = 4;
     static constexpr int REF_DIM = 2;
     static constexpr int PHYSICAL_DIM = 3;
 
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[4] = {
-            scalar_t(0.78867513459481287),
-            scalar_t(0.21132486540518708),
-            scalar_t(0.21132486540518713),
-            scalar_t(0.78867513459481287)
+    static const s_t *shape_1d() {
+        static const s_t data[4] = {
+            s_t(0.78867513459481287),
+            s_t(0.21132486540518708),
+            s_t(0.21132486540518713),
+            s_t(0.78867513459481287)
         };
         return data;
     }
 
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[4] = {
-            scalar_t(-1),
-            scalar_t(1),
-            scalar_t(-1),
-            scalar_t(1)
+    static const s_t *grad_1d() {
+        static const s_t data[4] = {
+            s_t(-1),
+            s_t(1),
+            s_t(-1),
+            s_t(1)
         };
         return data;
     }
 
-    static const scalar_t *weight_1d() {
-        static const scalar_t data[2] = {
-            scalar_t(0.5),
-            scalar_t(0.5)
+    static const s_t *weight_1d() {
+        static const s_t data[2] = {
+            s_t(0.5),
+            s_t(0.5)
         };
         return data;
     }
@@ -55,35 +55,35 @@ struct neumann_hex8_quadshell4_boundary_residual_soa_reference_data {
     }
 };
 
-template <typename scalar_t>
-static SFEM_INLINE scalar_t neumann_hex8_quadshell4_boundary_residual_soa_measure(
+template <typename s_t>
+static SFEM_INLINE s_t neumann_hex8_quadshell4_boundary_residual_soa_measure(
         const int qx,
         const int qy,
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points) {
-    const scalar_t *const SFEM_RESTRICT shape_1d = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const SFEM_RESTRICT grad_1d = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<scalar_t>::grad_1d();
-    const int *const SFEM_RESTRICT shape_index = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<scalar_t>::shape_index();
-    constexpr int S = 2;
-    scalar_t dxdr0 = scalar_t(0);
-    scalar_t dxdr1 = scalar_t(0);
-    scalar_t dxdr2 = scalar_t(0);
-    scalar_t dxds0 = scalar_t(0);
-    scalar_t dxds1 = scalar_t(0);
-    scalar_t dxds2 = scalar_t(0);
-    for (int sy = 0; sy < S; ++sy) {
-        const scalar_t vy = shape_1d[qy * S + sy];
-        const scalar_t gy = grad_1d[qy * S + sy];
-        for (int sx = 0; sx < S; ++sx) {
-            const int i = shape_index[sy * S + sx];
+    const s_t *const SFEM_RESTRICT shape_1d = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_1d();
+    const s_t *const SFEM_RESTRICT grad_1d = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<s_t>::grad_1d();
+    const int *const SFEM_RESTRICT shape_index = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_index();
+    constexpr int NS1 = 2;
+    s_t dxdr0 = s_t(0);
+    s_t dxdr1 = s_t(0);
+    s_t dxdr2 = s_t(0);
+    s_t dxds0 = s_t(0);
+    s_t dxds1 = s_t(0);
+    s_t dxds2 = s_t(0);
+    for (int sy = 0; sy < NS1; ++sy) {
+        const s_t vy = shape_1d[qy * NS1 + sy];
+        const s_t gy = grad_1d[qy * NS1 + sy];
+        for (int sx = 0; sx < NS1; ++sx) {
+            const int i = shape_index[sy * NS1 + sx];
             const idx_t node = ev[i];
-            const scalar_t vx = shape_1d[qx * S + sx];
-            const scalar_t gx = grad_1d[qx * S + sx];
-            const scalar_t gr = gx * vy;
-            const scalar_t gs = vx * gy;
-            const scalar_t x = scalar_t(points[0][node]);
-            const scalar_t y = scalar_t(points[1][node]);
-            const scalar_t z = scalar_t(points[2][node]);
+            const s_t vx = shape_1d[qx * NS1 + sx];
+            const s_t gx = grad_1d[qx * NS1 + sx];
+            const s_t gr = gx * vy;
+            const s_t gs = vx * gy;
+            const s_t x = s_t(points[0][node]);
+            const s_t y = s_t(points[1][node]);
+            const s_t z = s_t(points[2][node]);
             dxdr0 += x * gr;
             dxdr1 += y * gr;
             dxdr2 += z * gr;
@@ -92,9 +92,9 @@ static SFEM_INLINE scalar_t neumann_hex8_quadshell4_boundary_residual_soa_measur
             dxds2 += z * gs;
         }
     }
-    const scalar_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
-    const scalar_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
-    const scalar_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
+    const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
+    const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
+    const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
     return sqrt(c0 * c0 + c1 * c1 + c2 * c2);
 }
 
@@ -140,32 +140,32 @@ static SFEM_INLINE void neumann_hex8_quadshell4_boundary_residual_soa_gather_sid
     }
 }
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE void neumann_hex8_quadshell4_boundary_residual_soa_element(
         const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points, const scalar_t t0, const scalar_t t1, const scalar_t t2,
-        scalar_t element_vector[3][4]) {
-    const scalar_t *const SFEM_RESTRICT shape_1d = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const SFEM_RESTRICT weight_1d = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<scalar_t>::weight_1d();
-    const int *const SFEM_RESTRICT shape_index = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<scalar_t>::shape_index();
-    constexpr int S = 2;
-    constexpr int Q = 2;
+        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t1, const s_t t2,
+        s_t element_vector[3][4]) {
+    const s_t *const SFEM_RESTRICT shape_1d = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_1d();
+    const s_t *const SFEM_RESTRICT weight_1d = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<s_t>::weight_1d();
+    const int *const SFEM_RESTRICT shape_index = neumann_hex8_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_index();
+    constexpr int NS1 = 2;
+    constexpr int NQ1 = 2;
 
-    const scalar_t coeff0 = -t0;
-    const scalar_t coeff1 = -t1;
-    const scalar_t coeff2 = -t2;
+    const s_t coeff0 = -t0;
+    const s_t coeff1 = -t1;
+    const s_t coeff2 = -t2;
 
-    for (int qy = 0; qy < Q; ++qy) {
-        for (int qx = 0; qx < Q; ++qx) {
-            const scalar_t dS = neumann_hex8_quadshell4_boundary_residual_soa_measure<scalar_t>(qx, qy, ev, points);
-            const scalar_t qw = weight_1d[qx] * weight_1d[qy] * dS;
+    for (int qy = 0; qy < NQ1; ++qy) {
+        for (int qx = 0; qx < NQ1; ++qx) {
+            const s_t dS = neumann_hex8_quadshell4_boundary_residual_soa_measure<s_t>(qx, qy, ev, points);
+            const s_t qw = weight_1d[qx] * weight_1d[qy] * dS;
 
-            for (int sy = 0; sy < S; ++sy) {
-                const scalar_t vy = shape_1d[qy * S + sy];
+            for (int sy = 0; sy < NS1; ++sy) {
+                const s_t vy = shape_1d[qy * NS1 + sy];
 #pragma omp simd
-                for (int sx = 0; sx < S; ++sx) {
-                    const int i = shape_index[sy * S + sx];
-                    const scalar_t test = shape_1d[qx * S + sx] * vy * qw;
+                for (int sx = 0; sx < NS1; ++sx) {
+                    const int i = shape_index[sy * NS1 + sx];
+                    const s_t test = shape_1d[qx * NS1 + sx] * vy * qw;
                     element_vector[0][i] += coeff0 * test;
                     element_vector[1][i] += coeff1 * test;
                     element_vector[2][i] += coeff2 * test;
@@ -175,14 +175,14 @@ static SFEM_INLINE void neumann_hex8_quadshell4_boundary_residual_soa_element(
     }
 }
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE void neumann_hex8_quadshell4_boundary_residual_soa_scatter_element(
         const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t element_vector[3][4],
+        const s_t element_vector[3][4],
         const int out_stride,
-        scalar_t *const SFEM_RESTRICT out0,
-        scalar_t *const SFEM_RESTRICT out1,
-        scalar_t *const SFEM_RESTRICT out2) {
+        s_t *const SFEM_RESTRICT out0,
+        s_t *const SFEM_RESTRICT out1,
+        s_t *const SFEM_RESTRICT out2) {
     constexpr int n_shape = 4;
     for (int i = 0; i < n_shape; ++i) {
         const idx_t node = ev[i];
@@ -195,59 +195,59 @@ static SFEM_INLINE void neumann_hex8_quadshell4_boundary_residual_soa_scatter_el
     }
 }
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE int neumann_hex8_quadshell4_boundary_residual_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points, const scalar_t t0, const scalar_t t1, const scalar_t t2,
+        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t1, const s_t t2,
         const int out_stride,
-        scalar_t *const SFEM_RESTRICT out0,
-        scalar_t *const SFEM_RESTRICT out1,
-        scalar_t *const SFEM_RESTRICT out2) {
+        s_t *const SFEM_RESTRICT out0,
+        s_t *const SFEM_RESTRICT out1,
+        s_t *const SFEM_RESTRICT out2) {
 #pragma omp parallel for
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         idx_t ev[4];
-        scalar_t element_vector[3][4];
+        s_t element_vector[3][4];
         for (int i = 0; i < 4; ++i) {
             ev[i] = elements[i][e];
         }
         for (int c = 0; c < 3; ++c) {
             for (int i = 0; i < 4; ++i) {
-                element_vector[c][i] = scalar_t(0);
+                element_vector[c][i] = s_t(0);
             }
         }
-        neumann_hex8_quadshell4_boundary_residual_soa_element<scalar_t>(ev, points, t0, t1, t2, element_vector);
-        neumann_hex8_quadshell4_boundary_residual_soa_scatter_element<scalar_t>(ev, element_vector, out_stride, out0, out1, out2);
+        neumann_hex8_quadshell4_boundary_residual_soa_element<s_t>(ev, points, t0, t1, t2, element_vector);
+        neumann_hex8_quadshell4_boundary_residual_soa_scatter_element<s_t>(ev, element_vector, out_stride, out0, out1, out2);
     }
 
     return SFEM_SUCCESS;
 }
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE int neumann_hex8_quadshell4_boundary_residual_sideset_soa_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
         const element_idx_t *const SFEM_RESTRICT parent,
         const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const scalar_t t0, const scalar_t t1, const scalar_t t2,
+        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t1, const s_t t2,
         const int out_stride,
-        scalar_t *const SFEM_RESTRICT out0,
-        scalar_t *const SFEM_RESTRICT out1,
-        scalar_t *const SFEM_RESTRICT out2) {
+        s_t *const SFEM_RESTRICT out0,
+        s_t *const SFEM_RESTRICT out1,
+        s_t *const SFEM_RESTRICT out2) {
 #pragma omp parallel for
     for (ptrdiff_t s = 0; s < nsides; ++s) {
         idx_t ev[4];
-        scalar_t element_vector[3][4];
+        s_t element_vector[3][4];
         neumann_hex8_quadshell4_boundary_residual_soa_gather_sideset_element(parent[s], side_idx[s], elements, ev);
         for (int c = 0; c < 3; ++c) {
             for (int i = 0; i < 4; ++i) {
-                element_vector[c][i] = scalar_t(0);
+                element_vector[c][i] = s_t(0);
             }
         }
-        neumann_hex8_quadshell4_boundary_residual_soa_element<scalar_t>(ev, points, t0, t1, t2, element_vector);
-        neumann_hex8_quadshell4_boundary_residual_soa_scatter_element<scalar_t>(ev, element_vector, out_stride, out0, out1, out2);
+        neumann_hex8_quadshell4_boundary_residual_soa_element<s_t>(ev, points, t0, t1, t2, element_vector);
+        neumann_hex8_quadshell4_boundary_residual_soa_scatter_element<s_t>(ev, element_vector, out_stride, out0, out1, out2);
     }
 
     return SFEM_SUCCESS;

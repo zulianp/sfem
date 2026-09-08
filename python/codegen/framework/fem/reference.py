@@ -65,7 +65,7 @@ def sfem_tensor_product_quad_uses_cartesian_ordering(element_type):
 class SfemSoAArrayInput:
     name: str
     size: int
-    scalar_type: str = "scalar_t"
+    scalar_type: str = "s_t"
     layout: str = "element_stream"
     n_qp: int = 1
     n_shape: int = 1
@@ -106,11 +106,11 @@ class SfemSoAArrayInput:
         return self.size
 
 
-def sfem_soa_array_input(name, size, scalar_type="scalar_t"):
+def sfem_soa_array_input(name, size, scalar_type="s_t"):
     return SfemSoAArrayInput(name, size, scalar_type)
 
 
-def sfem_soa_reference_input(name, n_qp, n_shape, components, scalar_type="scalar_t"):
+def sfem_soa_reference_input(name, n_qp, n_shape, components, scalar_type="s_t"):
     return SfemSoAArrayInput(
         name,
         int(n_qp) * int(n_shape) * int(components),
@@ -178,7 +178,7 @@ class SfemElementQuadratureRule:
         expected = len(weights) * n_shape * dim
         if len(reference_gradients) != expected:
             raise ValueError(
-                "reference_gradients must have N_QP * N_SHAPE * dim entries"
+                "reference_gradients must have NQ * NS * dim entries"
             )
         has_tensor_product_data = (
             bool(tensor_product_shape_values_1d)
@@ -194,9 +194,9 @@ class SfemElementQuadratureRule:
             n_qp_1d = len(tensor_product_weights_1d)
             expected_1d = n_qp_1d * self.tensor_product_n_shape_1d
             if len(tensor_product_shape_values_1d) != expected_1d:
-                raise ValueError("tensor-product shape values must be N_QP_1D * N_SHAPE_1D")
+                raise ValueError("tensor-product shape values must be NQ1 * NS1")
             if len(tensor_product_shape_gradients_1d) != expected_1d:
-                raise ValueError("tensor-product shape gradients must be N_QP_1D * N_SHAPE_1D")
+                raise ValueError("tensor-product shape gradients must be NQ1 * NS1")
             if n_shape != self.tensor_product_n_shape_1d ** dim:
                 raise ValueError("tensor-product n_shape does not match 1D shape count")
             if len(weights) != n_qp_1d ** dim:

@@ -29,24 +29,24 @@
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *affine_geometry_stream(
         const int,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT,
+        const g_t *const SFEM_RESTRICT source,
+        s_t *const SFEM_RESTRICT,
         std::true_type) {
     return source;
 }
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *affine_geometry_stream(
         const int nelems,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT converted,
+        const g_t *const SFEM_RESTRICT source,
+        s_t *const SFEM_RESTRICT converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
-        converted[lane] = scalar_t(source[lane]);
+        converted[lane] = s_t(source[lane]);
     }
     return converted;
 }
@@ -58,34 +58,34 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename scalar_t>
+template <typename s_t>
 struct two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[6] = {scalar_t(0.8872983346207417), scalar_t(0.1127016653792583), scalar_t(0.5), scalar_t(0.5), scalar_t(0.1127016653792583), scalar_t(0.8872983346207417)};
+    static const s_t *shape_1d() {
+        static const s_t data[6] = {s_t(0.8872983346207417), s_t(0.1127016653792583), s_t(0.5), s_t(0.5), s_t(0.1127016653792583), s_t(0.8872983346207417)};
         return data;
     }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[6] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const s_t *grad_1d() {
+        static const s_t data[6] = {s_t(-1), s_t(1), s_t(-1), s_t(1), s_t(-1), s_t(1)};
         return data;
     }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[3] = {scalar_t(0.27777777777777779), scalar_t(0.44444444444444442), scalar_t(0.27777777777777779)};
+    static const s_t *q_weight_1d() {
+        static const s_t data[3] = {s_t(0.27777777777777779), s_t(0.44444444444444442), s_t(0.27777777777777779)};
         return data;
     }
 };
 
-template <typename scalar_t>
+template <typename s_t>
 struct two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[6] = {scalar_t(0.8872983346207417), scalar_t(0.1127016653792583), scalar_t(0.5), scalar_t(0.5), scalar_t(0.1127016653792583), scalar_t(0.8872983346207417)};
+    static const s_t *shape_1d() {
+        static const s_t data[6] = {s_t(0.8872983346207417), s_t(0.1127016653792583), s_t(0.5), s_t(0.5), s_t(0.1127016653792583), s_t(0.8872983346207417)};
         return data;
     }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[6] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
+    static const s_t *grad_1d() {
+        static const s_t data[6] = {s_t(-1), s_t(1), s_t(-1), s_t(1), s_t(-1), s_t(1)};
         return data;
     }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[3] = {scalar_t(0.27777777777777779), scalar_t(0.44444444444444442), scalar_t(0.27777777777777779)};
+    static const s_t *q_weight_1d() {
+        static const s_t data[3] = {s_t(0.27777777777777779), s_t(0.44444444444444442), s_t(0.27777777777777779)};
         return data;
     }
 };
@@ -768,75 +768,75 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_element_soa_float
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
+template <typename s_t, typename g_t>
 static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_residual_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t C_ka1,
-        const scalar_t C_ka2,
-        const scalar_t K_0,
-        const scalar_t K_1,
-        const scalar_t K_2,
-        const scalar_t K_3,
-        const scalar_t K_4,
-        const scalar_t K_5,
-        const scalar_t K_6,
-        const scalar_t K_7,
-        const scalar_t K_8,
-        const scalar_t M_c,
-        const scalar_t P_r,
-        const scalar_t R,
-        const scalar_t S_res,
-        const scalar_t T,
-        const scalar_t Z,
-        const scalar_t dt,
-        const scalar_t m,
-        const scalar_t mu_c,
-        const scalar_t porosity,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const s_t C_ka1,
+        const s_t C_ka2,
+        const s_t K_0,
+        const s_t K_1,
+        const s_t K_2,
+        const s_t K_3,
+        const s_t K_4,
+        const s_t K_5,
+        const s_t K_6,
+        const s_t K_7,
+        const s_t K_8,
+        const s_t M_c,
+        const s_t P_r,
+        const s_t R,
+        const s_t S_res,
+        const s_t T,
+        const s_t Z,
+        const s_t dt,
+        const s_t m,
+        const s_t mu_c,
+        const s_t porosity,
         const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT p_w,
-        const scalar_t *const SFEM_RESTRICT p_c,
+        const s_t *const SFEM_RESTRICT p_w,
+        const s_t *const SFEM_RESTRICT p_c,
         const ptrdiff_t previous_stride,
-        const scalar_t *const SFEM_RESTRICT p_w_old,
-        const scalar_t *const SFEM_RESTRICT p_c_old,
+        const s_t *const SFEM_RESTRICT p_w_old,
+        const s_t *const SFEM_RESTRICT p_c_old,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT p_w_out,
-        scalar_t *const SFEM_RESTRICT p_c_out
+        s_t *const SFEM_RESTRICT p_w_out,
+        s_t *const SFEM_RESTRICT p_c_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 8;
-    static constexpr int N_FIELDS = 2;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int ND = 3;
+    static constexpr int NQ = 27;
+    static constexpr int NS = 8;
+    static constexpr int NC = 2;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<scalar_t>::q_weight_1d();
+    const s_t *const affine_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<s_t>::shape_1d();
+    const s_t *const affine_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<s_t>::grad_1d();
+    const s_t *const affine_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        const scalar_t *const current_components[N_FIELDS] = {p_w, p_c};
-        const scalar_t *const previous_components[N_FIELDS] = {p_w_old, p_c_old};
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        s_t block_current[NC * NS][VS];
+        s_t block_previous[NC * NS][VS];
+        s_t block_output[NC * NS][VS];
+        const s_t *const current_components[NC] = {p_w, p_c};
+        const s_t *const previous_components[NC] = {p_w_old, p_c_old};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
@@ -849,30 +849,30 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_residual_affine_me
         for (int stream = 0; stream < 16; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
+                block_output[stream][lane] = s_t(0);
             }
         }
 
-        const jacobian_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
-        scalar_t block_affine_geometry_data[10][VECTOR_SIZE];
-        const scalar_t *block_affine_geometry_streams[10];
+        const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        s_t block_affine_geometry_data[10][VS];
+        const s_t *block_affine_geometry_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<s_t, g_t, VS>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const scalar_t *block_adjugate[9];
+        const s_t *block_adjugate[9];
         for (int component = 0; component < 9; ++component) {
             block_adjugate[component] = block_affine_geometry_streams[component];
         }
 
-        two_phase_flow_form_1_p_c_d3_tensor_product_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current, block_previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, block_output);
+        two_phase_flow_form_1_p_c_d3_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current, block_previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, block_output);
 
-        scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        s_t *const output_components[NC] = {p_w_out, p_c_out};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
+                s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
@@ -986,81 +986,81 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_affine_mesh_soa_f
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_residual_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t C_ka1,
-        const scalar_t C_ka2,
-        const scalar_t K_0,
-        const scalar_t K_1,
-        const scalar_t K_2,
-        const scalar_t K_3,
-        const scalar_t K_4,
-        const scalar_t K_5,
-        const scalar_t K_6,
-        const scalar_t K_7,
-        const scalar_t K_8,
-        const scalar_t M_c,
-        const scalar_t P_r,
-        const scalar_t R,
-        const scalar_t S_res,
-        const scalar_t T,
-        const scalar_t Z,
-        const scalar_t dt,
-        const scalar_t m,
-        const scalar_t mu_c,
-        const scalar_t porosity,
+        const s_t C_ka1,
+        const s_t C_ka2,
+        const s_t K_0,
+        const s_t K_1,
+        const s_t K_2,
+        const s_t K_3,
+        const s_t K_4,
+        const s_t K_5,
+        const s_t K_6,
+        const s_t K_7,
+        const s_t K_8,
+        const s_t M_c,
+        const s_t P_r,
+        const s_t R,
+        const s_t S_res,
+        const s_t T,
+        const s_t Z,
+        const s_t dt,
+        const s_t m,
+        const s_t mu_c,
+        const s_t porosity,
         const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT p_w,
-        const scalar_t *const SFEM_RESTRICT p_c,
+        const s_t *const SFEM_RESTRICT p_w,
+        const s_t *const SFEM_RESTRICT p_c,
         const ptrdiff_t previous_stride,
-        const scalar_t *const SFEM_RESTRICT p_w_old,
-        const scalar_t *const SFEM_RESTRICT p_c_old,
+        const s_t *const SFEM_RESTRICT p_w_old,
+        const s_t *const SFEM_RESTRICT p_c_old,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT p_w_out,
-        scalar_t *const SFEM_RESTRICT p_c_out
+        s_t *const SFEM_RESTRICT p_w_out,
+        s_t *const SFEM_RESTRICT p_c_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 8;
-    static constexpr int N_FIELDS = 2;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int ND = 3;
+    static constexpr int NQ = 27;
+    static constexpr int NS = 8;
+    static constexpr int NC = 2;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    const s_t *const isoparametric_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
+    const s_t *const isoparametric_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
+    const s_t *const isoparametric_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_coordinates[3 * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        s_t block_coordinates[3 * NS][VS];
+        s_t block_adjugate_data[9][NQ * VS];
+        s_t block_determinant[NQ * VS];
+        s_t block_current[NC * NS][VS];
+        s_t block_previous[NC * NS][VS];
+        s_t block_output[NC * NS][VS];
 
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int d = 0; d < DIM; ++d) {
+            for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
-                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                    block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
         }
-        const scalar_t *const current_components[N_FIELDS] = {p_w, p_c};
-        const scalar_t *const previous_components[N_FIELDS] = {p_w_old, p_c_old};
+        const s_t *const current_components[NC] = {p_w, p_c};
+        const s_t *const previous_components[NC] = {p_w_old, p_c_old};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
@@ -1073,35 +1073,35 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_residual_isoparame
         for (int stream = 0; stream < 16; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
+                block_output[stream][lane] = s_t(0);
             }
         }
 
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+        s_t coordinate_grad_ref[ND * NQ * ND * VS];
+        tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                coordinate_grad_ref + 0 * NQ * ND * VS);
+        tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                coordinate_grad_ref + 1 * NQ * ND * VS);
+        tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+                coordinate_grad_ref + 2 * NQ * ND * VS);
 
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
 
-        const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        const s_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        two_phase_flow_form_1_p_c_d3_tensor_product_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current, block_previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, block_output);
+        two_phase_flow_form_1_p_c_d3_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, VS, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current, block_previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, block_output);
 
-        scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        s_t *const output_components[NC] = {p_w_out, p_c_out};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
+                s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
@@ -1243,54 +1243,54 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_element_so
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
+template <typename s_t, typename g_t>
 static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT p_w_out,
-        scalar_t *const SFEM_RESTRICT p_c_out
+        s_t *const SFEM_RESTRICT p_w_out,
+        s_t *const SFEM_RESTRICT p_c_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 8;
-    static constexpr int N_FIELDS = 2;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int ND = 3;
+    static constexpr int NQ = 27;
+    static constexpr int NS = 8;
+    static constexpr int NC = 2;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<scalar_t>::q_weight_1d();
+    const s_t *const affine_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<s_t>::shape_1d();
+    const s_t *const affine_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<s_t>::grad_1d();
+    const s_t *const affine_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        s_t block_output[NC * NS][VS];
 
         for (int stream = 0; stream < 16; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
+                block_output[stream][lane] = s_t(0);
             }
         }
 
-        const jacobian_t *const affine_geometry_sources[1] = {g_jacobian_determinant0 + evbegin};
-        scalar_t block_affine_geometry_data[1][VECTOR_SIZE];
-        const scalar_t *block_affine_geometry_streams[1];
+        const g_t *const affine_geometry_sources[1] = {g_jacobian_determinant0 + evbegin};
+        s_t block_affine_geometry_data[1][VS];
+        const s_t *block_affine_geometry_streams[1];
         for (int geometry_stream = 0; geometry_stream < 1; ++geometry_stream) {
-            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<s_t, g_t, VS>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
 
-        two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[0], affine_shape_1d, affine_q_weight_1d, block_output);
+        two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, block_affine_geometry_streams[0], affine_shape_1d, affine_q_weight_1d, block_output);
 
-        scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        s_t *const output_components[NC] = {p_w_out, p_c_out};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
+                s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
@@ -1332,42 +1332,42 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_affine_mes
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const *const SFEM_RESTRICT points,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT p_w_out,
-        scalar_t *const SFEM_RESTRICT p_c_out
+        s_t *const SFEM_RESTRICT p_w_out,
+        s_t *const SFEM_RESTRICT p_c_out
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 8;
-    static constexpr int N_FIELDS = 2;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int ND = 3;
+    static constexpr int NQ = 27;
+    static constexpr int NS = 8;
+    static constexpr int NC = 2;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
+    const s_t *const isoparametric_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
+    const s_t *const isoparametric_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
+    const s_t *const isoparametric_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_coordinates[3 * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[9][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        s_t block_coordinates[3 * NS][VS];
+        s_t block_adjugate_data[9][NQ * VS];
+        s_t block_determinant[NQ * VS];
+        s_t block_output[NC * NS][VS];
 
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int d = 0; d < DIM; ++d) {
+            for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evbegin + lane];
-                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
+                    block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
         }
@@ -1375,34 +1375,34 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_is
         for (int stream = 0; stream < 16; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
+                block_output[stream][lane] = s_t(0);
             }
         }
 
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+        s_t coordinate_grad_ref[ND * NQ * ND * VS];
+        tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                coordinate_grad_ref + 0 * NQ * ND * VS);
+        tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
+                coordinate_grad_ref + 1 * NQ * ND * VS);
+        tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+                coordinate_grad_ref + 2 * NQ * ND * VS);
 
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
                 nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
 
 
-        two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, isoparametric_shape_1d, isoparametric_q_weight_1d, block_output);
+        two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, VS, block_determinant, isoparametric_shape_1d, isoparametric_q_weight_1d, block_output);
 
-        scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
+        s_t *const output_components[NC] = {p_w_out, p_c_out};
+        for (int shape = 0; shape < NS; ++shape) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
+            for (int field = 0; field < NC; ++field) {
+                const int stream = shape * NC + field;
+                s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];

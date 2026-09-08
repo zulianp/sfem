@@ -7,166 +7,166 @@
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
+template <typename s_t>
 struct neumann_general_tet10_trishell6_boundary_residual_soa_reference_data {
-    static constexpr int N_SHAPE = 6;
-    static constexpr int N_QP = 6;
+    static constexpr int NS = 6;
+    static constexpr int NQ = 6;
     static constexpr int REF_DIM = 2;
     static constexpr int PHYSICAL_DIM = 3;
 
-    static const scalar_t *shape() {
-        static const scalar_t data[36] = {
-            scalar_t(-0.084730493093977982),
-            scalar_t(-0.04820837781551205),
-            scalar_t(-0.04820837781551205),
-            scalar_t(0.1928335112620482),
-            scalar_t(0.79548022620090564),
-            scalar_t(0.1928335112620482),
-            scalar_t(-0.04820837781551205),
-            scalar_t(-0.084730493093977968),
-            scalar_t(-0.04820837781551205),
-            scalar_t(0.19283351126204817),
-            scalar_t(0.19283351126204817),
-            scalar_t(0.79548022620090564),
-            scalar_t(-0.04820837781551205),
-            scalar_t(-0.04820837781551205),
-            scalar_t(-0.084730493093977968),
-            scalar_t(0.79548022620090564),
-            scalar_t(0.19283351126204817),
-            scalar_t(0.19283351126204817),
-            scalar_t(0.5176323419876725),
-            scalar_t(-0.074803807748196505),
-            scalar_t(-0.074803807748196505),
-            scalar_t(0.29921523099278602),
-            scalar_t(0.03354481152314847),
-            scalar_t(0.29921523099278602),
-            scalar_t(-0.074803807748196505),
-            scalar_t(0.5176323419876725),
-            scalar_t(-0.074803807748196505),
-            scalar_t(0.29921523099278602),
-            scalar_t(0.29921523099278602),
-            scalar_t(0.03354481152314847),
-            scalar_t(-0.074803807748196505),
-            scalar_t(-0.074803807748196505),
-            scalar_t(0.5176323419876725),
-            scalar_t(0.03354481152314847),
-            scalar_t(0.29921523099278602),
-            scalar_t(0.29921523099278602)
+    static const s_t *shape() {
+        static const s_t data[36] = {
+            s_t(-0.084730493093977982),
+            s_t(-0.04820837781551205),
+            s_t(-0.04820837781551205),
+            s_t(0.1928335112620482),
+            s_t(0.79548022620090564),
+            s_t(0.1928335112620482),
+            s_t(-0.04820837781551205),
+            s_t(-0.084730493093977968),
+            s_t(-0.04820837781551205),
+            s_t(0.19283351126204817),
+            s_t(0.19283351126204817),
+            s_t(0.79548022620090564),
+            s_t(-0.04820837781551205),
+            s_t(-0.04820837781551205),
+            s_t(-0.084730493093977968),
+            s_t(0.79548022620090564),
+            s_t(0.19283351126204817),
+            s_t(0.19283351126204817),
+            s_t(0.5176323419876725),
+            s_t(-0.074803807748196505),
+            s_t(-0.074803807748196505),
+            s_t(0.29921523099278602),
+            s_t(0.03354481152314847),
+            s_t(0.29921523099278602),
+            s_t(-0.074803807748196505),
+            s_t(0.5176323419876725),
+            s_t(-0.074803807748196505),
+            s_t(0.29921523099278602),
+            s_t(0.29921523099278602),
+            s_t(0.03354481152314847),
+            s_t(-0.074803807748196505),
+            s_t(-0.074803807748196505),
+            s_t(0.5176323419876725),
+            s_t(0.03354481152314847),
+            s_t(0.29921523099278602),
+            s_t(0.29921523099278602)
         };
         return data;
     }
 
-    static const scalar_t *grad() {
-        static const scalar_t data[72] = {
-            scalar_t(0.56758792732771912),
-            scalar_t(0.56758792732771912),
-            scalar_t(0.78379396366385956),
-            scalar_t(0),
-            scalar_t(0),
-            scalar_t(0.78379396366385956),
-            scalar_t(-1.3513818909915787),
-            scalar_t(-1.7837939636638596),
-            scalar_t(1.7837939636638596),
-            scalar_t(1.7837939636638596),
-            scalar_t(-1.7837939636638596),
-            scalar_t(-1.3513818909915787),
-            scalar_t(-0.78379396366385956),
-            scalar_t(-0.78379396366385956),
-            scalar_t(-0.56758792732771912),
-            scalar_t(0),
-            scalar_t(0),
-            scalar_t(0.78379396366385956),
-            scalar_t(1.3513818909915787),
-            scalar_t(-0.43241207267228082),
-            scalar_t(1.7837939636638596),
-            scalar_t(0.43241207267228082),
-            scalar_t(-1.7837939636638596),
-            scalar_t(0),
-            scalar_t(-0.78379396366385956),
-            scalar_t(-0.78379396366385956),
-            scalar_t(0.78379396366385956),
-            scalar_t(0),
-            scalar_t(0),
-            scalar_t(-0.56758792732771912),
-            scalar_t(5.5511151231257827e-17),
-            scalar_t(-1.7837939636638596),
-            scalar_t(0.43241207267228082),
-            scalar_t(1.7837939636638596),
-            scalar_t(-0.43241207267228082),
-            scalar_t(1.3513818909915787),
-            scalar_t(-2.2673902919218341),
-            scalar_t(-2.2673902919218341),
-            scalar_t(-0.63369514596091703),
-            scalar_t(0),
-            scalar_t(0),
-            scalar_t(-0.63369514596091703),
-            scalar_t(2.9010854378827511),
-            scalar_t(-0.36630485403908297),
-            scalar_t(0.36630485403908297),
-            scalar_t(0.36630485403908297),
-            scalar_t(-0.36630485403908297),
-            scalar_t(2.9010854378827511),
-            scalar_t(0.63369514596091703),
-            scalar_t(0.63369514596091703),
-            scalar_t(2.2673902919218341),
-            scalar_t(0),
-            scalar_t(0),
-            scalar_t(-0.63369514596091703),
-            scalar_t(-2.9010854378827511),
-            scalar_t(-3.2673902919218341),
-            scalar_t(0.36630485403908297),
-            scalar_t(3.2673902919218341),
-            scalar_t(-0.36630485403908297),
-            scalar_t(0),
-            scalar_t(0.63369514596091703),
-            scalar_t(0.63369514596091703),
-            scalar_t(-0.63369514596091703),
-            scalar_t(0),
-            scalar_t(0),
-            scalar_t(2.2673902919218341),
-            scalar_t(0),
-            scalar_t(-0.36630485403908297),
-            scalar_t(3.2673902919218341),
-            scalar_t(0.36630485403908297),
-            scalar_t(-3.2673902919218341),
-            scalar_t(-2.9010854378827511)
+    static const s_t *grad() {
+        static const s_t data[72] = {
+            s_t(0.56758792732771912),
+            s_t(0.56758792732771912),
+            s_t(0.78379396366385956),
+            s_t(0),
+            s_t(0),
+            s_t(0.78379396366385956),
+            s_t(-1.3513818909915787),
+            s_t(-1.7837939636638596),
+            s_t(1.7837939636638596),
+            s_t(1.7837939636638596),
+            s_t(-1.7837939636638596),
+            s_t(-1.3513818909915787),
+            s_t(-0.78379396366385956),
+            s_t(-0.78379396366385956),
+            s_t(-0.56758792732771912),
+            s_t(0),
+            s_t(0),
+            s_t(0.78379396366385956),
+            s_t(1.3513818909915787),
+            s_t(-0.43241207267228082),
+            s_t(1.7837939636638596),
+            s_t(0.43241207267228082),
+            s_t(-1.7837939636638596),
+            s_t(0),
+            s_t(-0.78379396366385956),
+            s_t(-0.78379396366385956),
+            s_t(0.78379396366385956),
+            s_t(0),
+            s_t(0),
+            s_t(-0.56758792732771912),
+            s_t(5.5511151231257827e-17),
+            s_t(-1.7837939636638596),
+            s_t(0.43241207267228082),
+            s_t(1.7837939636638596),
+            s_t(-0.43241207267228082),
+            s_t(1.3513818909915787),
+            s_t(-2.2673902919218341),
+            s_t(-2.2673902919218341),
+            s_t(-0.63369514596091703),
+            s_t(0),
+            s_t(0),
+            s_t(-0.63369514596091703),
+            s_t(2.9010854378827511),
+            s_t(-0.36630485403908297),
+            s_t(0.36630485403908297),
+            s_t(0.36630485403908297),
+            s_t(-0.36630485403908297),
+            s_t(2.9010854378827511),
+            s_t(0.63369514596091703),
+            s_t(0.63369514596091703),
+            s_t(2.2673902919218341),
+            s_t(0),
+            s_t(0),
+            s_t(-0.63369514596091703),
+            s_t(-2.9010854378827511),
+            s_t(-3.2673902919218341),
+            s_t(0.36630485403908297),
+            s_t(3.2673902919218341),
+            s_t(-0.36630485403908297),
+            s_t(0),
+            s_t(0.63369514596091703),
+            s_t(0.63369514596091703),
+            s_t(-0.63369514596091703),
+            s_t(0),
+            s_t(0),
+            s_t(2.2673902919218341),
+            s_t(0),
+            s_t(-0.36630485403908297),
+            s_t(3.2673902919218341),
+            s_t(0.36630485403908297),
+            s_t(-3.2673902919218341),
+            s_t(-2.9010854378827511)
         };
         return data;
     }
 
-    static const scalar_t *weight() {
-        static const scalar_t data[6] = {
-            scalar_t(0.11169079483900569),
-            scalar_t(0.11169079483900569),
-            scalar_t(0.11169079483900569),
-            scalar_t(0.054975871827660998),
-            scalar_t(0.054975871827660998),
-            scalar_t(0.054975871827660998)
+    static const s_t *weight() {
+        static const s_t data[6] = {
+            s_t(0.11169079483900569),
+            s_t(0.11169079483900569),
+            s_t(0.11169079483900569),
+            s_t(0.054975871827660998),
+            s_t(0.054975871827660998),
+            s_t(0.054975871827660998)
         };
         return data;
     }
 };
 
-template <typename scalar_t>
-static SFEM_INLINE scalar_t neumann_general_tet10_trishell6_boundary_residual_soa_measure(
+template <typename s_t>
+static SFEM_INLINE s_t neumann_general_tet10_trishell6_boundary_residual_soa_measure(
         const int q,
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points) {
-    const scalar_t *const grad = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<scalar_t>::grad();
-    const int n_shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<scalar_t>::N_SHAPE;
-    scalar_t dxdr0 = scalar_t(0);
-    scalar_t dxdr1 = scalar_t(0);
-    scalar_t dxdr2 = scalar_t(0);
-    scalar_t dxds0 = scalar_t(0);
-    scalar_t dxds1 = scalar_t(0);
-    scalar_t dxds2 = scalar_t(0);
+    const s_t *const grad = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::grad();
+    const int n_shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NS;
+    s_t dxdr0 = s_t(0);
+    s_t dxdr1 = s_t(0);
+    s_t dxdr2 = s_t(0);
+    s_t dxds0 = s_t(0);
+    s_t dxds1 = s_t(0);
+    s_t dxds2 = s_t(0);
     for (int i = 0; i < n_shape; ++i) {
-        const scalar_t gr = grad[(q * n_shape + i) * 2 + 0];
-        const scalar_t gs = grad[(q * n_shape + i) * 2 + 1];
+        const s_t gr = grad[(q * n_shape + i) * 2 + 0];
+        const s_t gs = grad[(q * n_shape + i) * 2 + 1];
         const idx_t node = ev[i];
-        const scalar_t x = scalar_t(points[0][node]);
-        const scalar_t y = scalar_t(points[1][node]);
-        const scalar_t z = scalar_t(points[2][node]);
+        const s_t x = s_t(points[0][node]);
+        const s_t y = s_t(points[1][node]);
+        const s_t z = s_t(points[2][node]);
         dxdr0 += x * gr;
         dxdr1 += y * gr;
         dxdr2 += z * gr;
@@ -174,9 +174,9 @@ static SFEM_INLINE scalar_t neumann_general_tet10_trishell6_boundary_residual_so
         dxds1 += y * gs;
         dxds2 += z * gs;
     }
-    const scalar_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
-    const scalar_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
-    const scalar_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
+    const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
+    const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
+    const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
     return sqrt(c0 * c0 + c1 * c1 + c2 * c2);
 }
 
@@ -222,37 +222,37 @@ static SFEM_INLINE void neumann_general_tet10_trishell6_boundary_residual_soa_ga
     }
 }
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE void neumann_general_tet10_trishell6_boundary_residual_soa_element(
         const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points, const scalar_t t0, const scalar_t t0_001, const scalar_t t0_010, const scalar_t t0_100, const scalar_t t1, const scalar_t t1_001, const scalar_t t1_010, const scalar_t t1_100, const scalar_t t2, const scalar_t t2_001, const scalar_t t2_010, const scalar_t t2_100,
-        scalar_t element_vector[3][6]) {
-    const scalar_t *const shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<scalar_t>::shape();
-    const scalar_t *const weight = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<scalar_t>::weight();
-    const int n_shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<scalar_t>::N_SHAPE;
-    const int n_qp = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<scalar_t>::N_QP;
+        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
+        s_t element_vector[3][6]) {
+    const s_t *const shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::shape();
+    const s_t *const weight = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::weight();
+    const int n_shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NS;
+    const int n_qp = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NQ;
 
 
 
     for (int q = 0; q < n_qp; ++q) {
-        const scalar_t dS = neumann_general_tet10_trishell6_boundary_residual_soa_measure<scalar_t>(q, ev, points);
-        const scalar_t qw = weight[q] * dS;
-        scalar_t x0 = scalar_t(0);
-        scalar_t x1 = scalar_t(0);
-        scalar_t x2 = scalar_t(0);
+        const s_t dS = neumann_general_tet10_trishell6_boundary_residual_soa_measure<s_t>(q, ev, points);
+        const s_t qw = weight[q] * dS;
+        s_t x0 = s_t(0);
+        s_t x1 = s_t(0);
+        s_t x2 = s_t(0);
         for (int j = 0; j < n_shape; ++j) {
-            const scalar_t phi = shape[q * n_shape + j];
+            const s_t phi = shape[q * n_shape + j];
             const idx_t node = ev[j];
-            x0 += scalar_t(points[0][node]) * phi;
-            x1 += scalar_t(points[1][node]) * phi;
-            x2 += scalar_t(points[2][node]) * phi;
+            x0 += s_t(points[0][node]) * phi;
+            x1 += s_t(points[1][node]) * phi;
+            x2 += s_t(points[2][node]) * phi;
         }
-        const scalar_t coeff0 = t0 + t0_001*x2 + t0_010*x1 + t0_100*x0;
-        const scalar_t coeff1 = t1 + t1_001*x2 + t1_010*x1 + t1_100*x0;
-        const scalar_t coeff2 = t2 + t2_001*x2 + t2_010*x1 + t2_100*x0;
+        const s_t coeff0 = t0 + t0_001*x2 + t0_010*x1 + t0_100*x0;
+        const s_t coeff1 = t1 + t1_001*x2 + t1_010*x1 + t1_100*x0;
+        const s_t coeff2 = t2 + t2_001*x2 + t2_010*x1 + t2_100*x0;
 #pragma omp simd
         for (int i = 0; i < n_shape; ++i) {
-            const scalar_t test = shape[q * n_shape + i] * qw;
+            const s_t test = shape[q * n_shape + i] * qw;
                 element_vector[0][i] += coeff0 * test;
                 element_vector[1][i] += coeff1 * test;
                 element_vector[2][i] += coeff2 * test;
@@ -260,14 +260,14 @@ static SFEM_INLINE void neumann_general_tet10_trishell6_boundary_residual_soa_el
     }
 }
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE void neumann_general_tet10_trishell6_boundary_residual_soa_scatter_element(
         const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t element_vector[3][6],
+        const s_t element_vector[3][6],
         const int out_stride,
-        scalar_t *const SFEM_RESTRICT out0,
-        scalar_t *const SFEM_RESTRICT out1,
-        scalar_t *const SFEM_RESTRICT out2) {
+        s_t *const SFEM_RESTRICT out0,
+        s_t *const SFEM_RESTRICT out1,
+        s_t *const SFEM_RESTRICT out2) {
     constexpr int n_shape = 6;
     for (int i = 0; i < n_shape; ++i) {
         const idx_t node = ev[i];
@@ -280,59 +280,59 @@ static SFEM_INLINE void neumann_general_tet10_trishell6_boundary_residual_soa_sc
     }
 }
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE int neumann_general_tet10_trishell6_boundary_residual_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points, const scalar_t t0, const scalar_t t0_001, const scalar_t t0_010, const scalar_t t0_100, const scalar_t t1, const scalar_t t1_001, const scalar_t t1_010, const scalar_t t1_100, const scalar_t t2, const scalar_t t2_001, const scalar_t t2_010, const scalar_t t2_100,
+        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
         const int out_stride,
-        scalar_t *const SFEM_RESTRICT out0,
-        scalar_t *const SFEM_RESTRICT out1,
-        scalar_t *const SFEM_RESTRICT out2) {
+        s_t *const SFEM_RESTRICT out0,
+        s_t *const SFEM_RESTRICT out1,
+        s_t *const SFEM_RESTRICT out2) {
 #pragma omp parallel for
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         idx_t ev[6];
-        scalar_t element_vector[3][6];
+        s_t element_vector[3][6];
         for (int i = 0; i < 6; ++i) {
             ev[i] = elements[i][e];
         }
         for (int c = 0; c < 3; ++c) {
             for (int i = 0; i < 6; ++i) {
-                element_vector[c][i] = scalar_t(0);
+                element_vector[c][i] = s_t(0);
             }
         }
-        neumann_general_tet10_trishell6_boundary_residual_soa_element<scalar_t>(ev, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, element_vector);
-        neumann_general_tet10_trishell6_boundary_residual_soa_scatter_element<scalar_t>(ev, element_vector, out_stride, out0, out1, out2);
+        neumann_general_tet10_trishell6_boundary_residual_soa_element<s_t>(ev, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, element_vector);
+        neumann_general_tet10_trishell6_boundary_residual_soa_scatter_element<s_t>(ev, element_vector, out_stride, out0, out1, out2);
     }
 
     return SFEM_SUCCESS;
 }
 
-template <typename scalar_t>
+template <typename s_t>
 static SFEM_INLINE int neumann_general_tet10_trishell6_boundary_residual_sideset_soa_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
         idx_t **const SFEM_RESTRICT elements,
         const element_idx_t *const SFEM_RESTRICT parent,
         const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const scalar_t t0, const scalar_t t0_001, const scalar_t t0_010, const scalar_t t0_100, const scalar_t t1, const scalar_t t1_001, const scalar_t t1_010, const scalar_t t1_100, const scalar_t t2, const scalar_t t2_001, const scalar_t t2_010, const scalar_t t2_100,
+        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
         const int out_stride,
-        scalar_t *const SFEM_RESTRICT out0,
-        scalar_t *const SFEM_RESTRICT out1,
-        scalar_t *const SFEM_RESTRICT out2) {
+        s_t *const SFEM_RESTRICT out0,
+        s_t *const SFEM_RESTRICT out1,
+        s_t *const SFEM_RESTRICT out2) {
 #pragma omp parallel for
     for (ptrdiff_t s = 0; s < nsides; ++s) {
         idx_t ev[6];
-        scalar_t element_vector[3][6];
+        s_t element_vector[3][6];
         neumann_general_tet10_trishell6_boundary_residual_soa_gather_sideset_element(parent[s], side_idx[s], elements, ev);
         for (int c = 0; c < 3; ++c) {
             for (int i = 0; i < 6; ++i) {
-                element_vector[c][i] = scalar_t(0);
+                element_vector[c][i] = s_t(0);
             }
         }
-        neumann_general_tet10_trishell6_boundary_residual_soa_element<scalar_t>(ev, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, element_vector);
-        neumann_general_tet10_trishell6_boundary_residual_soa_scatter_element<scalar_t>(ev, element_vector, out_stride, out0, out1, out2);
+        neumann_general_tet10_trishell6_boundary_residual_soa_element<s_t>(ev, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, element_vector);
+        neumann_general_tet10_trishell6_boundary_residual_soa_scatter_element<s_t>(ev, element_vector, out_stride, out0, out1, out2);
     }
 
     return SFEM_SUCCESS;

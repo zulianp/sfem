@@ -20,415 +20,415 @@
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_2d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const SFEM_RESTRICT values
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const SFEM_RESTRICT values
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_energy_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_tri3_energy_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 40:
-            return linear_elasticity_quad4_energy_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_quad4_energy_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 400000:
-            return linear_elasticity_proteus_quad4_energy_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_proteus_quad4_energy_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_3d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const SFEM_RESTRICT values
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const SFEM_RESTRICT values
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_energy_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_tet4_energy_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 10:
-            return linear_elasticity_tet10_energy_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_tet10_energy_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 8:
-            return linear_elasticity_hex8_energy_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_hex8_energy_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 100008:
-            return linear_elasticity_proteus_hex8_energy_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_proteus_hex8_energy_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_2d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const SFEM_RESTRICT values
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const SFEM_RESTRICT values
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_energy_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_tri3_energy_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 40:
-            return linear_elasticity_quad4_energy_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_quad4_energy_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 400000:
-            return linear_elasticity_proteus_quad4_energy_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_proteus_quad4_energy_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_3d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const SFEM_RESTRICT values
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const SFEM_RESTRICT values
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_energy_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_tet4_energy_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 10:
-            return linear_elasticity_tet10_energy_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_tet10_energy_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 8:
-            return linear_elasticity_hex8_energy_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_hex8_energy_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         case 100008:
-            return linear_elasticity_proteus_hex8_energy_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, values);
+            return linear_elasticity_proteus_hex8_energy_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_2d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const SFEM_RESTRICT values
+        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
+        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const SFEM_RESTRICT values
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_energy_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
+            return linear_elasticity_tri3_energy_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
         case 40:
-            return linear_elasticity_quad4_energy_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
+            return linear_elasticity_quad4_energy_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
         case 400000:
-            return linear_elasticity_proteus_quad4_energy_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
+            return linear_elasticity_proteus_quad4_energy_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_3d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const SFEM_RESTRICT values
+        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
+        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const SFEM_RESTRICT values
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_energy_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
+            return linear_elasticity_tet4_energy_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
         case 10:
-            return linear_elasticity_tet10_energy_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
+            return linear_elasticity_tet10_energy_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
         case 8:
-            return linear_elasticity_hex8_energy_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
+            return linear_elasticity_hex8_energy_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
         case 100008:
-            return linear_elasticity_proteus_hex8_energy_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
+            return linear_elasticity_proteus_hex8_energy_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, values);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_2d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const *const SFEM_RESTRICT out_streams
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_gradient_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tri3_gradient_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 40:
-            return linear_elasticity_quad4_gradient_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_quad4_gradient_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 400000:
-            return linear_elasticity_proteus_quad4_gradient_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_proteus_quad4_gradient_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_3d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const *const SFEM_RESTRICT out_streams
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_gradient_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tet4_gradient_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 10:
-            return linear_elasticity_tet10_gradient_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tet10_gradient_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 8:
-            return linear_elasticity_hex8_gradient_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_hex8_gradient_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 100008:
-            return linear_elasticity_proteus_hex8_gradient_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_proteus_hex8_gradient_element_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_2d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const *const SFEM_RESTRICT out_streams
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_gradient_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tri3_gradient_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 40:
-            return linear_elasticity_quad4_gradient_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_quad4_gradient_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 400000:
-            return linear_elasticity_proteus_quad4_gradient_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_proteus_quad4_gradient_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_3d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const *const SFEM_RESTRICT out_streams
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_gradient_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tet4_gradient_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 10:
-            return linear_elasticity_tet10_gradient_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tet10_gradient_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 8:
-            return linear_elasticity_hex8_gradient_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_hex8_gradient_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         case 100008:
-            return linear_elasticity_proteus_hex8_gradient_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_proteus_hex8_gradient_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_2d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
+        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const *const SFEM_RESTRICT out_streams
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_gradient_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tri3_gradient_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
         case 40:
-            return linear_elasticity_quad4_gradient_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_quad4_gradient_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
         case 400000:
-            return linear_elasticity_proteus_quad4_gradient_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_proteus_quad4_gradient_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_3d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        const scalar_t *const *const SFEM_RESTRICT u_streams,
-        scalar_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
+        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const *const SFEM_RESTRICT u_streams,
+        s_t *const *const SFEM_RESTRICT out_streams
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_gradient_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tet4_gradient_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
         case 10:
-            return linear_elasticity_tet10_gradient_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_tet10_gradient_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
         case 8:
-            return linear_elasticity_hex8_gradient_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_hex8_gradient_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
         case 100008:
-            return linear_elasticity_proteus_hex8_gradient_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
+            return linear_elasticity_proteus_hex8_gradient_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, u_streams, out_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_2d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        scalar_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        s_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_hessian_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_tri3_hessian_element_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 40:
-            return linear_elasticity_quad4_hessian_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_quad4_hessian_element_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 400000:
-            return linear_elasticity_proteus_quad4_hessian_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_proteus_quad4_hessian_element_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_3d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        scalar_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        s_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_hessian_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_tet4_hessian_element_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 10:
-            return linear_elasticity_tet10_hessian_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_tet10_hessian_element_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 8:
-            return linear_elasticity_hex8_hessian_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_hex8_hessian_element_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 100008:
-            return linear_elasticity_proteus_hex8_hessian_element_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_proteus_hex8_hessian_element_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_2d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        scalar_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        s_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_hessian_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_tri3_hessian_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 40:
-            return linear_elasticity_quad4_hessian_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_quad4_hessian_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 400000:
-            return linear_elasticity_proteus_quad4_hessian_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_proteus_quad4_hessian_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_3d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT coords,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        scalar_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t lmbda,
+        const s_t mu,
+        s_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_hessian_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_tet4_hessian_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 10:
-            return linear_elasticity_tet10_hessian_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_tet10_hessian_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 8:
-            return linear_elasticity_hex8_hessian_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_hex8_hessian_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         case 100008:
-            return linear_elasticity_proteus_hex8_hessian_element_coords_soa<scalar_t, VECTOR_SIZE>(nelements, coords, lmbda, mu, matrix_streams);
+            return linear_elasticity_proteus_hex8_hessian_element_coords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_2d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        scalar_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
+        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t lmbda,
+        const s_t mu,
+        s_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     switch ((int)element_type) {
         case 3:
-            return linear_elasticity_tri3_hessian_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
+            return linear_elasticity_tri3_hessian_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
         case 40:
-            return linear_elasticity_quad4_hessian_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
+            return linear_elasticity_quad4_hessian_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
         case 400000:
-            return linear_elasticity_proteus_quad4_hessian_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
+            return linear_elasticity_proteus_quad4_hessian_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
         default:
             return SFEM_FAILURE;
     }
 }
 
-template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>
+template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_3d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const scalar_t *const SFEM_RESTRICT jacobian_determinant,
-        const scalar_t lmbda,
-        const scalar_t mu,
-        scalar_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
+        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t lmbda,
+        const s_t mu,
+        s_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     switch ((int)element_type) {
         case 4:
-            return linear_elasticity_tet4_hessian_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
+            return linear_elasticity_tet4_hessian_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
         case 10:
-            return linear_elasticity_tet10_hessian_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
+            return linear_elasticity_tet10_hessian_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
         case 8:
-            return linear_elasticity_hex8_hessian_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
+            return linear_elasticity_hex8_hessian_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
         case 100008:
-            return linear_elasticity_proteus_hex8_hessian_element_geometry_soa<scalar_t, VECTOR_SIZE>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
+            return linear_elasticity_proteus_hex8_hessian_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, matrix_streams);
         default:
             return SFEM_FAILURE;
     }

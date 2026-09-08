@@ -484,13 +484,13 @@ class OpenMPSoABackend:
         if local_source is None:
             raise RuntimeError("OpenMP SoA backend did not emit '%s'" % local_name)
         OpenMPSoABackend._validate_mesh_source_contract(files)
-        if "template <typename scalar_t, int N_QP" not in local_source:
+        if "template <typename s_t, int NQ" not in local_source:
             raise RuntimeError(
-                "OpenMP SoA local kernel '%s' is not templated on N_QP" % local_name
+                "OpenMP SoA local kernel '%s' is not templated on NQ" % local_name
             )
-        if "int VECTOR_SIZE" not in local_source:
+        if "int VS" not in local_source:
             raise RuntimeError(
-                "OpenMP SoA local kernel '%s' is not templated on VECTOR_SIZE"
+                "OpenMP SoA local kernel '%s' is not templated on VS"
                 % local_name
             )
         block_name = "%s_" % local_prefix

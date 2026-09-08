@@ -26,88 +26,88 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
+template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_tensor_product_direct_hessian_tensor_product_element_matrix(
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate0,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate1,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate2,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate3,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate4,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate5,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate6,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate7,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate8,
-        const scalar_t *const SFEM_RESTRICT block_jacobian_determinant0,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t kappa,
-        scalar_t *const SFEM_RESTRICT element_matrix
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate0,
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate1,
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate2,
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate3,
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate4,
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate5,
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate6,
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate7,
+        const s_t *const SFEM_RESTRICT block_jacobian_adjugate8,
+        const s_t *const SFEM_RESTRICT block_jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT shape_1d,
+        const s_t *const SFEM_RESTRICT grad_1d,
+        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t kappa,
+        s_t *const SFEM_RESTRICT element_matrix
 ) {
-    static_assert(N_QP > 0, "N_QP must be positive");
-    static_assert(N_SHAPE > 0, "N_SHAPE must be positive");
-    static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int N_FIELD_COMPONENTS = 1;
-    static constexpr int SPATIAL_DIM = 3;
-    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
-    static constexpr int N_QP_1D = integer_root(N_QP, 3);
-    static constexpr int N_SHAPE_1D = integer_root(N_SHAPE, 3);
-    static_assert(ipow(N_QP_1D, 3) == N_QP, "N_QP must be tensor-product compatible");
-    static_assert(ipow(N_SHAPE_1D, 3) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
+    static_assert(NQ > 0, "NQ must be positive");
+    static_assert(NS > 0, "NS must be positive");
+    static_assert(VS > 0, "VS must be positive");
+    static constexpr int NC = 1;
+    static constexpr int ND = 3;
+    static constexpr int NDOFS = NC * NS;
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
+    static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
     for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {
-        element_matrix[entry] = scalar_t(0);
+        element_matrix[entry] = s_t(0);
     }
-    for (int q = 0; q < N_QP; ++q) {
-        const int qx = q % N_QP_1D;
-        const int qy = (q / N_QP_1D) % N_QP_1D;
-        const int qz = q / (N_QP_1D * N_QP_1D);
-        const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
+    for (int q = 0; q < NQ; ++q) {
+        const int qx = q % NQ1;
+        const int qy = (q / NQ1) % NQ1;
+        const int qz = q / (NQ1 * NQ1);
+        const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
         const int lane = 0;
-        const ptrdiff_t geometry_offset = q * VECTOR_SIZE + lane;
-        const scalar_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[geometry_offset];
-        const scalar_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[geometry_offset];
-        const scalar_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[geometry_offset];
-        const scalar_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[geometry_offset];
-        const scalar_t jacobian_adjugate_lane4 = block_jacobian_adjugate4[geometry_offset];
-        const scalar_t jacobian_adjugate_lane5 = block_jacobian_adjugate5[geometry_offset];
-        const scalar_t jacobian_adjugate_lane6 = block_jacobian_adjugate6[geometry_offset];
-        const scalar_t jacobian_adjugate_lane7 = block_jacobian_adjugate7[geometry_offset];
-        const scalar_t jacobian_adjugate_lane8 = block_jacobian_adjugate8[geometry_offset];
-        const scalar_t jacobian_determinant_lane0 = block_jacobian_determinant0[geometry_offset];
-        const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
-        for (int trial_component = 0; trial_component < N_FIELD_COMPONENTS; ++trial_component) {
-            for (int trial_shape = 0; trial_shape < N_SHAPE; ++trial_shape) {
-                const int trial_sx = trial_shape % N_SHAPE_1D;
-                const int trial_sy = (trial_shape / N_SHAPE_1D) % N_SHAPE_1D;
-                const int trial_sz = trial_shape / (N_SHAPE_1D * N_SHAPE_1D);
-                const scalar_t trial_grad_ref0 = grad_1d[qx * N_SHAPE_1D + trial_sx] * shape_1d[qy * N_SHAPE_1D + trial_sy] * shape_1d[qz * N_SHAPE_1D + trial_sz];
-                const scalar_t trial_grad_ref1 = shape_1d[qx * N_SHAPE_1D + trial_sx] * grad_1d[qy * N_SHAPE_1D + trial_sy] * shape_1d[qz * N_SHAPE_1D + trial_sz];
-                const scalar_t trial_grad_ref2 = shape_1d[qx * N_SHAPE_1D + trial_sx] * shape_1d[qy * N_SHAPE_1D + trial_sy] * grad_1d[qz * N_SHAPE_1D + trial_sz];
-                scalar_t trial_grad[N_FIELD_COMPONENTS * SPATIAL_DIM];
-                for (int i = 0; i < N_FIELD_COMPONENTS * SPATIAL_DIM; ++i) {
-                    trial_grad[i] = scalar_t(0);
+        const ptrdiff_t geometry_offset = q * VS + lane;
+        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[geometry_offset];
+        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[geometry_offset];
+        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[geometry_offset];
+        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[geometry_offset];
+        const s_t jacobian_adjugate_lane4 = block_jacobian_adjugate4[geometry_offset];
+        const s_t jacobian_adjugate_lane5 = block_jacobian_adjugate5[geometry_offset];
+        const s_t jacobian_adjugate_lane6 = block_jacobian_adjugate6[geometry_offset];
+        const s_t jacobian_adjugate_lane7 = block_jacobian_adjugate7[geometry_offset];
+        const s_t jacobian_adjugate_lane8 = block_jacobian_adjugate8[geometry_offset];
+        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[geometry_offset];
+        const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
+        for (int trial_component = 0; trial_component < NC; ++trial_component) {
+            for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
+                const int trial_sx = trial_shape % NS1;
+                const int trial_sy = (trial_shape / NS1) % NS1;
+                const int trial_sz = trial_shape / (NS1 * NS1);
+                const s_t trial_grad_ref0 = grad_1d[qx * NS1 + trial_sx] * shape_1d[qy * NS1 + trial_sy] * shape_1d[qz * NS1 + trial_sz];
+                const s_t trial_grad_ref1 = shape_1d[qx * NS1 + trial_sx] * grad_1d[qy * NS1 + trial_sy] * shape_1d[qz * NS1 + trial_sz];
+                const s_t trial_grad_ref2 = shape_1d[qx * NS1 + trial_sx] * shape_1d[qy * NS1 + trial_sy] * grad_1d[qz * NS1 + trial_sz];
+                s_t trial_grad[NC * ND];
+                for (int i = 0; i < NC * ND; ++i) {
+                    trial_grad[i] = s_t(0);
                 }
-                trial_grad[trial_component * SPATIAL_DIM + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane3 + trial_grad_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-                trial_grad[trial_component * SPATIAL_DIM + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane4 + trial_grad_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-                trial_grad[trial_component * SPATIAL_DIM + 2] = (trial_grad_ref0 * jacobian_adjugate_lane2 + trial_grad_ref1 * jacobian_adjugate_lane5 + trial_grad_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-                scalar_t material[N_FIELD_COMPONENTS * SPATIAL_DIM];
+                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane3 + trial_grad_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
+                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane4 + trial_grad_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
+                trial_grad[trial_component * ND + 2] = (trial_grad_ref0 * jacobian_adjugate_lane2 + trial_grad_ref1 * jacobian_adjugate_lane5 + trial_grad_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
+                s_t material[NC * ND];
                 material[0] = kappa*trial_grad[0];
                 material[1] = kappa*trial_grad[1];
                 material[2] = kappa*trial_grad[2];
-                for (int test_component = 0; test_component < N_FIELD_COMPONENTS; ++test_component) {
-                    for (int test_shape = 0; test_shape < N_SHAPE; ++test_shape) {
-                        const int test_sx = test_shape % N_SHAPE_1D;
-                        const int test_sy = (test_shape / N_SHAPE_1D) % N_SHAPE_1D;
-                        const int test_sz = test_shape / (N_SHAPE_1D * N_SHAPE_1D);
-                        const scalar_t test_grad_ref0 = grad_1d[qx * N_SHAPE_1D + test_sx] * shape_1d[qy * N_SHAPE_1D + test_sy] * shape_1d[qz * N_SHAPE_1D + test_sz];
-                        const scalar_t test_grad_ref1 = shape_1d[qx * N_SHAPE_1D + test_sx] * grad_1d[qy * N_SHAPE_1D + test_sy] * shape_1d[qz * N_SHAPE_1D + test_sz];
-                        const scalar_t test_grad_ref2 = shape_1d[qx * N_SHAPE_1D + test_sx] * shape_1d[qy * N_SHAPE_1D + test_sy] * grad_1d[qz * N_SHAPE_1D + test_sz];
-                        scalar_t entry = scalar_t(0);
-                        entry += test_grad_ref0 * qw * (material[test_component * SPATIAL_DIM + 0] * jacobian_adjugate_lane0 + material[test_component * SPATIAL_DIM + 1] * jacobian_adjugate_lane1 + material[test_component * SPATIAL_DIM + 2] * jacobian_adjugate_lane2);
-                        entry += test_grad_ref1 * qw * (material[test_component * SPATIAL_DIM + 0] * jacobian_adjugate_lane3 + material[test_component * SPATIAL_DIM + 1] * jacobian_adjugate_lane4 + material[test_component * SPATIAL_DIM + 2] * jacobian_adjugate_lane5);
-                        entry += test_grad_ref2 * qw * (material[test_component * SPATIAL_DIM + 0] * jacobian_adjugate_lane6 + material[test_component * SPATIAL_DIM + 1] * jacobian_adjugate_lane7 + material[test_component * SPATIAL_DIM + 2] * jacobian_adjugate_lane8);
-                        const int row = test_component * N_SHAPE + test_shape;
-                        const int col = trial_component * N_SHAPE + trial_shape;
+                for (int test_component = 0; test_component < NC; ++test_component) {
+                    for (int test_shape = 0; test_shape < NS; ++test_shape) {
+                        const int test_sx = test_shape % NS1;
+                        const int test_sy = (test_shape / NS1) % NS1;
+                        const int test_sz = test_shape / (NS1 * NS1);
+                        const s_t test_grad_ref0 = grad_1d[qx * NS1 + test_sx] * shape_1d[qy * NS1 + test_sy] * shape_1d[qz * NS1 + test_sz];
+                        const s_t test_grad_ref1 = shape_1d[qx * NS1 + test_sx] * grad_1d[qy * NS1 + test_sy] * shape_1d[qz * NS1 + test_sz];
+                        const s_t test_grad_ref2 = shape_1d[qx * NS1 + test_sx] * shape_1d[qy * NS1 + test_sy] * grad_1d[qz * NS1 + test_sz];
+                        s_t entry = s_t(0);
+                        entry += test_grad_ref0 * qw * (material[test_component * ND + 0] * jacobian_adjugate_lane0 + material[test_component * ND + 1] * jacobian_adjugate_lane1 + material[test_component * ND + 2] * jacobian_adjugate_lane2);
+                        entry += test_grad_ref1 * qw * (material[test_component * ND + 0] * jacobian_adjugate_lane3 + material[test_component * ND + 1] * jacobian_adjugate_lane4 + material[test_component * ND + 2] * jacobian_adjugate_lane5);
+                        entry += test_grad_ref2 * qw * (material[test_component * ND + 0] * jacobian_adjugate_lane6 + material[test_component * ND + 1] * jacobian_adjugate_lane7 + material[test_component * ND + 2] * jacobian_adjugate_lane8);
+                        const int row = test_component * NS + test_shape;
+                        const int col = trial_component * NS + trial_shape;
                         element_matrix[row * NDOFS + col] += entry;
                     }
                 }

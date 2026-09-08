@@ -460,9 +460,9 @@ namespace sfem {
     // is earned.
     //
     // It used to be earned per element instead: every scatter walked its
-    // N_SHAPE x N_SHAPE candidates, tested each with a three-condition branch
+    // NS x NS candidates, tested each with a three-condition branch
     // and reported through std::fprintf from inside the caller's parallel
-    // region.  That paid O(elements x N_SHAPE^2) on every assembly for a
+    // region.  That paid O(elements x NS^2) on every assembly for a
     // property of the mesh and the graph together, which cannot change between
     // elements or between calls.  Here it is O(nnz), once.
     //

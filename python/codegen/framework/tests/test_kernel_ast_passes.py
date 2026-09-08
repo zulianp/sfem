@@ -51,7 +51,7 @@ def _lane_loop(body, vectorized=True):
 
 class VectorizationContractTest(unittest.TestCase):
     def test_a_clean_lane_loop_passes(self):
-        loop = _lane_loop([BufferDeclNode("const scalar_t", "x", (), expr_ref("1"))])
+        loop = _lane_loop([BufferDeclNode("const s_t", "x", (), expr_ref("1"))])
         self.assertEqual(len(render_kernel_ast_lines("k", (loop,))), 3)
 
     def test_a_nested_loop_is_rejected(self):

@@ -38,20 +38,20 @@ class FunctionDefPrintingTest(unittest.TestCase):
     def test_prints_the_signature_the_emitter_used_to_build(self):
         node = FunctionDefNode(
             "laplace_block",
-            params=("const int nelems", "scalar_t output[1][VECTOR_SIZE]"),
-            body=(BufferDeclNode("static constexpr int", "DIM", (), expr_ref("3")),),
+            params=("const int nelems", "s_t output[1][VS]"),
+            body=(BufferDeclNode("static constexpr int", "ND", (), expr_ref("3")),),
             qualifier="static SFEM_INLINE",
-            template_params=("typename scalar_t", "int N_QP"),
+            template_params=("typename s_t", "int NQ"),
         )
         self.assertEqual(
             CLikeKernelASTPrinter().print_node(node),
             (
-                "template <typename scalar_t, int N_QP>",
+                "template <typename s_t, int NQ>",
                 "static SFEM_INLINE void laplace_block(",
                 "        const int nelems,",
-                "        scalar_t output[1][VECTOR_SIZE]",
+                "        s_t output[1][VS]",
                 ") {",
-                "    static constexpr int DIM = 3;",
+                "    static constexpr int ND = 3;",
                 "}",
             ),
         )
@@ -66,13 +66,13 @@ class FunctionDefPrintingTest(unittest.TestCase):
                     lane,
                     iteration_range(0, expr_ref("nelems")),
                     pre_increment(lane),
-                    body=(BufferDeclNode("const scalar_t", "x", (), expr_ref("1")),),
+                    body=(BufferDeclNode("const s_t", "x", (), expr_ref("1")),),
                 ),
             ),
         )
         lines = CLikeKernelASTPrinter().print_node(node)
         self.assertIn("    for (int lane = 0; lane < nelems; ++lane) {", lines)
-        self.assertIn("        const scalar_t x = 1;", lines)
+        self.assertIn("        const s_t x = 1;", lines)
         self.assertEqual(
             "".join(lines).count("{"), "".join(lines).count("}"), "unbalanced braces"
         )
@@ -132,7 +132,7 @@ class EveryLocalKernelIsATreeTest(unittest.TestCase):
             self.assertIsInstance(node, FunctionDefNode)
             self.assertTrue(node.name)
             self.assertTrue(node.body, "%s has an empty body" % node.name)
-            self.assertIn("scalar_t", " ".join(node.template_params))
+            self.assertIn("s_t", " ".join(node.template_params))
 
     def test_migrated_bodies_carry_no_raw_lines(self):
         """The reference residual on TET4 takes the gradient-metric path,
@@ -312,7 +312,7 @@ class BlockAndLoopHeaderTest(unittest.TestCase):
         """
         from codegen.framework.targets import CUDATarget, use_target
 
-        body = [BufferDeclNode("const scalar_t", "x", (), expr_ref("1"))]
+        body = [BufferDeclNode("const s_t", "x", (), expr_ref("1"))]
         node = residual_codegen._quadrature_lane_kernel_node(body)
         self.assertIsInstance(node.body[0], LoopNode, "OpenMP should open a lane loop")
 
@@ -328,7 +328,7 @@ class BlockAndLoopHeaderTest(unittest.TestCase):
     def test_the_thread_lane_nest_prints_balanced(self):
         from codegen.framework.targets import CUDATarget, use_target
 
-        body = [BufferDeclNode("const scalar_t", "x", (), expr_ref("1"))]
+        body = [BufferDeclNode("const s_t", "x", (), expr_ref("1"))]
         with use_target(CUDATarget()):
             lines = residual_codegen._quadrature_lane_kernel_lines(body)
         text = "".join(lines)

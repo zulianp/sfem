@@ -306,11 +306,11 @@ def _boundary_source(function, element_type, surface, components, parameters, co
         )
     side_node_values = tuple(node for side in side_nodes for node in side)
     sideset_function = function.replace("_boundary_residual_soa", "_boundary_residual_sideset_soa")
-    param_decls = "".join(", const scalar_t %s" % parameter for parameter in parameters)
+    param_decls = "".join(", const s_t %s" % parameter for parameter in parameters)
     extern_param_decls = "".join(", const real_t %s" % parameter for parameter in parameters)
     extern_float_param_decls = "".join(", const float %s" % parameter for parameter in parameters)
     param_args = "".join(", %s" % parameter for parameter in parameters)
-    current_decls = _current_declarations(current_symbols, "scalar_t")
+    current_decls = _current_declarations(current_symbols, "s_t")
     extern_current_decls = _current_declarations(current_symbols, "real_t")
     extern_float_current_decls = _current_declarations(current_symbols, "float")
     current_args = "".join(", %s" % symbol for symbol in current_symbols)
@@ -318,18 +318,18 @@ def _boundary_source(function, element_type, surface, components, parameters, co
     component_uses_coordinates = _usage.component_uses_coordinates
     component_uses_current = _usage.component_uses_current
     coeff_lines = [
-        "        const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "        const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if not component_uses_coordinates[i] and not component_uses_current[i]
     ]
     qp_coeff_lines = _value_eval_lines(coordinate_symbols, current_symbols) + [
-        "        const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "        const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
-        "        scalar_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "        s_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_out_params = "\n".join(
@@ -349,42 +349,42 @@ def _boundary_source(function, element_type, surface, components, parameters, co
 namespace sfem {{
 namespace codegen {{
 
-template <typename scalar_t>
+template <typename s_t>
 struct {function}_reference_data {{
-    static constexpr int N_SHAPE = {n_shape};
-    static constexpr int N_QP = {n_qp};
+    static constexpr int NS = {n_shape};
+    static constexpr int NQ = {n_qp};
     static constexpr int REF_DIM = {ref_dim};
     static constexpr int PHYSICAL_DIM = {physical_dim};
 
-    static const scalar_t *shape() {{
-        static const scalar_t data[{shape_count}] = {{
+    static const s_t *shape() {{
+        static const s_t data[{shape_count}] = {{
 {shape_values}
         }};
         return data;
     }}
 
-    static const scalar_t *grad() {{
-        static const scalar_t data[{grad_count}] = {{
+    static const s_t *grad() {{
+        static const s_t data[{grad_count}] = {{
 {grad_values}
         }};
         return data;
     }}
 
-    static const scalar_t *weight() {{
-        static const scalar_t data[{weight_count}] = {{
+    static const s_t *weight() {{
+        static const s_t data[{weight_count}] = {{
 {weight_values}
         }};
         return data;
     }}
 }};
 
-template <typename scalar_t>
-{function_qualifier} scalar_t {function}_measure(
+template <typename s_t>
+{function_qualifier} s_t {function}_measure(
         const int q,
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points) {{
-    const scalar_t *const grad = {function}_reference_data<scalar_t>::grad();
-    const int n_shape = {function}_reference_data<scalar_t>::N_SHAPE;
+    const s_t *const grad = {function}_reference_data<s_t>::grad();
+    const int n_shape = {function}_reference_data<s_t>::NS;
 {measure_body}
 }}
 
@@ -407,34 +407,34 @@ template <typename scalar_t>
     }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} void {function}_element(
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
-        scalar_t element_vector[{components}][{n_shape}]) {{
-    const scalar_t *const shape = {function}_reference_data<scalar_t>::shape();
-    const scalar_t *const weight = {function}_reference_data<scalar_t>::weight();
-    const int n_shape = {function}_reference_data<scalar_t>::N_SHAPE;
-    const int n_qp = {function}_reference_data<scalar_t>::N_QP;
+        s_t element_vector[{components}][{n_shape}]) {{
+    const s_t *const shape = {function}_reference_data<s_t>::shape();
+    const s_t *const weight = {function}_reference_data<s_t>::weight();
+    const int n_shape = {function}_reference_data<s_t>::NS;
+    const int n_qp = {function}_reference_data<s_t>::NQ;
 
 {coeff_lines}
 
     for (int q = 0; q < n_qp; ++q) {{
-        const scalar_t dS = {function}_measure<scalar_t>(q, ev, points);
-        const scalar_t qw = weight[q] * dS;
+        const s_t dS = {function}_measure<s_t>(q, ev, points);
+        const s_t qw = weight[q] * dS;
 {qp_coeff_lines}
 {vectorize_pragma}
         for (int i = 0; i < n_shape; ++i) {{
-            const scalar_t test = shape[q * n_shape + i] * qw;
+            const s_t test = shape[q * n_shape + i] * qw;
 {accum_lines}
         }}
     }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} void {function}_scatter_element(
         const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t element_vector[{components}][{n_shape}],
+        const s_t element_vector[{components}][{n_shape}],
         const int out_stride,
 {out_params}) {{
     constexpr int n_shape = {n_shape};
@@ -444,7 +444,7 @@ template <typename scalar_t>
     }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} int {function}_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -455,23 +455,23 @@ template <typename scalar_t>
 {parallel_for_pragma}
     for (ptrdiff_t e = 0; e < nelements; ++e) {{
         idx_t ev[{n_shape}];
-        scalar_t element_vector[{components}][{n_shape}];
+        s_t element_vector[{components}][{n_shape}];
         for (int i = 0; i < {n_shape}; ++i) {{
             ev[i] = elements[i][e];
         }}
         for (int c = 0; c < {components}; ++c) {{
             for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = scalar_t(0);
+                element_vector[c][i] = s_t(0);
             }}
         }}
-        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
+        {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+        {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
     }}
 
     return SFEM_SUCCESS;
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} int {sideset_function}_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
@@ -484,15 +484,15 @@ template <typename scalar_t>
 {parallel_for_pragma}
     for (ptrdiff_t s = 0; s < nsides; ++s) {{
         idx_t ev[{n_shape}];
-        scalar_t element_vector[{components}][{n_shape}];
+        s_t element_vector[{components}][{n_shape}];
         {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
         for (int c = 0; c < {components}; ++c) {{
             for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = scalar_t(0);
+                element_vector[c][i] = s_t(0);
             }}
         }}
-        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
+        {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+        {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
     }}
 
     return SFEM_SUCCESS;
@@ -637,24 +637,24 @@ def _value_eval_lines(coordinate_symbols, current_symbols):
     if not coordinate_symbols and not current_symbols:
         return []
     lines = [
-        "        scalar_t %s = scalar_t(0);" % symbol
+        "        s_t %s = s_t(0);" % symbol
         for symbol in coordinate_symbols
     ]
     lines.extend(
-        "        scalar_t %s_q = scalar_t(0);" % symbol
+        "        s_t %s_q = s_t(0);" % symbol
         for symbol in current_symbols
     )
     lines.extend(
         [
             "        for (int j = 0; j < n_shape; ++j) {",
-            "            const scalar_t phi = shape[q * n_shape + j];",
+            "            const s_t phi = shape[q * n_shape + j];",
             "            const idx_t node = ev[j];",
         ]
     )
     for symbol in coordinate_symbols:
         component = int(str(symbol)[1:])
         lines.append(
-            "            %s += scalar_t(points[%d][node]) * phi;" % (symbol, component)
+            "            %s += s_t(points[%d][node]) * phi;" % (symbol, component)
         )
     for symbol in current_symbols:
         lines.append("            %s_q += %s[node] * phi;" % (symbol, symbol))
@@ -666,27 +666,27 @@ def _tensor_value_eval_lines(coordinate_symbols, current_symbols):
     if not coordinate_symbols and not current_symbols:
         return []
     lines = [
-        "            scalar_t %s = scalar_t(0);" % symbol
+        "            s_t %s = s_t(0);" % symbol
         for symbol in coordinate_symbols
     ]
     lines.extend(
-        "            scalar_t %s_q = scalar_t(0);" % symbol
+        "            s_t %s_q = s_t(0);" % symbol
         for symbol in current_symbols
     )
     lines.extend(
         [
-            "            for (int cy = 0; cy < S; ++cy) {",
-            "                const scalar_t vy_coord = shape_1d[qy * S + cy];",
-            "                for (int cx = 0; cx < S; ++cx) {",
-            "                    const int j = shape_index[cy * S + cx];",
+            "            for (int cy = 0; cy < NS1; ++cy) {",
+            "                const s_t vy_coord = shape_1d[qy * NS1 + cy];",
+            "                for (int cx = 0; cx < NS1; ++cx) {",
+            "                    const int j = shape_index[cy * NS1 + cx];",
             "                    const idx_t node = ev[j];",
-            "                    const scalar_t phi = shape_1d[qx * S + cx] * vy_coord;",
+            "                    const s_t phi = shape_1d[qx * NS1 + cx] * vy_coord;",
         ]
     )
     for symbol in coordinate_symbols:
         component = int(str(symbol)[1:])
         lines.append(
-            "                    %s += scalar_t(points[%d][node]) * phi;"
+            "                    %s += s_t(points[%d][node]) * phi;"
             % (symbol, component)
         )
     for symbol in current_symbols:
@@ -726,11 +726,11 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
     current_symbols = _coefficient_current_symbols(system, coefficients)
     codegen_coefficients = _replace_current_symbols(coefficients, current_symbols)
     parameters = _filter_coordinate_parameters(parameters, 3)
-    param_decls = "".join(", const scalar_t %s" % parameter for parameter in parameters)
+    param_decls = "".join(", const s_t %s" % parameter for parameter in parameters)
     extern_param_decls = "".join(", const real_t %s" % parameter for parameter in parameters)
     extern_float_param_decls = "".join(", const float %s" % parameter for parameter in parameters)
     param_args = "".join(", %s" % parameter for parameter in parameters)
-    current_decls = _current_declarations(current_symbols, "scalar_t")
+    current_decls = _current_declarations(current_symbols, "s_t")
     extern_current_decls = _current_declarations(current_symbols, "real_t")
     extern_float_current_decls = _current_declarations(current_symbols, "float")
     current_args = "".join(", %s" % symbol for symbol in current_symbols)
@@ -738,18 +738,18 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
     component_uses_coordinates = _usage.component_uses_coordinates
     component_uses_current = _usage.component_uses_current
     coeff_lines = [
-        "    const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "    const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if not component_uses_coordinates[i] and not component_uses_current[i]
     ]
     qp_coeff_lines = _tensor_value_eval_lines(coordinate_symbols, current_symbols) + [
-        "            const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "            const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
-        "        scalar_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "        s_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_out_params = "\n".join(
@@ -769,31 +769,31 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
 namespace sfem {{
 namespace codegen {{
 
-template <typename scalar_t>
+template <typename s_t>
 struct {function}_reference_data {{
-    static constexpr int N_SHAPE_1D = {n_shape_1d};
-    static constexpr int N_QP_1D = {n_qp_1d};
-    static constexpr int N_SHAPE = {n_shape};
-    static constexpr int N_QP = {n_qp};
+    static constexpr int NS1 = {n_shape_1d};
+    static constexpr int NQ1 = {n_qp_1d};
+    static constexpr int NS = {n_shape};
+    static constexpr int NQ = {n_qp};
     static constexpr int REF_DIM = 2;
     static constexpr int PHYSICAL_DIM = 3;
 
-    static const scalar_t *shape_1d() {{
-        static const scalar_t data[{shape_1d_count}] = {{
+    static const s_t *shape_1d() {{
+        static const s_t data[{shape_1d_count}] = {{
 {shape_1d_values}
         }};
         return data;
     }}
 
-    static const scalar_t *grad_1d() {{
-        static const scalar_t data[{grad_1d_count}] = {{
+    static const s_t *grad_1d() {{
+        static const s_t data[{grad_1d_count}] = {{
 {grad_1d_values}
         }};
         return data;
     }}
 
-    static const scalar_t *weight_1d() {{
-        static const scalar_t data[{weight_1d_count}] = {{
+    static const s_t *weight_1d() {{
+        static const s_t data[{weight_1d_count}] = {{
 {weight_1d_values}
         }};
         return data;
@@ -807,35 +807,35 @@ struct {function}_reference_data {{
     }}
 }};
 
-template <typename scalar_t>
-{function_qualifier} scalar_t {function}_measure(
+template <typename s_t>
+{function_qualifier} s_t {function}_measure(
         const int qx,
         const int qy,
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points) {{
-    const scalar_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const SFEM_RESTRICT grad_1d = {function}_reference_data<scalar_t>::grad_1d();
-    const int *const SFEM_RESTRICT shape_index = {function}_reference_data<scalar_t>::shape_index();
-    constexpr int S = {n_shape_1d};
-    scalar_t dxdr0 = scalar_t(0);
-    scalar_t dxdr1 = scalar_t(0);
-    scalar_t dxdr2 = scalar_t(0);
-    scalar_t dxds0 = scalar_t(0);
-    scalar_t dxds1 = scalar_t(0);
-    scalar_t dxds2 = scalar_t(0);
-    for (int sy = 0; sy < S; ++sy) {{
-        const scalar_t vy = shape_1d[qy * S + sy];
-        const scalar_t gy = grad_1d[qy * S + sy];
-        for (int sx = 0; sx < S; ++sx) {{
-            const int i = shape_index[sy * S + sx];
+    const s_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<s_t>::shape_1d();
+    const s_t *const SFEM_RESTRICT grad_1d = {function}_reference_data<s_t>::grad_1d();
+    const int *const SFEM_RESTRICT shape_index = {function}_reference_data<s_t>::shape_index();
+    constexpr int NS1 = {n_shape_1d};
+    s_t dxdr0 = s_t(0);
+    s_t dxdr1 = s_t(0);
+    s_t dxdr2 = s_t(0);
+    s_t dxds0 = s_t(0);
+    s_t dxds1 = s_t(0);
+    s_t dxds2 = s_t(0);
+    for (int sy = 0; sy < NS1; ++sy) {{
+        const s_t vy = shape_1d[qy * NS1 + sy];
+        const s_t gy = grad_1d[qy * NS1 + sy];
+        for (int sx = 0; sx < NS1; ++sx) {{
+            const int i = shape_index[sy * NS1 + sx];
             const idx_t node = ev[i];
-            const scalar_t vx = shape_1d[qx * S + sx];
-            const scalar_t gx = grad_1d[qx * S + sx];
-            const scalar_t gr = gx * vy;
-            const scalar_t gs = vx * gy;
-            const scalar_t x = scalar_t(points[0][node]);
-            const scalar_t y = scalar_t(points[1][node]);
-            const scalar_t z = scalar_t(points[2][node]);
+            const s_t vx = shape_1d[qx * NS1 + sx];
+            const s_t gx = grad_1d[qx * NS1 + sx];
+            const s_t gr = gx * vy;
+            const s_t gs = vx * gy;
+            const s_t x = s_t(points[0][node]);
+            const s_t y = s_t(points[1][node]);
+            const s_t z = s_t(points[2][node]);
             dxdr0 += x * gr;
             dxdr1 += y * gr;
             dxdr2 += z * gr;
@@ -844,9 +844,9 @@ template <typename scalar_t>
             dxds2 += z * gs;
         }}
     }}
-    const scalar_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
-    const scalar_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
-    const scalar_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
+    const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
+    const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
+    const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
     return sqrt(c0 * c0 + c1 * c1 + c2 * c2);
 }}
 
@@ -869,30 +869,30 @@ template <typename scalar_t>
     }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} void {function}_element(
         const idx_t *const SFEM_RESTRICT ev,
         const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
-        scalar_t element_vector[{components}][{n_shape}]) {{
-    const scalar_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const SFEM_RESTRICT weight_1d = {function}_reference_data<scalar_t>::weight_1d();
-    const int *const SFEM_RESTRICT shape_index = {function}_reference_data<scalar_t>::shape_index();
-    constexpr int S = {n_shape_1d};
-    constexpr int Q = {n_qp_1d};
+        s_t element_vector[{components}][{n_shape}]) {{
+    const s_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<s_t>::shape_1d();
+    const s_t *const SFEM_RESTRICT weight_1d = {function}_reference_data<s_t>::weight_1d();
+    const int *const SFEM_RESTRICT shape_index = {function}_reference_data<s_t>::shape_index();
+    constexpr int NS1 = {n_shape_1d};
+    constexpr int NQ1 = {n_qp_1d};
 
 {coeff_lines}
 
-    for (int qy = 0; qy < Q; ++qy) {{
-        for (int qx = 0; qx < Q; ++qx) {{
-            const scalar_t dS = {function}_measure<scalar_t>(qx, qy, ev, points);
-            const scalar_t qw = weight_1d[qx] * weight_1d[qy] * dS;
+    for (int qy = 0; qy < NQ1; ++qy) {{
+        for (int qx = 0; qx < NQ1; ++qx) {{
+            const s_t dS = {function}_measure<s_t>(qx, qy, ev, points);
+            const s_t qw = weight_1d[qx] * weight_1d[qy] * dS;
 {qp_coeff_lines}
-            for (int sy = 0; sy < S; ++sy) {{
-                const scalar_t vy = shape_1d[qy * S + sy];
+            for (int sy = 0; sy < NS1; ++sy) {{
+                const s_t vy = shape_1d[qy * NS1 + sy];
 {vectorize_pragma}
-                for (int sx = 0; sx < S; ++sx) {{
-                    const int i = shape_index[sy * S + sx];
-                    const scalar_t test = shape_1d[qx * S + sx] * vy * qw;
+                for (int sx = 0; sx < NS1; ++sx) {{
+                    const int i = shape_index[sy * NS1 + sx];
+                    const s_t test = shape_1d[qx * NS1 + sx] * vy * qw;
 {accum_lines}
                 }}
             }}
@@ -900,10 +900,10 @@ template <typename scalar_t>
     }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} void {function}_scatter_element(
         const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t element_vector[{components}][{n_shape}],
+        const s_t element_vector[{components}][{n_shape}],
         const int out_stride,
 {out_params}) {{
     constexpr int n_shape = {n_shape};
@@ -913,7 +913,7 @@ template <typename scalar_t>
     }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} int {function}_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -924,23 +924,23 @@ template <typename scalar_t>
 {parallel_for_pragma}
     for (ptrdiff_t e = 0; e < nelements; ++e) {{
         idx_t ev[{n_shape}];
-        scalar_t element_vector[{components}][{n_shape}];
+        s_t element_vector[{components}][{n_shape}];
         for (int i = 0; i < {n_shape}; ++i) {{
             ev[i] = elements[i][e];
         }}
         for (int c = 0; c < {components}; ++c) {{
             for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = scalar_t(0);
+                element_vector[c][i] = s_t(0);
             }}
         }}
-        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
+        {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+        {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
     }}
 
     return SFEM_SUCCESS;
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} int {sideset_function}_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
@@ -953,15 +953,15 @@ template <typename scalar_t>
 {parallel_for_pragma}
     for (ptrdiff_t s = 0; s < nsides; ++s) {{
         idx_t ev[{n_shape}];
-        scalar_t element_vector[{components}][{n_shape}];
+        s_t element_vector[{components}][{n_shape}];
         {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
         for (int c = 0; c < {components}; ++c) {{
             for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = scalar_t(0);
+                element_vector[c][i] = s_t(0);
             }}
         }}
-        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
+        {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+        {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
     }}
 
     return SFEM_SUCCESS;
@@ -1166,28 +1166,28 @@ def _quad_shape_index(n, sx, sy, proteus):
 
 def _measure_body(ref_dim, physical_dim):
     if ref_dim == 1:
-        return """    scalar_t dx0 = scalar_t(0);
-    scalar_t dx1 = scalar_t(0);
+        return """    s_t dx0 = s_t(0);
+    s_t dx1 = s_t(0);
     for (int i = 0; i < n_shape; ++i) {
-        const scalar_t gi = grad[q * n_shape + i];
+        const s_t gi = grad[q * n_shape + i];
         const idx_t node = ev[i];
-        dx0 += scalar_t(points[0][node]) * gi;
-        dx1 += scalar_t(points[1][node]) * gi;
+        dx0 += s_t(points[0][node]) * gi;
+        dx1 += s_t(points[1][node]) * gi;
     }
     return sqrt(dx0 * dx0 + dx1 * dx1);"""
-    return """    scalar_t dxdr0 = scalar_t(0);
-    scalar_t dxdr1 = scalar_t(0);
-    scalar_t dxdr2 = scalar_t(0);
-    scalar_t dxds0 = scalar_t(0);
-    scalar_t dxds1 = scalar_t(0);
-    scalar_t dxds2 = scalar_t(0);
+    return """    s_t dxdr0 = s_t(0);
+    s_t dxdr1 = s_t(0);
+    s_t dxdr2 = s_t(0);
+    s_t dxds0 = s_t(0);
+    s_t dxds1 = s_t(0);
+    s_t dxds2 = s_t(0);
     for (int i = 0; i < n_shape; ++i) {
-        const scalar_t gr = grad[(q * n_shape + i) * 2 + 0];
-        const scalar_t gs = grad[(q * n_shape + i) * 2 + 1];
+        const s_t gr = grad[(q * n_shape + i) * 2 + 0];
+        const s_t gs = grad[(q * n_shape + i) * 2 + 1];
         const idx_t node = ev[i];
-        const scalar_t x = scalar_t(points[0][node]);
-        const scalar_t y = scalar_t(points[1][node]);
-        const scalar_t z = scalar_t(points[2][node]);
+        const s_t x = s_t(points[0][node]);
+        const s_t y = s_t(points[1][node]);
+        const s_t z = s_t(points[2][node]);
         dxdr0 += x * gr;
         dxdr1 += y * gr;
         dxdr2 += z * gr;
@@ -1195,14 +1195,14 @@ def _measure_body(ref_dim, physical_dim):
         dxds1 += y * gs;
         dxds2 += z * gs;
     }
-    const scalar_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
-    const scalar_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
-    const scalar_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
+    const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
+    const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
+    const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
     return sqrt(c0 * c0 + c1 * c1 + c2 * c2);"""
 
 
 def _cpp_array_values(values):
-    return ",\n".join("            scalar_t(%.17g)" % float(value) for value in values)
+    return ",\n".join("            s_t(%.17g)" % float(value) for value in values)
 
 
 def _cpp_int_array_values(values):

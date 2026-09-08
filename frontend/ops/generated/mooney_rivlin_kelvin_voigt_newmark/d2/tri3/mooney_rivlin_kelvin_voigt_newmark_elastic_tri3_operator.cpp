@@ -22,24 +22,24 @@
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *affine_geometry_stream(
         const int,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT,
+        const g_t *const SFEM_RESTRICT source,
+        s_t *const SFEM_RESTRICT,
         std::true_type) {
     return source;
 }
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *affine_geometry_stream(
         const int nelems,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT converted,
+        const g_t *const SFEM_RESTRICT source,
+        s_t *const SFEM_RESTRICT converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
-        converted[lane] = scalar_t(source[lane]);
+        converted[lane] = s_t(source[lane]);
     }
     return converted;
 }
@@ -51,42 +51,42 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename scalar_t>
+template <typename s_t>
 struct mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data {
-    static const scalar_t *shape() {
-        static const scalar_t data[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
+    static const s_t *shape() {
+        static const s_t data[3] = {s_t(0.33333333333333343), s_t(0.33333333333333331), s_t(0.33333333333333331)};
         return data;
     }
-    static const scalar_t *grad_ref_x() {
-        static const scalar_t data[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
+    static const s_t *grad_ref_x() {
+        static const s_t data[3] = {s_t(-1), s_t(1), s_t(0)};
         return data;
     }
-    static const scalar_t *grad_ref_y() {
-        static const scalar_t data[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
+    static const s_t *grad_ref_y() {
+        static const s_t data[3] = {s_t(-1), s_t(0), s_t(1)};
         return data;
     }
-    static const scalar_t *q_weight() {
-        static const scalar_t data[1] = {scalar_t(0.5)};
+    static const s_t *q_weight() {
+        static const s_t data[1] = {s_t(0.5)};
         return data;
     }
 };
 
-template <typename scalar_t>
+template <typename s_t>
 struct mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data {
-    static const scalar_t *shape() {
-        static const scalar_t data[3] = {scalar_t(0.33333333333333343), scalar_t(0.33333333333333331), scalar_t(0.33333333333333331)};
+    static const s_t *shape() {
+        static const s_t data[3] = {s_t(0.33333333333333343), s_t(0.33333333333333331), s_t(0.33333333333333331)};
         return data;
     }
-    static const scalar_t *grad_ref_x() {
-        static const scalar_t data[3] = {scalar_t(-1), scalar_t(1), scalar_t(0)};
+    static const s_t *grad_ref_x() {
+        static const s_t data[3] = {s_t(-1), s_t(1), s_t(0)};
         return data;
     }
-    static const scalar_t *grad_ref_y() {
-        static const scalar_t data[3] = {scalar_t(-1), scalar_t(0), scalar_t(1)};
+    static const s_t *grad_ref_y() {
+        static const s_t data[3] = {s_t(-1), s_t(0), s_t(1)};
         return data;
     }
-    static const scalar_t *q_weight() {
-        static const scalar_t data[1] = {scalar_t(0.5)};
+    static const s_t *q_weight() {
+        static const s_t data[1] = {s_t(0.5)};
         return data;
     }
 };
@@ -226,101 +226,101 @@ extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_isopar
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
+template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t lmbda,
-        const scalar_t mu,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const s_t lmbda,
+        const s_t mu,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
+        const s_t *const SFEM_RESTRICT ux,
+        const s_t *const SFEM_RESTRICT uy,
         const ptrdiff_t h_stride,
-        const scalar_t *const SFEM_RESTRICT hx,
-        const scalar_t *const SFEM_RESTRICT hy,
+        const s_t *const SFEM_RESTRICT hx,
+        const s_t *const SFEM_RESTRICT hy,
         const int nsteps,
-        const scalar_t *const SFEM_RESTRICT steps,
-        scalar_t *const SFEM_RESTRICT value
+        const s_t *const SFEM_RESTRICT steps,
+        s_t *const SFEM_RESTRICT value
 ) {
-    static constexpr int N_FIELD_COMPONENTS = 2;
-    static constexpr int N_QP = 1;
-    static constexpr int N_SHAPE = 3;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int NC = 2;
+    static constexpr int NQ = 1;
+    static constexpr int NS = 3;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<scalar_t>::q_weight();
+    const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];
-        scalar_t block_u_base_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];
-        scalar_t block_h_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];
-        scalar_t block_value[VECTOR_SIZE];
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        idx_t ev[VS * NS];
+        s_t block_u_data[NS * NC][VS];
+        s_t block_u_base_data[NS * NC][VS];
+        s_t block_h_data[NS * NC][VS];
+        s_t block_value[VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+        for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evbegin + lane];
             }
         }
 
-        const scalar_t *const u_components[N_FIELD_COMPONENTS] = {ux, uy};
-        const scalar_t *const h_components[N_FIELD_COMPONENTS] = {hx, hy};
-        const scalar_t *block_u_streams[N_SHAPE * N_FIELD_COMPONENTS];
-        for (int stream = 0; stream < N_SHAPE * N_FIELD_COMPONENTS; ++stream) {
+        const s_t *const u_components[NC] = {ux, uy};
+        const s_t *const h_components[NC] = {hx, hy};
+        const s_t *block_u_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
             block_u_streams[stream] = block_u_data[stream];
         }
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {
+        for (int shape = 0; shape < NS; ++shape) {
+            for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_base_data[shape * N_FIELD_COMPONENTS + d][lane] = u_components[d][node * u_stride];
-                    block_h_data[shape * N_FIELD_COMPONENTS + d][lane] = h_components[d][node * h_stride];
+                    const idx_t node = ev[shape * VS + lane];
+                    block_u_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+                    block_h_data[shape * NC + d][lane] = h_components[d][node * h_stride];
                 }
             }
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+        s_t block_jacobian_adjugate0_data[VS];
+        const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate1_data[VS];
+        const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate2_data[VS];
+        const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate3_data[VS];
+        const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_determinant0_data[VS];
+        const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
-            const scalar_t alpha = steps[step];
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {
+            const s_t alpha = steps[step];
+            for (int shape = 0; shape < NS; ++shape) {
+                for (int d = 0; d < NC; ++d) {
                     #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
-                        block_u_data[shape * N_FIELD_COMPONENTS + d][lane] = block_u_base_data[shape * N_FIELD_COMPONENTS + d][lane] + alpha * block_h_data[shape * N_FIELD_COMPONENTS + d][lane];
+                        block_u_data[shape * NC + d][lane] = block_u_base_data[shape * NC + d][lane] + alpha * block_h_data[shape * NC + d][lane];
                     }
                 }
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_value[lane] = scalar_t(0);
+                block_value[lane] = s_t(0);
             }
 
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_value);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_value);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -516,98 +516,98 @@ extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_isopara
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
+template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t lmbda,
-        const scalar_t mu,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const s_t lmbda,
+        const s_t mu,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
+        const s_t *const SFEM_RESTRICT ux,
+        const s_t *const SFEM_RESTRICT uy,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT outx,
-        scalar_t *const SFEM_RESTRICT outy
+        s_t *const SFEM_RESTRICT outx,
+        s_t *const SFEM_RESTRICT outy
 ) {
-    static constexpr int N_FIELD_COMPONENTS = 2;
-    static constexpr int N_QP = 1;
-    static constexpr int N_SHAPE = 3;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int NC = 2;
+    static constexpr int NQ = 1;
+    static constexpr int NS = 3;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<scalar_t>::q_weight();
+    const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];
-        scalar_t block_out_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        idx_t ev[VS * NS];
+        s_t block_u_data[NS * NC][VS];
+        s_t block_out_data[NS * NC][VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+        for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evbegin + lane];
             }
         }
-        const scalar_t *const u_components[N_FIELD_COMPONENTS] = {ux, uy};
+        const s_t *const u_components[NC] = {ux, uy};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {
+        for (int shape = 0; shape < NS; ++shape) {
+            for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_data[shape * N_FIELD_COMPONENTS + d][lane] = u_components[d][node * u_stride];
+                    const idx_t node = ev[shape * VS + lane];
+                    block_u_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                 }
             }
         }
-        for (int stream = 0; stream < N_SHAPE * N_FIELD_COMPONENTS; ++stream) {
+        for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_out_data[stream][lane] = scalar_t(0);
+                block_out_data[stream][lane] = s_t(0);
             }
         }
 
-        const scalar_t *block_u_streams[N_SHAPE * N_FIELD_COMPONENTS];
-        for (int stream = 0; stream < N_SHAPE * N_FIELD_COMPONENTS; ++stream) {
+        const s_t *block_u_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
             block_u_streams[stream] = block_u_data[stream];
         }
-        scalar_t *block_out_streams[N_SHAPE * N_FIELD_COMPONENTS];
-        for (int stream = 0; stream < N_SHAPE * N_FIELD_COMPONENTS; ++stream) {
+        s_t *block_out_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+        s_t block_jacobian_adjugate0_data[VS];
+        const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate1_data[VS];
+        const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate2_data[VS];
+        const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate3_data[VS];
+        const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_determinant0_data[VS];
+        const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
 
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_out_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_out_streams);
 
-        scalar_t *const out_components[N_FIELD_COMPONENTS] = {outx, outy};
+        s_t *const out_components[NC] = {outx, outy};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {
+        for (int shape = 0; shape < NS; ++shape) {
+            for (int d = 0; d < NC; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * N_FIELD_COMPONENTS + d][scatter];
+                        out_components[d][ev[shape * VS + scatter] * out_stride] += block_out_data[shape * NC + d][scatter];
                     }
                 }
             }
@@ -795,108 +795,108 @@ extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_isoparamet
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
+template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t lmbda,
-        const scalar_t mu,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const s_t lmbda,
+        const s_t mu,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
+        const s_t *const SFEM_RESTRICT ux,
+        const s_t *const SFEM_RESTRICT uy,
         const ptrdiff_t h_stride,
-        const scalar_t *const SFEM_RESTRICT hx,
-        const scalar_t *const SFEM_RESTRICT hy,
+        const s_t *const SFEM_RESTRICT hx,
+        const s_t *const SFEM_RESTRICT hy,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT outx,
-        scalar_t *const SFEM_RESTRICT outy
+        s_t *const SFEM_RESTRICT outx,
+        s_t *const SFEM_RESTRICT outy
 ) {
-    static constexpr int N_FIELD_COMPONENTS = 2;
-    static constexpr int N_QP = 1;
-    static constexpr int N_SHAPE = 3;
-    static constexpr int VECTOR_SIZE = 16;
+    static constexpr int NC = 2;
+    static constexpr int NQ = 1;
+    static constexpr int NS = 3;
+    static constexpr int VS = 16;
     (void)nnodes;
-    const scalar_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<scalar_t>::q_weight();
+    const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];
-        scalar_t block_h_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];
-        scalar_t block_out_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+        idx_t ev[VS * NS];
+        s_t block_u_data[NS * NC][VS];
+        s_t block_h_data[NS * NC][VS];
+        s_t block_out_data[NS * NC][VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
+        for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evbegin + lane];
             }
         }
-        const scalar_t *const u_components[N_FIELD_COMPONENTS] = {ux, uy};
-        const scalar_t *const h_components[N_FIELD_COMPONENTS] = {hx, hy};
+        const s_t *const u_components[NC] = {ux, uy};
+        const s_t *const h_components[NC] = {hx, hy};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {
+        for (int shape = 0; shape < NS; ++shape) {
+            for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_data[shape * N_FIELD_COMPONENTS + d][lane] = u_components[d][node * u_stride];
-                    block_h_data[shape * N_FIELD_COMPONENTS + d][lane] = h_components[d][node * h_stride];
+                    const idx_t node = ev[shape * VS + lane];
+                    block_u_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+                    block_h_data[shape * NC + d][lane] = h_components[d][node * h_stride];
                 }
             }
         }
-        for (int stream = 0; stream < N_SHAPE * N_FIELD_COMPONENTS; ++stream) {
+        for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_out_data[stream][lane] = scalar_t(0);
+                block_out_data[stream][lane] = s_t(0);
             }
         }
 
-        const scalar_t *block_u_streams[N_SHAPE * N_FIELD_COMPONENTS];
-        for (int stream = 0; stream < N_SHAPE * N_FIELD_COMPONENTS; ++stream) {
+        const s_t *block_u_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
             block_u_streams[stream] = block_u_data[stream];
         }
-        const scalar_t *block_h_streams[N_SHAPE * N_FIELD_COMPONENTS];
-        for (int stream = 0; stream < N_SHAPE * N_FIELD_COMPONENTS; ++stream) {
+        const s_t *block_h_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
             block_h_streams[stream] = block_h_data[stream];
         }
-        scalar_t *block_out_streams[N_SHAPE * N_FIELD_COMPONENTS];
-        for (int stream = 0; stream < N_SHAPE * N_FIELD_COMPONENTS; ++stream) {
+        s_t *block_out_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
             block_out_streams[stream] = block_out_data[stream];
         }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+        s_t block_jacobian_adjugate0_data[VS];
+        const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate1_data[VS];
+        const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate2_data[VS];
+        const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_adjugate3_data[VS];
+        const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        s_t block_jacobian_determinant0_data[VS];
+        const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
 
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
 
-        scalar_t *const out_components[N_FIELD_COMPONENTS] = {outx, outy};
+        s_t *const out_components[NC] = {outx, outy};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {
+        for (int shape = 0; shape < NS; ++shape) {
+            for (int d = 0; d < NC; ++d) {
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * N_FIELD_COMPONENTS + d][scatter];
+                        out_components[d][ev[shape * VS + scatter] * out_stride] += block_out_data[shape * NC + d][scatter];
                     }
                 }
             }

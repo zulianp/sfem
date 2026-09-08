@@ -29,244 +29,244 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>
+template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT determinant,
-        const scalar_t *const SFEM_RESTRICT adjugate[4],
-        const scalar_t *const SFEM_RESTRICT field_shape[2],
-        const scalar_t *const SFEM_RESTRICT field_grad_ref[4],
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t *const SFEM_RESTRICT current[15],
-        scalar_t *const SFEM_RESTRICT output[15]
+        const s_t *const SFEM_RESTRICT determinant,
+        const s_t *const SFEM_RESTRICT adjugate[4],
+        const s_t *const SFEM_RESTRICT field_shape[2],
+        const s_t *const SFEM_RESTRICT field_grad_ref[4],
+        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t *const SFEM_RESTRICT current[15],
+        s_t *const SFEM_RESTRICT output[15]
 ) {
-    static constexpr int DIM = 2;
-    static constexpr int N_FIELDS = 2;
+    static constexpr int ND = 2;
+    static constexpr int NC = 2;
     static constexpr int N_FIELD_STREAMS = 15;
-    (void)CELL_N_SHAPE;
+    (void)CELL_NS;
     (void)N_FIELD_STREAMS;
-    static constexpr int U_N_SHAPE = 6;
-    static constexpr int P_N_SHAPE = 3;
-    for (int q = 0; q < N_QP; ++q) {
+    static constexpr int U_NS = 6;
+    static constexpr int P_NS = 3;
+    for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const scalar_t det = determinant[geometry_offset];
-            const scalar_t adj0 = adjugate[0][geometry_offset];
-            const scalar_t adj1 = adjugate[1][geometry_offset];
-            const scalar_t adj2 = adjugate[2][geometry_offset];
-            const scalar_t adj3 = adjugate[3][geometry_offset];
-            scalar_t u0_grad_0_ref = scalar_t(0);
-            scalar_t u0_grad_1_ref = scalar_t(0);
-            const scalar_t coeff_current_u0_0 = current[0][lane];
-            u0_grad_0_ref += coeff_current_u0_0 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 0];
-            u0_grad_1_ref += coeff_current_u0_0 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 0];
-            const scalar_t coeff_current_u0_1 = current[1][lane];
-            u0_grad_0_ref += coeff_current_u0_1 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 1];
-            u0_grad_1_ref += coeff_current_u0_1 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 1];
-            const scalar_t coeff_current_u0_2 = current[2][lane];
-            u0_grad_0_ref += coeff_current_u0_2 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 2];
-            u0_grad_1_ref += coeff_current_u0_2 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 2];
-            const scalar_t coeff_current_u0_3 = current[3][lane];
-            u0_grad_0_ref += coeff_current_u0_3 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 3];
-            u0_grad_1_ref += coeff_current_u0_3 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 3];
-            const scalar_t coeff_current_u0_4 = current[4][lane];
-            u0_grad_0_ref += coeff_current_u0_4 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 4];
-            u0_grad_1_ref += coeff_current_u0_4 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 4];
-            const scalar_t coeff_current_u0_5 = current[5][lane];
-            u0_grad_0_ref += coeff_current_u0_5 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 5];
-            u0_grad_1_ref += coeff_current_u0_5 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 5];
-            const scalar_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
-            const scalar_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
-            scalar_t u1_grad_0_ref = scalar_t(0);
-            scalar_t u1_grad_1_ref = scalar_t(0);
-            const scalar_t coeff_current_u1_0 = current[6][lane];
-            u1_grad_0_ref += coeff_current_u1_0 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 0];
-            u1_grad_1_ref += coeff_current_u1_0 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 0];
-            const scalar_t coeff_current_u1_1 = current[7][lane];
-            u1_grad_0_ref += coeff_current_u1_1 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 1];
-            u1_grad_1_ref += coeff_current_u1_1 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 1];
-            const scalar_t coeff_current_u1_2 = current[8][lane];
-            u1_grad_0_ref += coeff_current_u1_2 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 2];
-            u1_grad_1_ref += coeff_current_u1_2 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 2];
-            const scalar_t coeff_current_u1_3 = current[9][lane];
-            u1_grad_0_ref += coeff_current_u1_3 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 3];
-            u1_grad_1_ref += coeff_current_u1_3 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 3];
-            const scalar_t coeff_current_u1_4 = current[10][lane];
-            u1_grad_0_ref += coeff_current_u1_4 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 4];
-            u1_grad_1_ref += coeff_current_u1_4 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 4];
-            const scalar_t coeff_current_u1_5 = current[11][lane];
-            u1_grad_0_ref += coeff_current_u1_5 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 5];
-            u1_grad_1_ref += coeff_current_u1_5 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 5];
-            const scalar_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
-            const scalar_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
-            scalar_t p_grad_0_ref = scalar_t(0);
-            scalar_t p_grad_1_ref = scalar_t(0);
-            const scalar_t coeff_current_p_0 = current[12][lane];
-            p_grad_0_ref += coeff_current_p_0 * field_grad_ref[1 * DIM + 0][q * P_N_SHAPE + 0];
-            p_grad_1_ref += coeff_current_p_0 * field_grad_ref[1 * DIM + 1][q * P_N_SHAPE + 0];
-            const scalar_t coeff_current_p_1 = current[13][lane];
-            p_grad_0_ref += coeff_current_p_1 * field_grad_ref[1 * DIM + 0][q * P_N_SHAPE + 1];
-            p_grad_1_ref += coeff_current_p_1 * field_grad_ref[1 * DIM + 1][q * P_N_SHAPE + 1];
-            const scalar_t coeff_current_p_2 = current[14][lane];
-            p_grad_0_ref += coeff_current_p_2 * field_grad_ref[1 * DIM + 0][q * P_N_SHAPE + 2];
-            p_grad_1_ref += coeff_current_p_2 * field_grad_ref[1 * DIM + 1][q * P_N_SHAPE + 2];
-            const scalar_t p_grad_0 = (p_grad_0_ref * adj0 + p_grad_1_ref * adj2) / det;
-            const scalar_t p_grad_1 = (p_grad_0_ref * adj1 + p_grad_1_ref * adj3) / det;
-            const scalar_t value_coeff2 = u0_grad_0 + u1_grad_1;
-            const scalar_t test_value_p_0 = field_shape[1][q * P_N_SHAPE + 0];
+            const s_t det = determinant[geometry_offset];
+            const s_t adj0 = adjugate[0][geometry_offset];
+            const s_t adj1 = adjugate[1][geometry_offset];
+            const s_t adj2 = adjugate[2][geometry_offset];
+            const s_t adj3 = adjugate[3][geometry_offset];
+            s_t u0_grad_0_ref = s_t(0);
+            s_t u0_grad_1_ref = s_t(0);
+            const s_t coeff_current_u0_0 = current[0][lane];
+            u0_grad_0_ref += coeff_current_u0_0 * field_grad_ref[0 * ND + 0][q * U_NS + 0];
+            u0_grad_1_ref += coeff_current_u0_0 * field_grad_ref[0 * ND + 1][q * U_NS + 0];
+            const s_t coeff_current_u0_1 = current[1][lane];
+            u0_grad_0_ref += coeff_current_u0_1 * field_grad_ref[0 * ND + 0][q * U_NS + 1];
+            u0_grad_1_ref += coeff_current_u0_1 * field_grad_ref[0 * ND + 1][q * U_NS + 1];
+            const s_t coeff_current_u0_2 = current[2][lane];
+            u0_grad_0_ref += coeff_current_u0_2 * field_grad_ref[0 * ND + 0][q * U_NS + 2];
+            u0_grad_1_ref += coeff_current_u0_2 * field_grad_ref[0 * ND + 1][q * U_NS + 2];
+            const s_t coeff_current_u0_3 = current[3][lane];
+            u0_grad_0_ref += coeff_current_u0_3 * field_grad_ref[0 * ND + 0][q * U_NS + 3];
+            u0_grad_1_ref += coeff_current_u0_3 * field_grad_ref[0 * ND + 1][q * U_NS + 3];
+            const s_t coeff_current_u0_4 = current[4][lane];
+            u0_grad_0_ref += coeff_current_u0_4 * field_grad_ref[0 * ND + 0][q * U_NS + 4];
+            u0_grad_1_ref += coeff_current_u0_4 * field_grad_ref[0 * ND + 1][q * U_NS + 4];
+            const s_t coeff_current_u0_5 = current[5][lane];
+            u0_grad_0_ref += coeff_current_u0_5 * field_grad_ref[0 * ND + 0][q * U_NS + 5];
+            u0_grad_1_ref += coeff_current_u0_5 * field_grad_ref[0 * ND + 1][q * U_NS + 5];
+            const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
+            const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
+            s_t u1_grad_0_ref = s_t(0);
+            s_t u1_grad_1_ref = s_t(0);
+            const s_t coeff_current_u1_0 = current[6][lane];
+            u1_grad_0_ref += coeff_current_u1_0 * field_grad_ref[0 * ND + 0][q * U_NS + 0];
+            u1_grad_1_ref += coeff_current_u1_0 * field_grad_ref[0 * ND + 1][q * U_NS + 0];
+            const s_t coeff_current_u1_1 = current[7][lane];
+            u1_grad_0_ref += coeff_current_u1_1 * field_grad_ref[0 * ND + 0][q * U_NS + 1];
+            u1_grad_1_ref += coeff_current_u1_1 * field_grad_ref[0 * ND + 1][q * U_NS + 1];
+            const s_t coeff_current_u1_2 = current[8][lane];
+            u1_grad_0_ref += coeff_current_u1_2 * field_grad_ref[0 * ND + 0][q * U_NS + 2];
+            u1_grad_1_ref += coeff_current_u1_2 * field_grad_ref[0 * ND + 1][q * U_NS + 2];
+            const s_t coeff_current_u1_3 = current[9][lane];
+            u1_grad_0_ref += coeff_current_u1_3 * field_grad_ref[0 * ND + 0][q * U_NS + 3];
+            u1_grad_1_ref += coeff_current_u1_3 * field_grad_ref[0 * ND + 1][q * U_NS + 3];
+            const s_t coeff_current_u1_4 = current[10][lane];
+            u1_grad_0_ref += coeff_current_u1_4 * field_grad_ref[0 * ND + 0][q * U_NS + 4];
+            u1_grad_1_ref += coeff_current_u1_4 * field_grad_ref[0 * ND + 1][q * U_NS + 4];
+            const s_t coeff_current_u1_5 = current[11][lane];
+            u1_grad_0_ref += coeff_current_u1_5 * field_grad_ref[0 * ND + 0][q * U_NS + 5];
+            u1_grad_1_ref += coeff_current_u1_5 * field_grad_ref[0 * ND + 1][q * U_NS + 5];
+            const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
+            const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
+            s_t p_grad_0_ref = s_t(0);
+            s_t p_grad_1_ref = s_t(0);
+            const s_t coeff_current_p_0 = current[12][lane];
+            p_grad_0_ref += coeff_current_p_0 * field_grad_ref[1 * ND + 0][q * P_NS + 0];
+            p_grad_1_ref += coeff_current_p_0 * field_grad_ref[1 * ND + 1][q * P_NS + 0];
+            const s_t coeff_current_p_1 = current[13][lane];
+            p_grad_0_ref += coeff_current_p_1 * field_grad_ref[1 * ND + 0][q * P_NS + 1];
+            p_grad_1_ref += coeff_current_p_1 * field_grad_ref[1 * ND + 1][q * P_NS + 1];
+            const s_t coeff_current_p_2 = current[14][lane];
+            p_grad_0_ref += coeff_current_p_2 * field_grad_ref[1 * ND + 0][q * P_NS + 2];
+            p_grad_1_ref += coeff_current_p_2 * field_grad_ref[1 * ND + 1][q * P_NS + 2];
+            const s_t p_grad_0 = (p_grad_0_ref * adj0 + p_grad_1_ref * adj2) / det;
+            const s_t p_grad_1 = (p_grad_0_ref * adj1 + p_grad_1_ref * adj3) / det;
+            const s_t value_coeff2 = u0_grad_0 + u1_grad_1;
+            const s_t test_value_p_0 = field_shape[1][q * P_NS + 0];
             output[12][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_0);
-            const scalar_t test_value_p_1 = field_shape[1][q * P_N_SHAPE + 1];
+            const s_t test_value_p_1 = field_shape[1][q * P_NS + 1];
             output[13][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_1);
-            const scalar_t test_value_p_2 = field_shape[1][q * P_N_SHAPE + 2];
+            const s_t test_value_p_2 = field_shape[1][q * P_NS + 2];
             output[14][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_2);
         }
     }
 }
 
-template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>
+template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT determinant,
-        const scalar_t *const SFEM_RESTRICT adjugate[4],
-        const scalar_t *const SFEM_RESTRICT field_shape[2],
-        const scalar_t *const SFEM_RESTRICT field_grad_ref[4],
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t current[15][VECTOR_SIZE],
-        scalar_t output[15][VECTOR_SIZE]
+        const s_t *const SFEM_RESTRICT determinant,
+        const s_t *const SFEM_RESTRICT adjugate[4],
+        const s_t *const SFEM_RESTRICT field_shape[2],
+        const s_t *const SFEM_RESTRICT field_grad_ref[4],
+        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t current[15][VS],
+        s_t output[15][VS]
 ) {
-    static constexpr int DIM = 2;
-    static constexpr int N_FIELDS = 2;
+    static constexpr int ND = 2;
+    static constexpr int NC = 2;
     static constexpr int N_FIELD_STREAMS = 15;
-    (void)CELL_N_SHAPE;
+    (void)CELL_NS;
     (void)N_FIELD_STREAMS;
-    static constexpr int U_N_SHAPE = 6;
-    static constexpr int P_N_SHAPE = 3;
-    for (int q = 0; q < N_QP; ++q) {
+    static constexpr int U_NS = 6;
+    static constexpr int P_NS = 3;
+    for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const scalar_t det = determinant[geometry_offset];
-            const scalar_t adj0 = adjugate[0][geometry_offset];
-            const scalar_t adj1 = adjugate[1][geometry_offset];
-            const scalar_t adj2 = adjugate[2][geometry_offset];
-            const scalar_t adj3 = adjugate[3][geometry_offset];
-            scalar_t u0_grad_0_ref = scalar_t(0);
-            scalar_t u0_grad_1_ref = scalar_t(0);
-            const scalar_t coeff_current_u0_0 = current[0][lane];
-            u0_grad_0_ref += coeff_current_u0_0 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 0];
-            u0_grad_1_ref += coeff_current_u0_0 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 0];
-            const scalar_t coeff_current_u0_1 = current[1][lane];
-            u0_grad_0_ref += coeff_current_u0_1 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 1];
-            u0_grad_1_ref += coeff_current_u0_1 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 1];
-            const scalar_t coeff_current_u0_2 = current[2][lane];
-            u0_grad_0_ref += coeff_current_u0_2 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 2];
-            u0_grad_1_ref += coeff_current_u0_2 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 2];
-            const scalar_t coeff_current_u0_3 = current[3][lane];
-            u0_grad_0_ref += coeff_current_u0_3 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 3];
-            u0_grad_1_ref += coeff_current_u0_3 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 3];
-            const scalar_t coeff_current_u0_4 = current[4][lane];
-            u0_grad_0_ref += coeff_current_u0_4 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 4];
-            u0_grad_1_ref += coeff_current_u0_4 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 4];
-            const scalar_t coeff_current_u0_5 = current[5][lane];
-            u0_grad_0_ref += coeff_current_u0_5 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 5];
-            u0_grad_1_ref += coeff_current_u0_5 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 5];
-            const scalar_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
-            const scalar_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
-            scalar_t u1_grad_0_ref = scalar_t(0);
-            scalar_t u1_grad_1_ref = scalar_t(0);
-            const scalar_t coeff_current_u1_0 = current[6][lane];
-            u1_grad_0_ref += coeff_current_u1_0 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 0];
-            u1_grad_1_ref += coeff_current_u1_0 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 0];
-            const scalar_t coeff_current_u1_1 = current[7][lane];
-            u1_grad_0_ref += coeff_current_u1_1 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 1];
-            u1_grad_1_ref += coeff_current_u1_1 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 1];
-            const scalar_t coeff_current_u1_2 = current[8][lane];
-            u1_grad_0_ref += coeff_current_u1_2 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 2];
-            u1_grad_1_ref += coeff_current_u1_2 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 2];
-            const scalar_t coeff_current_u1_3 = current[9][lane];
-            u1_grad_0_ref += coeff_current_u1_3 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 3];
-            u1_grad_1_ref += coeff_current_u1_3 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 3];
-            const scalar_t coeff_current_u1_4 = current[10][lane];
-            u1_grad_0_ref += coeff_current_u1_4 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 4];
-            u1_grad_1_ref += coeff_current_u1_4 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 4];
-            const scalar_t coeff_current_u1_5 = current[11][lane];
-            u1_grad_0_ref += coeff_current_u1_5 * field_grad_ref[0 * DIM + 0][q * U_N_SHAPE + 5];
-            u1_grad_1_ref += coeff_current_u1_5 * field_grad_ref[0 * DIM + 1][q * U_N_SHAPE + 5];
-            const scalar_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
-            const scalar_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
-            scalar_t p_grad_0_ref = scalar_t(0);
-            scalar_t p_grad_1_ref = scalar_t(0);
-            const scalar_t coeff_current_p_0 = current[12][lane];
-            p_grad_0_ref += coeff_current_p_0 * field_grad_ref[1 * DIM + 0][q * P_N_SHAPE + 0];
-            p_grad_1_ref += coeff_current_p_0 * field_grad_ref[1 * DIM + 1][q * P_N_SHAPE + 0];
-            const scalar_t coeff_current_p_1 = current[13][lane];
-            p_grad_0_ref += coeff_current_p_1 * field_grad_ref[1 * DIM + 0][q * P_N_SHAPE + 1];
-            p_grad_1_ref += coeff_current_p_1 * field_grad_ref[1 * DIM + 1][q * P_N_SHAPE + 1];
-            const scalar_t coeff_current_p_2 = current[14][lane];
-            p_grad_0_ref += coeff_current_p_2 * field_grad_ref[1 * DIM + 0][q * P_N_SHAPE + 2];
-            p_grad_1_ref += coeff_current_p_2 * field_grad_ref[1 * DIM + 1][q * P_N_SHAPE + 2];
-            const scalar_t p_grad_0 = (p_grad_0_ref * adj0 + p_grad_1_ref * adj2) / det;
-            const scalar_t p_grad_1 = (p_grad_0_ref * adj1 + p_grad_1_ref * adj3) / det;
-            const scalar_t value_coeff2 = u0_grad_0 + u1_grad_1;
-            const scalar_t test_value_p_0 = field_shape[1][q * P_N_SHAPE + 0];
+            const s_t det = determinant[geometry_offset];
+            const s_t adj0 = adjugate[0][geometry_offset];
+            const s_t adj1 = adjugate[1][geometry_offset];
+            const s_t adj2 = adjugate[2][geometry_offset];
+            const s_t adj3 = adjugate[3][geometry_offset];
+            s_t u0_grad_0_ref = s_t(0);
+            s_t u0_grad_1_ref = s_t(0);
+            const s_t coeff_current_u0_0 = current[0][lane];
+            u0_grad_0_ref += coeff_current_u0_0 * field_grad_ref[0 * ND + 0][q * U_NS + 0];
+            u0_grad_1_ref += coeff_current_u0_0 * field_grad_ref[0 * ND + 1][q * U_NS + 0];
+            const s_t coeff_current_u0_1 = current[1][lane];
+            u0_grad_0_ref += coeff_current_u0_1 * field_grad_ref[0 * ND + 0][q * U_NS + 1];
+            u0_grad_1_ref += coeff_current_u0_1 * field_grad_ref[0 * ND + 1][q * U_NS + 1];
+            const s_t coeff_current_u0_2 = current[2][lane];
+            u0_grad_0_ref += coeff_current_u0_2 * field_grad_ref[0 * ND + 0][q * U_NS + 2];
+            u0_grad_1_ref += coeff_current_u0_2 * field_grad_ref[0 * ND + 1][q * U_NS + 2];
+            const s_t coeff_current_u0_3 = current[3][lane];
+            u0_grad_0_ref += coeff_current_u0_3 * field_grad_ref[0 * ND + 0][q * U_NS + 3];
+            u0_grad_1_ref += coeff_current_u0_3 * field_grad_ref[0 * ND + 1][q * U_NS + 3];
+            const s_t coeff_current_u0_4 = current[4][lane];
+            u0_grad_0_ref += coeff_current_u0_4 * field_grad_ref[0 * ND + 0][q * U_NS + 4];
+            u0_grad_1_ref += coeff_current_u0_4 * field_grad_ref[0 * ND + 1][q * U_NS + 4];
+            const s_t coeff_current_u0_5 = current[5][lane];
+            u0_grad_0_ref += coeff_current_u0_5 * field_grad_ref[0 * ND + 0][q * U_NS + 5];
+            u0_grad_1_ref += coeff_current_u0_5 * field_grad_ref[0 * ND + 1][q * U_NS + 5];
+            const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
+            const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
+            s_t u1_grad_0_ref = s_t(0);
+            s_t u1_grad_1_ref = s_t(0);
+            const s_t coeff_current_u1_0 = current[6][lane];
+            u1_grad_0_ref += coeff_current_u1_0 * field_grad_ref[0 * ND + 0][q * U_NS + 0];
+            u1_grad_1_ref += coeff_current_u1_0 * field_grad_ref[0 * ND + 1][q * U_NS + 0];
+            const s_t coeff_current_u1_1 = current[7][lane];
+            u1_grad_0_ref += coeff_current_u1_1 * field_grad_ref[0 * ND + 0][q * U_NS + 1];
+            u1_grad_1_ref += coeff_current_u1_1 * field_grad_ref[0 * ND + 1][q * U_NS + 1];
+            const s_t coeff_current_u1_2 = current[8][lane];
+            u1_grad_0_ref += coeff_current_u1_2 * field_grad_ref[0 * ND + 0][q * U_NS + 2];
+            u1_grad_1_ref += coeff_current_u1_2 * field_grad_ref[0 * ND + 1][q * U_NS + 2];
+            const s_t coeff_current_u1_3 = current[9][lane];
+            u1_grad_0_ref += coeff_current_u1_3 * field_grad_ref[0 * ND + 0][q * U_NS + 3];
+            u1_grad_1_ref += coeff_current_u1_3 * field_grad_ref[0 * ND + 1][q * U_NS + 3];
+            const s_t coeff_current_u1_4 = current[10][lane];
+            u1_grad_0_ref += coeff_current_u1_4 * field_grad_ref[0 * ND + 0][q * U_NS + 4];
+            u1_grad_1_ref += coeff_current_u1_4 * field_grad_ref[0 * ND + 1][q * U_NS + 4];
+            const s_t coeff_current_u1_5 = current[11][lane];
+            u1_grad_0_ref += coeff_current_u1_5 * field_grad_ref[0 * ND + 0][q * U_NS + 5];
+            u1_grad_1_ref += coeff_current_u1_5 * field_grad_ref[0 * ND + 1][q * U_NS + 5];
+            const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
+            const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
+            s_t p_grad_0_ref = s_t(0);
+            s_t p_grad_1_ref = s_t(0);
+            const s_t coeff_current_p_0 = current[12][lane];
+            p_grad_0_ref += coeff_current_p_0 * field_grad_ref[1 * ND + 0][q * P_NS + 0];
+            p_grad_1_ref += coeff_current_p_0 * field_grad_ref[1 * ND + 1][q * P_NS + 0];
+            const s_t coeff_current_p_1 = current[13][lane];
+            p_grad_0_ref += coeff_current_p_1 * field_grad_ref[1 * ND + 0][q * P_NS + 1];
+            p_grad_1_ref += coeff_current_p_1 * field_grad_ref[1 * ND + 1][q * P_NS + 1];
+            const s_t coeff_current_p_2 = current[14][lane];
+            p_grad_0_ref += coeff_current_p_2 * field_grad_ref[1 * ND + 0][q * P_NS + 2];
+            p_grad_1_ref += coeff_current_p_2 * field_grad_ref[1 * ND + 1][q * P_NS + 2];
+            const s_t p_grad_0 = (p_grad_0_ref * adj0 + p_grad_1_ref * adj2) / det;
+            const s_t p_grad_1 = (p_grad_0_ref * adj1 + p_grad_1_ref * adj3) / det;
+            const s_t value_coeff2 = u0_grad_0 + u1_grad_1;
+            const s_t test_value_p_0 = field_shape[1][q * P_NS + 0];
             output[12][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_0);
-            const scalar_t test_value_p_1 = field_shape[1][q * P_N_SHAPE + 1];
+            const s_t test_value_p_1 = field_shape[1][q * P_NS + 1];
             output[13][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_1);
-            const scalar_t test_value_p_2 = field_shape[1][q * P_N_SHAPE + 2];
+            const s_t test_value_p_2 = field_shape[1][q * P_NS + 2];
             output[14][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_2);
         }
     }
 }
 
-template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>
+template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT determinant,
-        const scalar_t *const SFEM_RESTRICT field_shape[2],
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        scalar_t *const SFEM_RESTRICT output[15]
+        const s_t *const SFEM_RESTRICT determinant,
+        const s_t *const SFEM_RESTRICT field_shape[2],
+        const s_t *const SFEM_RESTRICT q_weight,
+        s_t *const SFEM_RESTRICT output[15]
 ) {
-    static constexpr int DIM = 2;
-    static constexpr int N_FIELDS = 2;
+    static constexpr int ND = 2;
+    static constexpr int NC = 2;
     static constexpr int N_FIELD_STREAMS = 15;
-    (void)CELL_N_SHAPE;
+    (void)CELL_NS;
     (void)N_FIELD_STREAMS;
-    static constexpr int U_N_SHAPE = 6;
-    static constexpr int P_N_SHAPE = 3;
-    for (int q = 0; q < N_QP; ++q) {
+    static constexpr int U_NS = 6;
+    static constexpr int P_NS = 3;
+    for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const scalar_t det = determinant[geometry_offset];
+            const s_t det = determinant[geometry_offset];
         }
     }
 }
 
-template <typename scalar_t, int N_QP, int CELL_N_SHAPE, int VECTOR_SIZE>
+template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT determinant,
-        const scalar_t *const SFEM_RESTRICT field_shape[2],
-        const scalar_t *const SFEM_RESTRICT q_weight,
-        scalar_t output[15][VECTOR_SIZE]
+        const s_t *const SFEM_RESTRICT determinant,
+        const s_t *const SFEM_RESTRICT field_shape[2],
+        const s_t *const SFEM_RESTRICT q_weight,
+        s_t output[15][VS]
 ) {
-    static constexpr int DIM = 2;
-    static constexpr int N_FIELDS = 2;
+    static constexpr int ND = 2;
+    static constexpr int NC = 2;
     static constexpr int N_FIELD_STREAMS = 15;
-    (void)CELL_N_SHAPE;
+    (void)CELL_NS;
     (void)N_FIELD_STREAMS;
-    static constexpr int U_N_SHAPE = 6;
-    static constexpr int P_N_SHAPE = 3;
-    for (int q = 0; q < N_QP; ++q) {
+    static constexpr int U_NS = 6;
+    static constexpr int P_NS = 3;
+    for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const scalar_t det = determinant[geometry_offset];
+            const s_t det = determinant[geometry_offset];
         }
     }
 }
