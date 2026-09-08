@@ -90,6 +90,15 @@ function(cvfem_subpar_target tgt)
     endif()
 endfunction()
 
+# Every cvfem header is included by bare filename, never by path, so each source module
+# directory goes on the include path -- the arrangement SFEM uses for its own modules
+# (see the SFEM_BUILD_INCLUDES loop in the top-level CMakeLists.txt).
+set(CVFEM_MODULES src/core src/hex8 src/tet4 src/generated src/ss src/op src/cases)
+set(CVFEM_INCLUDE_DIRS)
+foreach(_mod ${CVFEM_MODULES})
+    list(APPEND CVFEM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/${_mod})
+endforeach()
+
 set(_cvfem_perf_opts)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     list(APPEND _cvfem_perf_opts
@@ -99,7 +108,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
         # Load-bearing, do not remove. -ffast-math implies -ffinite-math-only,
         # under which the compiler may assume no NaN and no infinity ever occurs.
         # It then folds every std::isfinite()/std::isnan() guard to a constant
-        # `true` -- including the ones in cvfem_hex8_ns_steady.cpp that exist to
+        # `true` -- including the ones in drivers/cvfem_hex8_ns_steady.cpp that exist to
         # catch a singular preconditioner block or a diverged Newton residual.
         # The guards failed *open*: the solver proceeded on a NaN state instead
         # of reporting failure. Verified on the generated code, where the guard
@@ -145,43 +154,43 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
 endif()
 
 foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baseline cvfem_hex8_ns_upwind_bench)
-    add_executable(${_cvfem_tgt} ${_cvfem_tgt}.cpp)
+    add_executable(${_cvfem_tgt} drivers/${_cvfem_tgt}.cpp)
     target_link_libraries(${_cvfem_tgt}
         PRIVATE
             SFEM::sfem
             $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
     target_compile_options(${_cvfem_tgt} PRIVATE ${_cvfem_perf_opts})
-    target_include_directories(${_cvfem_tgt} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_include_directories(${_cvfem_tgt} PRIVATE ${CVFEM_INCLUDE_DIRS})
     cvfem_subpar_target(${_cvfem_tgt})
     cvfem_trace_target(${_cvfem_tgt})
 endforeach()
 
 # How much of the matrix the velocity-dependent half ever touches.
-add_executable(nlcover nlcover.cpp)
+add_executable(nlcover drivers/nlcover.cpp)
 target_link_libraries(nlcover PRIVATE SFEM::sfem
     $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
 target_compile_options(nlcover PRIVATE ${_cvfem_perf_opts})
-target_include_directories(nlcover PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(nlcover PRIVATE ${CVFEM_INCLUDE_DIRS})
 cvfem_subpar_target(nlcover)
 cvfem_trace_target(nlcover)
 
 # Guards the guards. Built with exactly the solver's flags, so it fails if the
-# build's floating-point options have folded cvfem_hex8_ns_steady.cpp's
+# build's floating-point options have folded drivers/cvfem_hex8_ns_steady.cpp's
 # std::isfinite() checks into a constant `true`. See the -fno-finite-math-only
 # comment above. Run it in CI; it takes microseconds.
-add_executable(cvfem_guard_selftest cvfem_guard_selftest.cpp)
+add_executable(cvfem_guard_selftest tests/cvfem_guard_selftest.cpp)
 target_compile_options(cvfem_guard_selftest PRIVATE ${_cvfem_perf_opts})
-target_include_directories(cvfem_guard_selftest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(cvfem_guard_selftest PRIVATE ${CVFEM_INCLUDE_DIRS})
 add_test(NAME cvfem_guard_selftest COMMAND cvfem_guard_selftest)
 
-add_executable(cvfem_hex8_ns_steady cvfem_hex8_ns_steady.cpp)
+add_executable(cvfem_hex8_ns_steady drivers/cvfem_hex8_ns_steady.cpp)
 target_link_libraries(cvfem_hex8_ns_steady
     PRIVATE
         SFEM::sfem
         $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
 target_compile_options(cvfem_hex8_ns_steady PRIVATE ${_cvfem_perf_opts})
 target_include_directories(cvfem_hex8_ns_steady PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CVFEM_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
 cvfem_subpar_target(cvfem_hex8_ns_steady)
@@ -189,14 +198,17 @@ cvfem_trace_target(cvfem_hex8_ns_steady)
 
 # The sfem::Op face of the same kernels, for the semi-structured GMG work. Kept as a
 # library so the Op compiles and is gated on its own before any driver depends on it.
-add_library(cvfem_ns_op STATIC cvfem_hex8_ns_op.cpp cvfem_ss_galerkin.cpp cvfem_ss_vanka.cpp)
+add_library(cvfem_ns_op STATIC
+    src/op/cvfem_hex8_ns_op.cpp
+    src/ss/cvfem_ss_galerkin.cpp
+    src/ss/cvfem_ss_vanka.cpp)
 target_link_libraries(cvfem_ns_op
     PUBLIC
         SFEM::sfem
         $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
 target_compile_options(cvfem_ns_op PRIVATE ${_cvfem_perf_opts})
 target_include_directories(cvfem_ns_op PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CVFEM_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
 cvfem_subpar_target(cvfem_ns_op)
@@ -204,7 +216,7 @@ cvfem_trace_target(cvfem_ns_op)
 
 # Proves the Op reproduces the standalone driver on the same mesh and state. Cheap
 # enough to be a ctest, and it is the gate everything downstream of the Op rests on.
-add_executable(cvfem_ns_op_gate cvfem_ns_op_gate.cpp)
+add_executable(cvfem_ns_op_gate tests/cvfem_ns_op_gate.cpp)
 target_link_libraries(cvfem_ns_op_gate PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_ns_op_gate PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_op_gate)
@@ -214,7 +226,7 @@ add_test(NAME cvfem_ns_op_gate COMMAND cvfem_ns_op_gate)
 # Compile-time proof that the operator header is usable from any driver: it leaks none
 # of the solver core, and it coexists with the benchmark's layout family. Failure mode
 # is a build error, which is the point.
-add_executable(cvfem_ns_op_isolation cvfem_ns_op_isolation.cpp)
+add_executable(cvfem_ns_op_isolation tests/cvfem_ns_op_isolation.cpp)
 target_link_libraries(cvfem_ns_op_isolation PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_ns_op_isolation PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_op_isolation)
@@ -223,7 +235,7 @@ add_test(NAME cvfem_ns_op_isolation COMMAND cvfem_ns_op_isolation)
 
 # The frontend-driven solver: same channel problem through sfem::Function, on the way to
 # the semi-structured multigrid hierarchy.
-add_executable(cvfem_hex8_ns_ssgmg cvfem_hex8_ns_ssgmg.cpp)
+add_executable(cvfem_hex8_ns_ssgmg drivers/cvfem_hex8_ns_ssgmg.cpp)
 target_link_libraries(cvfem_hex8_ns_ssgmg PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_hex8_ns_ssgmg PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_hex8_ns_ssgmg)
@@ -231,7 +243,7 @@ cvfem_trace_target(cvfem_hex8_ns_ssgmg)
 
 # Throughput of the operator kernels on their own, swept across sizes so the saturated
 # figure is a plateau rather than an assumption. Baseline for the semi-structured work.
-add_executable(cvfem_ns_apply_bench cvfem_ns_apply_bench.cpp)
+add_executable(cvfem_ns_apply_bench drivers/cvfem_ns_apply_bench.cpp)
 target_link_libraries(cvfem_ns_apply_bench PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_ns_apply_bench PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_apply_bench)
@@ -239,11 +251,11 @@ cvfem_trace_target(cvfem_ns_apply_bench)
 
 # T3: the macro-local gather on a semi-structured mesh, against the flat gather on the
 # same mesh. Doubles as a correctness test -- the two must agree to round-off.
-add_executable(cvfem_sshex8_bench cvfem_sshex8_bench.cpp)
+add_executable(cvfem_sshex8_bench drivers/cvfem_sshex8_bench.cpp)
 target_link_libraries(cvfem_sshex8_bench PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_sshex8_bench PRIVATE ${_cvfem_perf_opts})
 target_include_directories(cvfem_sshex8_bench PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CVFEM_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../operators)
 cvfem_subpar_target(cvfem_sshex8_bench)
 cvfem_trace_target(cvfem_sshex8_bench)
@@ -296,7 +308,7 @@ if(CVFEM_ENABLE_CUDA)
     function(cvfem_cuda_target tgt)
         target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_CUDA)
         target_include_directories(${tgt} PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
+            ${CVFEM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
         cvfem_subpar_target(${tgt})
         cvfem_trace_target(${tgt})
         target_compile_options(${tgt} PRIVATE
