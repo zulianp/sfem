@@ -238,6 +238,10 @@ int main(int argc, char **argv) {
     int         rhie_chow  = 0;
     scalar_t    rc_scale   = 1;
     int         boundary   = 0;
+    // Whether the nodal pressure gradient is rebuilt inside every apply or hoisted out of
+    // the timed loop. This is the difference SFEM_PGRAD_CACHE makes in the solver, and it
+    // is the other half of the cascade: the gradient is a full element sweep.
+    int         pgrad_per_apply = 0;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -287,6 +291,8 @@ int main(int argc, char **argv) {
             if (i + 1 < argc && argv[i + 1][0] != '-') rc_scale = (scalar_t)std::atof(argv[++i]);
         } else if (arg == "--boundary")
             boundary = 1;
+        else if (arg == "--pgrad-per-apply")
+            pgrad_per_apply = 1;
         else if (arg == "--csv" && i + 1 < argc)
             csv_path = argv[++i];
         else if (arg == "--tag" && i + 1 < argc)
@@ -333,6 +339,12 @@ int main(int argc, char **argv) {
                     "                 no Rhie-Chow term. Off by default: without it there is no\n"
                     "                 pressure-pressure coupling at all, which is a smaller and\n"
                     "                 faster operator than the one the solver runs.\n"
+                    "  --pgrad-per-apply  rebuild the nodal pressure gradient inside every apply\n"
+                    "                 instead of hoisting it out of the timed loop. The gradient is\n"
+                    "                 a full element sweep, about 39%% of an apply, and hoisting it\n"
+                    "                 across a Krylov solve is worth 1.26x off the whole linear\n"
+                    "                 solve -- so which of the two is measured has to be said.\n"
+                    "                 Requires --rhie-chow.\n"
                     "  --boundary     close the boundary control volumes with the boundary\n"
                     "                 sub-control-surface terms. Off by default; the benchmark\n"
                     "                 otherwise has no boundary handling. Reaches ~43%% of the\n"
@@ -362,15 +374,30 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
-    // Only the atomic layout threads the two terms through so far. The packed, colored and
-    // store layouts stage their element data through Hex8ResidualPack/Hex8RhieChowPack and
-    // need that staging extended before they can carry either term; until then, asking for
-    // one there has to fail rather than quietly return a number measured without it.
-    if ((rhie_chow || boundary) && layout != "atomic") {
+    // --boundary is a separate element sweep and so is layout-independent, but it only
+    // reaches the residual and the Jacobian action that way. The assembled matrix needs the
+    // boundary blocks written through the element BSR slots, which so far only the atomic
+    // assembly does.
+    if (boundary && (assemble || assemble_diag || bsr_apply) && layout != "atomic") {
         std::fprintf(stderr,
-                     "--rhie-chow / --boundary are implemented for --layout atomic only "
-                     "(got '%s')\n",
+                     "--boundary with --assemble/--assemble-diag/--bsr-apply is implemented "
+                     "for --layout atomic only (got '%s')\n",
                      layout.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // Rhie-Chow lives inside the element kernel, so it has to be staged per layout. The
+    // packed, colored and store sweeps carry their element data through Hex8RhieChowPack
+    // and that staging is not wired up here yet; asking for it there has to fail rather
+    // than quietly return a number measured without it.
+    if (rhie_chow && layout != "atomic") {
+        std::fprintf(stderr, "--rhie-chow is implemented for --layout atomic only (got '%s')\n",
+                     layout.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    if (pgrad_per_apply && !rhie_chow) {
+        std::fprintf(stderr, "--pgrad-per-apply is meaningless without --rhie-chow\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -547,7 +574,8 @@ int main(int argc, char **argv) {
         // step here; until it exists, a --rhie-chow number is the hoisted figure.
         cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, d.p.data(), 1,
                                        d.pgx, d.pgy, d.pgz);
-        std::printf("rhie_chow: scale %g\n", (double)rc_scale);
+        std::printf("rhie_chow: scale %g, nodal gradient %s\n", (double)rc_scale,
+                    pgrad_per_apply ? "rebuilt per apply" : "hoisted out of the timed loop");
     }
 
     BSR4                  bsr;
@@ -722,7 +750,13 @@ int main(int argc, char **argv) {
         }
     }
 
+    // The boundary closure is one extra element sweep after the layout's own, which is
+    // how the solver arranges it too -- see apply_boundary_scs_residual_pass. Doing it
+    // here rather than inside each layout means --boundary works for all four.
     auto apply_fn = [&]() {
+        if (pgrad_per_apply)
+            cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, d.p.data(), 1,
+                                           d.pgx, d.pgy, d.pgz);
         if (geom_kind == GeomKind::Isoparam) {
             if (layout == "colored")
                 apply_residual_colored(d, packed, colors, rho, mu, kernel_kind, GeomKind::Isoparam);
@@ -742,6 +776,8 @@ int main(int argc, char **argv) {
             apply_residual_atomic_sumfact(d, rho, mu);
         else
             apply_residual_atomic(d, rho, mu);
+            if (boundary)
+            apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
     };
     auto jac_fn = [&]() {
         if (geom_kind == GeomKind::Isoparam) {
@@ -808,6 +844,9 @@ int main(int argc, char **argv) {
             apply_jacobian_action_atomic_isoparam(d, rho, mu, jac_dir.data(), jac_out.data());
         else
             apply_jacobian_action_atomic(d, rho, mu, jac_dir.data(), jac_out.data());
+            if (boundary)
+            apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0,
+                                                    jac_dir.data(), jac_out.data());
     };
 
     // Block diagonal, for the block-Jacobi preconditioner. Assembles only the 4x4
