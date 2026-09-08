@@ -48,10 +48,10 @@ class FunctionDefPrintingTest(unittest.TestCase):
             (
                 "template <typename s_t, int NQ>",
                 "static SFEM_INLINE void laplace_block(",
-                "        const int ne,",
-                "        s_t output[1][VS]",
+                "    const int ne,",
+                "    s_t output[1][VS]",
                 ") {",
-                "    static constexpr int ND = 3;",
+                "  static constexpr int ND = 3;",
                 "}",
             ),
         )
@@ -71,8 +71,8 @@ class FunctionDefPrintingTest(unittest.TestCase):
             ),
         )
         lines = CLikeKernelASTPrinter().print_node(node)
-        self.assertIn("    for (int lane = 0; lane < ne; ++lane) {", lines)
-        self.assertIn("        const s_t x = 1;", lines)
+        self.assertIn("  for (int lane = 0; lane < ne; ++lane) {", lines)
+        self.assertIn("    const s_t x = 1;", lines)
         self.assertEqual(
             "".join(lines).count("{"), "".join(lines).count("}"), "unbalanced braces"
         )
@@ -84,10 +84,10 @@ class FunctionDefPrintingTest(unittest.TestCase):
         it again would shift already-correct code.  This asymmetry is the
         reason the node exists and the reason it should disappear.
         """
-        node = RawLinesNode(("    already indented;",), reason="not yet IR")
+        node = RawLinesNode(("  already indented;",), reason="not yet IR")
         self.assertEqual(
-            CLikeKernelASTPrinter().print_node(node, "        "),
-            ("    already indented;",),
+            CLikeKernelASTPrinter().print_node(node, "    "),
+            ("  already indented;",),
         )
 
     def test_the_qualifier_comes_from_the_target(self):

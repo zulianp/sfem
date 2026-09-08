@@ -26,17 +26,17 @@ from codegen.framework.package.op_wrappers import (
 
 METRIC_KERNEL = '''
 extern "C" int demo_gradient_3d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const geom_t *const RSTR g_met0,
-        const geom_t *const RSTR g_met5
+    const smesh::ElemType element_type,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met5
 );
 '''
 
 ADJUGATE_KERNEL = '''
 extern "C" int demo_apply_3d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_det0
+    const smesh::ElemType element_type,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_det0
 );
 '''
 
@@ -44,8 +44,8 @@ extern "C" int demo_apply_3d_affine_mesh_soa(
 # to answer here too, because the per-element call sites ask about it.
 ELEMENT_KERNEL = '''
 int demo_tet4_gradient_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const geom_t *const RSTR g_met0
+    const ptrdiff_t nelements,
+    const geom_t *const RSTR g_met0
 );
 '''
 

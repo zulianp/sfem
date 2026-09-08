@@ -76,7 +76,7 @@ def generate_cpp_kernel(
     lines.extend(_sfem_math_inline_source_lines())
     lines.extend(["", 'extern "C" void %s(%s) {' % (function_name, ", ".join(arguments))])
 
-    _append_statement_lines(lines, statements, scalar_type, output_name, indent="    ")
+    _append_statement_lines(lines, statements, scalar_type, output_name, indent="  ")
 
     lines.append("}")
     lines.append("")
@@ -130,7 +130,7 @@ def generate_openmp_cpp_kernel(
             "{",
         ]
     )
-    _append_statement_lines(lines, statements, scalar_type, output_name, indent="    ")
+    _append_statement_lines(lines, statements, scalar_type, output_name, indent="  ")
     lines.extend(
         [
             "}",
@@ -143,15 +143,15 @@ def generate_openmp_cpp_kernel(
         lines.append(pragma)
     lines.extend(
         [
-            "    for (%s e = 0; e < nelements; ++e) {" % index_type,
-            "        %s(%s);" % (element_function_name, ", ".join(element_call_arguments)),
-            "    }",
+            "  for (%s e = 0; e < nelements; ++e) {" % index_type,
+            "    %s(%s);" % (element_function_name, ", ".join(element_call_arguments)),
+            "  }",
             "}",
             "",
             "struct %s {" % wrapper_name,
-            "    void apply(%s) const {" % ", ".join(batch_arguments),
-            "        %s(%s);" % (function_name, ", ".join(_openmp_wrapper_call_arguments(batch_arguments))),
-            "    }",
+            "  void apply(%s) const {" % ", ".join(batch_arguments),
+            "    %s(%s);" % (function_name, ", ".join(_openmp_wrapper_call_arguments(batch_arguments))),
+            "  }",
             "};",
             "",
         ]
@@ -211,23 +211,23 @@ def generate_cuda_kernel(
             "{",
         ]
     )
-    _append_statement_lines(lines, statements, scalar_type, output_name, indent="    ")
+    _append_statement_lines(lines, statements, scalar_type, output_name, indent="  ")
     lines.extend(
         [
             "}",
             "",
             'extern "C" __global__ void %s(%s)' % (global_function_name, ", ".join(kernel_arguments)),
             "{",
-            "    for (%s e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {" % index_type,
-            "        %s(%s);" % (element_function_name, ", ".join(element_call_arguments)),
-            "    }",
+            "  for (%s e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {" % index_type,
+            "    %s(%s);" % (element_function_name, ", ".join(element_call_arguments)),
+            "  }",
             "}",
             "",
             'extern "C" void %s(%s)' % (function_name, ", ".join(kernel_arguments)),
             "{",
-            "    const int block_size = 256;",
-            "    const int grid_size = (int)((nelements + block_size - 1) / block_size);",
-            "    %s<<<grid_size, block_size>>>(nelements%s%s);" % (
+            "  const int block_size = 256;",
+            "  const int grid_size = (int)((nelements + block_size - 1) / block_size);",
+            "  %s<<<grid_size, block_size>>>(nelements%s%s);" % (
                 global_function_name,
                 ", " if launch_arguments else "",
                 ", ".join(launch_arguments),

@@ -47,7 +47,7 @@ class PrinterLayout:
 
 @dataclass(frozen=True)
 class CLikeKernelASTPrinter:
-    indent_unit: str = "    "
+    indent_unit: str = "  "
     vectorize_pragma: str = ""
     atomic_update_pragma: str = ""
     layout: PrinterLayout = PrinterLayout()
@@ -104,7 +104,7 @@ class CLikeKernelASTPrinter:
                     tail = ") {" if close_on_last else ""
                 else:
                     tail = ","
-                lines.append("%s        %s%s" % (indent, param, tail))
+                lines.append("%s    %s%s" % (indent, param, tail))
             if not close_on_last:
                 lines.append("%s) {" % indent)
             for body_node in node.body:

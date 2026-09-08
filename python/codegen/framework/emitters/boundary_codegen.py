@@ -320,26 +320,26 @@ def _boundary_source(function, element_type, surface, components, parameters, co
     component_uses_coordinates = _usage.component_uses_coordinates
     component_uses_current = _usage.component_uses_current
     coeff_lines = [
-        "        const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "    const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if not component_uses_coordinates[i] and not component_uses_current[i]
     ]
     qp_coeff_lines = _value_eval_lines(coordinate_symbols, current_symbols) + [
-        "        const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "    const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
-        "        s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
+        "    s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_out_params = "\n".join(
-        "        real_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
+        "    real_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_float_out_params = "\n".join(
-        "        float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
+        "    float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     return """#include "sfem_base.hpp"
@@ -354,202 +354,202 @@ namespace codegen {{
 
 template <typename s_t>
 struct {function}_reference_data {{
-    static constexpr int NS = {n_shape};
-    static constexpr int NQ = {n_qp};
-    static constexpr int REF_DIM = {ref_dim};
-    static constexpr int PHYSICAL_DIM = {physical_dim};
+  static constexpr int NS = {n_shape};
+  static constexpr int NQ = {n_qp};
+  static constexpr int REF_DIM = {ref_dim};
+  static constexpr int PHYSICAL_DIM = {physical_dim};
 
-    static const s_t *shape() {{
-        static const s_t data[{shape_count}] = {{
+  static const s_t *shape() {{
+    static const s_t data[{shape_count}] = {{
 {shape_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 
-    static const s_t *grad() {{
-        static const s_t data[{grad_count}] = {{
+  static const s_t *grad() {{
+    static const s_t data[{grad_count}] = {{
 {grad_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 
-    static const s_t *weight() {{
-        static const s_t data[{weight_count}] = {{
+  static const s_t *weight() {{
+    static const s_t data[{weight_count}] = {{
 {weight_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 }};
 
 template <typename s_t>
 {function_qualifier} s_t {function}_measure(
-        const int q,
-        const idx_t *const RSTR ev,
-        const geom_t *const *const RSTR points) {{
-    const s_t *const grad = {function}_reference_data<s_t>::grad();
-    const int n_shape = {function}_reference_data<s_t>::NS;
+    const int q,
+    const idx_t *const RSTR ev,
+    const geom_t *const *const RSTR points) {{
+  const s_t *const grad = {function}_reference_data<s_t>::grad();
+  const int n_shape = {function}_reference_data<s_t>::NS;
 {measure_body}
 }}
 
 {function_qualifier} const int *{function}_side_nodes() {{
-    static const int data[{side_node_count}] = {{
+  static const int data[{side_node_count}] = {{
 {side_node_values}
-    }};
-    return data;
+  }};
+  return data;
 }}
 
 {function_qualifier} void {function}_gather_sideset_element(
-        const element_idx_t parent_element,
-        const int side,
-        idx_t **const RSTR elements,
-        idx_t *const RSTR ev) {{
-    const int *const RSTR side_nodes = {function}_side_nodes();
-    constexpr int n_shape = {n_shape};
-    for (int i = 0; i < n_shape; ++i) {{
-        ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
-    }}
+    const element_idx_t parent_element,
+    const int side,
+    idx_t **const RSTR elements,
+    idx_t *const RSTR ev) {{
+  const int *const RSTR side_nodes = {function}_side_nodes();
+  constexpr int n_shape = {n_shape};
+  for (int i = 0; i < n_shape; ++i) {{
+    ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
+  }}
 }}
 
 template <typename s_t>
 {function_qualifier} void {function}_element(
-        const idx_t *const RSTR ev,
-        const geom_t *const *const RSTR points{current_decls}{param_decls},
-        s_t element_vector[{components}][{n_shape}]) {{
-    const s_t *const shape = {function}_reference_data<s_t>::shape();
-    const s_t *const weight = {function}_reference_data<s_t>::weight();
-    const int n_shape = {function}_reference_data<s_t>::NS;
-    const int n_qp = {function}_reference_data<s_t>::NQ;
+    const idx_t *const RSTR ev,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    s_t element_vector[{components}][{n_shape}]) {{
+  const s_t *const shape = {function}_reference_data<s_t>::shape();
+  const s_t *const weight = {function}_reference_data<s_t>::weight();
+  const int n_shape = {function}_reference_data<s_t>::NS;
+  const int n_qp = {function}_reference_data<s_t>::NQ;
 
 {coeff_lines}
 
-    for (int q = 0; q < n_qp; ++q) {{
-        const s_t dS = {function}_measure<s_t>(q, ev, points);
-        const s_t qw = weight[q] * dS;
+  for (int q = 0; q < n_qp; ++q) {{
+    const s_t dS = {function}_measure<s_t>(q, ev, points);
+    const s_t qw = weight[q] * dS;
 {qp_coeff_lines}
 {vectorize_pragma}
-        for (int i = 0; i < n_shape; ++i) {{
-            const s_t test = shape[q * n_shape + i] * qw;
+    for (int i = 0; i < n_shape; ++i) {{
+      const s_t test = shape[q * n_shape + i] * qw;
 {accum_lines}
-        }}
     }}
+  }}
 }}
 
 template <typename s_t>
 {function_qualifier} void {function}_scatter_element(
-        const idx_t *const RSTR ev,
-        const s_t element_vector[{components}][{n_shape}],
-        const int out_stride,
+    const idx_t *const RSTR ev,
+    const s_t element_vector[{components}][{n_shape}],
+    const int out_stride,
 {out_params}) {{
-    constexpr int n_shape = {n_shape};
-    for (int i = 0; i < n_shape; ++i) {{
-        const idx_t node = ev[i];
+  constexpr int n_shape = {n_shape};
+  for (int i = 0; i < n_shape; ++i) {{
+    const idx_t node = ev[i];
 {scatter_lines}
-    }}
+  }}
 }}
 
 template <typename s_t>
 {function_qualifier} int {function}_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points{current_decls}{param_decls},
-        const int out_stride,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    const int out_stride,
 {out_params}) {{
 {parallel_for_pragma}
-    for (ptrdiff_t e = 0; e < nelements; ++e) {{
-        idx_t ev[{n_shape}];
-        s_t element_vector[{components}][{n_shape}];
-        for (int i = 0; i < {n_shape}; ++i) {{
-            ev[i] = elements[i][e];
-        }}
-        for (int c = 0; c < {components}; ++c) {{
-            for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = s_t(0);
-            }}
-        }}
-        {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  for (ptrdiff_t e = 0; e < nelements; ++e) {{
+    idx_t ev[{n_shape}];
+    s_t element_vector[{components}][{n_shape}];
+    for (int i = 0; i < {n_shape}; ++i) {{
+      ev[i] = elements[i][e];
     }}
+    for (int c = 0; c < {components}; ++c) {{
+      for (int i = 0; i < {n_shape}; ++i) {{
+        element_vector[c][i] = s_t(0);
+      }}
+    }}
+    {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+    {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  }}
 
-    return SFEM_SUCCESS;
+  return SFEM_SUCCESS;
 }}
 
 template <typename s_t>
 {function_qualifier} int {sideset_function}_impl(
-        const ptrdiff_t nsides,
-        const ptrdiff_t,
-        idx_t **const RSTR elements,
-        const element_idx_t *const RSTR parent,
-        const int16_t *const RSTR side_idx,
-        const geom_t *const *const RSTR points{current_decls}{param_decls},
-        const int out_stride,
+    const ptrdiff_t nsides,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    const int out_stride,
 {out_params}) {{
 {parallel_for_pragma}
-    for (ptrdiff_t s = 0; s < nsides; ++s) {{
-        idx_t ev[{n_shape}];
-        s_t element_vector[{components}][{n_shape}];
-        {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
-        for (int c = 0; c < {components}; ++c) {{
-            for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = s_t(0);
-            }}
-        }}
-        {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  for (ptrdiff_t s = 0; s < nsides; ++s) {{
+    idx_t ev[{n_shape}];
+    s_t element_vector[{components}][{n_shape}];
+    {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
+    for (int c = 0; c < {components}; ++c) {{
+      for (int i = 0; i < {n_shape}; ++i) {{
+        element_vector[c][i] = s_t(0);
+      }}
     }}
+    {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+    {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  }}
 
-    return SFEM_SUCCESS;
+  return SFEM_SUCCESS;
 }}
 
 }}  // namespace codegen
 }}  // namespace sfem
 
 extern "C" int {function}(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
-        const int out_stride,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
+    const int out_stride,
 {extern_out_params}) {{
-    return sfem::codegen::{function}_impl<real_t>(
-            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+  return sfem::codegen::{function}_impl<real_t>(
+      nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {function}_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
-        const int out_stride,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
+    const int out_stride,
 {extern_float_out_params}) {{
-    return sfem::codegen::{function}_impl<float>(
-            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+  return sfem::codegen::{function}_impl<float>(
+      nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {sideset_function}(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const element_idx_t *const RSTR parent,
-        const int16_t *const RSTR side_idx,
-        const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
-        const int out_stride,
+    const ptrdiff_t nsides,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
+    const int out_stride,
 {extern_out_params}) {{
-    return sfem::codegen::{sideset_function}_impl<real_t>(
-            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+  return sfem::codegen::{sideset_function}_impl<real_t>(
+      nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {sideset_function}_float(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const element_idx_t *const RSTR parent,
-        const int16_t *const RSTR side_idx,
-        const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
-        const int out_stride,
+    const ptrdiff_t nsides,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
+    const int out_stride,
 {extern_float_out_params}) {{
-    return sfem::codegen::{sideset_function}_impl<float>(
-            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+  return sfem::codegen::{sideset_function}_impl<float>(
+      nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 """.format(
         restrict_prelude="\n".join(restrict_prelude()),
@@ -586,7 +586,7 @@ extern "C" int {sideset_function}_float(
         qp_coeff_lines="\n".join(qp_coeff_lines),
         components=components,
         accum_lines="\n".join(
-            "                element_vector[{c}][i] += coeff{c} * test;".format(c=c)
+            "        element_vector[{c}][i] += coeff{c} * test;".format(c=c)
             for c in range(components)
         ),
         scatter_lines="\n".join(
@@ -641,28 +641,28 @@ def _value_eval_lines(coordinate_symbols, current_symbols):
     if not coordinate_symbols and not current_symbols:
         return []
     lines = [
-        "        s_t %s = s_t(0);" % symbol
+        "    s_t %s = s_t(0);" % symbol
         for symbol in coordinate_symbols
     ]
     lines.extend(
-        "        s_t %s_q = s_t(0);" % symbol
+        "    s_t %s_q = s_t(0);" % symbol
         for symbol in current_symbols
     )
     lines.extend(
         [
-            "        for (int j = 0; j < n_shape; ++j) {",
-            "            const s_t phi = shape[q * n_shape + j];",
-            "            const idx_t node = ev[j];",
+            "    for (int j = 0; j < n_shape; ++j) {",
+            "      const s_t phi = shape[q * n_shape + j];",
+            "      const idx_t node = ev[j];",
         ]
     )
     for symbol in coordinate_symbols:
         component = int(str(symbol)[1:])
         lines.append(
-            "            %s += s_t(points[%d][node]) * phi;" % (symbol, component)
+            "      %s += s_t(points[%d][node]) * phi;" % (symbol, component)
         )
     for symbol in current_symbols:
-        lines.append("            %s_q += %s[node] * phi;" % (symbol, symbol))
-    lines.append("        }")
+        lines.append("      %s_q += %s[node] * phi;" % (symbol, symbol))
+    lines.append("    }")
     return lines
 
 
@@ -670,35 +670,35 @@ def _tensor_value_eval_lines(coordinate_symbols, current_symbols):
     if not coordinate_symbols and not current_symbols:
         return []
     lines = [
-        "            s_t %s = s_t(0);" % symbol
+        "      s_t %s = s_t(0);" % symbol
         for symbol in coordinate_symbols
     ]
     lines.extend(
-        "            s_t %s_q = s_t(0);" % symbol
+        "      s_t %s_q = s_t(0);" % symbol
         for symbol in current_symbols
     )
     lines.extend(
         [
-            "            for (int cy = 0; cy < NS1; ++cy) {",
-            "                const s_t vy_coord = shape_1d[qy * NS1 + cy];",
-            "                for (int cx = 0; cx < NS1; ++cx) {",
-            "                    const int j = shape_index[cy * NS1 + cx];",
-            "                    const idx_t node = ev[j];",
-            "                    const s_t phi = shape_1d[qx * NS1 + cx] * vy_coord;",
+            "      for (int cy = 0; cy < NS1; ++cy) {",
+            "        const s_t vy_coord = shape_1d[qy * NS1 + cy];",
+            "        for (int cx = 0; cx < NS1; ++cx) {",
+            "          const int j = shape_index[cy * NS1 + cx];",
+            "          const idx_t node = ev[j];",
+            "          const s_t phi = shape_1d[qx * NS1 + cx] * vy_coord;",
         ]
     )
     for symbol in coordinate_symbols:
         component = int(str(symbol)[1:])
         lines.append(
-            "                    %s += s_t(points[%d][node]) * phi;"
+            "          %s += s_t(points[%d][node]) * phi;"
             % (symbol, component)
         )
     for symbol in current_symbols:
-        lines.append("                    %s_q += %s[node] * phi;" % (symbol, symbol))
+        lines.append("          %s_q += %s[node] * phi;" % (symbol, symbol))
     lines.extend(
         [
-            "                }",
-            "            }",
+            "        }",
+            "      }",
         ]
     )
     return lines
@@ -742,26 +742,26 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
     component_uses_coordinates = _usage.component_uses_coordinates
     component_uses_current = _usage.component_uses_current
     coeff_lines = [
-        "    const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "  const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if not component_uses_coordinates[i] and not component_uses_current[i]
     ]
     qp_coeff_lines = _tensor_value_eval_lines(coordinate_symbols, current_symbols) + [
-        "            const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "      const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
-        "        s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
+        "    s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_out_params = "\n".join(
-        "        real_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
+        "    real_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_float_out_params = "\n".join(
-        "        float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
+        "    float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     return """#include "sfem_base.hpp"
@@ -776,251 +776,251 @@ namespace codegen {{
 
 template <typename s_t>
 struct {function}_reference_data {{
-    static constexpr int NS1 = {n_shape_1d};
-    static constexpr int NQ1 = {n_qp_1d};
-    static constexpr int NS = {n_shape};
-    static constexpr int NQ = {n_qp};
-    static constexpr int REF_DIM = 2;
-    static constexpr int PHYSICAL_DIM = 3;
+  static constexpr int NS1 = {n_shape_1d};
+  static constexpr int NQ1 = {n_qp_1d};
+  static constexpr int NS = {n_shape};
+  static constexpr int NQ = {n_qp};
+  static constexpr int REF_DIM = 2;
+  static constexpr int PHYSICAL_DIM = 3;
 
-    static const s_t *shape_1d() {{
-        static const s_t data[{shape_1d_count}] = {{
+  static const s_t *shape_1d() {{
+    static const s_t data[{shape_1d_count}] = {{
 {shape_1d_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 
-    static const s_t *grad_1d() {{
-        static const s_t data[{grad_1d_count}] = {{
+  static const s_t *grad_1d() {{
+    static const s_t data[{grad_1d_count}] = {{
 {grad_1d_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 
-    static const s_t *weight_1d() {{
-        static const s_t data[{weight_1d_count}] = {{
+  static const s_t *weight_1d() {{
+    static const s_t data[{weight_1d_count}] = {{
 {weight_1d_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 
-    static const int *shape_index() {{
-        static const int data[{n_shape}] = {{
+  static const int *shape_index() {{
+    static const int data[{n_shape}] = {{
 {shape_index_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 }};
 
 template <typename s_t>
 {function_qualifier} s_t {function}_measure(
-        const int qx,
-        const int qy,
-        const idx_t *const RSTR ev,
-        const geom_t *const *const RSTR points) {{
-    const s_t *const RSTR shape_1d = {function}_reference_data<s_t>::shape_1d();
-    const s_t *const RSTR grad_1d = {function}_reference_data<s_t>::grad_1d();
-    const int *const RSTR shape_index = {function}_reference_data<s_t>::shape_index();
-    constexpr int NS1 = {n_shape_1d};
-    s_t dxdr0 = s_t(0);
-    s_t dxdr1 = s_t(0);
-    s_t dxdr2 = s_t(0);
-    s_t dxds0 = s_t(0);
-    s_t dxds1 = s_t(0);
-    s_t dxds2 = s_t(0);
-    for (int sy = 0; sy < NS1; ++sy) {{
-        const s_t vy = shape_1d[qy * NS1 + sy];
-        const s_t gy = grad_1d[qy * NS1 + sy];
-        for (int sx = 0; sx < NS1; ++sx) {{
-            const int i = shape_index[sy * NS1 + sx];
-            const idx_t node = ev[i];
-            const s_t vx = shape_1d[qx * NS1 + sx];
-            const s_t gx = grad_1d[qx * NS1 + sx];
-            const s_t gr = gx * vy;
-            const s_t gs = vx * gy;
-            const s_t x = s_t(points[0][node]);
-            const s_t y = s_t(points[1][node]);
-            const s_t z = s_t(points[2][node]);
-            dxdr0 += x * gr;
-            dxdr1 += y * gr;
-            dxdr2 += z * gr;
-            dxds0 += x * gs;
-            dxds1 += y * gs;
-            dxds2 += z * gs;
-        }}
+    const int qx,
+    const int qy,
+    const idx_t *const RSTR ev,
+    const geom_t *const *const RSTR points) {{
+  const s_t *const RSTR shape_1d = {function}_reference_data<s_t>::shape_1d();
+  const s_t *const RSTR grad_1d = {function}_reference_data<s_t>::grad_1d();
+  const int *const RSTR shape_index = {function}_reference_data<s_t>::shape_index();
+  constexpr int NS1 = {n_shape_1d};
+  s_t dxdr0 = s_t(0);
+  s_t dxdr1 = s_t(0);
+  s_t dxdr2 = s_t(0);
+  s_t dxds0 = s_t(0);
+  s_t dxds1 = s_t(0);
+  s_t dxds2 = s_t(0);
+  for (int sy = 0; sy < NS1; ++sy) {{
+    const s_t vy = shape_1d[qy * NS1 + sy];
+    const s_t gy = grad_1d[qy * NS1 + sy];
+    for (int sx = 0; sx < NS1; ++sx) {{
+      const int i = shape_index[sy * NS1 + sx];
+      const idx_t node = ev[i];
+      const s_t vx = shape_1d[qx * NS1 + sx];
+      const s_t gx = grad_1d[qx * NS1 + sx];
+      const s_t gr = gx * vy;
+      const s_t gs = vx * gy;
+      const s_t x = s_t(points[0][node]);
+      const s_t y = s_t(points[1][node]);
+      const s_t z = s_t(points[2][node]);
+      dxdr0 += x * gr;
+      dxdr1 += y * gr;
+      dxdr2 += z * gr;
+      dxds0 += x * gs;
+      dxds1 += y * gs;
+      dxds2 += z * gs;
     }}
-    const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
-    const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
-    const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
-    return sqrt(c0 * c0 + c1 * c1 + c2 * c2);
+  }}
+  const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
+  const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
+  const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
+  return sqrt(c0 * c0 + c1 * c1 + c2 * c2);
 }}
 
 {function_qualifier} const int *{function}_side_nodes() {{
-    static const int data[{side_node_count}] = {{
+  static const int data[{side_node_count}] = {{
 {side_node_values}
-    }};
-    return data;
+  }};
+  return data;
 }}
 
 {function_qualifier} void {function}_gather_sideset_element(
-        const element_idx_t parent_element,
-        const int side,
-        idx_t **const RSTR elements,
-        idx_t *const RSTR ev) {{
-    const int *const RSTR side_nodes = {function}_side_nodes();
-    constexpr int n_shape = {n_shape};
-    for (int i = 0; i < n_shape; ++i) {{
-        ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
-    }}
+    const element_idx_t parent_element,
+    const int side,
+    idx_t **const RSTR elements,
+    idx_t *const RSTR ev) {{
+  const int *const RSTR side_nodes = {function}_side_nodes();
+  constexpr int n_shape = {n_shape};
+  for (int i = 0; i < n_shape; ++i) {{
+    ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
+  }}
 }}
 
 template <typename s_t>
 {function_qualifier} void {function}_element(
-        const idx_t *const RSTR ev,
-        const geom_t *const *const RSTR points{current_decls}{param_decls},
-        s_t element_vector[{components}][{n_shape}]) {{
-    const s_t *const RSTR shape_1d = {function}_reference_data<s_t>::shape_1d();
-    const s_t *const RSTR weight_1d = {function}_reference_data<s_t>::weight_1d();
-    const int *const RSTR shape_index = {function}_reference_data<s_t>::shape_index();
-    constexpr int NS1 = {n_shape_1d};
-    constexpr int NQ1 = {n_qp_1d};
+    const idx_t *const RSTR ev,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    s_t element_vector[{components}][{n_shape}]) {{
+  const s_t *const RSTR shape_1d = {function}_reference_data<s_t>::shape_1d();
+  const s_t *const RSTR weight_1d = {function}_reference_data<s_t>::weight_1d();
+  const int *const RSTR shape_index = {function}_reference_data<s_t>::shape_index();
+  constexpr int NS1 = {n_shape_1d};
+  constexpr int NQ1 = {n_qp_1d};
 
 {coeff_lines}
 
-    for (int qy = 0; qy < NQ1; ++qy) {{
-        for (int qx = 0; qx < NQ1; ++qx) {{
-            const s_t dS = {function}_measure<s_t>(qx, qy, ev, points);
-            const s_t qw = weight_1d[qx] * weight_1d[qy] * dS;
+  for (int qy = 0; qy < NQ1; ++qy) {{
+    for (int qx = 0; qx < NQ1; ++qx) {{
+      const s_t dS = {function}_measure<s_t>(qx, qy, ev, points);
+      const s_t qw = weight_1d[qx] * weight_1d[qy] * dS;
 {qp_coeff_lines}
-            for (int sy = 0; sy < NS1; ++sy) {{
-                const s_t vy = shape_1d[qy * NS1 + sy];
+      for (int sy = 0; sy < NS1; ++sy) {{
+        const s_t vy = shape_1d[qy * NS1 + sy];
 {vectorize_pragma}
-                for (int sx = 0; sx < NS1; ++sx) {{
-                    const int i = shape_index[sy * NS1 + sx];
-                    const s_t test = shape_1d[qx * NS1 + sx] * vy * qw;
+        for (int sx = 0; sx < NS1; ++sx) {{
+          const int i = shape_index[sy * NS1 + sx];
+          const s_t test = shape_1d[qx * NS1 + sx] * vy * qw;
 {accum_lines}
-                }}
-            }}
         }}
+      }}
     }}
+  }}
 }}
 
 template <typename s_t>
 {function_qualifier} void {function}_scatter_element(
-        const idx_t *const RSTR ev,
-        const s_t element_vector[{components}][{n_shape}],
-        const int out_stride,
+    const idx_t *const RSTR ev,
+    const s_t element_vector[{components}][{n_shape}],
+    const int out_stride,
 {out_params}) {{
-    constexpr int n_shape = {n_shape};
-    for (int i = 0; i < n_shape; ++i) {{
-        const idx_t node = ev[i];
+  constexpr int n_shape = {n_shape};
+  for (int i = 0; i < n_shape; ++i) {{
+    const idx_t node = ev[i];
 {scatter_lines}
-    }}
+  }}
 }}
 
 template <typename s_t>
 {function_qualifier} int {function}_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points{current_decls}{param_decls},
-        const int out_stride,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    const int out_stride,
 {out_params}) {{
 {parallel_for_pragma}
-    for (ptrdiff_t e = 0; e < nelements; ++e) {{
-        idx_t ev[{n_shape}];
-        s_t element_vector[{components}][{n_shape}];
-        for (int i = 0; i < {n_shape}; ++i) {{
-            ev[i] = elements[i][e];
-        }}
-        for (int c = 0; c < {components}; ++c) {{
-            for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = s_t(0);
-            }}
-        }}
-        {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  for (ptrdiff_t e = 0; e < nelements; ++e) {{
+    idx_t ev[{n_shape}];
+    s_t element_vector[{components}][{n_shape}];
+    for (int i = 0; i < {n_shape}; ++i) {{
+      ev[i] = elements[i][e];
     }}
+    for (int c = 0; c < {components}; ++c) {{
+      for (int i = 0; i < {n_shape}; ++i) {{
+        element_vector[c][i] = s_t(0);
+      }}
+    }}
+    {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+    {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  }}
 
-    return SFEM_SUCCESS;
+  return SFEM_SUCCESS;
 }}
 
 template <typename s_t>
 {function_qualifier} int {sideset_function}_impl(
-        const ptrdiff_t nsides,
-        const ptrdiff_t,
-        idx_t **const RSTR elements,
-        const element_idx_t *const RSTR parent,
-        const int16_t *const RSTR side_idx,
-        const geom_t *const *const RSTR points{current_decls}{param_decls},
-        const int out_stride,
+    const ptrdiff_t nsides,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    const int out_stride,
 {out_params}) {{
 {parallel_for_pragma}
-    for (ptrdiff_t s = 0; s < nsides; ++s) {{
-        idx_t ev[{n_shape}];
-        s_t element_vector[{components}][{n_shape}];
-        {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
-        for (int c = 0; c < {components}; ++c) {{
-            for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = s_t(0);
-            }}
-        }}
-        {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  for (ptrdiff_t s = 0; s < nsides; ++s) {{
+    idx_t ev[{n_shape}];
+    s_t element_vector[{components}][{n_shape}];
+    {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
+    for (int c = 0; c < {components}; ++c) {{
+      for (int i = 0; i < {n_shape}; ++i) {{
+        element_vector[c][i] = s_t(0);
+      }}
     }}
+    {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+    {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  }}
 
-    return SFEM_SUCCESS;
+  return SFEM_SUCCESS;
 }}
 
 }}  // namespace codegen
 }}  // namespace sfem
 
 extern "C" int {function}(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
-        const int out_stride,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
+    const int out_stride,
 {extern_out_params}) {{
-    return sfem::codegen::{function}_impl<real_t>(
-            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+  return sfem::codegen::{function}_impl<real_t>(
+      nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {function}_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
-        const int out_stride,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
+    const int out_stride,
 {extern_float_out_params}) {{
-    return sfem::codegen::{function}_impl<float>(
-            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+  return sfem::codegen::{function}_impl<float>(
+      nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {sideset_function}(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const element_idx_t *const RSTR parent,
-        const int16_t *const RSTR side_idx,
-        const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
-        const int out_stride,
+    const ptrdiff_t nsides,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
+    const int out_stride,
 {extern_out_params}) {{
-    return sfem::codegen::{sideset_function}_impl<real_t>(
-            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+  return sfem::codegen::{sideset_function}_impl<real_t>(
+      nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 
 extern "C" int {sideset_function}_float(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const element_idx_t *const RSTR parent,
-        const int16_t *const RSTR side_idx,
-        const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
-        const int out_stride,
+    const ptrdiff_t nsides,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
+    const int out_stride,
 {extern_float_out_params}) {{
-    return sfem::codegen::{sideset_function}_impl<float>(
-            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+  return sfem::codegen::{sideset_function}_impl<float>(
+      nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 """.format(
         restrict_prelude="\n".join(restrict_prelude()),
@@ -1057,7 +1057,7 @@ extern "C" int {sideset_function}_float(
         qp_coeff_lines="\n".join(qp_coeff_lines),
         components=components,
         accum_lines="\n".join(
-            "                    element_vector[{c}][i] += coeff{c} * test;".format(c=c)
+            "          element_vector[{c}][i] += coeff{c} * test;".format(c=c)
             for c in range(components)
         ),
         scatter_lines="\n".join(
@@ -1173,43 +1173,43 @@ def _quad_shape_index(n, sx, sy, proteus):
 def _measure_body(ref_dim, physical_dim):
     if ref_dim == 1:
         return """    s_t dx0 = s_t(0);
-    s_t dx1 = s_t(0);
-    for (int i = 0; i < n_shape; ++i) {
-        const s_t gi = grad[q * n_shape + i];
-        const idx_t node = ev[i];
-        dx0 += s_t(points[0][node]) * gi;
-        dx1 += s_t(points[1][node]) * gi;
-    }
-    return sqrt(dx0 * dx0 + dx1 * dx1);"""
+  s_t dx1 = s_t(0);
+  for (int i = 0; i < n_shape; ++i) {
+    const s_t gi = grad[q * n_shape + i];
+    const idx_t node = ev[i];
+    dx0 += s_t(points[0][node]) * gi;
+    dx1 += s_t(points[1][node]) * gi;
+  }
+  return sqrt(dx0 * dx0 + dx1 * dx1);"""
     return """    s_t dxdr0 = s_t(0);
-    s_t dxdr1 = s_t(0);
-    s_t dxdr2 = s_t(0);
-    s_t dxds0 = s_t(0);
-    s_t dxds1 = s_t(0);
-    s_t dxds2 = s_t(0);
-    for (int i = 0; i < n_shape; ++i) {
-        const s_t gr = grad[(q * n_shape + i) * 2 + 0];
-        const s_t gs = grad[(q * n_shape + i) * 2 + 1];
-        const idx_t node = ev[i];
-        const s_t x = s_t(points[0][node]);
-        const s_t y = s_t(points[1][node]);
-        const s_t z = s_t(points[2][node]);
-        dxdr0 += x * gr;
-        dxdr1 += y * gr;
-        dxdr2 += z * gr;
-        dxds0 += x * gs;
-        dxds1 += y * gs;
-        dxds2 += z * gs;
-    }
-    const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
-    const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
-    const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
-    return sqrt(c0 * c0 + c1 * c1 + c2 * c2);"""
+  s_t dxdr1 = s_t(0);
+  s_t dxdr2 = s_t(0);
+  s_t dxds0 = s_t(0);
+  s_t dxds1 = s_t(0);
+  s_t dxds2 = s_t(0);
+  for (int i = 0; i < n_shape; ++i) {
+    const s_t gr = grad[(q * n_shape + i) * 2 + 0];
+    const s_t gs = grad[(q * n_shape + i) * 2 + 1];
+    const idx_t node = ev[i];
+    const s_t x = s_t(points[0][node]);
+    const s_t y = s_t(points[1][node]);
+    const s_t z = s_t(points[2][node]);
+    dxdr0 += x * gr;
+    dxdr1 += y * gr;
+    dxdr2 += z * gr;
+    dxds0 += x * gs;
+    dxds1 += y * gs;
+    dxds2 += z * gs;
+  }
+  const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
+  const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
+  const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
+  return sqrt(c0 * c0 + c1 * c1 + c2 * c2);"""
 
 
 def _cpp_array_values(values):
-    return ",\n".join("            s_t(%.17g)" % float(value) for value in values)
+    return ",\n".join("      s_t(%.17g)" % float(value) for value in values)
 
 
 def _cpp_int_array_values(values):
-    return ",\n".join("        %d" % int(value) for value in values)
+    return ",\n".join("    %d" % int(value) for value in values)
