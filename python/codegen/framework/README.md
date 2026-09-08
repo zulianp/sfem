@@ -1,25 +1,44 @@
 # SFEM Codegen Framework Layout
 
-This package is organized by lowering layer. New implementation code should live
-inside one of these layer packages; the legacy files in this directory are
-compatibility shims for existing imports.
+This package is organized by lowering layer. Implementation code lives inside one of the layer
+packages; `__init__.py` is the only file at the package root and is a thin façade that re-exports
+moved symbols for existing callers.
 
-- `symbolic/`: symbolic fields, forms, equations, residual systems, and
-  constitutive helpers.
-- `fem/`: finite-element reference data, basis plans, geometry plans, and
-  tensor-product helpers.
-- `plans/`: semantic emission plans, kernel signatures, diagnostics, reference
-  data plans, and mesh/local phase planning.
-- `ir/`: SFEM kernel AST and optional adapters to external IR/codegen tools.
-- `emitters/`: target-language source emitters and code printers.
-- `backends/`: backend boundaries such as OpenMP, CUDA, and optional OpenCL
-  experiments.
-- `generators/`: executable generation scripts. Use
-  `generators/regenerate_all.sh` to run the standard generation set.
-- `mlir/`: MLIR/OpenMP/OpenCL lowering experiments, runtime helpers, scripts,
-  and C++ benchmark drivers.
+Read `PRESCRIBED_ARCHITECTURE.md` first: it states what each layer owns and the rules that keep
+the boundaries real. `ARCHITECTURE.html` records how far the code has got against them.
+
+## The lowering stack
+
+Imports point up this list and never down, enforced by `tests/test_layering.py`.
+
+- `symbolic/`: symbolic fields, forms, equations, residual systems, and constitutive helpers.
+  Names no other layer.
+- `fem/`: finite-element reference data, basis plans, element families, and tensor-product helpers.
+- `plans/`: what a kernel is — phases, data streams, blocks, geometry and variants, layouts,
+  kernel signatures, matrix formats, evaluation strategy, cost. SymPy ends here.
+- `ir/`: the SFEM kernel AST and optional adapters to external IR/codegen tools.
+- `targets/`: OpenMP, CUDA/HIP, AVX512 and SVE/SME — pragmas, qualifiers, atomics, widths.
+- `emitters/`: target-language source emitters and code printers. Prints plans; decides nothing.
+- `backends/`: backend orchestration, which drives emission for one target.
+
+## Beside the stack
+
+- `pipeline/`: the driver. Calls each layer in sequence and is imported by none of them.
+- `package/`: the C ABI, the generated `sfem::Op` wrapper and factory integration. Runs after
+  emission and never changes a kernel body.
 - `materials/`: material model definitions consumed by the framework.
+- `generators/`: executable generation scripts. `generators/regenerate_all.sh` runs the standard
+  generation set.
+- `tools/`: gates and measurement — snapshot, reproducibility digests, apply benchmark.
+- `tests/`: the suite, including the architectural ratchets.
+- `mlir/`: MLIR/OpenMP/OpenCL lowering experiments. Self-contained and out of scope for the
+  layering work; nothing outside it imports it.
 
-Compatibility shims at the package root should stay thin: they re-export moved
-symbols for old callers, but implementation modules should import from the
-layer packages directly.
+## Documentation
+
+- `PRESCRIBED_ARCHITECTURE.md` — what the layers must own, and the rules.
+- `ARCHITECTURE.html` — what is actually built, with the open points.
+- `INEXACT.md` — the projected (partial-assembly) apply.
+- `docs/` — worked examples: matrix formats, coupled residual, Mooney-Rivlin.
+- `retired/` — superseded design documents, kept for their reasoning. Not maintained, and not
+  cited from code.

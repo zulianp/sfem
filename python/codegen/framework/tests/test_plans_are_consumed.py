@@ -6,11 +6,16 @@ matrix format.  If an emitter does not read a plan, then whatever that plan
 describes is still being decided inside the emitter, and the plan is at best
 documentation that can drift from the code it claims to describe.
 
-This module tracks exactly that number.  The thirteen plan types named in
-``KERNELS.md`` as carrying kernel structure are listed here; every one that no
-emitter or backend reads is pinned.  Entries may be removed as decisions move
-up, and never added -- so the list is a measure of how much of the emission
-layer's job is still misplaced, and it can only shrink.
+This module tracks exactly that number.  ``STRUCTURAL_PLAN_TYPES`` below is the
+list, and it is authoritative here rather than derived from a document: it began
+as the thirteen types ``retired/KERNELS.md`` named, and that file drifted -- ten
+of the twenty-six plan types it listed no longer exist.  A list that gates a
+ratchet belongs next to the ratchet.  Every type that no emitter or backend reads is
+pinned in ``UNCONSUMED_PLAN_TYPES``; entries may be removed as decisions move up,
+and never added, so it can only shrink.
+
+The architecture this enforces is stated in ``PRESCRIBED_ARCHITECTURE.md`` (L3
+owns the decision, L6 prints it); ``ARCHITECTURE.html`` records where it stands.
 
 The check counts a plan as consumed when an emitter or backend mentions either
 the type itself or one of the planning-layer factories that returns it.  A
@@ -27,7 +32,9 @@ import unittest
 FRAMEWORK_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONSUMER_PACKAGES = ("emitters", "backends")
 
-#: The plan types KERNELS.md names as describing kernel structure.
+#: The plan types that carry kernel structure.  Add one when a new plan decides
+#: something an emitter would otherwise decide; a plan that merely carries data
+#: between two planning-layer functions does not belong here.
 STRUCTURAL_PLAN_TYPES = (
     "LocalPhasePlan",
     "MeshPhasePlan",

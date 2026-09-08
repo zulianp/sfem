@@ -39,8 +39,8 @@ import tempfile
 ELEMENT_NODES = {"HEX8": 8}
 
 #: Elements whose kernels are aliases forwarding to another element's, so both
-#: have to be generated for the result to link.  KERNELS.md asks for exactly
-#: this: "HEX8 kernels should just wrap PROTEUS_HEX8 versions".
+#: have to be generated for the result to link: a HEX8 kernel is a thin wrapper
+#: around the PROTEUS_HEX8 one.
 ALIAS_TARGETS = {"HEX8": ("PROTEUS_HEX8",)}
 
 
@@ -643,8 +643,8 @@ def main(argv=None):
 
     prefix = "%s_%s" % (args.material, args.element.lower())
     # HEX8 kernels are thin aliases that forward to the PROTEUS_HEX8 ones (see
-    # KERNELS.md), so linking the requested element's operator alone leaves
-    # every symbol undefined.  Link every operator the generator produced.
+    # ALIAS_TARGETS above), so linking the requested element's operator alone
+    # leaves every symbol undefined.  Link every operator the generator produced.
     operators = sorted(
         os.path.join(directory, name)
         for directory, _dirs, files in os.walk(generated)

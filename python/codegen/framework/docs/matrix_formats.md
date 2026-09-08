@@ -14,16 +14,21 @@ PYTHONPATH=python venv/bin/python -m codegen.framework.generators.neohookean_ogd
   --matrix-format crs
 ```
 
-Generate BSR, DIA, COO, and patch variants:
+Generate BSR and block-diagonal-symmetric variants:
 
 ```bash
 PYTHONPATH=python venv/bin/python -m codegen.framework.generators.neohookean_ogden \
   --element HEX8 \
   --matrix-format bsr \
-  --matrix-format dia \
-  --matrix-format coo \
-  --matrix-format patch
+  --matrix-format block_diag_sym
 ```
+
+The three formats above are the whole set today. DIA, COO and patch assembly
+were generated once and were removed to reduce scope while the framework is
+being reworked -- the `MatrixFormat` members, their assembly plans and their
+scatter emitters -- so `--matrix-format dia` now raises `ValueError: 'dia' is
+not a valid MatrixFormat` rather than emitting anything. They are expected back;
+the code is in git history.
 
 Generate every maintained matrix format:
 
@@ -41,7 +46,6 @@ PYTHONPATH=python venv/bin/python -m codegen.framework.generators.neohookean_ogd
   --matrix-format all \
   --matrix-layout all \
   --packed-pass all \
-  --patch-node-index-filter \
   --dump-plan
 ```
 
@@ -88,11 +92,9 @@ result = gen.generate(
 ```
 
 Generated wrappers expose CRS and BSR assembly through the SFEM frontend
-factory path. They also expose concrete `hessian_dia`, `hessian_coo`, and
-`hessian_patch` methods that route to the generated C ABI entry points when
-those standard-layout formats are available for the generated form. Requests
-for formats that are not integrated into the selected frontend operator path
-fail with a runtime error instead of falling back to another matrix format.
+factory path. Requests for formats that are not integrated into the selected
+frontend operator path fail with a runtime error instead of falling back to
+another matrix format.
 The generated C ABI diagnostics include the assembly kind, index policy, value
 layout, accumulation policy, structural compatibility, reduction policy, block
 size, and block entry counts used by the selected matrix-format layout plan.

@@ -1,6 +1,7 @@
 """What each residual emitter path can generate, and how little they share.
 
-PIPELINE.md says that after form lowering there is one shared code-generation
+``PRESCRIBED_ARCHITECTURE.md`` requires that both formulations unify below the
+form layer, so that after form lowering there is one shared code-generation
 process.  For the residual path there are two, and they are nearly disjoint:
 ``generate_coupled_residual_sfem_files`` reaches 6,716 lines of code that
 ``generate_mixed_residual_sfem_files`` does not, the mixed path reaches 2,155
