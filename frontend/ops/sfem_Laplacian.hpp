@@ -104,9 +104,25 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
         int value(const real_t *x, real_t *const out) override;
+
+        int gradient(const real_t *const x, real_t *const out, const ElementScope scope) override;
+        int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override;
+        int value(const real_t *x, real_t *const out, const ElementScope scope) override;
+
+        int apply_scope_flat_range(const real_t *const x,
+                                   const real_t *const h,
+                                   real_t *const       out,
+                                   const ElementScope  scope,
+                                   const ptrdiff_t     flat_begin,
+                                   const ptrdiff_t     flat_end) override;
+
         int report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;
 
+        /**
+         * Per-block diffusion coefficient. Use var_name `"k"` (default 1). Copied through
+         * `derefine_op` so SS GMG levels keep heterogeneous coefficients.
+         */
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
         void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
         void set_option(const std::string &name, bool val) override;

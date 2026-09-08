@@ -8,6 +8,9 @@
 
 int laplacian_is_opt(smesh::ElemType element_type);
 
+/// 1 if laplacian_apply has a kernel for this type; 0 for WEDGE/PYRAMID and other gaps.
+int laplacian_has_kernel(smesh::ElemType element_type);
+
 int laplacian_assemble_value(smesh::ElemType element_type,
                              const ptrdiff_t nelements,
                              const ptrdiff_t nnodes,

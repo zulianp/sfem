@@ -1,17 +1,23 @@
 #pragma once
 
 #include "sfem_Op.hpp"
+#include "sstet4_linear_elasticity.hpp"
+
+#include <memory>
+#include <vector>
 
 namespace sfem {
     class SemiStructuredEMLinearElasticity : public Op {
     public:
-        std::shared_ptr<FunctionSpace>    space;
-        smesh::ElemType                   element_type{smesh::INVALID};
-        std::shared_ptr<Buffer<scalar_t>> element_matrix;
-        real_t                            mu{1};
-        real_t                            lambda{1};
-        long                              calls{0};
-        double                            total_time{0};
+        std::shared_ptr<FunctionSpace>                 space;
+        smesh::ElemType                                element_type{smesh::INVALID};
+        std::shared_ptr<Buffer<scalar_t>>              element_matrix;
+        std::vector<std::shared_ptr<Buffer<scalar_t>>> element_matrices;
+        std::vector<std::shared_ptr<sstet4_linear_elasticity_stencil_t>> sstet4_stencils;
+        real_t                                         mu{1};
+        real_t                                         lambda{1};
+        long                                           calls{0};
+        double                                         total_time{0};
 
         ~SemiStructuredEMLinearElasticity();
 
@@ -34,6 +40,7 @@ namespace sfem {
                         const idx_t *const   colidx,
                         real_t *const        values) override;
         int hessian_diag(const real_t *const x, real_t *const out) override;
+        int hessian_block_diag_sym(const real_t *const x, real_t *const values) override;
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
         int value(const real_t *x, real_t *const out) override;

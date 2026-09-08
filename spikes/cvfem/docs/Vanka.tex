@@ -1,0 +1,321 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!55!black]{hyperref}
+\usepackage{fancyvrb}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+\titleformat{\section}{\normalfont\Large\bfseries\color{blue!45!black}}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{blue!30!black}}{\thesubsection}{1em}{}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\Rey}{\mathrm{Re}}
+
+\title{\bfseries The Vanka Smoother\\
+\large Theory, and a high-performance implementation for the SFEM\\
+semi-structured matrix-free CVFEM Navier--Stokes solver}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{tcolorbox}[colback=red!4,colframe=red!55!black,title=\bfseries Why this document exists]
+Measured on our solver, the block-Jacobi smoother has an asymptotic convergence factor of
+$\rho \approx 0.981$ at $\Rey = 1$ --- 1.9\,\% error removal per sweep, 120 sweeps per decade
+--- and \emph{diverges} for $\omega \ge 0.5$. The SIMPLE variant measures identically. Local
+Fourier analysis for Stokes puts a Vanka smoother at $\rho = 0.08$.
+
+That difference, roughly a factor of 50 in iteration count, is the single largest lever
+available to this solver.
+\end{tcolorbox}
+
+\section{What Vanka is, and why block-Jacobi fails here}
+
+\subsection{The saddle-point structure}
+Our linearised system has the block form
+\begin{equation}
+\mathcal{A} =
+\begin{pmatrix} F & B^{\mathsf T} \\ B & -C \end{pmatrix},
+\qquad
+\begin{pmatrix} \delta u \\ \delta p \end{pmatrix},
+\end{equation}
+where $F$ is the momentum operator (viscous plus convective), $B$ the discrete divergence,
+$B^{\mathsf T}$ the pressure gradient, and $C$ the Rhie--Chow stabilisation. Without
+stabilisation $C = 0$ and the system is a genuine saddle point.
+
+A \emph{point-block} smoother inverts, at each node $i$, the $4\times4$ block
+\begin{equation}
+D_i =
+\begin{pmatrix}
+F_{ii} & B^{\mathsf T}_{ii} \\ B_{ii} & -C_{ii}
+\end{pmatrix},
+\end{equation}
+and this is where it fails. The pressure row of $D_i$ contains only the \emph{local} part of
+the divergence constraint. Continuity is a statement about fluxes across the faces
+\emph{surrounding} a node, so $B_{ii}$ carries almost none of it: the constraint that actually
+determines the pressure lives in the off-diagonal couplings $B_{ij}$, $j \ne i$, which the
+point-block smoother discards entirely. Damping the momentum equation while ignoring the
+constraint is why $\rho \to 1$: the velocity error is smoothed, and the pressure error is
+barely touched.
+
+\subsection{The Vanka idea}
+Vanka's construction (S.\,P.\ Vanka, \emph{JCP} \textbf{65} (1986) 138--158) replaces the
+per-node block by a small \emph{coupled local system} over a patch $\Omega_k$ of degrees of
+freedom chosen so that at least one pressure unknown appears \emph{together with all the
+velocity unknowns that its continuity equation references}. Writing $R_k$ for the restriction
+onto patch $k$, one sweep of additive Vanka is
+\begin{equation}
+x \leftarrow x + \omega \sum_k R_k^{\mathsf T}\,
+\big( R_k \mathcal{A} R_k^{\mathsf T} \big)^{-1} R_k \, (b - \mathcal{A}x).
+\label{eq:vanka}
+\end{equation}
+The inverted object $\mathcal{A}_k = R_k \mathcal{A} R_k^{\mathsf T}$ is the true operator
+restricted to the patch, \emph{including} the velocity--pressure coupling. That is the whole
+difference from block-Jacobi, and it is why the local solve can enforce the constraint.
+
+\begin{tcolorbox}[colback=blue!4,colframe=blue!50!black,title=\bfseries Published rates (Stokes, LFA)]
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Smoother & $\rho$ (periodic) & $\rho$ (Dirichlet) \\
+\midrule
+\textbf{Vanka} & \textbf{0.08} & \textbf{0.10} \\
+Triad Gauss--Seidel & 0.26 & 0.36 \\
+Triad Jacobi & 0.49 & divergent \\
+\midrule
+\emph{our point-block Jacobi (measured, $\Rey{=}1$)} & --- & \emph{0.981} \\
+\bottomrule
+\end{tabular}
+\end{center}
+Claus \& Bolten, \href{https://arxiv.org/pdf/2008.08719}{arXiv:2008.08719}. Our smoother is
+weaker than the entry that study calls divergent, under the boundary conditions we run.
+\end{tcolorbox}
+
+\section{Choosing the patch for a colocated CVFEM discretisation}
+
+Vanka was devised for staggered (MAC) grids, where the patch is obvious: one cell-centred
+pressure plus the six face velocities that its continuity equation uses. Our discretisation is
+\emph{colocated} --- all four fields live at every node --- so the patch must be chosen
+deliberately.
+
+\begin{center}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Patch & Size & Comment \\
+\midrule
+Node star & $1 + 27\times3 = 82$ & one pressure, velocities of the $3^3$ neighbourhood \\
+\textbf{Micro-element} & $8\times4 = \mathbf{32}$ & the 8 corners of one micro-cell, all fields \\
+Pressure Schur only & 8 & micro-element patch with velocities eliminated \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{tcolorbox}[colback=green!4,colframe=green!45!black,title=\bfseries Recommendation: the micro-element patch]
+The micro-element patch is the right choice here for a reason specific to our code: the
+$32\times32$ patch operator $\mathcal{A}_k$ is \emph{exactly the dense micro-cell matrix we
+already know how to build}. Passing identity slots to
+\code{cvfem\_hex8\_ns\_upwind\_jacobian\_add\_slots} writes it into a local buffer --- the same
+trick \code{assemble\_block\_diag} uses and the same one the element-wise Galerkin assembly
+relies on. No new kernel is needed to form the patch operator.
+
+It also aligns with every structure the solver already has: the micro-cell loop, the constant
+corner offsets on the lattice, and the deterministic two-pass scatter.
+\end{tcolorbox}
+
+A subtlety in our favour: because Rhie--Chow supplies $C \neq 0$, the patch matrix has a
+non-zero pressure block and is nonsingular without any extra pinning. On an unstabilised
+saddle point the local systems are singular up to a constant and need care; we avoid that.
+
+\section{Variants, and what each costs}
+
+\subsection{Full versus diagonal Vanka}
+\emph{Full} Vanka inverts $\mathcal{A}_k$ exactly. \emph{Diagonal} Vanka approximates the
+velocity block $F_k$ by its diagonal, which lets the velocities be eliminated analytically and
+leaves a small pressure system --- the local Schur complement
+\begin{equation}
+S_k = -C_k - B_k\,\mathrm{diag}(F_k)^{-1} B_k^{\mathsf T},
+\end{equation}
+of size $8\times8$ for the micro-element patch. This is the variant most production codes use;
+it retains the essential velocity--pressure coupling while removing most of the cost.
+
+\subsection{Cost model}
+At $L=8$ with 108 macro-elements: 55\,296 micro-cells, 60\,625 nodes, 242\,500 dof.
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Variant & patch $n$ & factor (flop) & apply (flop) & factors, all cells \\
+\midrule
+Full Vanka & 32 & 21\,845 & 2048 & 432\,MiB \\
+\textbf{Diagonal Vanka} & \textbf{8} & \textbf{341} & \textbf{128} & \textbf{27\,MiB} \\
+\bottomrule
+\end{tabular}
+\end{center}
+Per-sweep cost of the local solves alone, against the current smoother:
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+nodal $4\times4$ block-Jacobi (current) & 1.94\,MFLOP \\
+diagonal Vanka, $8\times8$ Schur & 7.08\,MFLOP \\
+full Vanka, $32\times32$ & 113.25\,MFLOP \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=\bfseries The trade, stated plainly]
+The local solve is a small part of a sweep --- the sweep is dominated by the residual
+evaluation, which is unchanged. Diagonal Vanka should raise sweep cost by tens of percent, not
+multiples. Against that, moving $\rho$ from 0.98 to even 0.3 is a factor of $\sim$50 in
+iteration count. Full Vanka's 432\,MiB of cached factors is the reason to start with the
+diagonal variant, not its flop count.
+\end{tcolorbox}
+
+\section{High-performance implementation on the semi-structured mesh}
+
+\subsection{Additive versus multiplicative, and colouring}
+Equation~\eqref{eq:vanka} is \emph{additive}: every patch reads the same residual, so all
+patches are independent and the sweep is embarrassingly parallel. It converges more slowly
+than the \emph{multiplicative} form, in which each patch sees the updates of those before it
+(Gauss--Seidel in patches).
+
+The multiplicative form parallelises by colouring patches so that same-coloured patches share
+no degrees of freedom. On our lattice this is exact and free: two micro-cells share a node iff
+their indices differ by at most one in every axis, so the parity classes
+\begin{equation}
+c(i,j,k) = (i \bmod 2) + 2\,(j \bmod 2) + 4\,(k \bmod 2) \in \{0,\dots,7\}
+\end{equation}
+give \textbf{eight colours}, and within a colour every pair of cells differs by at least two in
+some axis and is therefore independent. Eight sequential passes, each fully parallel over
+$L^3/8$ cells per macro-element.
+
+\subsection{Accumulation and determinism}
+Additive Vanka writes overlapping contributions to shared nodes --- exactly the pattern the
+solver already handles. Reuse \code{SSScatter}: each macro-element writes its exclusively owned
+nodes directly and stages the shared ones, then a second pass sums each shared node's
+contributions in a fixed order. No atomics, and the sweep is bitwise reproducible on any thread
+count, which the existing determinism gates will check for free.
+
+\subsection{Where the factorisations live}
+The patch matrices depend on the linearisation state, so they are valid for one Newton step and
+must be rebuilt when it changes --- the same lifetime as the element-wise Galerkin coarse
+operators, and they can be built in the same pass.
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Cache the $8\times8$ Schur factors} (27\,MiB at $L=8$): build once per Newton
+step, apply on every sweep. Six sweeps per V-cycle and hundreds of cycles per Newton step make
+this overwhelmingly the right trade.
+\item Store them in the \emph{lattice} layout already used elsewhere --- indexed by
+\code{(macro element, micro-cell)} --- so the sweep streams them contiguously with no
+indirection, exactly as the 27-point stencil coarse operators do.
+\item Do \emph{not} cache the full $32\times32$ factors; 432\,MiB is not worth it before the
+diagonal variant has been measured.
+\end{itemize}
+
+\subsection{Matrix-free, precisely}
+``Matrix-free'' here means no \emph{global} sparse matrix, not no local matrices. Vanka needs
+the patch entries, and we form them transiently per micro-cell from the existing kernel, use
+them, and discard them --- which is what the element-wise Galerkin assembly already does. The
+fine-level residual evaluation, which dominates the sweep, stays exactly as it is.
+
+\section{Implementation plan}
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Form the patch operator.} Per micro-cell, identity slots into
+\code{cvfem\_hex8\_ns\_upwind\_jacobian\_add\_slots} give the dense $32\times32$
+$\mathcal{A}_k$. Already available; no new kernel.
+\item \textbf{Build the local Schur complement.} Extract $\mathrm{diag}(F_k)$, form
+$S_k = -C_k - B_k\,\mathrm{diag}(F_k)^{-1}B_k^{\mathsf T}$ ($8\times8$), factor it, and store
+by \code{(element, cell)}. One pass per Newton step, fusable with the Galerkin assembly pass.
+\item \textbf{Additive sweep first.} Residual, then per cell: gather 32 local values, solve
+$S_k$ for the pressure correction, back-substitute the velocities, scatter through
+\code{SSScatter}. Additive is simpler and its correctness is easier to establish.
+\item \textbf{Measure with \code{SFEM\_GMG\_CHECK=3}}, 150 sweeps, to the asymptote --- the same
+gate that produced the 0.981 figure, so the comparison is like for like. Sweep $\omega$.
+\item \textbf{Then multiplicative with 8-colour parity} if the additive rate is insufficient.
+Expect a substantially better factor at the cost of eight sequential passes.
+\item \textbf{Only then reconsider full Vanka}, and only if the diagonal variant's rate is
+close enough to make the memory worth it.
+\end{enumerate}
+
+\begin{tcolorbox}[colback=blue!4,colframe=blue!50!black,title=\bfseries Acceptance criterion]
+The measurement that matters is the standalone smoother rate at the \emph{physical} Reynolds
+number, run to its asymptote with no coarse space. Block-Jacobi gives 0.981 at $\Rey=1$. Any
+Vanka variant that does not comfortably beat that, at $\Rey \ge 100$, is not worth carrying ---
+and a rate near or above 1 must be treated as disqualifying however good it looks over the
+first few sweeps, because the rate can fall for twenty sweeps and then climb through unity.
+\end{tcolorbox}
+
+\section{Is Vanka a Navier--Stokes smoother, or only a Stokes one?}
+
+It is a Navier--Stokes smoother by origin: Vanka's 1986 papers solve the primitive-variable
+Navier--Stokes equations on recirculating cavity flows, not Stokes, and Vanka-type smoothers
+are standard in finite-element Navier--Stokes multigrid. The ``Stokes smoother'' impression
+comes from the \emph{analysis}, not the method --- local Fourier analysis needs a linear,
+constant-coefficient operator, so published LFA rates are almost always Stokes rates.
+
+\begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=\bfseries What the 0.08 does and does not mean]
+The LFA rates quoted in this document measure how well the smoother handles the
+\textbf{saddle-point coupling}. They say nothing about \textbf{convection dominance}, which is
+a second and independent difficulty:
+\begin{itemize}[leftmargin=*,topsep=2pt]
+\item At low $\Rey$ the momentum block $F$ is essentially elliptic, and a local patch solve is
+a good local approximation --- the regime the LFA describes.
+\item As $\Rey$ rises, $F$ becomes convection-dominated and nearly hyperbolic. Information
+travels along streamlines, which is exactly what a \emph{local} smoother cannot follow. The
+classical remedies are flow-aligned (downstream) ordering of the multiplicative sweep, or line
+and plane smoothers, or semi-coarsening --- not a larger patch.
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Why it is still the right first step here}
+Our measured failure is at $\Rey = 1$: $\rho = 0.981$ in what is essentially the Stokes limit.
+That is a pure saddle-point-coupling failure, precisely the thing Vanka fixes, and it has to be
+fixed before Reynolds robustness is a meaningful question at all. Two separate problems are
+being conflated if we skip it:
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Symptom & Regime & Remedy \\
+\midrule
+$\rho = 0.981$ at $\Rey=1$ & Stokes limit & \textbf{Vanka} (this document) \\
+divergence at $\Rey \ge 400$ & convection-dominated & AL preconditioner, or ordering/semi-coarsening \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{What Vanka is unlikely to do}
+It should not be assumed that Vanka alone reaches $\Rey \ge 400$. For Reynolds robustness the
+reference result is the augmented-Lagrangian preconditioner of Farrell, Mitchell \& Wechsung
+(\href{https://arxiv.org/pdf/1810.03315}{arXiv:1810.03315}), which holds 4--8 Krylov iterations
+per Newton step to $\Rey = 10\,000$. That is not a drop-in replacement for a smoother: the
+augmented term $\gamma B^{\mathsf T}W^{-1}B$ makes the momentum block nearly singular, with a
+large kernel, and their multigrid uses a \emph{kernel-capturing subspace-correction} smoother
+built for that structure rather than Vanka.
+
+The realistic plan is therefore two-stage: Vanka to recover a working smoother in the
+Stokes-limit sense, then reassess Reynolds robustness on the evidence, with augmented
+Lagrangian as the expected second step if the Re sweep still degrades.
+
+\section{Risks and open questions}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Colocated patches are not the classical construction.} Vanka's rates are
+published for staggered discretisations. The micro-element patch is the natural colocated
+analogue, but the LFA numbers do not transfer automatically and our own measurement is the
+only evidence that will count.
+\item \textbf{Rhie--Chow coupling.} $C \neq 0$ makes the patches nonsingular, which helps, but
+the stabilisation scale $D_f = \text{rc}\,h^2/(2\mu)$ grows as $\Rey$ rises and as the mesh
+coarsens; the patch conditioning should be checked across the hierarchy, not only on the fine
+level.
+\item \textbf{Convection dominance} --- see the section above. No Stokes rate speaks to it,
+and measuring the Reynolds dependence of whatever smoother we adopt is not optional.
+\item \textbf{Coarse levels.} The coarse levels are assembled BSR, not matrix-free, so their
+patch operators must be extracted from the assembled matrix instead of from the cell kernel ---
+a second, simpler code path.
+\end{itemize}
+
+\end{document}

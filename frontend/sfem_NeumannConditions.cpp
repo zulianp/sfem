@@ -62,6 +62,186 @@
 
 namespace sfem {
 
+    static SFEM_INLINE count_t neumann_find_col(const idx_t target, const idx_t *const SFEM_RESTRICT row, const count_t lenrow) {
+        if (lenrow <= 32) {
+            for (count_t k = 0; k < lenrow; ++k) {
+                if (row[k] == target) return k;
+            }
+
+            return -1;
+        }
+
+        count_t left  = 0;
+        count_t right = lenrow;
+        while (left < right) {
+            const count_t mid = left + ((right - left) >> 1);
+            if (row[mid] < target) {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+
+        return left < lenrow && row[left] == target ? left : -1;
+    }
+
+    static bool is_supported_pressure_surface(const smesh::ElemType element_type) {
+        return element_type == smesh::EDGE2 || element_type == smesh::EDGESHELL2 || element_type == smesh::TRI3 ||
+               element_type == smesh::QUAD4;
+    }
+
+    static SFEM_INLINE void cross3(const real_t a[3], const real_t b[3], real_t out[3]) {
+        out[0] = a[1] * b[2] - a[2] * b[1];
+        out[1] = a[2] * b[0] - a[0] * b[2];
+        out[2] = a[0] * b[1] - a[1] * b[0];
+    }
+
+    static SFEM_INLINE void current_point3(const geom_t *const *const points,
+                                           const real_t *const        displacement,
+                                           const idx_t                node,
+                                           real_t                     out[3]) {
+        out[0] = points[0][node] + (displacement ? displacement[3 * node] : 0);
+        out[1] = points[1][node] + (displacement ? displacement[3 * node + 1] : 0);
+        out[2] = points[2][node] + (displacement ? displacement[3 * node + 2] : 0);
+    }
+
+    static SFEM_INLINE void atomic_add3(real_t *const out, const idx_t node, const real_t value[3], const real_t scale) {
+        for (int d = 0; d < 3; ++d) {
+#pragma omp atomic update
+            out[3 * node + d] += scale * value[d];
+        }
+    }
+
+    static SFEM_INLINE void pressure_triangle_gradient(const idx_t                a,
+                                                       const idx_t                b,
+                                                       const idx_t                c,
+                                                       const geom_t *const *const points,
+                                                       const real_t *const        displacement,
+                                                       const real_t               q,
+                                                       real_t *const              out) {
+        real_t xa[3], xb[3], xc[3], cross[3];
+        current_point3(points, displacement, a, xa);
+        current_point3(points, displacement, b, xb);
+        current_point3(points, displacement, c, xc);
+        cross3(xb, xc, cross);
+        atomic_add3(out, a, cross, q);
+        cross3(xc, xa, cross);
+        atomic_add3(out, b, cross, q);
+        cross3(xa, xb, cross);
+        atomic_add3(out, c, cross, q);
+    }
+
+    static SFEM_INLINE void pressure_triangle_apply(const idx_t                a,
+                                                    const idx_t                b,
+                                                    const idx_t                c,
+                                                    const geom_t *const *const points,
+                                                    const real_t *const        displacement,
+                                                    const real_t *const        h,
+                                                    const real_t               q,
+                                                    real_t *const              out) {
+        real_t xa[3], xb[3], xc[3], ha[3], hb[3], hc[3], t0[3], t1[3];
+        current_point3(points, displacement, a, xa);
+        current_point3(points, displacement, b, xb);
+        current_point3(points, displacement, c, xc);
+        for (int d = 0; d < 3; ++d) {
+            ha[d] = h[3 * a + d];
+            hb[d] = h[3 * b + d];
+            hc[d] = h[3 * c + d];
+        }
+
+        cross3(hb, xc, t0);
+        cross3(xb, hc, t1);
+        for (int d = 0; d < 3; ++d) t0[d] += t1[d];
+        atomic_add3(out, a, t0, q);
+
+        cross3(hc, xa, t0);
+        cross3(xc, ha, t1);
+        for (int d = 0; d < 3; ++d) t0[d] += t1[d];
+        atomic_add3(out, b, t0, q);
+
+        cross3(ha, xb, t0);
+        cross3(xa, hb, t1);
+        for (int d = 0; d < 3; ++d) t0[d] += t1[d];
+        atomic_add3(out, c, t0, q);
+    }
+
+    static SFEM_INLINE real_t pressure_triangle_volume(const idx_t                a,
+                                                       const idx_t                b,
+                                                       const idx_t                c,
+                                                       const geom_t *const *const points,
+                                                       const real_t *const        displacement) {
+        real_t xa[3], xb[3], xc[3], cross[3];
+        current_point3(points, displacement, a, xa);
+        current_point3(points, displacement, b, xb);
+        current_point3(points, displacement, c, xc);
+        cross3(xb, xc, cross);
+        return (xa[0] * cross[0] + xa[1] * cross[1] + xa[2] * cross[2]) / real_t(6);
+    }
+
+    static SFEM_INLINE real_t pressure_triangle_volume_step(const idx_t                a,
+                                                            const idx_t                b,
+                                                            const idx_t                c,
+                                                            const geom_t *const *const points,
+                                                            const real_t *const        displacement,
+                                                            const real_t *const        increment,
+                                                            const real_t               step) {
+        real_t xa[3], xb[3], xc[3], cross[3];
+        current_point3(points, displacement, a, xa);
+        current_point3(points, displacement, b, xb);
+        current_point3(points, displacement, c, xc);
+        for (int d = 0; d < 3; ++d) {
+            xa[d] += step * increment[3 * a + d];
+            xb[d] += step * increment[3 * b + d];
+            xc[d] += step * increment[3 * c + d];
+        }
+        cross3(xb, xc, cross);
+        return (xa[0] * cross[0] + xa[1] * cross[1] + xa[2] * cross[2]) / real_t(6);
+    }
+
+    static SFEM_INLINE void atomic_add_skew(real_t *const block, const real_t scale, const real_t x[3]) {
+        const real_t values[9] = {0, -scale * x[2], scale * x[1], scale * x[2], 0, -scale * x[0], -scale * x[1], scale * x[0], 0};
+        for (int k = 0; k < 9; ++k) {
+#pragma omp atomic update
+            block[k] += values[k];
+        }
+    }
+
+    static SFEM_INLINE int pressure_triangle_hessian(const idx_t                a,
+                                                     const idx_t                b,
+                                                     const idx_t                c,
+                                                     const geom_t *const *const points,
+                                                     const real_t *const        displacement,
+                                                     const count_t *const       rowptr,
+                                                     const idx_t *const         colidx,
+                                                     const real_t               q,
+                                                     real_t *const              values) {
+        const idx_t nodes[3] = {a, b, c};
+        real_t      x[3][3];
+        current_point3(points, displacement, a, x[0]);
+        current_point3(points, displacement, b, x[1]);
+        current_point3(points, displacement, c, x[2]);
+
+        real_t *blocks[3][3] = {{nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr}};
+        for (int i = 0; i < 3; ++i) {
+            const count_t begin = rowptr[nodes[i]];
+            const count_t len   = rowptr[nodes[i] + 1] - begin;
+            for (int j = 0; j < 3; ++j) {
+                if (i == j) continue;
+                const count_t entry = neumann_find_col(nodes[j], &colidx[begin], len);
+                if (entry < 0) return SFEM_FAILURE;
+                blocks[i][j] = &values[(begin + entry) * 9];
+            }
+        }
+
+        atomic_add_skew(blocks[0][1], -q, x[2]);
+        atomic_add_skew(blocks[0][2], q, x[1]);
+        atomic_add_skew(blocks[1][0], q, x[2]);
+        atomic_add_skew(blocks[1][2], -q, x[0]);
+        atomic_add_skew(blocks[2][0], -q, x[1]);
+        atomic_add_skew(blocks[2][1], q, x[0]);
+        return SFEM_SUCCESS;
+    }
+
     class NeumannConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -73,6 +253,27 @@ namespace sfem {
     std::vector<struct NeumannConditions::Condition> &NeumannConditions::conditions() { return impl_->conditions; }
 
     int NeumannConditions::n_conditions() const { return impl_->conditions.size(); }
+
+    bool NeumannConditions::is_linear() const {
+        for (const auto &c : impl_->conditions) {
+            if (c.follower_pressure) return false;
+        }
+        return true;
+    }
+
+    int NeumannConditions::set_time(const real_t time, const real_t global_scale) {
+        for (auto &c : impl_->conditions) {
+            if (!c.profile_initialized) {
+                c.base_value          = c.value;
+                c.profile_initialized = true;
+            }
+
+            const real_t scale = global_scale * c.profile.value(time);
+            c.value            = scale * c.base_value;
+        }
+
+        return SFEM_SUCCESS;
+    }
 
     ptrdiff_t NeumannConditions::n_dofs_domain() const { return impl_->space->n_dofs(); }
 
@@ -151,8 +352,7 @@ namespace sfem {
                         for (auto &p : paths) {
                             idx_t    *ii{nullptr};
                             ptrdiff_t lsize{0};
-                            if (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(pch), &ii, &lsize) !=
-                                SMESH_SUCCESS) {
+                            if (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(pch), &ii, &lsize) != SMESH_SUCCESS) {
                                 SFEM_ERROR("Failed to read file %s\n", pch);
                                 break;
                             }
@@ -228,7 +428,8 @@ namespace sfem {
                         }
                     }
 
-                    conds[i].value = 1;
+                    conds[i].value  = 1;
+                    conds[i].values = values;
 
                 } else {
                     conds[i].value = atof(pch);
@@ -255,11 +456,12 @@ namespace sfem {
         for (auto c : conds.children()) {
             std::shared_ptr<Sideset> sideset;
 
-            const bool is_sideset = c["type"].readable() && c["type"].val() == "sideset";
-            const bool is_file    = c["format"].readable() && c["format"].val() == "file";
-            const bool is_expr    = c["format"].readable() && c["format"].val() == "expr";
+            const bool is_sideset  = c["type"].readable() && c["type"].val() == "sideset";
+            const bool is_pressure = c["type"].readable() && c["type"].val() == "pressure";
+            const bool is_file     = c["format"].readable() && c["format"].val() == "file";
+            const bool is_expr     = c["format"].readable() && c["format"].val() == "expr";
 
-            assert(is_sideset);
+            assert(is_sideset || is_pressure);
             assert(is_file || is_expr);
 
             if (is_file) {
@@ -288,15 +490,42 @@ namespace sfem {
                 sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
             }
 
-            std::vector<int>    component;
-            std::vector<real_t> value;
-            auto                node_value     = c["value"];
-            auto                node_component = c["component"];
+            std::vector<int>     component;
+            std::vector<real_t>  value;
+            SharedBuffer<real_t> file_values;
+            auto                 node_value     = c["value"];
+            auto                 node_component = c["component"];
 
             assert(node_value.readable());
+
+            if (is_pressure) {
+                assert(!node_value.is_seq());
+                struct Condition nc;
+                nc.sidesets.push_back(sideset);
+                node_value >> nc.value;
+                nc.follower_pressure = true;
+                if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], nc.profile) != SFEM_SUCCESS) {
+                    return nullptr;
+                }
+                conditions.push_back(nc);
+                continue;
+            }
+
             assert(node_component.readable());
 
-            if (node_value.is_seq()) {
+            if (node_value.is_map()) {
+                if (!node_value.has_child("path")) {
+                    SFEM_ERROR("File-backed Neumann value requires path\n");
+                    return nullptr;
+                }
+                std::string value_path;
+                node_value["path"] >> value_path;
+                file_values = Buffer<real_t>::from_file(smesh::Path(value_path));
+                if (!file_values) {
+                    SFEM_ERROR("Unable to read Neumann value file %s\n", value_path.c_str());
+                    return nullptr;
+                }
+            } else if (node_value.is_seq()) {
                 node_value >> value;
             } else {
                 value.resize(1);
@@ -310,15 +539,26 @@ namespace sfem {
                 node_component >> component[0];
             }
 
-            if (component.size() != value.size()) {
-                SFEM_ERROR("Inconsistent sizes for component (%d) and value (%d)\n", (int)component.size(), (int)value.size());
+            if (file_values && component.size() != 1) {
+                SFEM_ERROR("A file-backed Neumann value requires exactly one component\n");
+                return nullptr;
             }
+
+            if (!file_values && component.size() != value.size()) {
+                SFEM_ERROR("Inconsistent sizes for component (%d) and value (%d)\n", (int)component.size(), (int)value.size());
+                return nullptr;
+            }
+
+            LoadProfile profile;
+            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile) != SFEM_SUCCESS) return nullptr;
 
             for (size_t i = 0; i < component.size(); i++) {
                 struct Condition nc;
                 nc.sidesets.push_back(sideset);
-                nc.value     = value[i];
+                nc.value     = file_values ? 1 : value[i];
+                nc.values    = file_values;
                 nc.component = component[i];
+                nc.profile   = profile;
                 conditions.push_back(nc);
             }
         }
@@ -347,21 +587,107 @@ namespace sfem {
 
     NeumannConditions::~NeumannConditions() = default;
 
-    int NeumannConditions::hessian_crs(const real_t *const /*x*/,
-                                       const count_t *const /*rowptr*/,
-                                       const idx_t *const /*colidx*/,
-                                       real_t *const /*values*/) {
+    int NeumannConditions::hessian_crs(const real_t *const  x,
+                                       const count_t *const rowptr,
+                                       const idx_t *const   colidx,
+                                       real_t *const        values) {
+        // Vector-valued CRS assembly uses node blocks before conversion to scalar CRS.
+        return hessian_bsr(x, rowptr, colidx, values);
+    }
+
+    int NeumannConditions::hessian_bsr(const real_t *const  x,
+                                       const count_t *const rowptr,
+                                       const idx_t *const   colidx,
+                                       real_t *const        values) {
+        SFEM_TRACE_SCOPE("NeumannConditions::hessian_bsr");
+
+        auto      space = impl_->space;
+        auto      mesh  = space->mesh_ptr();
+        const int dim   = mesh->spatial_dimension();
+        if (space->block_size() != dim || (dim != 2 && dim != 3)) return SFEM_FAILURE;
+
+        auto points = mesh->points();
+        if (space->has_semi_structured_mesh()) points = space->mesh().points();
+
+        for (const auto &c : impl_->conditions) {
+            if (!c.follower_pressure) continue;
+            if (!is_supported_pressure_surface(c.element_type)) {
+                SFEM_ERROR("Follower pressure does not support surface element type %s\n", smesh::type_to_string(c.element_type));
+                return SFEM_FAILURE;
+            }
+
+            const ptrdiff_t n = c.surface->extent(1);
+            int             missing_entry{0};
+
+            if (dim == 3) {
+                if (!x || (c.element_type != smesh::TRI3 && c.element_type != smesh::QUAD4)) {
+                    SFEM_ERROR("Three-dimensional follower pressure requires a current state and TRI3 or QUAD4 surfaces\n");
+                    return SFEM_FAILURE;
+                }
+
+                const idx_t *const node0 = c.surface->data()[0];
+                const idx_t *const node1 = c.surface->data()[1];
+                const idx_t *const node2 = c.surface->data()[2];
+                const idx_t *const node3 = c.element_type == smesh::QUAD4 ? c.surface->data()[3] : nullptr;
+                const real_t       q     = c.value / real_t(6);
+#pragma omp parallel for reduction(| : missing_entry)
+                for (ptrdiff_t e = 0; e < n; ++e) {
+                    missing_entry |=
+                            pressure_triangle_hessian(
+                                    node0[e], node1[e], node2[e], points->data(), x, rowptr, colidx, q, values) != SFEM_SUCCESS;
+                    if (node3) {
+                        missing_entry |= pressure_triangle_hessian(
+                                                 node0[e], node2[e], node3[e], points->data(), x, rowptr, colidx, q, values) !=
+                                         SFEM_SUCCESS;
+                    }
+                }
+            } else {
+                if (c.element_type != smesh::EDGE2 && c.element_type != smesh::EDGESHELL2) {
+                    SFEM_ERROR("Two-dimensional follower pressure requires EDGE2 surfaces\n");
+                    return SFEM_FAILURE;
+                }
+
+                const idx_t *const node0 = c.surface->data()[0];
+                const idx_t *const node1 = c.surface->data()[1];
+                const real_t       q     = c.value * real_t(0.5);
+
+#pragma omp parallel for reduction(| : missing_entry)
+                for (ptrdiff_t e = 0; e < n; ++e) {
+                    const idx_t i = node0[e];
+                    const idx_t j = node1[e];
+
+                    const count_t i_begin = rowptr[i];
+                    const count_t j_begin = rowptr[j];
+                    const count_t ij      = neumann_find_col(j, &colidx[i_begin], rowptr[i + 1] - i_begin);
+                    const count_t ji      = neumann_find_col(i, &colidx[j_begin], rowptr[j + 1] - j_begin);
+                    if (ij < 0 || ji < 0) {
+                        missing_entry = 1;
+                        continue;
+                    }
+
+                    real_t *const block_ij = &values[(i_begin + ij) * 4];
+                    real_t *const block_ji = &values[(j_begin + ji) * 4];
+#pragma omp atomic update
+                    block_ij[1] += q;
+#pragma omp atomic update
+                    block_ij[2] -= q;
+#pragma omp atomic update
+                    block_ji[1] -= q;
+#pragma omp atomic update
+                    block_ji[2] += q;
+                }
+            }
+
+            if (missing_entry) {
+                SFEM_ERROR("Follower pressure surface is not represented in the matrix graph\n");
+                return SFEM_FAILURE;
+            }
+        }
+
         return SFEM_SUCCESS;
     }
 
-    int NeumannConditions::hessian_bsr(const real_t *const /*x*/,
-                                       const count_t *const /*rowptr*/,
-                                       const idx_t *const /*colidx*/,
-                                       real_t *const /*values*/) {
-        return SFEM_SUCCESS;
-    }
-
-    int NeumannConditions::gradient(const real_t *const /*x*/, real_t *const out) {
+    int NeumannConditions::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeumannConditions::gradient");
 
         auto space = impl_->space;
@@ -374,7 +700,62 @@ namespace sfem {
 
         int err = 0;
         for (auto &c : impl_->conditions) {
-            if (c.values) {
+            if (c.follower_pressure) {
+                const int dim = mesh->spatial_dimension();
+                if (!x || space->block_size() != dim || !is_supported_pressure_surface(c.element_type)) {
+                    SFEM_ERROR("Follower pressure requires a current state and a supported oriented surface\n");
+                    return SFEM_FAILURE;
+                }
+
+                const idx_t *const node0 = c.surface->data()[0];
+                const idx_t *const node1 = c.surface->data()[1];
+                const ptrdiff_t    n     = c.surface->extent(1);
+
+                if (dim == 3) {
+                    if (c.element_type != smesh::TRI3 && c.element_type != smesh::QUAD4) {
+                        SFEM_ERROR("Three-dimensional follower pressure requires TRI3 or QUAD4 surfaces\n");
+                        return SFEM_FAILURE;
+                    }
+
+                    const idx_t *const node2 = c.surface->data()[2];
+                    const idx_t *const node3 = c.element_type == smesh::QUAD4 ? c.surface->data()[3] : nullptr;
+                    const real_t       q     = c.value / real_t(6);
+#pragma omp parallel for
+                    for (ptrdiff_t e = 0; e < n; ++e) {
+                        pressure_triangle_gradient(node0[e], node1[e], node2[e], points->data(), x, q, out);
+                        if (node3) pressure_triangle_gradient(node0[e], node2[e], node3[e], points->data(), x, q, out);
+                    }
+                    continue;
+                }
+
+                if (dim != 2 || (c.element_type != smesh::EDGE2 && c.element_type != smesh::EDGESHELL2)) {
+                    SFEM_ERROR("Two-dimensional follower pressure requires EDGE2 surfaces\n");
+                    return SFEM_FAILURE;
+                }
+
+                const geom_t *const px = points->data()[0];
+                const geom_t *const py = points->data()[1];
+                const real_t        q  = c.value * real_t(0.5);
+
+#pragma omp parallel for
+                for (ptrdiff_t e = 0; e < n; ++e) {
+                    const idx_t  i  = node0[e];
+                    const idx_t  j  = node1[e];
+                    const real_t xi = px[i] + x[2 * i];
+                    const real_t yi = py[i] + x[2 * i + 1];
+                    const real_t xj = px[j] + x[2 * j];
+                    const real_t yj = py[j] + x[2 * j + 1];
+
+#pragma omp atomic update
+                    out[2 * i] += q * yj;
+#pragma omp atomic update
+                    out[2 * i + 1] -= q * xj;
+#pragma omp atomic update
+                    out[2 * j] -= q * yi;
+#pragma omp atomic update
+                    out[2 * j + 1] += q * xi;
+                }
+            } else if (c.values) {
                 err |= integrate_values(c.element_type,
                                         c.surface->extent(1),
                                         mesh->n_nodes(),
@@ -403,66 +784,306 @@ namespace sfem {
         return err;
     }
 
-    int NeumannConditions::apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) {
-        // No-Op
+    int NeumannConditions::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("NeumannConditions::apply");
+
+        auto space  = impl_->space;
+        auto mesh   = space->mesh_ptr();
+        auto points = mesh->points();
+        if (space->has_semi_structured_mesh()) points = space->mesh().points();
+        for (const auto &c : impl_->conditions) {
+            if (!c.follower_pressure) continue;
+            const int dim = mesh->spatial_dimension();
+            if (!x || space->block_size() != dim || !is_supported_pressure_surface(c.element_type)) {
+                SFEM_ERROR("Follower pressure apply requires the current state and a supported oriented surface\n");
+                return SFEM_FAILURE;
+            }
+
+            const idx_t *const node0 = c.surface->data()[0];
+            const idx_t *const node1 = c.surface->data()[1];
+            const ptrdiff_t    n     = c.surface->extent(1);
+
+            if (dim == 3) {
+                if (c.element_type != smesh::TRI3 && c.element_type != smesh::QUAD4) {
+                    SFEM_ERROR("Three-dimensional follower pressure requires TRI3 or QUAD4 surfaces\n");
+                    return SFEM_FAILURE;
+                }
+
+                const idx_t *const node2 = c.surface->data()[2];
+                const idx_t *const node3 = c.element_type == smesh::QUAD4 ? c.surface->data()[3] : nullptr;
+                const real_t       q     = c.value / real_t(6);
+#pragma omp parallel for
+                for (ptrdiff_t e = 0; e < n; ++e) {
+                    pressure_triangle_apply(node0[e], node1[e], node2[e], points->data(), x, h, q, out);
+                    if (node3) pressure_triangle_apply(node0[e], node2[e], node3[e], points->data(), x, h, q, out);
+                }
+                continue;
+            }
+
+            if (dim != 2 || (c.element_type != smesh::EDGE2 && c.element_type != smesh::EDGESHELL2)) {
+                SFEM_ERROR("Two-dimensional follower pressure requires EDGE2 surfaces\n");
+                return SFEM_FAILURE;
+            }
+
+            const real_t q = c.value * real_t(0.5);
+
+#pragma omp parallel for
+            for (ptrdiff_t e = 0; e < n; ++e) {
+                const idx_t i = node0[e];
+                const idx_t j = node1[e];
+
+#pragma omp atomic update
+                out[2 * i] += q * h[2 * j + 1];
+#pragma omp atomic update
+                out[2 * i + 1] -= q * h[2 * j];
+#pragma omp atomic update
+                out[2 * j] -= q * h[2 * i + 1];
+#pragma omp atomic update
+                out[2 * j + 1] += q * h[2 * i];
+            }
+        }
+
         return SFEM_SUCCESS;
     }
 
     int NeumannConditions::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeumannConditions::value");
 
-        auto space = impl_->space;
-        auto temp  = create_host_buffer<real_t>(space->n_dofs());
-        if (!temp) {
-            return SFEM_FAILURE;
+        auto space  = impl_->space;
+        auto mesh   = space->mesh_ptr();
+        auto points = mesh->points();
+        if (space->has_semi_structured_mesh()) {
+            points = space->mesh().points();
         }
 
-        int err = gradient(x, temp->data());
-        if (err != SFEM_SUCCESS) {
-            return err;
+        SharedBuffer<real_t> temp;
+        real_t               acc = 0;
+        int                  err = SFEM_SUCCESS;
+        for (const auto &c : impl_->conditions) {
+            if (c.follower_pressure) {
+                const int dim = mesh->spatial_dimension();
+                if (!x || space->block_size() != dim || !is_supported_pressure_surface(c.element_type)) {
+                    SFEM_ERROR("Follower pressure value requires a current state and a supported oriented surface\n");
+                    return SFEM_FAILURE;
+                }
+
+                if (dim == 3) {
+                    if (c.element_type != smesh::TRI3 && c.element_type != smesh::QUAD4) {
+                        SFEM_ERROR("Three-dimensional follower pressure requires TRI3 or QUAD4 surfaces\n");
+                        return SFEM_FAILURE;
+                    }
+
+                    const idx_t *const node0         = c.surface->data()[0];
+                    const idx_t *const node1         = c.surface->data()[1];
+                    const idx_t *const node2         = c.surface->data()[2];
+                    const idx_t *const node3         = c.element_type == smesh::QUAD4 ? c.surface->data()[3] : nullptr;
+                    const ptrdiff_t    n             = c.surface->extent(1);
+                    real_t             volume_change = 0;
+#pragma omp parallel for reduction(+ : volume_change)
+                    for (ptrdiff_t e = 0; e < n; ++e) {
+                        volume_change += pressure_triangle_volume(node0[e], node1[e], node2[e], points->data(), x);
+                        volume_change -= pressure_triangle_volume(node0[e], node1[e], node2[e], points->data(), nullptr);
+                        if (node3) {
+                            volume_change += pressure_triangle_volume(node0[e], node2[e], node3[e], points->data(), x);
+                            volume_change -= pressure_triangle_volume(node0[e], node2[e], node3[e], points->data(), nullptr);
+                        }
+                    }
+                    acc += c.value * volume_change;
+                    continue;
+                }
+
+                if (dim != 2 || (c.element_type != smesh::EDGE2 && c.element_type != smesh::EDGESHELL2)) {
+                    SFEM_ERROR("Two-dimensional follower pressure requires EDGE2 surfaces\n");
+                    return SFEM_FAILURE;
+                }
+
+                const idx_t *const  node0           = c.surface->data()[0];
+                const idx_t *const  node1           = c.surface->data()[1];
+                const geom_t *const px              = points->data()[0];
+                const geom_t *const py              = points->data()[1];
+                const ptrdiff_t     n               = c.surface->extent(1);
+                real_t              pressure_energy = 0;
+
+#pragma omp parallel for reduction(+ : pressure_energy)
+                for (ptrdiff_t e = 0; e < n; ++e) {
+                    const idx_t  i  = node0[e];
+                    const idx_t  j  = node1[e];
+                    const real_t xi = px[i] + x[2 * i];
+                    const real_t yi = py[i] + x[2 * i + 1];
+                    const real_t xj = px[j] + x[2 * j];
+                    const real_t yj = py[j] + x[2 * j + 1];
+                    pressure_energy += xi * yj - xj * yi - (px[i] * py[j] - px[j] * py[i]);
+                }
+
+                acc += c.value * real_t(0.5) * pressure_energy;
+            } else if (c.values) {
+                if (!temp) {
+                    temp = create_host_buffer<real_t>(space->n_dofs());
+                    if (!temp) return SFEM_FAILURE;
+                    std::memset(temp->data(), 0, sizeof(real_t) * static_cast<size_t>(space->n_dofs()));
+                }
+
+                err |= integrate_values(c.element_type,
+                                        c.surface->extent(1),
+                                        mesh->n_nodes(),
+                                        c.surface->data(),
+                                        points->data(),
+                                        -c.value,
+                                        c.values->data(),
+                                        space->block_size(),
+                                        c.component,
+                                        temp->data());
+            } else {
+                if (!temp) {
+                    temp = create_host_buffer<real_t>(space->n_dofs());
+                    if (!temp) return SFEM_FAILURE;
+                    std::memset(temp->data(), 0, sizeof(real_t) * static_cast<size_t>(space->n_dofs()));
+                }
+
+                err |= integrate_value(c.element_type,
+                                       c.surface->extent(1),
+                                       mesh->n_nodes(),
+                                       c.surface->data(),
+                                       points->data(),
+                                       -c.value,
+                                       space->block_size(),
+                                       c.component,
+                                       temp->data());
+            }
         }
 
-        const ptrdiff_t     ndofs = space->n_dofs();
-        const real_t *const g     = temp->data();
-        real_t              acc   = 0;
+        if (err != SFEM_SUCCESS) return err;
+
+        if (temp) {
+            const ptrdiff_t     ndofs = space->n_dofs();
+            const real_t *const g     = temp->data();
 
 #pragma omp parallel for reduction(+ : acc)
-        for (ptrdiff_t i = 0; i < ndofs; ++i) {
-            acc += g[i] * x[i];
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                acc += g[i] * x[i];
+            }
         }
 
         *out += acc;
         return SFEM_SUCCESS;
     }
 
-    int NeumannConditions::value_steps(const real_t *const       x,
-                                       const real_t *const       h,
-                                       const int                 nsteps,
-                                       const real_t *const       steps,
-                                       real_t *const             out) {
+    int NeumannConditions::value_steps(const real_t *const x,
+                                       const real_t *const h,
+                                       const int           nsteps,
+                                       const real_t *const steps,
+                                       real_t *const       out) {
         SFEM_TRACE_SCOPE("NeumannConditions::value_steps");
 
-        auto space = impl_->space;
-        auto temp  = create_host_buffer<real_t>(space->n_dofs());
-        if (!temp) {
-            return SFEM_FAILURE;
+        auto space  = impl_->space;
+        auto mesh   = space->mesh_ptr();
+        auto points = mesh->points();
+        if (space->has_semi_structured_mesh()) {
+            points = space->mesh().points();
         }
 
-        int err = gradient(x, temp->data());
-        if (err != SFEM_SUCCESS) {
-            return err;
+        const ptrdiff_t      ndofs = space->n_dofs();
+        SharedBuffer<real_t> dead_load;
+        int                  err = SFEM_SUCCESS;
+        for (const auto &c : impl_->conditions) {
+            if (c.follower_pressure) {
+                const int dim = mesh->spatial_dimension();
+                if (!x || space->block_size() != dim || !is_supported_pressure_surface(c.element_type) ||
+                    (dim == 2 && c.element_type != smesh::EDGE2 && c.element_type != smesh::EDGESHELL2) ||
+                    (dim == 3 && c.element_type != smesh::TRI3 && c.element_type != smesh::QUAD4)) {
+                    SFEM_ERROR("Follower pressure value_steps requires a supported oriented surface\n");
+                    return SFEM_FAILURE;
+                }
+
+                continue;
+            }
+
+            if (!dead_load) {
+                dead_load = create_host_buffer<real_t>(ndofs);
+                if (!dead_load) return SFEM_FAILURE;
+                std::memset(dead_load->data(), 0, sizeof(real_t) * static_cast<size_t>(ndofs));
+            }
+
+            if (c.values) {
+                err |= integrate_values(c.element_type,
+                                        c.surface->extent(1),
+                                        mesh->n_nodes(),
+                                        c.surface->data(),
+                                        points->data(),
+                                        -c.value,
+                                        c.values->data(),
+                                        space->block_size(),
+                                        c.component,
+                                        dead_load->data());
+            } else {
+                err |= integrate_value(c.element_type,
+                                       c.surface->extent(1),
+                                       mesh->n_nodes(),
+                                       c.surface->data(),
+                                       points->data(),
+                                       -c.value,
+                                       space->block_size(),
+                                       c.component,
+                                       dead_load->data());
+            }
         }
 
-        const ptrdiff_t     ndofs = space->n_dofs();
-        const real_t *const g     = temp->data();
+        if (err != SFEM_SUCCESS) return err;
 
         for (int s = 0; s < nsteps; ++s) {
             const real_t step = steps[s];
             real_t       acc  = 0;
+            if (dead_load) {
+                const real_t *const g = dead_load->data();
 #pragma omp parallel for reduction(+ : acc)
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                acc += g[i] * (x[i] + step * h[i]);
+                for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                    acc += g[i] * (x[i] + step * h[i]);
+                }
             }
+
+            for (const auto &c : impl_->conditions) {
+                if (!c.follower_pressure) continue;
+
+                const idx_t *const node0 = c.surface->data()[0];
+                const idx_t *const node1 = c.surface->data()[1];
+                const ptrdiff_t    n     = c.surface->extent(1);
+
+                if (mesh->spatial_dimension() == 3) {
+                    const idx_t *const node2         = c.surface->data()[2];
+                    const idx_t *const node3         = c.element_type == smesh::QUAD4 ? c.surface->data()[3] : nullptr;
+                    real_t             volume_change = 0;
+#pragma omp parallel for reduction(+ : volume_change)
+                    for (ptrdiff_t e = 0; e < n; ++e) {
+                        volume_change += pressure_triangle_volume_step(node0[e], node1[e], node2[e], points->data(), x, h, step);
+                        volume_change -= pressure_triangle_volume(node0[e], node1[e], node2[e], points->data(), nullptr);
+                        if (node3) {
+                            volume_change +=
+                                    pressure_triangle_volume_step(node0[e], node2[e], node3[e], points->data(), x, h, step);
+                            volume_change -= pressure_triangle_volume(node0[e], node2[e], node3[e], points->data(), nullptr);
+                        }
+                    }
+                    acc += c.value * volume_change;
+                    continue;
+                }
+
+                const geom_t *const px              = points->data()[0];
+                const geom_t *const py              = points->data()[1];
+                real_t              pressure_energy = 0;
+
+#pragma omp parallel for reduction(+ : pressure_energy)
+                for (ptrdiff_t e = 0; e < n; ++e) {
+                    const idx_t  i  = node0[e];
+                    const idx_t  j  = node1[e];
+                    const real_t xi = px[i] + x[2 * i] + step * h[2 * i];
+                    const real_t yi = py[i] + x[2 * i + 1] + step * h[2 * i + 1];
+                    const real_t xj = px[j] + x[2 * j] + step * h[2 * j];
+                    const real_t yj = py[j] + x[2 * j + 1] + step * h[2 * j + 1];
+                    pressure_energy += xi * yj - xj * yi - (px[i] * py[j] - px[j] * py[i]);
+                }
+
+                acc += c.value * real_t(0.5) * pressure_energy;
+            }
+
             out[s] += acc;
         }
 
@@ -544,9 +1165,7 @@ namespace sfem {
     }
 
 #ifndef SFEM_ENABLE_CUDA
-    std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
-        return nc;
-    }
+    std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) { return nc; }
 #endif
 
 }  // namespace sfem

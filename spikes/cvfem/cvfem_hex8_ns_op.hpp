@@ -1,0 +1,200 @@
+#pragma once
+
+// sfem::Op over the HEX8 CVFEM Navier-Stokes kernels.
+//
+// Deliberately opaque. Everything the operator is built from -- MeshData, BSR4, the
+// element kernels, and a file-scope `using scalar_t = double` -- sits behind an Impl in
+// the .cpp, so a driver that includes this header gets the operator and nothing else.
+//
+// That matters more here than it usually would. Two families of HEX8 CVFEM headers live
+// in this directory: cvfem_hex8_ns_core.hpp behind the solver, and the
+// cvfem_hex8_layout_*.hpp family behind the throughput benchmark. They define sixteen of
+// the same names and disagree on the physics behind several of them -- the benchmark's
+// assembly carries no boundary sub-control-surface or Rhie-Chow terms. A header that
+// leaked the core would settle that argument for every driver that included it, and
+// would collide outright with any driver that also wanted the benchmark layouts.
+//
+// Block size is 4 -- (ux, uy, uz, p) per node -- and the element kernels already write
+// that interleaved layout, which is what sfem::Op expects.
+//
+// Parameters are plain public fields rather than a parameter block. They are read at
+// initialize() and again on each call, so they may be set in any order beforehand.
+
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_Op.hpp"
+
+#include <memory>
+#include <string>
+#include <vector>
+
+// The semi-structured kernel's mesh view. Forward-declared so a driver that wants to build
+// element-wise Galerkin coarse operators can reach the lattice without this header pulling in
+// the whole sshex8 kernel; see semi_structured_data().
+struct SSMeshData;
+
+namespace sfem {
+
+    // Mirrors the core's GeomKind, restated so a driver need not include the core to say
+    // which geometry treatment it wants.
+    enum class CVFEMGeometry { Affine, Isoparam };
+
+    // Selectors for apply_blocks. Named here so a driver can spell a block selection
+    // without including the semi-structured kernel header, which the operator otherwise
+    // keeps to itself.
+    enum CVFEMBlock : int {
+        CVFEM_BLOCK_UU = 1,  // momentum rows, velocity columns
+        CVFEM_BLOCK_UP = 2,  // momentum rows, pressure column
+        CVFEM_BLOCK_PU = 4,  // continuity row, velocity columns
+        CVFEM_BLOCK_PP = 8   // continuity row, pressure column
+    };
+
+    class CVFEMNavierStokes final : public Op {
+    public:
+        explicit CVFEMNavierStokes(const std::shared_ptr<FunctionSpace> &space);
+        ~CVFEMNavierStokes() override;
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
+
+        const char *name() const override { return "cvfem:NavierStokes"; }
+        bool        is_linear() const override { return false; }
+
+        // True when initialize() found a semi-structured mesh on the space and the
+        // operator is running the sshex8 kernels over macro-elements.
+        //
+        // That path is affine-macro only: it computes one Jacobian per macro-element and
+        // reuses it across the lattice, which is exact for a box and wrong for a curved
+        // macro-element. It ignores `geom` for the same reason, and refuses hessian_bsr --
+        // an assembled matrix per level is the memory a hierarchy exists to avoid.
+        bool is_semi_structured() const;
+
+        // The macro-element lattice, or null when the flat path is running. Exposed for
+        // element-wise Galerkin coarsening, which needs the same gather, geometry and state
+        // the apply uses -- rebuilding them beside the operator would be a second copy of
+        // the arithmetic that could drift from this one. Valid only after initialize(), and
+        // its state fields only after update().
+        const ::SSMeshData *semi_structured_data() const;
+
+        // Body force, one vector per node, in the node numbering the operator uses.
+        // MUST be called after initialize(): the packed path renumbers mesh nodes, so a
+        // force built against the pre-initialize numbering would be silently scrambled.
+        // Passing nullptr clears it. Only the manufactured-solution case sets one; with no
+        // force the residual is untouched.
+        void set_body_force(const real_t *fx, const real_t *fy, const real_t *fz);
+
+        // Name of the sideset carrying the natural (do-nothing) outflow; set before
+        // initialize(). Empty means none, which is every case but the backward-facing step.
+        //
+        // A name rather than a coordinate plane: the sideset is level-invariant (it stores
+        // (parent, lfi) on the macro element, which a semi-structured level change does not
+        // touch), it costs no geometric test per level, and it cannot disagree with the
+        // Dirichlet set derived from the same object.
+        std::string natural_outflow_sideset;
+
+        // Control volume per node -- the CVFEM lumped mass. Exposed because the driver
+        // cannot include the kernel headers, and the MMS error norms are volume-weighted.
+        int node_volume(real_t *const out) const;
+
+        ptrdiff_t n_dofs_domain() const override;
+        ptrdiff_t n_dofs_image() const override;
+
+        // WARNING: this renumbers the mesh's nodes when the packed path is enabled
+        // (pack_size > 0 with affine geometry). The packed kernels address the global
+        // arrays as `owned_nodes_ptr[pack] + k`, which is only a node id because packing
+        // made each pack's owned nodes contiguous, so the renumbering is part of the
+        // layout rather than an optimisation that could be skipped.
+        //
+        // Anything indexed by node must therefore be built AFTER this call -- Dirichlet
+        // node sets, initial conditions, anything reading mesh->points(). Building them
+        // first leaves them referring to the old numbering, silently. Set pack_size = 0
+        // to keep the mesh untouched at the cost of the packed kernels.
+        int initialize(const std::vector<std::string> &block_names = {}) override;
+
+        // Refreshes the nodal pressure gradient Rhie-Chow interpolation needs, and marks
+        // it current for the state it was given.
+        int update(const real_t *const x) override;
+
+        // "cache_nodal_pgrad": let apply() reuse the nodal pressure gradient computed by
+        // the last update() or gradient() instead of recomputing it.
+        //
+        // Worth having because the gradient is a full element sweep costing about 39% of
+        // an apply, and a Krylov solve applies the operator hundreds of times at a state
+        // that does not change. Off by default, because switching it on is a promise
+        // about the caller's loop: after any change to the state, update() or gradient()
+        // must run before the next apply(). A Newton loop satisfies that -- the residual
+        // is evaluated right after the step and before the linear solve -- but nothing
+        // enforces it, and a caller that breaks it gets a stale gradient and a wrong
+        // answer rather than a failure. Left off, apply() recomputes and is always right.
+        void set_option(const std::string &name, bool val) override;
+
+        int gradient(const real_t *const x, real_t *const out) override;
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
+        int value(const real_t *x, real_t *const out) override;
+
+        // Pure virtual on the base, so it has to exist. It refuses: this is a
+        // vector-valued problem and BSR is the format for those here, so a scalar CRS
+        // expansion of the 4x4 blocks would be a worse matrix nobody wants.
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override;
+
+        int hessian_bsr(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override;
+
+        // Scalar diagonal, one value per dof, taken from the diagonal of each 4x4 block.
+        int hessian_diag(const real_t *const x, real_t *const values) override;
+
+        // Full 4x4 diagonal block per node, 16 values each, matrix-free. Not a base-class
+        // virtual: Op offers hessian_block_diag_sym, whose symmetric packing does not fit
+        // a Navier-Stokes block. This is what a block-Jacobi smoother wants. `values`
+        // must hold n_nodes * 16 entries and is accumulated into.
+        int hessian_block_diag(const real_t *const x, real_t *const values);
+
+        // Jacobian action restricted to a subset of the 2x2 (velocity, pressure) blocks.
+        //
+        // `blocks` is an OR of the block selectors: 1 = momentum rows / velocity columns,
+        // 2 = momentum rows / pressure column, 4 = continuity row / velocity columns,
+        // 8 = continuity row / pressure column. Rows outside the selection are left alone
+        // and columns outside it are treated as zero, so a selection costs a kernel with
+        // the terms it does not need removed rather than branched over.
+        //
+        // This is what a saddle-point smoother needs: SIMPLE builds its pressure
+        // correction from the off-diagonal blocks alone, and evaluating the full operator
+        // to obtain one of them would throw most of the work away. Semi-structured only;
+        // it refuses on the flat path, which has no block-split kernel.
+        int apply_blocks(const real_t *const x, const real_t *const h, real_t *const out, const int blocks);
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+
+        // The operator this one produced for the next coarser level, or null. Function
+        // owns the coarse Function and does not hand its operators back, but a multigrid
+        // smoother needs each level's block diagonal, so the chain is recorded on the way
+        // down and walked from the finest.
+        std::shared_ptr<CVFEMNavierStokes> coarser() const;
+        std::shared_ptr<Op> clone() const override;
+
+        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
+
+        real_t        rho{1};
+        real_t        mu{0.01};
+        real_t        rhie_chow_scale{1};
+        // Harten band for the upwind switch, as an absolute mass-flux magnitude. Zero is the
+        // hard switch. See cvfem_upwind_abs.
+        real_t        upwind_eps{0};
+        CVFEMGeometry geom{CVFEMGeometry::Affine};
+
+        // Affine packing width, mirroring SFEM_PACK_SIZE in the driver. 0 selects the
+        // atomic path. Ignored for isoparametric geometry, which has no packed kernel.
+        int pack_size{2048};
+
+    private:
+        // Shared by clone() and derefine_op(): same parameters, different space.
+        std::shared_ptr<Op> clone_onto(const std::shared_ptr<FunctionSpace> &space) const;
+
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+
+}  // namespace sfem

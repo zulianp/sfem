@@ -3,6 +3,7 @@
 // C includes
 #include "sshex8_laplacian.hpp"
 #include "sshex8_stencil_element_matrix_apply.hpp"
+#include "stencil3.hpp"
 
 // C++ includes
 #include "sfem_Laplacian.hpp"
@@ -11,7 +12,36 @@
 
 #include "smesh_glob.hpp"
 
+#include <algorithm>
+#include <vector>
+
 namespace sfem {
+
+    namespace {
+
+        static bool block_is_selected(const std::string &name, const std::vector<std::string> &block_names) {
+            return block_names.empty() || std::find(block_names.begin(), block_names.end(), name) != block_names.end();
+        }
+
+        static int require_sshex8_block(const char *const op_name, const smesh::Mesh &mesh, const size_t block_id) {
+            const auto element_type = mesh.element_type(static_cast<smesh::block_idx_t>(block_id));
+            if (!is_semistructured_type(element_type) || macro_base_elem(element_type) != smesh::PROTEUS_HEX8) {
+                SFEM_ERROR("%s supports homogeneous SSHEX8 blocks\n", op_name);
+                return SFEM_FAILURE;
+            }
+
+            return SFEM_SUCCESS;
+        }
+
+        static std::shared_ptr<smesh::Mesh> element_matrix_mesh(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+            if (mesh && mesh->element_type(0) == smesh::PROTEUS_HEX8) {
+                mesh = smesh::sshex_to_hex8(mesh);
+            }
+            return mesh;
+        }
+
+    }  // namespace
 
     std::unique_ptr<Op> SemiStructuredEMLaplacian::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::create");
@@ -62,32 +92,72 @@ namespace sfem {
             ret->initialize();
             return ret;
         } else {
-            auto ret = std::make_shared<Laplacian>(space);
-            assert(space->n_blocks() == 1);  // FIXME
-            ret->override_element_types({macro_base_elem(element_type)});
+            auto                         ret = std::make_shared<Laplacian>(space);
+            std::vector<smesh::ElemType> element_types(space->n_blocks(), macro_base_elem(element_type));
+            ret->override_element_types(element_types);
             return ret;
         }
     }
 
-    const char *SemiStructuredEMLaplacian::name() const { return "ss:em:Laplacian"; }
+    const char *SemiStructuredEMLaplacian::name() const { return "em:Laplacian"; }
 
     int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
-        auto &ssm      = space->mesh();
-        auto  mesh     = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
-        element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
-        return sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
-                                               mesh->n_elements(),
-                                               mesh->n_nodes(),
-                                               mesh->elements(0)->data(),
-                                               mesh->points()->data(),
-                                               element_matrix->data());
+        auto &ssm  = space->mesh();
+        auto  mesh = element_matrix_mesh(space);
+        if (!mesh) {
+            return SFEM_FAILURE;
+        }
+
+        const auto n_blocks = ssm.n_blocks();
+        element_matrices.assign(n_blocks, nullptr);
+        element_stencils.assign(n_blocks, nullptr);
+        element_matrix = nullptr;
+
+        int err = SFEM_SUCCESS;
+        for (size_t b = 0; b < n_blocks; ++b) {
+            const auto block_id = static_cast<smesh::block_idx_t>(b);
+            if (!block_is_selected(ssm.block(b)->name(), block_names)) {
+                continue;
+            }
+
+            err = require_sshex8_block(name(), ssm, b);
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
+
+            auto matrix = sfem::create_host_buffer<real_t>(mesh->n_elements(block_id) * 64);
+            err         = sshex8_laplacian_element_matrix_cartesian(smesh::semistructured_level(ssm),
+                                                            mesh->n_elements(block_id),
+                                                            mesh->n_nodes(),
+                                                            mesh->elements(block_id)->data(),
+                                                            mesh->points()->data(),
+                                                            matrix->data());
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
+
+            element_matrices[b] = matrix;
+            if (!element_matrix) {
+                element_matrix = matrix;
+            }
+
+            auto stencil = sfem::create_host_buffer<scalar_t>(mesh->n_elements(block_id) * 27);
+#pragma omp parallel for
+            for (ptrdiff_t e = 0; e < mesh->n_elements(block_id); ++e) {
+                hex8_matrix_to_stencil(&matrix->data()[e * 64], &stencil->data()[e * 27]);
+            }
+
+            element_stencils[b] = stencil;
+        }
+
+        return SFEM_SUCCESS;
     }
 
     int SemiStructuredEMLaplacian::hessian_crs(const real_t *const  x,
                                                const count_t *const rowptr,
                                                const idx_t *const   colidx,
                                                real_t *const        values) {
-        SFEM_ERROR("[Error] ss:em:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
@@ -95,12 +165,28 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::hessian_diag");
 
         auto &ssm = space->mesh();
-        return affine_sshex8_laplacian_diag(
-                smesh::semistructured_level(ssm), ssm.n_elements(), ssm.elements(0)->data(), ssm.points()->data(), out);
+        int   err = SFEM_SUCCESS;
+        for (size_t b = 0; b < element_matrices.size(); ++b) {
+            if (!element_matrices[b]) {
+                continue;
+            }
+
+            const auto block_id = static_cast<smesh::block_idx_t>(b);
+            err                 = affine_sshex8_laplacian_diag(smesh::semistructured_level(ssm),
+                                               ssm.n_elements(block_id),
+                                               ssm.elements(block_id)->data(),
+                                               ssm.points()->data(),
+                                               out);
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
+        }
+
+        return SFEM_SUCCESS;
     }
 
     int SemiStructuredEMLaplacian::gradient(const real_t *const x, real_t *const out) {
-        SFEM_ERROR("[Error] ss:em:Laplacian::gradient NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:Laplacian::gradient NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
@@ -113,8 +199,34 @@ namespace sfem {
 
         double tick = smesh::time_seconds();
 
-        int err = sshex8_stencil_element_matrix_apply(
-                smesh::semistructured_level(ssm), ssm.n_elements(), ssm.elements(0)->data(), element_matrix->data(), h, out);
+        int err = SFEM_SUCCESS;
+        for (size_t b = 0; b < element_matrices.size(); ++b) {
+            auto &matrix = element_matrices[b];
+            if (!matrix) {
+                continue;
+            }
+
+            const auto block_id = static_cast<smesh::block_idx_t>(b);
+            if (element_stencils[b]) {
+                err = sshex8_stencil_element_matrix_apply_hyteg(smesh::semistructured_level(ssm),
+                                                                ssm.n_elements(block_id),
+                                                                ssm.elements(block_id)->data(),
+                                                                matrix->data(),
+                                                                element_stencils[b]->data(),
+                                                                h,
+                                                                out);
+            } else {
+                err = sshex8_stencil_element_matrix_apply(smesh::semistructured_level(ssm),
+                                                          ssm.n_elements(block_id),
+                                                          ssm.elements(block_id)->data(),
+                                                          matrix->data(),
+                                                          h,
+                                                          out);
+            }
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
+        }
 
         double tock = smesh::time_seconds();
         total_time += (tock - tick);
@@ -123,7 +235,7 @@ namespace sfem {
     }
 
     int SemiStructuredEMLaplacian::value(const real_t *x, real_t *const out) {
-        SFEM_ERROR("[Error] ss:em:Laplacian::value NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:Laplacian::value NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 

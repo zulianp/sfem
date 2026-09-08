@@ -199,9 +199,8 @@ int main(int argc, char** argv) {
     // Krylov PCs: overwrite inverse scaling. ShiftableJacobi defaults to damped accumulate
     // apply intended for smoothers.
     auto jacobi                   = create_inverse_diagonal_scaling(diag, es);
-    auto bjacobi                  = create_shiftable_block_sym_jacobi(BS, B_sym6, mask, es);
-    bjacobi->relaxation_parameter = 1;
-    bjacobi->set_diag(B_sym6);
+    auto bjacobi = create_shiftable_block_sym_jacobi(BS, B_sym6, mask, es);
+    bjacobi->set_relaxation_parameter(1);
 
     // Separate damped copies for stationary smoothers
     auto jacobi_smooth  = create_shiftable_jacobi(diag, es);
@@ -284,7 +283,7 @@ int main(int argc, char** argv) {
         cg->set_rtol(SFEM_RTOL);
         cg->set_atol(SFEM_ATOL);
         cg->verbose = false;
-        cg->set_host_fusion(host_fusion);
+        cg->set_fusion(host_fusion);
         if (precond) {
             cg->set_preconditioner_op(precond);
         }
@@ -420,7 +419,7 @@ int main(int argc, char** argv) {
            double(SFEM_RTOL),
            double(SFEM_ATOL),
            SFEM_SMOOTH_IT);
-    printf("# cg_blas / cg_*_blas: host_fusion=0 (separate BLAS axpby+dot); cg / cg_bjacobi: fused\n");
+    printf("# cg_blas / cg_*_blas: fusion=0 (separate BLAS axpby+dot); cg / cg_bjacobi: fused OpenMP/CUDA strategy\n");
     printf("# Filter with SFEM_SOLVERS=cg,cg_blas,cg_bjacobi,... or all\n");
 
     return EXIT_SUCCESS;

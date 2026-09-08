@@ -3647,7 +3647,10 @@ def _coupled_dependency_flags(systems_by_dim, energy_name, residual_name):
         energy_equation = next(equation for equation in system.equations if equation.name == energy_name)
         residual_equation = next(equation for equation in system.equations if equation.name == residual_name)
         energy_collection = system.form_collection(energy_equation)
-        residual_collection = system.form_collection(residual_equation)
+        residual_collection = system.form_collection(
+            residual_equation,
+            orders=(FormOrder.ONE, FormOrder.TWO),
+        )
         energy_apply = energy_collection.form_metadata(FormOrder.TWO).dependencies
         residual_gradient = residual_collection.form_metadata(FormOrder.ONE).dependencies
         residual_apply = residual_collection.form_metadata(FormOrder.TWO).dependencies
@@ -3705,7 +3708,10 @@ def _coupled_cases(
         energy_equation = next(equation for equation in system.equations if equation.name == energy_name)
         residual_equation = next(equation for equation in system.equations if equation.name == residual_name)
         energy_collection = system.form_collection(energy_equation)
-        residual_collection = system.form_collection(residual_equation)
+        residual_collection = system.form_collection(
+            residual_equation,
+            orders=(FormOrder.ONE, FormOrder.TWO),
+        )
         energy_field = energy_collection.fields[0]
         residual_fields = tuple(residual_collection.fields)
         block_size = sum(int(field.components) for field in residual_fields)
@@ -3771,25 +3777,29 @@ def _coupled_cases(
                 )
             )
         if has_gradient:
+            diagnostics = ["%s_gradient_soa_diagnostics" % energy_stem]
+            affine_flags = ["gradient_uses_affine"]
+            if getattr(residual_equation, "diagnostics", True):
+                diagnostics.append("%s_residual_element_soa_diagnostics" % residual_stem)
+                affine_flags.append("residual_uses_affine")
             cases["performance"]["gradient"].append(
                 _performance_case(
                     element,
-                    (
-                        "%s_gradient_soa_diagnostics" % energy_stem,
-                        "%s_residual_element_soa_diagnostics" % residual_stem,
-                    ),
-                    affine_flags=("gradient_uses_affine", "residual_uses_affine"),
+                    tuple(diagnostics),
+                    affine_flags=tuple(affine_flags),
                 )
             )
         if has_apply:
+            diagnostics = ["%s_apply_soa_diagnostics" % energy_stem]
+            affine_flags = ["apply_uses_affine"]
+            if getattr(residual_equation, "diagnostics", True):
+                diagnostics.append("%s_jacobian_action_element_soa_diagnostics" % residual_stem)
+                affine_flags.append("jacobian_action_uses_affine")
             cases["performance"]["apply"].append(
                 _performance_case(
                     element,
-                    (
-                        "%s_apply_soa_diagnostics" % energy_stem,
-                        "%s_jacobian_action_element_soa_diagnostics" % residual_stem,
-                    ),
-                    affine_flags=("apply_uses_affine", "jacobian_action_uses_affine"),
+                    tuple(diagnostics),
+                    affine_flags=tuple(affine_flags),
                 )
             )
         energy_objective_dependencies = energy_collection.form_metadata(FormOrder.ZERO).dependencies
@@ -3957,10 +3967,10 @@ def _coupled_cases(
         )
         if has_objective:
             cases["objective"].append(
-                """                case smesh::%(element)s:
+                """%(cases)s
                     status = impl_->objective_uses_affine ? %(affine)s : %(isoparametric)s;
                     break;""" % {
-                    "element": _mesh_element_name(element),
+                    "cases": _mesh_case_labels(element, "                "),
                     "affine": energy_objective_affine,
                     "isoparametric": energy_objective_iso,
                 }
@@ -3969,12 +3979,12 @@ def _coupled_cases(
 
 
 def _coupled_case(element, block_size, setup_lines, body):
-    return """                case smesh::%(element)s: {
+    return """%(cases)s {
                     static constexpr ptrdiff_t FIELD_STRIDE = %(block_size)d;
 %(setup)s
 %(body)s
                 }""" % {
-        "element": _mesh_element_name(element),
+        "cases": _mesh_case_labels(element, "                "),
         "block_size": block_size,
         "setup": "\n".join(setup_lines),
         "body": body,
@@ -4170,10 +4180,15 @@ def _residual_soa_view_declarations(fields, base, suffix, scalar_type):
 
 
 def _residual_soa_field_argument_names(fields, suffix):
-    return tuple(
-        _safe_identifier("%s_%s" % (field.name, suffix))
-        for field in fields
-    )
+    names = []
+    for field in fields:
+        components = int(field.components)
+        name = _safe_identifier("%s_%s" % (field.name, suffix))
+        if components == 1:
+            names.append(name)
+        else:
+            names.extend("%s[%d]" % (name, component) for component in range(components))
+    return tuple(names)
 
 
 def _boundary_soa_component_argument_names(fields, suffix):
@@ -5706,9 +5721,9 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
 
 
 def _case(element, function, arguments):
-    return """                case smesh::%(element)s:
+    return """%(cases)s
                     return %(function)s(%(arguments)s);""" % {
-        "element": _mesh_element_name(element),
+        "cases": _mesh_case_labels(element, "                "),
         "function": function,
         "arguments": arguments,
     }
@@ -7070,9 +7085,9 @@ def _hyperelastic_hessian_current_prologue(op_name, operation, apply_dependencie
 
 
 def _dual_case(element, flag, affine_function, affine_arguments, isoparametric_function, isoparametric_arguments):
-    return """                case smesh::%(element)s:
+    return """%(cases)s
                     return impl_->%(flag)s ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
-        "element": _mesh_element_name(element),
+        "cases": _mesh_case_labels(element, "                "),
         "flag": flag,
         "affine_function": affine_function,
         "affine_arguments": affine_arguments,
@@ -7091,12 +7106,12 @@ def _dual_aos_unit_case(
     isoparametric_function,
     isoparametric_arguments,
 ):
-    return """                case smesh::%(element)s:
+    return """%(cases)s
                     if (impl_->%(flag)s) {
                         return adjugate_aos ? %(affine_aos_function)s(%(affine_aos_arguments)s) : %(affine_function)s(%(affine_arguments)s);
                     }
                     return %(isoparametric_function)s(%(isoparametric_arguments)s);""" % {
-        "element": _mesh_element_name(element),
+        "cases": _mesh_case_labels(element, "                "),
         "flag": flag,
         "affine_aos_function": affine_aos_function,
         "affine_aos_arguments": affine_aos_arguments,
@@ -7108,10 +7123,10 @@ def _dual_aos_unit_case(
 
 
 def _dual_status_case(element, affine_function, affine_arguments, isoparametric_function, isoparametric_arguments):
-    return """                case smesh::%(element)s:
+    return """%(cases)s
                     status = impl_->objective_uses_affine ? %(affine_function)s(%(affine_arguments)s) : %(isoparametric_function)s(%(isoparametric_arguments)s);
                     break;""" % {
-        "element": _mesh_element_name(element),
+        "cases": _mesh_case_labels(element, "                "),
         "affine_function": affine_function,
         "affine_arguments": affine_arguments,
         "isoparametric_function": isoparametric_function,
@@ -7353,6 +7368,20 @@ def _element_dim(element):
 
 def _mesh_element_name(element):
     return getattr(element, "cell_element_type", _element_name(element))
+
+
+def _mesh_case_elements(element):
+    name = _mesh_element_name(element)
+    aliases = {
+        "PROTEUS_QUAD4": ("QUAD4", "PROTEUS_QUAD4"),
+        "PROTEUS_HEX8": ("HEX8", "PROTEUS_HEX8"),
+        "PROTEUS_HEX27": ("HEX27", "PROTEUS_HEX27"),
+    }
+    return aliases.get(name, (name,))
+
+
+def _mesh_case_labels(element, indent):
+    return "\n".join("%scase smesh::%s:" % (indent, name) for name in _mesh_case_elements(element))
 
 
 def _element_name(element):

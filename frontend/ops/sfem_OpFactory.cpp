@@ -17,6 +17,7 @@
 #include "sfem_Mass.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_NewmarkInertiaPotential.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_NeoHookeanOgdenPacked.hpp"
@@ -24,8 +25,18 @@
 #include "sfem_PlugInOp.hpp"
 #include "sfem_SemiStructuredEMLaplacian.hpp"
 #include "sfem_SemiStructuredEMLinearElasticity.hpp"
+#include "sfem_SemiStructuredHyTeGLinearElasticity.hpp"
 #include "sfem_SpectralElementLaplacian.hpp"
 #include "sfem_VectorLaplacian.hpp"
+
+#ifdef SFEM_ENABLE_RYAML
+#include <c4/format.hpp>
+#include <ryml_std.hpp>
+#endif
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 
 namespace sfem {
 
@@ -44,19 +55,15 @@ namespace sfem {
 
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
-            instance_.private_register_op("ss:KelvinVoigtNewmark", KelvinVoigtNewmark::create);
             instance_.private_register_op("BDF2InertiaPotential", BDF2InertiaPotential::create);
-            instance_.private_register_op("ss:BDF2InertiaPotential", BDF2InertiaPotential::create);
+            instance_.private_register_op("NewmarkInertiaPotential", NewmarkInertiaPotential::create);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
-            instance_.private_register_op("ss:LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("VectorLaplacian", VectorLaplacian::create);
-            instance_.private_register_op("ss:VectorLaplacian", VectorLaplacian::create);
-            instance_.private_register_op("ss:Laplacian", Laplacian::create);
-            instance_.private_register_op("ss:LumpedMass", LumpedMass::create);
-            instance_.private_register_op("ss:em:Laplacian", SemiStructuredEMLaplacian::create);
-            instance_.private_register_op("ss:em:LinearElasticity", SemiStructuredEMLinearElasticity::create);
-            instance_.private_register_op("ss:SpectralElementLaplacian", SpectralElementLaplacian::create);
+            instance_.private_register_op("em:Laplacian", SemiStructuredEMLaplacian::create);
+            instance_.private_register_op("em:LinearElasticity", SemiStructuredEMLinearElasticity::create);
+            instance_.private_register_op("LinearElasticityHyTeG", SemiStructuredHyTeGLinearElasticity::create);
+            instance_.private_register_op("SpectralElementLaplacian", SpectralElementLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
@@ -70,7 +77,6 @@ namespace sfem {
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinVisco", MooneyRivlinVisco::create);
             instance_.private_register_op("Hyperelasticity", Hyperelasticity::create);
-            instance_.private_register_op("ss:NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
             instance_.private_register_op("Gradient", Gradient::create);
             register_generated_ops();
@@ -89,32 +95,49 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> Factory::create_op_gpu(const std::shared_ptr<FunctionSpace> &space, const char *name) {
-        return Factory::create_op(space, d_op_str(name).c_str());
+#ifdef SFEM_ENABLE_CUDA
+        static bool registered_device_ops = false;
+        if (!registered_device_ops) {
+            sfem::register_device_ops();
+            registered_device_ops = true;
+        }
+#endif
+
+        assert(instance().impl_);
+
+        std::string m_name = name;
+        if (m_name.rfind("gpu:", 0) != 0) {
+            m_name = d_op_str(m_name);
+        }
+
+        auto &ntc = instance().impl_->name_to_create;
+        auto  it  = ntc.find(m_name);
+        if (it == ntc.end()) {
+            std::cerr << "Unable to find op " << m_name << "\n";
+            return nullptr;
+        }
+
+        return it->second(space);
     }
 
     std::shared_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space, const char *name) {
         assert(instance().impl_);
 
-        std::string m_name = name;
-
-        if (space->has_semi_structured_mesh()) {
-            m_name = "ss:" + m_name;
-        }
-
         auto &ntc = instance().impl_->name_to_create;
-        auto  it  = ntc.find(m_name);
+        auto  it  = ntc.find(name);
 
         if (it == ntc.end()) {
             // Try dynamic plug-in: prefix "plugin:"
             const std::string prefix = "plugin:";
-            if (m_name.rfind(prefix, 0) == 0) {
-                std::string opname = m_name.substr(prefix.size());
+            std::string       requested_name = name;
+            if (requested_name.rfind(prefix, 0) == 0) {
+                std::string opname = requested_name.substr(prefix.size());
                 auto        uop    = PlugInOp::create(space, opname);
                 if (!uop) return nullptr;
                 return std::shared_ptr<Op>(uop.release());
             }
 
-            std::cerr << "Unable to find op " << m_name << "\n";
+            std::cerr << "Unable to find op " << name << "\n";
             return nullptr;
         }
 
@@ -140,13 +163,28 @@ namespace sfem {
     std::string d_op_str(const std::string &name) { return "gpu:" + name; }
 
 #ifdef SFEM_ENABLE_RYAML
-    static std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
-                                                   const ryml::ConstNodeRef             &node,
-                                                   const ExecutionSpace                  es) {
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            const ryml::ConstNodeRef             &node,
+                                            const ExecutionSpace                  es) {
         std::string name;
         node["type"] >> name;
 
-        return create_op(space, name.c_str(), es);
+        auto prototype = create_op(space, name.c_str(), es);
+        if (!prototype) return nullptr;
+        return prototype->create_from_yaml(space, node);
+    }
+
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            std::string                           yaml,
+                                            const ExecutionSpace                  es) {
+        ryml::Tree tree = ryml::parse_in_place(ryml::to_substr(yaml));
+        auto       root = tree.rootref();
+        auto       node = root.has_child("operator") ? root["operator"] : root;
+        if (!node.has_child("type")) {
+            SFEM_ERROR("Operator YAML requires a type\n");
+            return nullptr;
+        }
+        return create_op_from_yaml(space, node, es);
     }
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem

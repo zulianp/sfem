@@ -59,21 +59,25 @@ namespace sfem {
 
         if (!impl_->mass) {
             impl_->mass = create_host_buffer<real_t>(ndofs);
-            LumpedMass lumped_mass(impl_->space);
-            if (lumped_mass.initialize(block_names) != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
+            if (impl_->density == real_t(0)) {
+                std::memset(impl_->mass->data(), 0, static_cast<size_t>(ndofs) * sizeof(real_t));
+            } else {
+                LumpedMass lumped_mass(impl_->space);
+                if (lumped_mass.initialize(block_names) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
 
-            if (lumped_mass.hessian_diag(nullptr, impl_->mass->data()) != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
+                if (lumped_mass.hessian_diag(nullptr, impl_->mass->data()) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
 
-            if (impl_->density != real_t(1)) {
                 real_t *const SFEM_RESTRICT mass = impl_->mass->data();
                 const real_t                rho  = impl_->density;
+                if (rho != real_t(1)) {
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                    mass[i] *= rho;
+                    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                        mass[i] *= rho;
+                    }
                 }
             }
         }

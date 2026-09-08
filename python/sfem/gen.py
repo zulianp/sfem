@@ -558,7 +558,7 @@ def _value_residual_integration_case(system):
     for equation in system.equations:
         if not equation.is_residual:
             continue
-        residual_system = system.form_collection(equation).source
+        residual_system = system.form_collection(equation, orders=(FormOrder.ONE,)).source
         value_symbols = set()
         for field in residual_system.fields:
             value_symbols.add(field.value)
@@ -1036,6 +1036,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
             matrix_format_plan=_matrix_format_plan_for_evaluation(evaluated),
             target=KernelTarget.OPENMP,
             coupling=coupling,
+            payload={"diagnostics": evaluated.diagnostics},
             material_name=material_name,
             unit_name=evaluated.name,
         )
@@ -1058,6 +1059,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         expression_plans=_form_collection_expression_plans(collection),
         matrix_format_plan=_matrix_format_plan_for_evaluation(evaluated),
         target=KernelTarget.OPENMP,
+        payload={"diagnostics": evaluated.diagnostics},
         material_name=material_name,
         unit_name=evaluated.name,
     )
@@ -1791,6 +1793,8 @@ def _evaluate_equation(dim, equation, form_collection, matrix_format_plan=None):
         return LoweredEquationEvaluation(
             equation.name,
             form_collection,
+            kernels=equation.kernels,
+            diagnostics=equation.diagnostics,
             matrix_format_plan=matrix_format_plan,
         )
     raise TypeError("unsupported equation form %s" % equation.form)
@@ -1800,7 +1804,7 @@ def _equation_form_orders(equation):
     if equation.is_energy:
         return _energy_form_orders(equation.kernels)
     if equation.is_residual:
-        return (FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)
+        return _residual_form_orders(equation.kernels)
     raise TypeError("unsupported equation form %s" % equation.form)
 
 
@@ -1836,6 +1840,25 @@ def _energy_form_orders(kernels):
         order = order_by_kernel.get(kernel)
         if order is not None and order not in orders:
             orders.append(order)
+    return tuple(orders)
+
+
+def _residual_form_orders(kernels):
+    order_by_kernel = {
+        "value": FormOrder.ZERO,
+        "objective": FormOrder.ZERO,
+        "gradient": FormOrder.ONE,
+        "residual": FormOrder.ONE,
+        "apply": FormOrder.TWO,
+        "jacobian_action": FormOrder.TWO,
+    }
+    orders = []
+    for kernel in kernels:
+        order = order_by_kernel.get(kernel)
+        if order is not None and order not in orders:
+            orders.append(order)
+    if not orders:
+        orders.extend((FormOrder.ONE, FormOrder.TWO))
     return tuple(orders)
 
 

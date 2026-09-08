@@ -13,6 +13,7 @@
 //
 
 #include "smesh_glob.hpp"
+#include "smesh_exchange.hpp"
 
 #include "sfem_ContactSurface.hpp"
 #include "sfem_Function.hpp"
@@ -21,6 +22,10 @@
 
 #include "smesh_restriction.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <memory>
 #include <vector>
 
 #ifdef SFEM_ENABLE_CUDA
@@ -282,58 +287,134 @@ namespace sfem {
         bool                                   variational{false};
         enum ExecutionSpace                    execution_space { EXECUTION_SPACE_HOST };
         std::shared_ptr<BLAS<real_t>>          blas_;
+        std::shared_ptr<smesh::Exchange>       volume_ex_;
 
         ~Impl() {}
+
+        bool is_mpi() const {
+            auto mesh = space->mesh_ptr();
+            return mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1 && mesh->distributed();
+        }
+
+        smesh::Exchange *volume_exchange() {
+            if (!is_mpi()) {
+                return nullptr;
+            }
+            if (!volume_ex_) {
+                volume_ex_ = smesh::Exchange::create_nodal(space->mesh_ptr(), smesh::Exchange::ExchangeScope::GhostsAndAura);
+            }
+            return volume_ex_.get();
+        }
+
+        // Scatter-add a surface nodal field through volume ghosts so interface nodes
+        // match serial lumped averages. Every rank must enter (empty contact included).
+        void complete_surface_nodal(real_t *const surf, const ptrdiff_t n_surf) {
+            auto *ex = volume_exchange();
+            if (!ex) {
+                return;
+            }
+            auto            mesh    = space->mesh_ptr();
+            const ptrdiff_t n_local = mesh->distributed()->n_nodes_local();
+            auto            vol     = create_host_buffer<real_t>(n_local);
+            auto            vd      = vol->data();
+            std::memset(vd, 0, sizeof(real_t) * static_cast<size_t>(n_local));
+            auto gmap = contact_surface->geometry_node_mapping();
+            if (gmap && surf && n_surf > 0) {
+                auto            gd  = gmap->data();
+                const ptrdiff_t n_g = std::min(n_surf, static_cast<ptrdiff_t>(gmap->size()));
+                for (ptrdiff_t i = 0; i < n_g; ++i) {
+                    const ptrdiff_t v = gd[i];
+                    if (v >= 0 && v < n_local) {
+                        vd[v] += surf[i];
+                    }
+                }
+            }
+            ex->scatter_add(vd, 1);
+            if (gmap && surf && n_surf > 0) {
+                auto            gd  = gmap->data();
+                const ptrdiff_t n_g = std::min(n_surf, static_cast<ptrdiff_t>(gmap->size()));
+                for (ptrdiff_t i = 0; i < n_g; ++i) {
+                    const ptrdiff_t v = gd[i];
+                    surf[i]           = (v >= 0 && v < n_local) ? vd[v] : real_t(0);
+                }
+            }
+        }
+
+        void gather_volume(real_t *const x) {
+            auto *ex = volume_exchange();
+            if (!ex || !x) {
+                return;
+            }
+            ex->gather(x, space->block_size());
+        }
 
         void assemble_mass_vector() {
             SFEM_TRACE_SCOPE("ContactConditions::assemble_mass_vector");
 
             contact_surface->reset_points();
 
-            auto st = contact_surface->element_type();
-            auto surface_mesh =
-                    std::make_shared<Mesh>(space->mesh_ptr()->comm(), st, contact_surface->elements(), contact_surface->points());
+            const bool mpi = is_mpi();
 
-            // surface_mesh->print();
-            auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
-            auto bop         = sfem::Factory::create_op(trace_space, "Mass");
-            bop->initialize();
-
-            mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
-
-            if (variational) {
-                resample_weight_local(
-                        // Mesh
-                        st,
-                        contact_surface->elements()->extent(1),
-                        contact_surface->node_mapping()->size(),
-                        contact_surface->elements()->data(),
-                        contact_surface->points()->data(),
-                        // Output
-                        mass_vector->data());
-
-                SMESH_CHECK_NANS(mass_vector);
-
+            if (contact_surface->node_mapping()->size() == 0) {
+                mass_vector = create_host_buffer<real_t>(0);
             } else {
-                auto ones = create_host_buffer<real_t>(trace_space->n_dofs());
-                sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
-                bop->apply(nullptr, ones->data(), mass_vector->data());
+                auto st = contact_surface->element_type();
+                auto surface_mesh = std::make_shared<Mesh>(
+                        space->mesh_ptr()->comm(), st, contact_surface->elements(), contact_surface->points());
+
+                auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
+                auto bop         = sfem::Factory::create_op(trace_space, "Mass");
+                bop->initialize();
+
+                mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
+
+                const ptrdiff_t n_geom = contact_surface->points() ? static_cast<ptrdiff_t>(contact_surface->points()->extent(1))
+                                                                  : contact_surface->node_mapping()->size();
+
+                if (variational) {
+                    resample_weight_local(
+                            st,
+                            contact_surface->elements()->extent(1),
+                            n_geom,
+                            contact_surface->elements()->data(),
+                            contact_surface->points()->data(),
+                            mass_vector->data());
+
+                    SMESH_CHECK_NANS(mass_vector);
+
+                } else {
+                    auto ones = create_host_buffer<real_t>(trace_space->n_dofs());
+                    sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
+                    bop->apply(nullptr, ones->data(), mass_vector->data());
+                }
             }
 
-            auto m = mass_vector->data();
+            if (mpi) {
+                const ptrdiff_t n_geom = mass_vector ? static_cast<ptrdiff_t>(mass_vector->size()) : 0;
+                complete_surface_nodal(mass_vector && n_geom > 0 ? mass_vector->data() : nullptr, n_geom);
+            }
 
             real_t area = 0;
-            for (ptrdiff_t i = 0; i < mass_vector->size(); i++) {
-                area += m[i];
-            }
-
+            if (mass_vector && mass_vector->size() > 0) {
+                auto            m      = mass_vector->data();
+                const ptrdiff_t n_area = contact_surface->node_mapping()->size();
+                for (ptrdiff_t i = 0; i < n_area; ++i) {
+                    area += m[i];
+                }
 #ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == execution_space) {
-                mass_vector = smesh::to_device(mass_vector);
-            }
+                if (EXECUTION_SPACE_DEVICE == execution_space) {
+                    mass_vector = smesh::to_device(mass_vector);
+                }
 #endif
+            }
 
-            printf("AREA: %g\n", (double)area);
+            auto comm = space->mesh_ptr() ? space->mesh_ptr()->comm() : nullptr;
+            if (comm) {
+                area = comm->sum(area);
+            }
+            if (!comm || comm->rank() == 0) {
+                printf("AREA: %g\n", (double)area);
+            }
             assert(area > 0);
         }
     };
@@ -341,6 +422,16 @@ namespace sfem {
     std::shared_ptr<Buffer<idx_t *>> ContactConditions::ss_sides() { return impl_->contact_surface->semi_structured_elements(); }
 
     ptrdiff_t ContactConditions::n_constrained_dofs() const { return impl_->contact_surface->node_mapping()->size(); }
+
+    static ptrdiff_t contact_geometry_n_nodes(const std::shared_ptr<ContactSurface> &cs) {
+        if (!cs) {
+            return 0;
+        }
+        if (cs->points()) {
+            return static_cast<ptrdiff_t>(cs->points()->extent(1));
+        }
+        return cs->node_mapping() ? cs->node_mapping()->size() : 0;
+    }
 
     const std::shared_ptr<Buffer<idx_t>> ContactConditions::node_mapping() { return impl_->contact_surface->node_mapping(); }
 
@@ -365,9 +456,14 @@ namespace sfem {
             cc->impl_->contact_surface = MeshContactSurface::create(space, sidesets, es);
         }
 
-        cc->impl_->normals = smesh::create_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs(), es);
         cc->impl_->execution_space = es;
         cc->impl_->blas_           = sfem::blas<real_t>(es);
+        {
+            const ptrdiff_t n_geom = cc->impl_->contact_surface->points()
+                                             ? static_cast<ptrdiff_t>(cc->impl_->contact_surface->points()->extent(1))
+                                             : cc->n_constrained_dofs();
+            cc->impl_->normals = smesh::create_buffer<real_t>(3, n_geom, es);
+        }
         cc->impl_->assemble_mass_vector();
 
         return cc;
@@ -415,31 +511,21 @@ namespace sfem {
     }
 
     int ContactConditions::signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const {
-        auto cs = impl_->contact_surface;
-        cs->displace_points(x);
-
-        auto temp = create_host_buffer<real_t>(n_constrained_dofs());
-        auto tt   = temp->data();
-
-        for (auto &obs : impl_->obstacles) {
-            int err = obs->sample(cs->element_type(),
-                                  cs->elements()->extent(1),
-                                  cs->node_mapping()->size(),
-                                  cs->elements()->data(),
-                                  cs->points()->data(),
-                                  impl_->normals->data(),
-                                  tt);
-
-            if (SFEM_SUCCESS != err) {
-                SFEM_ERROR("Unable to sample obstacle");
-            }
+        const ptrdiff_t n   = impl_->contact_surface->node_mapping()->size();
+        const int       dim = impl_->space->mesh_ptr()->spatial_dimension();
+        auto            gap = create_host_buffer<real_t>(n > 0 ? n : 0);
+        auto *          self = const_cast<ContactConditions *>(this);
+        const int       err  = self->signed_distance(x, n > 0 ? gap->data() : nullptr);
+        if (err != SFEM_SUCCESS) {
+            return err;
+        }
+        if (n <= 0 || !g) {
+            return SFEM_SUCCESS;
         }
 
-        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
-        int                dim = impl_->space->mesh_ptr()->spatial_dimension();
-
-        auto normals = impl_->normals->data();
+        const idx_t *const idx     = impl_->contact_surface->node_mapping()->data();
+        auto               normals = impl_->normals->data();
+        auto               tt      = gap->data();
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
@@ -529,6 +615,19 @@ namespace sfem {
         auto cs = impl_->contact_surface;
 
         int err = 0;
+        const ptrdiff_t n_geom = contact_geometry_n_nodes(cs);
+        const bool      mpi    = impl_->is_mpi();
+        if (cs->node_mapping()->size() == 0 && !mpi) {
+            return SFEM_SUCCESS;
+        }
+        if (mpi && impl_->normals) {
+            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            for (int d = 0; d < dim; ++d) {
+                if (impl_->normals->data()[d] && n_geom > 0) {
+                    std::memset(impl_->normals->data()[d], 0, sizeof(real_t) * static_cast<size_t>(n_geom));
+                }
+            }
+        }
         for (auto &obs : impl_->obstacles) {
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
@@ -546,18 +645,60 @@ namespace sfem {
                 continue;
             }
 #endif
-            err += obs->sample_normals(cs->element_type(),
-                                       cs->elements()->extent(1),
-                                       cs->node_mapping()->size(),
-                                       cs->elements()->data(),
-                                       cs->points()->data(),
-                                       impl_->normals->data());
+            if (mpi) {
+                if (auto sdf_obs = std::dynamic_pointer_cast<SDFObstacle>(obs)) {
+                    if (n_geom > 0 && cs->elements() && cs->points()) {
+                        err += sdf_obs->sample_normals_accumulate(cs->element_type(),
+                                                                  cs->elements()->extent(1),
+                                                                  n_geom,
+                                                                  cs->elements()->data(),
+                                                                  cs->points()->data(),
+                                                                  impl_->normals->data());
+                    }
+                } else if (n_geom > 0 && cs->elements() && cs->points()) {
+                    err += obs->sample_normals(cs->element_type(),
+                                               cs->elements()->extent(1),
+                                               n_geom,
+                                               cs->elements()->data(),
+                                               cs->points()->data(),
+                                               impl_->normals->data());
+                }
+            } else {
+                err += obs->sample_normals(cs->element_type(),
+                                           cs->elements()->extent(1),
+                                           contact_geometry_n_nodes(cs),
+                                           cs->elements()->data(),
+                                           cs->points()->data(),
+                                           impl_->normals->data());
+            }
+        }
+
+        if (mpi && impl_->normals) {
+            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            for (int d = 0; d < dim; ++d) {
+                impl_->complete_surface_nodal(impl_->normals->data()[d], n_geom);
+            }
+            auto nx = impl_->normals->data()[0];
+            auto ny = dim > 1 ? impl_->normals->data()[1] : nullptr;
+            auto nz = dim > 2 ? impl_->normals->data()[2] : nullptr;
+            for (ptrdiff_t i = 0; i < n_geom; ++i) {
+                const real_t x = nx ? nx[i] : real_t(0);
+                const real_t y = ny ? ny[i] : real_t(0);
+                const real_t z = nz ? nz[i] : real_t(0);
+                const real_t denom = std::sqrt(x * x + y * y + z * z);
+                if (denom > 0) {
+                    if (nx) nx[i] = x / denom;
+                    if (ny) ny[i] = y / denom;
+                    if (nz) nz[i] = z / denom;
+                }
+            }
         }
 
         return err;
     }
 
     int ContactConditions::update(const real_t *const x) {
+        impl_->gather_volume(const_cast<real_t *>(x));
         impl_->contact_surface->displace_points(x);
         return init();
     }
@@ -583,35 +724,93 @@ namespace sfem {
     int ContactConditions::signed_distance(real_t *const g) {
         SFEM_TRACE_SCOPE("ContactConditions::signed_distance");
 
-        auto cs  = impl_->contact_surface;
-        int  err = 0;
+        auto            cs     = impl_->contact_surface;
+        const bool      mpi    = impl_->is_mpi();
+        const ptrdiff_t n_geom = contact_geometry_n_nodes(cs);
+        const ptrdiff_t n_con  = cs->node_mapping() ? cs->node_mapping()->size() : 0;
+        if (n_con == 0 && !mpi) {
+            return SFEM_SUCCESS;
+        }
+        int err = 0;
 
+        real_t                             *gap = g;
+        std::shared_ptr<Buffer<real_t>>     temp;
+        if (n_geom != n_con || mpi) {
+            temp = create_host_buffer<real_t>(n_geom > 0 ? n_geom : 0);
+            gap  = n_geom > 0 ? temp->data() : nullptr;
+            if (gap) {
+                std::memset(gap, 0, sizeof(real_t) * static_cast<size_t>(n_geom));
+            }
+        }
+
+        for (auto &obs : impl_->obstacles) {
 #ifdef SFEM_ENABLE_CUDA
-        if (is_ptr_device(g)) {
-            SFEM_ERROR("IMPLEMENT ME!\n");
-        } else
+            if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+                assert(is_ptr_device(g));
+                assert(cs->points_device());
+                assert(is_ptr_device(cs->points_device()->data()));
+                err += obs->sample_value(cs->element_type(),
+                                         cs->elements_device()->extent(1),
+                                         cs->node_mapping_device()->size(),
+                                         cs->elements_device()->data(),
+                                         cs->points_device()->data(),
+                                         g);
+                continue;
+            }
 #endif
-        {
-            for (auto &obs : impl_->obstacles) {
-#ifdef SFEM_ENABLE_CUDA
-                if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            if (mpi) {
+                if (auto sdf_obs = std::dynamic_pointer_cast<SDFObstacle>(obs)) {
+                    if (n_geom > 0 && cs->elements() && cs->points()) {
+                        err += sdf_obs->sample_value_accumulate(cs->element_type(),
+                                                                cs->elements()->extent(1),
+                                                                n_geom,
+                                                                cs->elements()->data(),
+                                                                cs->points()->data(),
+                                                                gap);
+                    }
+                } else if (n_geom > 0 && cs->elements() && cs->points()) {
                     err += obs->sample_value(cs->element_type(),
-                                             cs->elements_device()->extent(1),
-                                             cs->node_mapping_device()->size(),
-                                             cs->elements_device()->data(),
-                                             cs->points_device()->data(),
-                                             g);
-                    continue;
+                                             cs->elements()->extent(1),
+                                             n_geom,
+                                             cs->elements()->data(),
+                                             cs->points()->data(),
+                                             gap);
                 }
-#endif
-                // FIXME always sample gap and normals together
+            } else {
                 err += obs->sample_value(cs->element_type(),
                                          cs->elements()->extent(1),
-                                         cs->node_mapping()->size(),
+                                         n_geom,
                                          cs->elements()->data(),
                                          cs->points()->data(),
-                                         g);
+                                         gap);
             }
+        }
+
+        if (mpi) {
+            impl_->complete_surface_nodal(gap, n_geom);
+            auto wbuf = create_host_buffer<real_t>(n_geom > 0 ? n_geom : 0);
+            auto w    = n_geom > 0 ? wbuf->data() : nullptr;
+            if (w) {
+                std::memset(w, 0, sizeof(real_t) * static_cast<size_t>(n_geom));
+            }
+            if (n_geom > 0 && cs->elements() && cs->points()) {
+                resample_weight_local(cs->element_type(),
+                                      cs->elements()->extent(1),
+                                      n_geom,
+                                      cs->elements()->data(),
+                                      cs->points()->data(),
+                                      w);
+            }
+            impl_->complete_surface_nodal(w, n_geom);
+            for (ptrdiff_t i = 0; i < n_geom; ++i) {
+                if (w && w[i] != real_t(0) && gap) {
+                    gap[i] /= w[i];
+                }
+            }
+        }
+
+        if (temp && g && n_con > 0 && gap) {
+            std::memcpy(g, gap, static_cast<size_t>(n_con) * sizeof(real_t));
         }
 
         return err;
@@ -626,10 +825,13 @@ namespace sfem {
     }
 
     int ContactConditions::signed_distance(const real_t *const disp, real_t *const g) {
-        if (is_ptr_device(disp)) {
-            SFEM_ERROR("IMPLEMENT ME!\n");
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            assert(is_ptr_device(disp));
+            assert(is_ptr_device(g));
         }
-
+#endif
+        impl_->gather_volume(const_cast<real_t *>(disp));
         impl_->contact_surface->displace_points(disp);
         return signed_distance(g);
     }
@@ -648,7 +850,10 @@ namespace sfem {
     int ContactConditions::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("ContactConditions::hessian_block_diag_sym");
 
-        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
+        const ptrdiff_t n = impl_->contact_surface->node_mapping()->size();
+        if (n == 0) {
+            return SFEM_SUCCESS;
+        }
         const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
 
         const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
@@ -665,3 +870,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

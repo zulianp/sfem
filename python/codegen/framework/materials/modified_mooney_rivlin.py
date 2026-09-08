@@ -19,11 +19,14 @@ def _modified_mooney_rivlin_energy(F, dim):
     J = gen.det(F_value)
     I1 = gen.inner(F_value, F_value)
     I2 = sp.Rational(1, 2) * (I1 * I1 - gen.inner(C, C))
-    I2_reference = sp.Rational(dim * (dim - 1), 2)
+    if dim == 2:
+        # Plane-strain 3D embedding (F_zz = 1): I1 += F_zz^2, I2 from block structure of C
+        I2 = I2 + I1
+        I1 = I1 + 1
 
     return (
-        c1 * (J ** sp.Rational(-2, 3) * I1 - dim)
-        + c2 * (J ** sp.Rational(-4, 3) * I2 - I2_reference)
+        c1 * (J ** sp.Rational(-2, 3) * I1 - 3)
+        + c2 * (J ** sp.Rational(-4, 3) * I2 - 3)
         + kappa * sp.log(J) ** 2 / 2
     )
 
@@ -37,7 +40,9 @@ def _build_system(dim):
             name="F",
             qualifier=gen.DEFORMATION_GRADIENT,
         )
-        system.add_energy("", _modified_mooney_rivlin_energy(F, dim), fields=(u,), variables=(F,))
+        system.add_energy(
+            "", _modified_mooney_rivlin_energy(F, dim), fields=(u,), variables=(F,)
+        )
     return system.build()
 
 

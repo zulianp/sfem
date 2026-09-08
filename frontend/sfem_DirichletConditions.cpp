@@ -18,13 +18,15 @@
 #include "smesh_sideset.hpp"
 
 #include <sys/stat.h>
+#include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <list>
-#include <map>
 #include <memory>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 // Mesh
@@ -67,8 +69,6 @@
 #include <sstream>
 #endif
 
-#include <map>
-
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #endif
@@ -79,6 +79,63 @@ namespace smesh {
 }
 
 namespace sfem {
+
+    static bool mesh_is_mpi_distributed(const std::shared_ptr<Mesh> &mesh) {
+        return mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1 && mesh->distributed() &&
+               mesh->distributed()->node_mapping();
+    }
+
+    static SharedBuffer<idx_t> coarse_nodeset_from_fine_nodeset(const std::shared_ptr<FunctionSpace> &fine_space,
+                                                                const std::shared_ptr<FunctionSpace> &coarse_space,
+                                                                const SharedBuffer<idx_t>            &fine_nodeset,
+                                                                const idx_t                           max_coarse_idx) {
+        if (!fine_nodeset || fine_nodeset->size() == 0) {
+            return create_host_buffer<idx_t>(0);
+        }
+
+        auto fm = fine_space ? fine_space->mesh_ptr() : nullptr;
+        auto cm = coarse_space ? coarse_space->mesh_ptr() : nullptr;
+        if (!mesh_is_mpi_distributed(fm) || !mesh_is_mpi_distributed(cm)) {
+            ptrdiff_t n   = 0;
+            idx_t    *idx = nullptr;
+            smesh::hierarchical_create_coarse_indices<idx_t>(
+                    max_coarse_idx, fine_nodeset->size(), fine_nodeset->data(), &n, &idx);
+            return manage_host_buffer<idx_t>(n, idx);
+        }
+
+        const ptrdiff_t n_fine_local   = fm->n_nodes();
+        const ptrdiff_t n_coarse_local = cm->n_nodes();
+        auto            fmap           = fm->distributed()->node_mapping()->data();
+        auto            cmap           = cm->distributed()->node_mapping()->data();
+
+        std::unordered_map<smesh::large_idx_t, idx_t> gid_to_coarse;
+        gid_to_coarse.reserve(static_cast<size_t>(n_coarse_local));
+        for (ptrdiff_t j = 0; j < n_coarse_local; ++j) {
+            gid_to_coarse.emplace(cmap[j], static_cast<idx_t>(j));
+        }
+
+        std::vector<idx_t> out;
+        out.reserve(static_cast<size_t>(fine_nodeset->size()));
+        auto fns = fine_nodeset->data();
+        for (ptrdiff_t k = 0; k < static_cast<ptrdiff_t>(fine_nodeset->size()); ++k) {
+            const idx_t fl = fns[k];
+            if (fl < 0 || static_cast<ptrdiff_t>(fl) >= n_fine_local) {
+                continue;
+            }
+            auto it = gid_to_coarse.find(fmap[fl]);
+            if (it != gid_to_coarse.end()) {
+                out.push_back(it->second);
+            }
+        }
+        std::sort(out.begin(), out.end());
+        out.erase(std::unique(out.begin(), out.end()), out.end());
+
+        auto buf = create_host_buffer<idx_t>(static_cast<ptrdiff_t>(out.size()));
+        if (!out.empty()) {
+            std::memcpy(buf->data(), out.data(), out.size() * sizeof(idx_t));
+        }
+        return buf;
+    }
 
     class DirichletConditions::Impl {
     public:
@@ -93,6 +150,7 @@ namespace sfem {
 
         for (auto &c : dc->impl_->conditions) {
             if (!c.nodeset) {
+                // Per-sideset extract uses Sideset::block_id(); multi-block vectors are unioned.
                 auto mesh_for_sidesets = space->mesh_ptr();
                 c.nodeset              = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, c.sidesets);
             }
@@ -106,6 +164,33 @@ namespace sfem {
 
     int DirichletConditions::n_conditions() const { return impl_->conditions.size(); }
 
+    int DirichletConditions::set_time(const real_t time, const real_t global_scale) {
+        for (auto &c : impl_->conditions) {
+            if (!c.profile_initialized) {
+                c.base_value = c.value;
+                if (c.values) {
+                    c.base_values = create_host_buffer<real_t>(static_cast<ptrdiff_t>(c.values->size()));
+                    if (!c.base_values) return SFEM_FAILURE;
+                    std::memcpy(c.base_values->data(), c.values->data(), c.values->size() * sizeof(real_t));
+                }
+                c.profile_initialized = true;
+            }
+
+            const real_t scale = global_scale * c.profile.value(time);
+            if (c.values) {
+                const ptrdiff_t n      = static_cast<ptrdiff_t>(c.values->size());
+                const real_t   *base   = c.base_values->data();
+                real_t         *values = c.values->data();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) values[i] = scale * base[i];
+            } else {
+                c.value = scale * c.base_value;
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
@@ -114,87 +199,45 @@ namespace sfem {
                                                               const bool                            as_zero) const {
         SFEM_TRACE_SCOPE("DirichletConditions::derefine");
 
-        auto space = impl_->space;
-        auto mesh  = space->mesh_ptr();
-        auto et    = (smesh::ElemType)space->element_type();
+        auto coarse = std::make_shared<DirichletConditions>(coarse_space);
+        auto &conds = impl_->conditions;
 
-        // FIXME
-        auto coarse_restriction_mesh = (!coarse_space->has_semi_structured_mesh() && space->has_semi_structured_mesh())
-                                               ? smesh::derefine(mesh, 1)
-                                               : nullptr;
+        // Hierarchical SS numbering puts coarse nodes at ids 0 .. n_coarse-1.
+        // Do not scan the fine SoA with the coarse element type: those local slots are not the
+        // coarse subset, so max_node_id can exceed the coarse vector length.
+        const int       coarse_bs      = std::max(coarse_space->block_size(), 1);
+        const ptrdiff_t n_coarse_nodes = coarse_space->n_dofs() / coarse_bs;
+        const idx_t     max_coarse_idx = n_coarse_nodes > 0 ? static_cast<idx_t>(n_coarse_nodes - 1) : static_cast<idx_t>(0);
 
-        ptrdiff_t max_coarse_idx = -1;
-        auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);
-        auto     &conds          = impl_->conditions;
-
-        std::map<std::shared_ptr<Sideset>, std::shared_ptr<Buffer<idx_t>>> sideset_to_nodeset;
         for (size_t i = 0; i < conds.size(); i++) {
             if (conds[i].nodeset->size() == 0) {
                 continue;
             }
-
-            ptrdiff_t coarse_num_nodes = 0;
-            idx_t    *coarse_nodeset   = nullptr;
 
             struct Condition cdc;
             cdc.sidesets  = conds[i].sidesets;
             cdc.component = conds[i].component;
             cdc.value     = as_zero ? 0 : conds[i].value;
 
-            // FIXME
+            const bool mpi = mesh_is_mpi_distributed(impl_->space->mesh_ptr()) &&
+                             mesh_is_mpi_distributed(coarse_space->mesh_ptr());
 
-            if (cdc.sidesets.empty()) {
-                if (max_coarse_idx == -1) {
-                    if (coarse_restriction_mesh) {
-                        max_coarse_idx = smesh::max_node_id(coarse_restriction_mesh->element_type(0),
-                                                            coarse_restriction_mesh->n_elements(),
-                                                            coarse_restriction_mesh->elements(0)->data());
-                    } else {
-                        max_coarse_idx =
-                                smesh::max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements(0)->data());
-                    }
-                }
+            // Intermediate SS levels (e.g. PROTEUS_HEX125) are still semistructured. Recreating
+            // the nodeset from sidesets calls LocalSideTable, which has no HEX-SS face tables.
+            // Hierarchical / GID filtering of the fine nodeset is valid on serial and MPI.
+            if (n_coarse_nodes <= 0) {
+                cdc.nodeset = create_host_buffer<idx_t>(0);
+            } else {
+                cdc.nodeset = coarse_nodeset_from_fine_nodeset(
+                        impl_->space, coarse_space, conds[i].nodeset, max_coarse_idx);
 
-                smesh::hierarchical_create_coarse_indices<idx_t>(
-                        max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
-                cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
-
-                if (!as_zero && conds[i].values) {
-                    cdc.values = create_host_buffer<real_t>(coarse_num_nodes);
+                if (!as_zero && conds[i].values && !mpi) {
+                    cdc.values = create_host_buffer<real_t>(static_cast<ptrdiff_t>(cdc.nodeset->size()));
                     smesh::hierarchical_collect_coarse_values<idx_t>(max_coarse_idx,
                                                                      conds[i].nodeset->size(),
                                                                      conds[i].nodeset->data(),
                                                                      conds[i].values->data(),
                                                                      cdc.values->data());
-                }
-
-            } else {
-                assert(as_zero);
-                if (!coarse_space->has_semi_structured_mesh()) {
-                    if (max_coarse_idx == -1) {
-                        max_coarse_idx = smesh::max_node_id(coarse_restriction_mesh->element_type(0),
-                                                            coarse_restriction_mesh->n_elements(),
-                                                            coarse_restriction_mesh->elements(0)->data());
-                    }
-
-                    smesh::hierarchical_create_coarse_indices<idx_t>(max_coarse_idx,
-                                                                     conds[i].nodeset->size(),
-                                                                     conds[i].nodeset->data(),
-                                                                     &coarse_num_nodes,
-                                                                     &coarse_nodeset);
-                    cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
-                } else {
-                    // Use first sideset to find nodeset
-                    auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);
-                    if (it == sideset_to_nodeset.end()) {
-                        auto mesh_for_sidesets = coarse_space->mesh_ptr();
-                        auto nodeset           = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, cdc.sidesets);
-                        cdc.nodeset            = nodeset;
-                        sideset_to_nodeset[conds[i].sidesets[0]] = nodeset;
-
-                    } else {
-                        cdc.nodeset = it->second;
-                    }
                 }
             }
 
@@ -343,6 +386,8 @@ namespace sfem {
                         }
                     }
 
+                    conds[i].values = values;
+
                 } else {
                     conds[i].value = atof(pch);
                 }
@@ -417,15 +462,32 @@ namespace sfem {
                 }
             }
 
-            std::vector<int>    component;
-            std::vector<real_t> value;
-            auto                node_value     = c["value"];
-            auto                node_component = c["component"];
+            std::vector<int>     component;
+            std::vector<real_t>  value;
+            SharedBuffer<real_t> file_values;
+            auto                 node_value     = c["value"];
+            auto                 node_component = c["component"];
 
             assert(node_value.readable());
             assert(node_component.readable());
 
-            if (node_value.is_seq()) {
+            if (node_value.is_map()) {
+                if (!node_value.has_child("path")) {
+                    SFEM_ERROR("File-backed Dirichlet value requires path\n");
+                    return nullptr;
+                }
+
+                std::string value_path;
+                node_value["path"] >> value_path;
+                file_values = Buffer<real_t>::from_file(smesh::Path(value_path));
+                if (!file_values || file_values->size() != nodeset->size()) {
+                    SFEM_ERROR("Dirichlet value file %s has %td entries; expected %td\n",
+                               value_path.c_str(),
+                               file_values ? static_cast<ptrdiff_t>(file_values->size()) : ptrdiff_t(0),
+                               static_cast<ptrdiff_t>(nodeset->size()));
+                    return nullptr;
+                }
+            } else if (node_value.is_seq()) {
                 node_value >> value;
             } else {
                 value.resize(1);
@@ -439,16 +501,27 @@ namespace sfem {
                 node_component >> component[0];
             }
 
-            if (component.size() != value.size()) {
-                SFEM_ERROR("Inconsistent sizes for component (%d) and value (%d)\n", (int)component.size(), (int)value.size());
+            if (file_values && component.size() != 1) {
+                SFEM_ERROR("A file-backed Dirichlet value requires exactly one component\n");
+                return nullptr;
             }
+
+            if (!file_values && component.size() != value.size()) {
+                SFEM_ERROR("Inconsistent sizes for component (%d) and value (%d)\n", (int)component.size(), (int)value.size());
+                return nullptr;
+            }
+
+            LoadProfile profile;
+            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile) != SFEM_SUCCESS) return nullptr;
 
             for (size_t i = 0; i < component.size(); i++) {
                 struct Condition cdc;
                 cdc.component = component[i];
-                cdc.value     = value[i];
+                cdc.value     = file_values ? 0 : value[i];
+                cdc.values    = file_values;
                 cdc.sidesets.push_back(sideset);
                 cdc.nodeset = nodeset;
+                cdc.profile = profile;
                 dc->impl_->conditions.push_back(cdc);
             }
         }

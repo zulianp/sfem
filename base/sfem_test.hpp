@@ -17,7 +17,9 @@
 #define SFEM_UNIT_TEST_INIT(argc, argv)            \
     auto context__ = sfem::initialize(argc, argv); \
     smesh_print_test_info();                       \
-    int err = 0;
+    const int smesh_test_argc__ = argc;            \
+    char **smesh_test_argv__    = argv;            \
+    int err                     = 0;
 
 #define SFEM_RUN_TEST(test_) SMESH_RUN_TEST(test_)
 #define SFEM_UNIT_TEST_FINALIZE() SMESH_UNIT_TEST_FINALIZE()

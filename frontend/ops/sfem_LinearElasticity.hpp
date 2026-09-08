@@ -34,7 +34,7 @@ namespace sfem {
      * - Level-of-refinement (LOR) and derefinement
      * - Performance optimization with precomputed Jacobians
      * - Multi-domain operations via MultiDomainOp
-     * - Semi-structured Proteus hex (same paths as former @c ss:LinearElasticity): @c apply /
+         * - Semi-structured Proteus hex: @c apply /
      *   @c gradient / @c hessian_bsr / @c hessian_diag / @c hessian_block_diag_sym when
      *   @c has_semi_structured_mesh() and @c is_semistructured_type(element_type).
      */
@@ -125,6 +125,16 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override;
         int value(const real_t *x, real_t *const out) override;
+
+        int gradient(const real_t *const x, real_t *const out, const ElementScope scope) override;
+        int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override;
+
+        int apply_scope_flat_range(const real_t *const x,
+                                   const real_t *const h,
+                                   real_t *const       out,
+                                   const ElementScope  scope,
+                                   const ptrdiff_t     flat_begin,
+                                   const ptrdiff_t     flat_end) override;
 
         int value_steps(const real_t       *x,
                         const real_t       *h,
