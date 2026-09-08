@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(cvfem_tet4_ns_upwind_bench LANGUAGES C CXX)
+# A standalone project, deliberately: the SFEM root build never adds this directory, and
+# the spike is developed and benchmarked against an *installed* SFEM. The layout below
+# nonetheless follows SFEM's own conventions -- named module directories globbed into one
+# library, each placed flat on the include path, drivers and tests discovered by globbing
+# their directory -- so that moving between the two costs nothing.
+project(cvfem LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,254 +38,139 @@ endif()
 find_package(OpenMP COMPONENTS CXX)
 enable_testing()
 
-option(CVFEM_ENABLE_SUBPAR "Build the quarantined CVFEM variants in subpar/" OFF)
+# ---------------------------------------------------------------------- options
+# Declared together rather than scattered through the file. CUDA is off by default
+# because the CPU targets must keep building on a machine with no CUDA toolkit, which
+# is where most of this spike is developed.
+option(CVFEM_ENABLE_CUDA "Build the CVFEM HEX8 CUDA targets" OFF)
 
-# BLAS for the element-matrix gemm path. Off by default so the build stays dependency
-# free, but worth turning on wherever this is benchmarked: without it
-# packed_elements_matmul falls back to a triple loop, and a "gemm" measurement that is
-# really a hand-rolled loop says nothing about the gemm. Accelerate supplies the Fortran
-# BLAS symbols on Apple; elsewhere the standard BLAS package is used.
-option(CVFEM_ENABLE_BLAS "Use BLAS for the element-matrix gemm path" OFF)
-set(_cvfem_blas_libs)
-if(CVFEM_ENABLE_BLAS)
-    if(APPLE)
-        find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
-        set(_cvfem_blas_libs ${ACCELERATE_FRAMEWORK})
-        message(STATUS "cvfem BLAS: Accelerate")
-    else()
-        find_package(BLAS REQUIRED)
-        set(_cvfem_blas_libs ${BLAS_LIBRARIES})
-        message(STATUS "cvfem BLAS: ${BLAS_LIBRARIES}")
-    endif()
-endif()
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(CVFEMCMakeFunctions)
 
-# Tracing is compiled into SFEM and smesh but the define does not reach consumers: neither
-# package exports SMESH_ENABLE_TRACE as an INTERFACE_COMPILE_DEFINITIONS, so every
-# SFEM_TRACE_SCOPE in this spike's own translation units expands to nothing and the kernels
-# are invisible in the trace. The scopes are already there -- and already name the variant
-# (apply_macro_local_hoisted vs apply_macro_local_affine vs apply_naive, residual vs
-# residual_naive, block_diag vs block_diag_naive) -- so switching the define on is all that
-# is needed to see which kernel runs and for how long.
-#
-# On by default, matching SFEM_ENABLE_TRACE and SMESH_ENABLE_TRACE upstream. The tracer keeps
-# a map of name -> (calls, total) and writes it at exit; the per-scope cost is a clock read.
-option(CVFEM_ENABLE_TRACE "Compile SFEM_TRACE_SCOPE in this spike's own sources" ON)
-function(cvfem_trace_target tgt)
-    if(CVFEM_ENABLE_TRACE)
-        target_compile_definitions(${tgt} PRIVATE SMESH_ENABLE_TRACE SFEM_ENABLE_TRACE)
-    endif()
-endfunction()
-
-function(cvfem_blas_target tgt)
-    if(CVFEM_ENABLE_BLAS)
-        target_compile_definitions(${tgt} PRIVATE SFEM_ENABLE_BLAS)
-        target_link_libraries(${tgt} PRIVATE ${_cvfem_blas_libs})
-    endif()
-endfunction()
-
-# Applied to every target that can reach a quarantined variant. Without the option the
-# subpar/ headers are not on the include path at all, so a stray #include fails loudly
-# rather than silently resurrecting a removed kernel.
-function(cvfem_subpar_target tgt)
-    if(CVFEM_ENABLE_SUBPAR)
-        target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_SUBPAR)
-        target_include_directories(${tgt} PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/subpar
-            ${CMAKE_CURRENT_SOURCE_DIR}/subpar/cuda)
-    endif()
-endfunction()
-
-# Every cvfem header is included by bare filename, never by path, so each source module
-# directory goes on the include path -- the arrangement SFEM uses for its own modules
-# (see the SFEM_BUILD_INCLUDES loop in the top-level CMakeLists.txt).
+# ---------------------------------------------------------------------- modules
+# Every cvfem header is included by bare filename, never by path, so each module
+# directory goes on the include path. This mirrors the SFEM_MODULES / scan_directories
+# loop in SFEM's own top-level CMakeLists.txt, and reuses its function where the SFEM
+# source tree is reachable -- the spike already compiles against ../../algebra.
 set(CVFEM_MODULES src/core src/hex8 src/tet4 src/generated src/ss src/op src/cases)
-set(CVFEM_INCLUDE_DIRS)
-foreach(_mod ${CVFEM_MODULES})
-    list(APPEND CVFEM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/${_mod})
-endforeach()
 
-set(_cvfem_perf_opts)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    list(APPEND _cvfem_perf_opts
-        -O3
-        -DNDEBUG
-        -ffast-math
-        # Load-bearing, do not remove. -ffast-math implies -ffinite-math-only,
-        # under which the compiler may assume no NaN and no infinity ever occurs.
-        # It then folds every std::isfinite()/std::isnan() guard to a constant
-        # `true` -- including the ones in drivers/cvfem_hex8_ns_steady.cpp that exist to
-        # catch a singular preconditioner block or a diverged Newton residual.
-        # The guards failed *open*: the solver proceeded on a NaN state instead
-        # of reporting failure. Verified on the generated code, where the guard
-        # compiled to `mov w0, #1; ret`.
-        #
-        # This cannot be worked around in the source. A bit test on the IEEE
-        # exponent field folds away too, because the optimizer propagates the
-        # assumption through the double-typed value before the bits are ever
-        # read -- so does the same test behind a pointer, once the producing
-        # arithmetic is visible in the same function.
-        #
-        # -fno-finite-math-only restores NaN/Inf handling while keeping the rest
-        # of -ffast-math (reassociation, FMA contraction, no-signed-zeros,
-        # reciprocal math).
-        #
-        # It is not codegen-neutral, and the change is in our favour. Measured on
-        # 72 Grace cores, interleaved A/B, medians of 5: assembly is flat (sympy
-        # 56.8 -> 56.2, sumfact 39.5 -> 39.5, store 74.0 -> 74.1, packed 54.9 ->
-        # 54.6) while the packed matrix-free operators gain (residual 2320 ->
-        # 2457, +5.9%; J*v 1873 -> 2028, +8.2%). The cause is visible in the
-        # object code: cvfem_hex8_conv_all_simd and _conv_all_jv_simd stop being
-        # emitted out of line (4328 and 6200 bytes -> 12-byte stubs) and are
-        # inlined into the packed loops instead, and the large SymPy Jacobian
-        # kernels shrink 10-17%. Worst cell measured was atomic residual at
-        # -1.5%, inside this machine's ~4% run-to-run band.
-        -fno-finite-math-only
-        -funroll-loops
-        -fomit-frame-pointer
-        -fno-math-errno
-        -fno-trapping-math
-        -ffp-contract=fast)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
-        list(APPEND _cvfem_perf_opts -mcpu=native -mtune=native)
-    else()
-        list(APPEND _cvfem_perf_opts -march=native -mtune=native)
-    endif()
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
-        list(APPEND _cvfem_perf_opts -fvectorize -fslp-vectorize)
-    else()
-        list(APPEND _cvfem_perf_opts -ftree-vectorize)
-    endif()
-    message(STATUS "cvfem performance flags: ${_cvfem_perf_opts}")
+set(_sfem_cmake_functions ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/SFEMCMakeFunctions.cmake)
+if(EXISTS ${_sfem_cmake_functions})
+    include(${_sfem_cmake_functions})
+    foreach(MODULE ${CVFEM_MODULES})
+        scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "."
+                         CVFEM_INCLUDE_DIRS CVFEM_HEADERS CVFEM_SOURCES)
+    endforeach()
+else()
+    # Detached copy of the spike: same result without the SFEM source tree.
+    foreach(MODULE ${CVFEM_MODULES})
+        file(GLOB _mod_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cpp")
+        file(GLOB _mod_headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.hpp")
+        list(APPEND CVFEM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/${MODULE})
+        list(APPEND CVFEM_SOURCES ${_mod_sources})
+        list(APPEND CVFEM_HEADERS ${_mod_headers})
+    endforeach()
 endif()
 
-foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baseline cvfem_hex8_ns_upwind_bench)
-    add_executable(${_cvfem_tgt} drivers/${_cvfem_tgt}.cpp)
-    target_link_libraries(${_cvfem_tgt}
-        PRIVATE
-            SFEM::sfem
-            $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
-    target_compile_options(${_cvfem_tgt} PRIVATE ${_cvfem_perf_opts})
-    target_include_directories(${_cvfem_tgt} PRIVATE ${CVFEM_INCLUDE_DIRS})
-    cvfem_subpar_target(${_cvfem_tgt})
-    cvfem_trace_target(${_cvfem_tgt})
+# The SFEM source tree, for the two headers that are reached in place rather than through
+# the install. Kept explicit so it is obvious which targets pay for the coupling.
+set(CVFEM_SFEM_ALGEBRA_INCLUDES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
+set(CVFEM_SFEM_OPERATORS_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../operators)
+
+# ---------------------------------------------------------------------- library
+# The sfem::Op face of the kernels, for the semi-structured GMG work. Kept as a library so
+# the Op compiles and is gated on its own before any driver depends on it.
+add_library(cvfem_ns_op STATIC ${CVFEM_SOURCES} ${CVFEM_HEADERS})
+target_link_libraries(cvfem_ns_op
+    PUBLIC
+        SFEM::sfem
+        $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+target_include_directories(cvfem_ns_op PUBLIC
+    ${CVFEM_INCLUDE_DIRS}
+    ${CVFEM_SFEM_ALGEBRA_INCLUDES})
+cvfem_target_defaults(cvfem_ns_op)
+
+# ---------------------------------------------------------------------- drivers
+# One executable per file in drivers/, named after the file, as SFEM does for drivers/.
+# Most link SFEM directly; the ones below go through the Op library.
+set(CVFEM_OP_DRIVERS cvfem_hex8_ns_ssgmg cvfem_ns_apply_bench cvfem_sshex8_bench)
+
+file(GLOB CVFEM_DRIVERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/drivers/*.cpp")
+foreach(DRIVER ${CVFEM_DRIVERS})
+    get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
+    add_executable(${DRIVER_NAME} ${DRIVER})
+    if(DRIVER_NAME IN_LIST CVFEM_OP_DRIVERS)
+        target_link_libraries(${DRIVER_NAME} PRIVATE cvfem_ns_op)
+    else()
+        target_link_libraries(${DRIVER_NAME}
+            PRIVATE
+                SFEM::sfem
+                $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+    endif()
+    cvfem_target_defaults(${DRIVER_NAME})
 endforeach()
 
-# How much of the matrix the velocity-dependent half ever touches.
-add_executable(nlcover drivers/nlcover.cpp)
-target_link_libraries(nlcover PRIVATE SFEM::sfem
-    $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
-target_compile_options(nlcover PRIVATE ${_cvfem_perf_opts})
-target_include_directories(nlcover PRIVATE ${CVFEM_INCLUDE_DIRS})
-cvfem_subpar_target(nlcover)
-cvfem_trace_target(nlcover)
+# The steady solver reaches into SFEM's algebra headers in place; the Op-linked drivers
+# get the same directories through cvfem_ns_op's PUBLIC includes.
+target_include_directories(cvfem_hex8_ns_steady PRIVATE ${CVFEM_SFEM_ALGEBRA_INCLUDES})
 
-# Guards the guards. Built with exactly the solver's flags, so it fails if the
-# build's floating-point options have folded drivers/cvfem_hex8_ns_steady.cpp's
-# std::isfinite() checks into a constant `true`. See the -fno-finite-math-only
-# comment above. Run it in CI; it takes microseconds.
+# T3: the macro-local gather on a semi-structured mesh, against the flat gather on the same
+# mesh. The only target built against BLAS -- the gemm path it measures is the only place
+# it would change a number.
+target_include_directories(cvfem_sshex8_bench PRIVATE ${CVFEM_SFEM_OPERATORS_INCLUDES})
+cvfem_blas_target(cvfem_sshex8_bench)
+add_test(NAME cvfem_sshex8_agree COMMAND cvfem_sshex8_bench)
+set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0")
+
+# ------------------------------------------------------------------------ tests
+# One test per file in tests/, filename == target name == ctest name, as SFEM does for
+# <module>/tests/. What each one gates:
+#   cvfem_ns_op_gate       the Op reproduces the standalone driver on the same mesh and
+#                          state -- the gate everything downstream of the Op rests on.
+#   cvfem_ns_op_isolation  compile-time proof that the operator header is usable from any
+#                          driver: it leaks none of the solver core and coexists with the
+#                          benchmark's layout family. Failure mode is a build error.
+#   tests_lshape_check     the L-shape generator's element and node counts against their
+#                          closed forms.
+file(GLOB CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_guard_selftest.cpp)
+
+set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation)
+foreach(TEST_SOURCE ${CVFEM_TESTS})
+    get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
+    add_executable(${TEST_NAME} ${TEST_SOURCE})
+    if(TEST_NAME IN_LIST CVFEM_OP_TESTS)
+        target_link_libraries(${TEST_NAME} PRIVATE cvfem_ns_op)
+    else()
+        target_link_libraries(${TEST_NAME}
+            PRIVATE
+                SFEM::sfem
+                $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+    endif()
+    cvfem_target_defaults(${TEST_NAME})
+    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+endforeach()
+
+# Guards the guards, and so is the one target that must not go through
+# cvfem_target_defaults: it links nothing and defines nothing, because what it tests is
+# the build's floating-point options in isolation. It fails if they have folded
+# drivers/cvfem_hex8_ns_steady.cpp's std::isfinite() checks into a constant `true`. See
+# the -fno-finite-math-only comment in cmake/CVFEMCMakeFunctions.cmake. Run it in CI; it
+# takes microseconds.
 add_executable(cvfem_guard_selftest tests/cvfem_guard_selftest.cpp)
 target_compile_options(cvfem_guard_selftest PRIVATE ${_cvfem_perf_opts})
 target_include_directories(cvfem_guard_selftest PRIVATE ${CVFEM_INCLUDE_DIRS})
 add_test(NAME cvfem_guard_selftest COMMAND cvfem_guard_selftest)
 
-add_executable(cvfem_hex8_ns_steady drivers/cvfem_hex8_ns_steady.cpp)
-target_link_libraries(cvfem_hex8_ns_steady
-    PRIVATE
-        SFEM::sfem
-        $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
-target_compile_options(cvfem_hex8_ns_steady PRIVATE ${_cvfem_perf_opts})
-target_include_directories(cvfem_hex8_ns_steady PRIVATE
-    ${CVFEM_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
-cvfem_subpar_target(cvfem_hex8_ns_steady)
-cvfem_trace_target(cvfem_hex8_ns_steady)
-
-# The sfem::Op face of the same kernels, for the semi-structured GMG work. Kept as a
-# library so the Op compiles and is gated on its own before any driver depends on it.
-add_library(cvfem_ns_op STATIC
-    src/op/cvfem_hex8_ns_op.cpp
-    src/ss/cvfem_ss_galerkin.cpp
-    src/ss/cvfem_ss_vanka.cpp)
-target_link_libraries(cvfem_ns_op
-    PUBLIC
-        SFEM::sfem
-        $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
-target_compile_options(cvfem_ns_op PRIVATE ${_cvfem_perf_opts})
-target_include_directories(cvfem_ns_op PUBLIC
-    ${CVFEM_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
-cvfem_subpar_target(cvfem_ns_op)
-cvfem_trace_target(cvfem_ns_op)
-
-# Proves the Op reproduces the standalone driver on the same mesh and state. Cheap
-# enough to be a ctest, and it is the gate everything downstream of the Op rests on.
-add_executable(cvfem_ns_op_gate tests/cvfem_ns_op_gate.cpp)
-target_link_libraries(cvfem_ns_op_gate PRIVATE cvfem_ns_op)
-target_compile_options(cvfem_ns_op_gate PRIVATE ${_cvfem_perf_opts})
-cvfem_subpar_target(cvfem_ns_op_gate)
-cvfem_trace_target(cvfem_ns_op_gate)
-add_test(NAME cvfem_ns_op_gate COMMAND cvfem_ns_op_gate)
-
-# Compile-time proof that the operator header is usable from any driver: it leaks none
-# of the solver core, and it coexists with the benchmark's layout family. Failure mode
-# is a build error, which is the point.
-add_executable(cvfem_ns_op_isolation tests/cvfem_ns_op_isolation.cpp)
-target_link_libraries(cvfem_ns_op_isolation PRIVATE cvfem_ns_op)
-target_compile_options(cvfem_ns_op_isolation PRIVATE ${_cvfem_perf_opts})
-cvfem_subpar_target(cvfem_ns_op_isolation)
-cvfem_trace_target(cvfem_ns_op_isolation)
-add_test(NAME cvfem_ns_op_isolation COMMAND cvfem_ns_op_isolation)
-
-# The frontend-driven solver: same channel problem through sfem::Function, on the way to
-# the semi-structured multigrid hierarchy.
-add_executable(cvfem_hex8_ns_ssgmg drivers/cvfem_hex8_ns_ssgmg.cpp)
-target_link_libraries(cvfem_hex8_ns_ssgmg PRIVATE cvfem_ns_op)
-target_compile_options(cvfem_hex8_ns_ssgmg PRIVATE ${_cvfem_perf_opts})
-cvfem_subpar_target(cvfem_hex8_ns_ssgmg)
-cvfem_trace_target(cvfem_hex8_ns_ssgmg)
-
-# Throughput of the operator kernels on their own, swept across sizes so the saturated
-# figure is a plateau rather than an assumption. Baseline for the semi-structured work.
-add_executable(cvfem_ns_apply_bench drivers/cvfem_ns_apply_bench.cpp)
-target_link_libraries(cvfem_ns_apply_bench PRIVATE cvfem_ns_op)
-target_compile_options(cvfem_ns_apply_bench PRIVATE ${_cvfem_perf_opts})
-cvfem_subpar_target(cvfem_ns_apply_bench)
-cvfem_trace_target(cvfem_ns_apply_bench)
-
-# T3: the macro-local gather on a semi-structured mesh, against the flat gather on the
-# same mesh. Doubles as a correctness test -- the two must agree to round-off.
-add_executable(cvfem_sshex8_bench drivers/cvfem_sshex8_bench.cpp)
-target_link_libraries(cvfem_sshex8_bench PRIVATE cvfem_ns_op)
-target_compile_options(cvfem_sshex8_bench PRIVATE ${_cvfem_perf_opts})
-target_include_directories(cvfem_sshex8_bench PRIVATE
-    ${CVFEM_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../operators)
-cvfem_subpar_target(cvfem_sshex8_bench)
-cvfem_trace_target(cvfem_sshex8_bench)
-cvfem_blas_target(cvfem_sshex8_bench)
-add_test(NAME cvfem_sshex8_agree COMMAND cvfem_sshex8_bench)
-set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0")
-
-# set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
-#     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-
-# ---------------------------------------------------------------------- CUDA
-# Off by default: the CPU targets above must keep building on a machine with no
-# CUDA toolkit, which is where most of this spike is developed.
-# Variants that were measured, lost, and were moved to subpar/ rather than deleted.
-# OFF by default; ON keeps them compiling so the removal decisions stay reproducible on
-# other hardware. subpar/README.md records what each one measured and where it lost.
-
-option(CVFEM_ENABLE_CUDA "Build the CVFEM HEX8 CUDA targets" OFF)
-
+# ------------------------------------------------------------------------- CUDA
 if(CVFEM_ENABLE_CUDA)
     include(CheckLanguage)
     check_language(CUDA)
     if(NOT CMAKE_CUDA_COMPILER)
         message(FATAL_ERROR "CVFEM_ENABLE_CUDA=ON but no CUDA compiler was found. "
-                            "On Alps, build inside the prgenv-gnu uenv (see alps_env.sh).")
+                            "On Alps, build inside the prgenv-gnu uenv (see scripts/alps_env.sh).")
     endif()
 
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
