@@ -742,7 +742,13 @@ class CoupledResidualSystemTest(unittest.TestCase):
         if compiler is None:
             self.skipTest("c++ compiler is not available")
 
-        for element in ("TRI3", "TET4", "HEX8"):
+        # HEX8 only.  TRI3 and TET4 are constant-P1 simplices and publish no
+        # isoparametric kernel any more -- their affine one computes the same
+        # numbers from a Jacobian that does not vary over the cell -- so there
+        # is nothing here for them to match.  The simplex isoparametric path
+        # would need TET10, which this module's `_element_emission_plan` helper
+        # does not build.
+        for element in ("HEX8",):
             rule = sfem_element_quadrature_rule(element)
             system, _, _ = two_field_diffusion_system(rule.dim)
             files = generate_coupled_residual_sfem_files(
