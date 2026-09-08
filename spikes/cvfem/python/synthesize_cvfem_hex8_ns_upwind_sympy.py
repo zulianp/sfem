@@ -3,10 +3,22 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import sympy as sp
-from sympy.printing.c import C99CodePrinter
+
+from cvfem_codegen import (
+    N_FIELD,
+    ScalarPrinter,
+    add_output_arguments,
+    cse_emit,
+    dof,
+    emit,
+    face_flux_residual,
+    jac_block_exprs as _jac_block_exprs,
+    sign_locals as _sign_locals,
+)
 
 
 HERE = Path(__file__).resolve().parent
@@ -16,7 +28,6 @@ SPIKE_ROOT = HERE.parent
 OUT = SPIKE_ROOT / "src" / "generated" / "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 
 N_NODE = 8
-N_FIELD = 4
 N_DOF = N_NODE * N_FIELD
 
 SCS = (
@@ -81,36 +92,6 @@ def dn_ref_at(xi, eta, zeta):
     )
 
 
-class ScalarPrinter(C99CodePrinter):
-    def _print_Rational(self, expr: sp.Rational) -> str:
-        return f"scalar_t({expr.p}) / scalar_t({expr.q})"
-
-    def _print_Integer(self, expr: sp.Integer) -> str:
-        return f"scalar_t({int(expr)})"
-
-    def _print_Float(self, expr: sp.Float) -> str:
-        return f"scalar_t({float(expr):.17g})"
-
-    def _print_Pow(self, expr: sp.Expr) -> str:
-        # Pin the reciprocal spelling to the scalar type. C99CodePrinter has
-        # rendered this as "1.0/x" in older SymPy and as "scalar_t(1)/x" in newer
-        # releases (which routes the 1 through _print_Integer), so without this
-        # override the generated text depends on the SymPy version.
-        #
-        # Note this is about output stability, NOT precision: "1.0/x" with a float
-        # x is not in fact a double division in the emitted code. float->double->
-        # float is exactly narrowable for +-*/, so the compiler contracts it; both
-        # spellings were measured to produce byte-identical object code.
-        if expr.exp == -1:
-            from sympy.printing.precedence import PRECEDENCE
-            return f"scalar_t(1)/{self.parenthesize(expr.base, PRECEDENCE['Mul'])}"
-        return super()._print_Pow(expr)
-
-
-def dof(node: int, field: int) -> int:
-    return node * N_FIELD + field
-
-
 def build_symbols() -> dict[str, object]:
     return {
         "rho": sp.Symbol("rho"),
@@ -172,45 +153,26 @@ def velocity_gradient(sym: dict[str, object], face: int | None = None) -> tuple[
 
 
 def face_residual_expr(sym: dict[str, object], s: int, isoparam: bool = False) -> tuple[list[sp.Expr], sp.Expr]:
-    rho = sym["rho"]
-    mu = sym["mu"]
-    ux = sym["ux"]
-    uy = sym["uy"]
-    uz = sym["uz"]
-    p = sym["p"]
-    sgn = sym["sgn"]
+    """The flux across sub-control surface ``s``.
 
-    r = [sp.Integer(0)] * N_DOF
-    face = s if isoparam else None
-    g00, g01, g02, g10, g11, g12, g20, g21, g22 = velocity_gradient(sym, face)
+    Only the geometry is HEX8-specific: the area vector and the velocity gradient come
+    either from the element-affine adjugate or, under ``isoparam``, from the adjugate
+    evaluated at that surface. The flux algebra itself is shared with TET4.
+    """
     i, j, ar = SCS[s]
-    ax, ay, az = area(sym, ar, face)
-    adv_x = sp.Rational(1, 2) * (ux[i] + ux[j])
-    adv_y = sp.Rational(1, 2) * (uy[i] + uy[j])
-    adv_z = sp.Rational(1, 2) * (uz[i] + uz[j])
-    mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az)
-    mdot_abs = sgn[s] * mdot
-    mdot_pos = sp.Rational(1, 2) * (mdot + mdot_abs)
-    mdot_neg = sp.Rational(1, 2) * (mdot - mdot_abs)
-    p_mid = sp.Rational(1, 2) * (p[i] + p[j])
-
-    tau_x = mu * ((2 * g00) * ax + (g01 + g10) * ay + (g02 + g20) * az)
-    tau_y = mu * ((g10 + g01) * ax + (2 * g11) * ay + (g12 + g21) * az)
-    tau_z = mu * ((g20 + g02) * ax + (g21 + g12) * ay + (2 * g22) * az)
-
-    fx = mdot_pos * ux[i] + mdot_neg * ux[j] + p_mid * ax - tau_x
-    fy = mdot_pos * uy[i] + mdot_neg * uy[j] + p_mid * ay - tau_y
-    fz = mdot_pos * uz[i] + mdot_neg * uz[j] + p_mid * az - tau_z
-
-    r[dof(i, 0)] += fx
-    r[dof(i, 1)] += fy
-    r[dof(i, 2)] += fz
-    r[dof(i, 3)] += mdot
-    r[dof(j, 0)] -= fx
-    r[dof(j, 1)] -= fy
-    r[dof(j, 2)] -= fz
-    r[dof(j, 3)] -= mdot
-    return r, mdot
+    face = s if isoparam else None
+    return face_flux_residual(
+        n_dof=N_DOF,
+        node_i=i,
+        node_j=j,
+        area=area(sym, ar, face),
+        grad=velocity_gradient(sym, face),
+        rho=sym["rho"],
+        mu=sym["mu"],
+        u=(sym["ux"], sym["uy"], sym["uz"]),
+        p=sym["p"],
+        sign=sym["sgn"][s],
+    )
 
 
 def residual_exprs(sym: dict[str, object], isoparam: bool = False) -> tuple[list[sp.Expr], list[sp.Expr]]:
@@ -225,31 +187,11 @@ def residual_exprs(sym: dict[str, object], isoparam: bool = False) -> tuple[list
 
 
 def cse_code(exprs: list[sp.Expr], outputs: list[str], indent: str = "    ", op: str = "=") -> str:
-    printer = ScalarPrinter()
-    nonzero = [(expr, out) for expr, out in zip(exprs, outputs) if expr != 0]
-    replacements, reduced = sp.cse([expr for expr, _out in nonzero], symbols=sp.numbered_symbols("x"), optimizations="basic")
-    lines: list[str] = []
-    for var, expr in replacements:
-        lines.append(f"{indent}const scalar_t {var} = {printer.doprint(expr)};")
-    for (_expr, out), expr in zip(nonzero, reduced):
-        lines.append(f"{indent}{out} {op} {printer.doprint(expr)};")
-    return "\n".join(lines)
+    return cse_emit(exprs, outputs, indent, mode="assign", op=op, drop_zeros=True)
 
 
 def cse_atomic_add_code(exprs: list[sp.Expr], outputs: list[str], indent: str = "    ") -> str:
-    printer = ScalarPrinter()
-    nonzero = [(expr, out) for expr, out in zip(exprs, outputs) if expr != 0]
-    replacements, reduced = sp.cse([expr for expr, _out in nonzero], symbols=sp.numbered_symbols("x"), optimizations="basic")
-    lines: list[str] = []
-    for var, expr in replacements:
-        lines.append(f"{indent}const scalar_t {var} = {printer.doprint(expr)};")
-    for k, ((_expr, out), expr) in enumerate(zip(nonzero, reduced)):
-        lines.append(f"{indent}const scalar_t add{k} = {printer.doprint(expr)};")
-        # CVFEM_ATOMIC_ADD expands to `#pragma omp atomic update` on a threaded host,
-        # atomicAdd on the device, and a plain += when serial. Keeping the choice in
-        # the macro is what lets these kernels compile for both targets unchanged.
-        lines.append(f"{indent}CVFEM_ATOMIC_ADD({out}, add{k});")
-    return "\n".join(lines)
+    return cse_emit(exprs, outputs, indent, mode="atomic_add", drop_zeros=True)
 
 
 def input_locals(include_pressure: bool) -> str:
@@ -292,15 +234,7 @@ def geom_locals_isoparam() -> str:
 
 
 def sign_locals(mdots: list[sp.Expr]) -> str:
-    printer = ScalarPrinter()
-    lines: list[str] = []
-    for s, mdot in enumerate(mdots):
-        lines.append(f"    const scalar_t mdot{s} = {printer.doprint(mdot)};")
-        lines.append(
-            f"    const scalar_t sgn{s} = mdot{s} > scalar_t(0) ? scalar_t(1) : "
-            f"(mdot{s} < scalar_t(0) ? scalar_t(-1) : scalar_t(0));"
-        )
-    return "\n".join(lines)
+    return _sign_locals(mdots)
 
 
 def residual_outputs() -> list[str]:
@@ -308,13 +242,7 @@ def residual_outputs() -> list[str]:
 
 
 def jac_block_exprs(jac: list[sp.Expr], row_node: int, col_node: int) -> list[sp.Expr]:
-    exprs: list[sp.Expr] = []
-    for row_field in range(N_FIELD):
-        row = dof(row_node, row_field)
-        for col_field in range(N_FIELD):
-            col = dof(col_node, col_field)
-            exprs.append(jac[row * N_DOF + col])
-    return exprs
+    return _jac_block_exprs(jac, row_node, col_node, N_DOF)
 
 
 def cse_add_bsr_slots_code(jac: list[sp.Expr], block_scope: str, atomic: bool) -> str:
@@ -640,15 +568,15 @@ def split_generated(text: str) -> tuple[str, str]:
     return prologue + "".join(keep) + tail, subpar_prologue + "".join(drop) + tail
 
 
-def main() -> None:
-    full = generate()
-    main_hpp, subpar_hpp = split_generated(full)
-    OUT.write_text(main_hpp)
-    SUBPAR_OUT.parent.mkdir(parents=True, exist_ok=True)
-    SUBPAR_OUT.write_text(subpar_hpp)
-    print(f"{OUT.name}: {main_hpp.count(chr(10))} lines")
-    print(f"{SUBPAR_OUT.name}: {subpar_hpp.count(chr(10))} lines")
+def main() -> int:
+    args = add_output_arguments(argparse.ArgumentParser(description=__doc__)).parse_args()
+    main_hpp, subpar_hpp = split_generated(generate())
+    out = args.out or OUT
+    # --out relocates the main header; the quarantined half follows it, so a check
+    # against a scratch copy still exercises both.
+    subpar_out = SUBPAR_OUT if args.out is None else out.parent / SUBPAR_OUT.name
+    return emit([(out, main_hpp), (subpar_out, subpar_hpp)], args.check)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

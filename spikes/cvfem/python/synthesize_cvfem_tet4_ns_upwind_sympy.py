@@ -7,10 +7,29 @@ and Jacobian microkernels in cvfem_tet4_ns_upwind_kernels.hpp.
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import sympy as sp
-from sympy.printing.c import C99CodePrinter
+
+from cvfem_codegen import (
+    N_FIELD,
+    ScalarPrinter,
+    add_output_arguments,
+    cse_emit,
+    dof,
+    emit,
+    face_flux_residual,
+    jac_block_exprs as _jac_block_exprs,
+    set_stable_pow,
+    sign_locals as _sign_locals,
+)
+
+# TET4 has always been emitted with C99CodePrinter's own reciprocal spelling.
+# Turning this on is an improvement -- it makes the header independent of the
+# SymPy version -- but it rewrites 35 lines of a measured kernel, so it belongs
+# in its own commit with a benchmark behind it, not in a refactor.
+set_stable_pow(False)
 
 
 HERE = Path(__file__).resolve().parent
@@ -20,7 +39,6 @@ SPIKE_ROOT = HERE.parent
 OUT = SPIKE_ROOT / "src" / "generated" / "cvfem_tet4_ns_upwind_sympy_kernels.hpp"
 
 N_NODE = 4
-N_FIELD = 4
 N_DOF = N_NODE * N_FIELD
 
 SCS = (
@@ -31,21 +49,6 @@ SCS = (
     (1, 3, (-sp.Rational(1, 24), sp.Rational(0), sp.Rational(1, 24))),
     (2, 3, (sp.Rational(0), -sp.Rational(1, 24), sp.Rational(1, 24))),
 )
-
-
-class ScalarPrinter(C99CodePrinter):
-    def _print_Rational(self, expr: sp.Rational) -> str:
-        return f"scalar_t({expr.p}) / scalar_t({expr.q})"
-
-    def _print_Integer(self, expr: sp.Integer) -> str:
-        return f"scalar_t({int(expr)})"
-
-    def _print_Float(self, expr: sp.Float) -> str:
-        return f"scalar_t({float(expr):.17g})"
-
-
-def dof(node: int, field: int) -> int:
-    return node * N_FIELD + field
 
 
 def build_symbols() -> dict[str, object]:
@@ -101,46 +104,28 @@ def velocity_gradient(sym: dict[str, object]) -> tuple[sp.Expr, ...]:
 def face_residual_expr(sym: dict[str, object],
                        scs_index: int,
                        semismooth_abs: bool) -> tuple[list[sp.Expr], sp.Expr]:
-    rho = sym["rho"]
-    mu = sym["mu"]
-    adj = sym["adj"]
-    ux = sym["ux"]
-    uy = sym["uy"]
-    uz = sym["uz"]
-    p = sym["p"]
-    sgn = sym["sgn"]
+    """The flux across sub-control surface ``scs_index``.
 
-    r = [sp.Integer(0)] * N_DOF
-    g00, g01, g02, g10, g11, g12, g20, g21, g22 = velocity_gradient(sym)
+    Only the geometry is TET4-specific -- the area vector comes from the element-affine
+    adjugate, and the velocity gradient is constant over the element. The flux algebra
+    itself is shared with HEX8.
+
+    ``semismooth_abs`` selects the frozen sign symbol over an exact ``Abs``; the exact
+    form has no derivative at a flow reversal, which is what the Jacobian needs.
+    """
     i, j, area_ref = SCS[scs_index]
-    ax, ay, az = scs_area(adj, area_ref)
-    adv_x = sp.Rational(1, 2) * (ux[i] + ux[j])
-    adv_y = sp.Rational(1, 2) * (uy[i] + uy[j])
-    adv_z = sp.Rational(1, 2) * (uz[i] + uz[j])
-    mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az)
-
-    mdot_abs = sgn[scs_index] * mdot if semismooth_abs else sp.Abs(mdot)
-    mdot_pos = sp.Rational(1, 2) * (mdot + mdot_abs)
-    mdot_neg = sp.Rational(1, 2) * (mdot - mdot_abs)
-    p_mid = sp.Rational(1, 2) * (p[i] + p[j])
-
-    tau_x = mu * ((2 * g00) * ax + (g01 + g10) * ay + (g02 + g20) * az)
-    tau_y = mu * ((g10 + g01) * ax + (2 * g11) * ay + (g12 + g21) * az)
-    tau_z = mu * ((g20 + g02) * ax + (g21 + g12) * ay + (2 * g22) * az)
-
-    fx = mdot_pos * ux[i] + mdot_neg * ux[j] + p_mid * ax - tau_x
-    fy = mdot_pos * uy[i] + mdot_neg * uy[j] + p_mid * ay - tau_y
-    fz = mdot_pos * uz[i] + mdot_neg * uz[j] + p_mid * az - tau_z
-
-    r[dof(i, 0)] += fx
-    r[dof(i, 1)] += fy
-    r[dof(i, 2)] += fz
-    r[dof(i, 3)] += mdot
-    r[dof(j, 0)] -= fx
-    r[dof(j, 1)] -= fy
-    r[dof(j, 2)] -= fz
-    r[dof(j, 3)] -= mdot
-    return r, mdot
+    return face_flux_residual(
+        n_dof=N_DOF,
+        node_i=i,
+        node_j=j,
+        area=scs_area(sym["adj"], area_ref),
+        grad=velocity_gradient(sym),
+        rho=sym["rho"],
+        mu=sym["mu"],
+        u=(sym["ux"], sym["uy"], sym["uz"]),
+        p=sym["p"],
+        sign=sym["sgn"][scs_index] if semismooth_abs else None,
+    )
 
 
 def face_action_direct_expr(sym: dict[str, object], scs_index: int) -> list[sp.Expr]:
@@ -207,48 +192,19 @@ def residual_exprs(sym: dict[str, object], semismooth_abs: bool) -> tuple[list[s
 
 
 def cse_code(exprs: list[sp.Expr], outputs: list[str], indent: str = "    ") -> str:
-    printer = ScalarPrinter()
-    replacements, reduced = sp.cse(exprs, symbols=sp.numbered_symbols("x"), optimizations="basic")
-    lines: list[str] = []
-    for var, expr in replacements:
-        lines.append(f"{indent}const scalar_t {var} = {printer.doprint(expr)};")
-    for out, expr in zip(outputs, reduced):
-        lines.append(f"{indent}{out} = {printer.doprint(expr)};")
-    return "\n".join(lines)
+    return cse_emit(exprs, outputs, indent, mode="assign", op="=")
 
 
 def cse_vector_store_code(exprs: list[sp.Expr], outputs: list[str], indent: str = "    ") -> str:
-    printer = ScalarPrinter()
-    replacements, reduced = sp.cse(exprs, symbols=sp.numbered_symbols("x"), optimizations="basic")
-    lines: list[str] = []
-    for var, expr in replacements:
-        lines.append(f"{indent}const auto {var} = {printer.doprint(expr)};")
-    for out, expr in zip(outputs, reduced):
-        lines.append(f"{indent}cvfem_store_scalar_v({out}, {printer.doprint(expr)});")
-    return "\n".join(lines)
+    return cse_emit(exprs, outputs, indent, mode="vector_store")
 
 
 def cse_add_code(exprs: list[sp.Expr], outputs: list[str], indent: str = "    ") -> str:
-    nonzero = [(expr, out) for expr, out in zip(exprs, outputs) if expr != 0]
-    printer = ScalarPrinter()
-    replacements, reduced = sp.cse([expr for expr, _out in nonzero], symbols=sp.numbered_symbols("x"), optimizations="basic")
-    lines: list[str] = []
-    for var, expr in replacements:
-        lines.append(f"{indent}const scalar_t {var} = {printer.doprint(expr)};")
-    for (_expr, out), expr in zip(nonzero, reduced):
-        lines.append(f"{indent}{out} += {printer.doprint(expr)};")
-    return "\n".join(lines)
+    return cse_emit(exprs, outputs, indent, mode="assign", op="+=", drop_zeros=True)
 
 
 def cse_decl_code(exprs: list[sp.Expr], names: list[str], indent: str = "        ") -> str:
-    printer = ScalarPrinter()
-    replacements, reduced = sp.cse(exprs, symbols=sp.numbered_symbols("x"), optimizations="basic")
-    lines: list[str] = []
-    for var, expr in replacements:
-        lines.append(f"{indent}const scalar_t {var} = {printer.doprint(expr)};")
-    for name, expr in zip(names, reduced):
-        lines.append(f"{indent}const scalar_t {name} = {printer.doprint(expr)};")
-    return "\n".join(lines)
+    return cse_emit(exprs, names, indent, mode="declare")
 
 
 def action_direction_gradient_code(indent: str = "        ") -> str:
@@ -300,13 +256,7 @@ def action_face_geom_sign_local(s: int, indent: str = "    ") -> str:
 
 
 def jac_block_exprs(jac: list[sp.Expr], row_node: int, col_node: int) -> list[sp.Expr]:
-    exprs: list[sp.Expr] = []
-    for row_field in range(N_FIELD):
-        row = dof(row_node, row_field)
-        for col_field in range(N_FIELD):
-            col = dof(col_node, col_field)
-            exprs.append(jac[row * N_DOF + col])
-    return exprs
+    return _jac_block_exprs(jac, row_node, col_node, N_DOF)
 
 
 def jac_block_outputs(row_node: int, col_node: int) -> list[str]:
@@ -437,16 +387,7 @@ def simd_action_input_locals() -> str:
 
 
 def sign_locals_with_indent(mdots: list[sp.Expr], indent: str) -> str:
-    printer = ScalarPrinter()
-    lines: list[str] = []
-    for s, mdot in enumerate(mdots):
-        expr = printer.doprint(mdot)
-        lines.append(f"{indent}const scalar_t mdot{s} = {expr};")
-        lines.append(
-            f"{indent}const scalar_t sgn{s} = mdot{s} > scalar_t(0) ? scalar_t(1) : "
-            f"(mdot{s} < scalar_t(0) ? scalar_t(-1) : scalar_t(0));"
-        )
-    return "\n".join(lines)
+    return _sign_locals(mdots, indent)
 
 
 def sign_locals(mdots: list[sp.Expr]) -> str:
@@ -988,9 +929,10 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_facewi
 """
 
 
-def main() -> None:
-    OUT.write_text(generate())
+def main() -> int:
+    args = add_output_arguments(argparse.ArgumentParser(description=__doc__)).parse_args()
+    return emit([(args.out or OUT, generate())], args.check)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
