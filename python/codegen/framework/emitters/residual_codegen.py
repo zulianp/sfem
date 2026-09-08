@@ -119,6 +119,7 @@ from codegen.framework.plans.evaluation_strategy import (
 from codegen.framework.plans.affine_element_kernel import (
     p1_simplex_metric_apply_plan,
 )
+from codegen.framework.plans.geometry_variants import geometry_variant_plan
 from codegen.framework.plans.form_transformations import (
     constant_p1_simplex_reference_gradients,
     simplex_gradient_metric_transformation,
@@ -4240,14 +4241,20 @@ def _operator_source(
                 geometry_family,
             )
         )
-        lines.extend(
-            _aos_dispatch_source(
-                system,
-                prefix,
-                form,
-                dependencies,
+        # The AoS wrapper forwards to the isoparametric SoA kernel, so it
+        # goes wherever that goes.  `apply_variants` already records that AoS
+        # only ever appears with isoparametric geometry.
+        for _aos_mode in geometry_variant_plan(
+            None, rule, specialized=False
+        ).isoparametric_modes:
+            lines.extend(
+                _aos_dispatch_source(
+                    system,
+                    prefix,
+                    form,
+                    dependencies,
+                )
             )
-        )
     lines.extend(
         _scalar_crs_matrix_assembly_source(
             system,
@@ -5392,19 +5399,25 @@ def _mesh_operator_source(
                     two_pass=True,
                 )
             )
-        lines.extend(
-            _isoparametric_mesh_operator_source(
-                system,
-                prefix,
-                local_prefix,
-                isoparametric_specialization,
-                form,
-                dependencies,
-                coefficients,
-                basis_family,
-                geometry_family,
+        # Iterated, not tested: a constant-P1 simplex publishes no
+        # isoparametric kernel, because its affine one computes the same
+        # numbers from a Jacobian that does not vary over the cell.
+        for _isoparametric_mode in geometry_variant_plan(
+            None, rule, specialized=False
+        ).isoparametric_modes:
+            lines.extend(
+                _isoparametric_mesh_operator_source(
+                    system,
+                    prefix,
+                    local_prefix,
+                    isoparametric_specialization,
+                    form,
+                    dependencies,
+                    coefficients,
+                    basis_family,
+                    geometry_family,
+                )
             )
-        )
         return lines
     lines.extend(
         _mesh_reference_alias_lines(
@@ -5634,19 +5647,25 @@ def _mesh_operator_source(
                 two_pass=True,
             )
         )
-    lines.extend(
-        _isoparametric_mesh_operator_source(
-            system,
-            prefix,
-            local_prefix,
-            isoparametric_specialization,
-            form,
-            dependencies,
-            coefficients,
-            basis_family,
-            geometry_family,
+    # Iterated, not tested: a constant-P1 simplex publishes no
+    # isoparametric kernel, because its affine one computes the same
+    # numbers from a Jacobian that does not vary over the cell.
+    for _isoparametric_mode in geometry_variant_plan(
+        None, rule, specialized=False
+    ).isoparametric_modes:
+        lines.extend(
+            _isoparametric_mesh_operator_source(
+                system,
+                prefix,
+                local_prefix,
+                isoparametric_specialization,
+                form,
+                dependencies,
+                coefficients,
+                basis_family,
+                geometry_family,
+            )
         )
-    )
     if form == "jacobian_action":
         lines.extend(
             _scalar_packed_jacobian_action_source(
