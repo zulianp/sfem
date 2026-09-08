@@ -794,10 +794,7 @@ namespace sfem {
                     auto ghost_ptr = packed->ghost_ptr(packed_block);
                     auto ghost_idx = packed->ghost_idx(packed_block);
                     const int dim = mesh->spatial_dimension();
-                    if (dim == 2) {
-                        status = linear_elasticity_objective_steps_packed_2d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    }
-                    else if (dim == 3) {
+                    if (dim == 3) {
                         status = linear_elasticity_objective_steps_packed_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
                     }
                 }
@@ -812,10 +809,7 @@ namespace sfem {
                     auto ghost_ptr = packed->ghost_ptr(packed_block);
                     auto ghost_idx = packed->ghost_idx(packed_block);
                     const int dim = mesh->spatial_dimension();
-                    if (dim == 2) {
-                        status = linear_elasticity_objective_steps_packed_2d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    }
-                    else if (dim == 3) {
+                    if (dim == 3) {
                         status = linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
                     }
                 }

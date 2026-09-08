@@ -3041,118 +3041,129 @@ def _sfem_soa_operator_source(
         )
         if _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
             affine_rule = affine_quadrature_rule
-            if "plain" in objective_variants:
-                lines.append("")
-                lines.extend(
-                    _sfem_soa_mesh_operator_function(
-                        form,
-                        prefix,
-                        dim,
-                        n_nodes,
-                        affine_rule.n_qp,
-                        vector_size,
-                        local_prefix,
-                        array_inputs,
-                        affine_rule,
-                        basis_family,
-                        geometry_family,
-                        use_shared_weak_local,
-                        geometry_mode="affine",
-                        matrix_format_plan=matrix_format_plan,
-                        source_builder=source_builder,
-                    )
-                )
-            fast_aos_unit_lines = _tet4_linear_elasticity_aos_unit_mesh_operator_function(
-                form,
-                prefix,
-                dim,
-                n_nodes,
-                affine_rule,
-                source_builder=source_builder,
+            variants = geometry_variant_plan(
+                form.weak_form,
+                quadrature_rule,
+                assembles_matrix=matrix_format_plan is not None and not matrix_format_plan.is_empty,
             )
-            if fast_aos_unit_lines:
-                lines.append("")
-                lines.extend(fast_aos_unit_lines)
-            if "steps" in objective_variants:
-                lines.append("")
-                lines.extend(
-                    _sfem_soa_mesh_objective_steps_function(
-                        form,
-                        prefix,
-                        dim,
-                        n_nodes,
-                        affine_rule.n_qp,
-                        vector_size,
-                        local_prefix,
-                        array_inputs,
-                        affine_rule,
-                        basis_family,
-                        geometry_family,
-                        use_shared_weak_local,
-                        geometry_mode="affine",
-                        source_builder=source_builder,
+            # Iterated, not tested.  A constant-P1 simplex yields no
+            # isoparametric mode -- its affine kernel computes the same numbers
+            # from a Jacobian that does not vary over the cell -- and a 2D
+            # element yields no affine one.  Emission walks what it is given.
+            for _affine_mode in variants.affine_modes:
+                if "plain" in objective_variants:
+                    lines.append("")
+                    lines.extend(
+                        _sfem_soa_mesh_operator_function(
+                            form,
+                            prefix,
+                            dim,
+                            n_nodes,
+                            affine_rule.n_qp,
+                            vector_size,
+                            local_prefix,
+                            array_inputs,
+                            affine_rule,
+                            basis_family,
+                            geometry_family,
+                            use_shared_weak_local,
+                            geometry_mode="affine",
+                            matrix_format_plan=matrix_format_plan,
+                            source_builder=source_builder,
+                        )
                     )
+                fast_aos_unit_lines = _tet4_linear_elasticity_aos_unit_mesh_operator_function(
+                    form,
+                    prefix,
+                    dim,
+                    n_nodes,
+                    affine_rule,
+                    source_builder=source_builder,
                 )
-            if "plain" in objective_variants:
-                lines.append("")
-                lines.extend(
-                    _sfem_soa_mesh_operator_function(
-                        form,
-                        prefix,
-                        dim,
-                        n_nodes,
-                        n_qp,
-                        vector_size,
-                        local_prefix,
-                        array_inputs,
-                        quadrature_rule,
-                        basis_family,
-                        geometry_family,
-                        use_shared_weak_local,
-                        geometry_mode="isoparametric",
-                        matrix_format_plan=matrix_format_plan,
-                        source_builder=source_builder,
+                if fast_aos_unit_lines:
+                    lines.append("")
+                    lines.extend(fast_aos_unit_lines)
+                if "steps" in objective_variants:
+                    lines.append("")
+                    lines.extend(
+                        _sfem_soa_mesh_objective_steps_function(
+                            form,
+                            prefix,
+                            dim,
+                            n_nodes,
+                            affine_rule.n_qp,
+                            vector_size,
+                            local_prefix,
+                            array_inputs,
+                            affine_rule,
+                            basis_family,
+                            geometry_family,
+                            use_shared_weak_local,
+                            geometry_mode="affine",
+                            source_builder=source_builder,
+                        )
                     )
-                )
-            if "steps" in objective_variants:
-                lines.append("")
-                lines.extend(
-                    _sfem_soa_mesh_objective_steps_function(
-                        form,
-                        prefix,
-                        dim,
-                        n_nodes,
-                        n_qp,
-                        vector_size,
-                        local_prefix,
-                        array_inputs,
-                        quadrature_rule,
-                        basis_family,
-                        geometry_family,
-                        use_shared_weak_local,
-                        geometry_mode="isoparametric",
-                        source_builder=source_builder,
+            for _isoparametric_mode in variants.isoparametric_modes:
+                if "plain" in objective_variants:
+                    lines.append("")
+                    lines.extend(
+                        _sfem_soa_mesh_operator_function(
+                            form,
+                            prefix,
+                            dim,
+                            n_nodes,
+                            n_qp,
+                            vector_size,
+                            local_prefix,
+                            array_inputs,
+                            quadrature_rule,
+                            basis_family,
+                            geometry_family,
+                            use_shared_weak_local,
+                            geometry_mode="isoparametric",
+                            matrix_format_plan=matrix_format_plan,
+                            source_builder=source_builder,
+                        )
                     )
-                )
-            if form.name == "apply":
-                lines.append("")
-                lines.extend(
-                    _sfem_soa_hessian_matrix_assembly_function(
-                        form,
-                        prefix,
-                        dim,
-                        n_nodes,
-                        n_qp,
-                        local_prefix,
-                        array_inputs,
-                        quadrature_rule,
-                        basis_family,
-                        geometry_family,
-                        use_shared_weak_local,
-                        matrix_format_plan,
-                        source_builder=source_builder,
+                if "steps" in objective_variants:
+                    lines.append("")
+                    lines.extend(
+                        _sfem_soa_mesh_objective_steps_function(
+                            form,
+                            prefix,
+                            dim,
+                            n_nodes,
+                            n_qp,
+                            vector_size,
+                            local_prefix,
+                            array_inputs,
+                            quadrature_rule,
+                            basis_family,
+                            geometry_family,
+                            use_shared_weak_local,
+                            geometry_mode="isoparametric",
+                            source_builder=source_builder,
+                        )
                     )
-                )
+                if form.name == "apply":
+                    lines.append("")
+                    lines.extend(
+                        _sfem_soa_hessian_matrix_assembly_function(
+                            form,
+                            prefix,
+                            dim,
+                            n_nodes,
+                            n_qp,
+                            local_prefix,
+                            array_inputs,
+                            quadrature_rule,
+                            basis_family,
+                            geometry_family,
+                            use_shared_weak_local,
+                            matrix_format_plan,
+                            source_builder=source_builder,
+                        )
+                    )
         lines.append("")
 
     return "\n".join(lines)
@@ -6290,32 +6301,38 @@ def _sfem_soa_mesh_objective_steps_function(
                 "",
             ]
         )
-    lines.extend(
-        _sfem_soa_packed_objective_steps_public_wrappers(
-            function_name=function_name,
-            dim=dim,
-            n_nodes=n_nodes,
-            n_qp=n_qp,
-            prefix=prefix,
-            local_prefix=local_prefix,
-            block_name=block_name,
-            quadrature_rule=quadrature_rule,
-            reference_inputs=reference_inputs,
-            use_tensor_product_reference=use_tensor_product_reference,
-            use_tensor_product_geometry=use_tensor_product_geometry,
-            use_reference_gradient_vectors=use_reference_gradient_vectors,
-            omit_reference_basis_inputs=omit_reference_basis_inputs,
-            stream_shape_order=stream_shape_order,
-            identity_stream_shape_order=identity_stream_shape_order,
-            vector_size=vector_size,
-            geometry_mode=geometry_mode,
-            material_parameter_names=material_parameter_names,
-            source_builder=source_builder,
-            n_field_components=n_field_components,
-            metric=metric,
-            expanded_value_plan=value_plan,
+    # The objective_steps packed wrappers are the other half of the packed
+    # family, emitted from here rather than from the mesh operator, and they
+    # follow the same plan.
+    for _packed_layout in geometry_variant_plan(
+        form.weak_form, quadrature_rule
+    ).packed_mesh_layouts:
+        lines.extend(
+            _sfem_soa_packed_objective_steps_public_wrappers(
+                function_name=function_name,
+                dim=dim,
+                n_nodes=n_nodes,
+                n_qp=n_qp,
+                prefix=prefix,
+                local_prefix=local_prefix,
+                block_name=block_name,
+                quadrature_rule=quadrature_rule,
+                reference_inputs=reference_inputs,
+                use_tensor_product_reference=use_tensor_product_reference,
+                use_tensor_product_geometry=use_tensor_product_geometry,
+                use_reference_gradient_vectors=use_reference_gradient_vectors,
+                omit_reference_basis_inputs=omit_reference_basis_inputs,
+                stream_shape_order=stream_shape_order,
+                identity_stream_shape_order=identity_stream_shape_order,
+                vector_size=vector_size,
+                geometry_mode=geometry_mode,
+                material_parameter_names=material_parameter_names,
+                source_builder=source_builder,
+                n_field_components=n_field_components,
+                metric=metric,
+                expanded_value_plan=value_plan,
+            )
         )
-    )
     return lines
 
 

@@ -613,64 +613,6 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_iso
         void *const SFEM_RESTRICT value
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_2d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
-        const void *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
-        const void *const SFEM_RESTRICT hy,
-        const int nsteps,
-        const void *const SFEM_RESTRICT steps,
-        void *const SFEM_RESTRICT value
-);
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_2d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
-        const void *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
-        const void *const SFEM_RESTRICT hy,
-        const int nsteps,
-        const void *const SFEM_RESTRICT steps,
-        void *const SFEM_RESTRICT value
-);
-
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,

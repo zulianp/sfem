@@ -78,6 +78,18 @@ class GeometryVariantPlan:
         return ("packed",) if self.emits_packed else ()
 
     @property
+    def affine_modes(self):
+        """`("affine",)` or `()`, for the same reason `packed_mesh_layouts` is a
+        sequence: emission iterates, it does not test."""
+        return ("affine",) if self.emits_affine else ()
+
+    @property
+    def isoparametric_modes(self):
+        """`("isoparametric",)` or `()`.  Empty for a constant-P1 simplex, whose
+        affine kernel already computes what this one would."""
+        return ("isoparametric",) if self.emits_isoparametric else ()
+
+    @property
     def geometry_modes(self):
         """The geometry kernels to emit, in the order they are emitted.
 
@@ -101,12 +113,22 @@ class GeometryVariantPlan:
         }
 
 
-def geometry_variant_plan(weak_form, rule, *, specialized=True):
+def geometry_variant_plan(weak_form, rule, *, specialized=True, assembles_matrix=False):
     """The variants this form publishes on the element `rule` describes.
 
     `specialized` is the emitter's own answer to whether it has a specialized
     kernel prefix to hang the metric off; it is passed rather than guessed
     because it is a fact about the emission unit, not about the form.
+
+    `assembles_matrix` says whether this form also emits matrix-assembly
+    kernels.  It has to, and the reason is a wrinkle rather than a principle:
+    assembly is emitted *inside* the isoparametric mesh operator rather than as
+    an axis of its own, so a P1 element that published no isoparametric mode
+    lost its `hessian_crs` and `hessian_bsr` entry points along with the
+    matrix-free kernel it meant to drop.  The equivalence argument -- that a
+    constant Jacobian makes the two kernels compute the same numbers -- is
+    about the matrix-free kernels, and applies only to them until assembly gets
+    an axis of its own.
     """
     if rule is None:
         return GeometryVariantPlan(True, True, True, None)
@@ -114,8 +136,22 @@ def geometry_variant_plan(weak_form, rule, *, specialized=True):
     constant_p1 = _is_constant_p1_simplex_rule(rule)
     metric = cached_metric_geometry(weak_form, rule) if specialized else None
     return GeometryVariantPlan(
-        emits_affine=constant_p1 or dim == 3,
-        emits_isoparametric=not constant_p1,
+        # Both geometry modes, for now.  The rules below are written down and
+        # the emitters already iterate them, but turning them on drops kernels
+        # that four tests still expect and, in one case, that a Taylor-Hood
+        # material appears to need: enabling them made
+        # `poro_hyperelasticity_solid_gradient_2d_isoparametric_mesh_soa`
+        # disappear on TRI6_TRI3, and TRI6 is not a constant-P1 simplex, so the
+        # rule as written should not have touched it.  Something about the
+        # compatible-element rule is not what this function assumes, and
+        # shipping a kernel-dropping policy whose behaviour is not understood
+        # is how a material quietly stops working.
+        #
+        #     emits_affine=constant_p1 or dim == 3,
+        #     emits_isoparametric=(not constant_p1) or assembles_matrix,
+        #
+        emits_affine=True,
+        emits_isoparametric=True,
         emits_packed=dim == 3,
         cached_metric=metric,
     )
