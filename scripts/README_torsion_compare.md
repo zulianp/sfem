@@ -25,14 +25,33 @@ The runner executes these five policies sequentially, with `SFEM_HISTORY_MODE=pe
 All runs use the same executable, a snapshot of `spikes/prony-series/cases/newmark_torsion_release.yaml`,
 and one shared HEX8 mesh. Geometry is fixed at 1 x 0.2 x 0.2, matching that YAML. Node counts
 default to 16 x 5 x 5; override `PRONY_NX`, `PRONY_NY`, `PRONY_NZ` for a mesh study.
+Alternatively, `--resolution` selects the study meshes below and takes precedence over those
+environment variables. Without it, the existing small/custom mesh behavior is unchanged.
+
+| Resolution | HEX8 elements in x, y, z | Nodes in x, y, z | Total elements |
+| --- | --- | --- | --- |
+| coarse | 40 x 8 x 8 | 41 x 9 x 9 | 2,560 |
+| medium | 80 x 16 x 16 | 81 x 17 x 17 | 20,480 |
+| fine | 160 x 32 x 32 | 161 x 33 x 33 | 163,840 |
+
+For example, run the five per-QP policies on the coarse mesh for the default 30 s:
+
+```bash
+venv/bin/python scripts/run_torsion_history_compare.py \
+  --resolution coarse --out build_torsion_runs/coarse_per_qp_T30_01
+```
+
+Use `medium` or `fine` with a separate output directory for the other meshes. These presets
+do not add per-element runs; this runner still executes the five per-QP policies only.
+
 `SFEM_T` and the old cantilever material environment variables do not configure this driver:
 the physics comes from the YAML. The script does not build or modify the solver.
 
 The case includes inertia: density = 1, Newmark beta = 0.64 and gamma = 0.6. These parameters
 are kept as supplied, including their numerical damping. Material C10 = 0.3, C01 = 0.05,
 K = 50; Prony weights = [0.4, 0.4, 0.1, 0.05], times = [1, 2, 5, 10], g_inf = 0.05.
-The twist ramps to 6.4 rad over 4 s, is released at 5 s, and the run ends at 80 s with dt = 0.005
-(16,000 steps per policy). Only the history storage policy differs between runs; mass and
+The twist ramps to 6.4 rad over 4 s, is released at 5 s, and the run ends at 30 s with dt = 0.005
+(6,000 steps per policy). Only the history storage policy differs between runs; mass and
 the time-integration parameters are identical.
 
 For a startup smoke test, shorten only the saved YAML's end time, without editing the source:
