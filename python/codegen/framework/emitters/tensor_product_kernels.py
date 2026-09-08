@@ -101,7 +101,7 @@ def _expand_residual_stream_layouts(header):
 def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
     if single_work_item:
         return "%s{" % indent
-    return "%s\n%sfor (int %s = 0; %s < nelems; ++%s) {" % (
+    return "%s\n%sfor (int %s = 0; %s < ne; ++%s) {" % (
         "\n".join("%s%s" % (indent, line) for line in simd_lines),
         indent,
         index_name,
@@ -187,7 +187,7 @@ template <typename s_t, int NQ, int NS, int VS>
 struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void gradient_impl(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const StreamContainer streams,
@@ -234,29 +234,29 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static %(inline_qualifier)s void gradient(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR streams[NS * NC],
             const int component,
             s_t *const RSTR gradient) {
-        gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
+        gradient_impl<NC>(ne, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static %(inline_qualifier)s void gradient_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t streams[NS * NC][VS],
             const int component,
             s_t *const RSTR gradient) {
-        gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
+        gradient_impl<NC>(ne, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static %(inline_qualifier)s void test(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR flux,
@@ -303,7 +303,7 @@ template <typename s_t, int NQ, int NS, int VS>
 struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void gradient_impl(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const StreamContainer streams,
@@ -381,29 +381,29 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static %(inline_qualifier)s void gradient(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR streams[NS * NC],
             const int component,
             s_t *const RSTR gradient) {
-        gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
+        gradient_impl<NC>(ne, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static %(inline_qualifier)s void gradient_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t streams[NS * NC][VS],
             const int component,
             s_t *const RSTR gradient) {
-        gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
+        gradient_impl<NC>(ne, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static %(inline_qualifier)s void test(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR flux,
@@ -480,38 +480,38 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_gradient(
-        const int nelems,
+        const int ne,
         const s_t *const RSTR shape_1d,
         const s_t *const RSTR grad_1d,
         const s_t *const RSTR streams[NS * NC],
         const int component,
         s_t *const RSTR gradient) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template gradient<NC>(
-            nelems, shape_1d, grad_1d, streams, component, gradient);
+            ne, shape_1d, grad_1d, streams, component, gradient);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_gradient_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const RSTR shape_1d,
         const s_t *const RSTR grad_1d,
         const s_t streams[NS * NC][VS],
         const int component,
         s_t *const RSTR gradient) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template gradient_contiguous<NC>(
-            nelems, shape_1d, grad_1d, streams, component, gradient);
+            ne, shape_1d, grad_1d, streams, component, gradient);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_test(
-        const int nelems,
+        const int ne,
         const s_t *const RSTR shape_1d,
         const s_t *const RSTR grad_1d,
         const s_t *const RSTR flux,
         s_t *const RSTR out_streams[NS * NC],
         const int component) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template test<NC>(
-            nelems, shape_1d, grad_1d, flux, out_streams, component);
+            ne, shape_1d, grad_1d, flux, out_streams, component);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND>
@@ -521,7 +521,7 @@ template <typename s_t, int NQ, int NS, int VS>
 struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void evaluate(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const StreamContainer streams,
@@ -567,7 +567,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void evaluate_value(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const StreamContainer streams,
             s_t *const value) {
@@ -598,7 +598,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void integrate(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t *const value_coeff,
@@ -638,7 +638,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void integrate_value(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const value_coeff,
             StreamContainer output) {
@@ -672,7 +672,7 @@ template <typename s_t, int NQ, int NS, int VS>
 struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void evaluate(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const StreamContainer streams,
@@ -741,7 +741,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void evaluate_value(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const StreamContainer streams,
             s_t *const value) {
@@ -782,7 +782,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void integrate(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t *const value_coeff,
@@ -842,7 +842,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void integrate_value(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const value_coeff,
             StreamContainer output) {
@@ -884,90 +884,90 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_evaluate(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
         const s_t *const RSTR streams[NC * NS],
         s_t *const value,
         s_t *const gradient) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate<NC>(
-            nelems, shape_1d, grad_1d, streams, value, gradient);
+            ne, shape_1d, grad_1d, streams, value, gradient);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_evaluate_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
         const s_t streams[NC * NS][VS],
         s_t *const value,
         s_t *const gradient) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_contiguous<NC>(
-            nelems, shape_1d, grad_1d, streams, value, gradient);
+            ne, shape_1d, grad_1d, streams, value, gradient);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_evaluate_value(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const RSTR streams[NC * NS],
         s_t *const value) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_value<NC>(
-            nelems, shape_1d, streams, value);
+            ne, shape_1d, streams, value);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_evaluate_value_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t streams[NC * NS][VS],
         s_t *const value) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_value_contiguous<NC>(
-            nelems, shape_1d, streams, value);
+            ne, shape_1d, streams, value);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_integrate(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
         const s_t *const value_coeff,
         const s_t *const grad_coeff,
         s_t *const RSTR output[NC * NS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate<NC>(
-            nelems, shape_1d, grad_1d, value_coeff, grad_coeff, output);
+            ne, shape_1d, grad_1d, value_coeff, grad_coeff, output);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_integrate_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
         const s_t *const value_coeff,
         const s_t *const grad_coeff,
         s_t output[NC * NS][VS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_contiguous<NC>(
-            nelems, shape_1d, grad_1d, value_coeff, grad_coeff, output);
+            ne, shape_1d, grad_1d, value_coeff, grad_coeff, output);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_integrate_value(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const value_coeff,
         s_t *const RSTR output[NC * NS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_value<NC>(
-            nelems, shape_1d, value_coeff, output);
+            ne, shape_1d, value_coeff, output);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_integrate_value_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const value_coeff,
         s_t output[NC * NS][VS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_value_contiguous<NC>(
-            nelems, shape_1d, value_coeff, output);
+            ne, shape_1d, value_coeff, output);
 }
 
 } // namespace codegen

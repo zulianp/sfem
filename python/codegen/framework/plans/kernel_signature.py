@@ -273,7 +273,7 @@ def _mesh_output_arguments(unit, kind):
 def _local_arguments(unit, emission_plan, kind, expression_plan):
     dim = int(unit.dim)
     dependencies = expression_plan.dependencies
-    arguments = [KernelArgument("nelems", "const ptrdiff_t nelems", "control")]
+    arguments = [KernelArgument("ne", "const ptrdiff_t ne", "control")]
     if kind != "boundary_residual_soa":
         arguments.extend(_geometry_arguments(dim))
         arguments.extend(_reference_arguments(emission_plan, dim, dependencies))

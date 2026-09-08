@@ -1167,7 +1167,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn('#include "tensor_product_kernels.hpp"', local_source)
         self.assertIn("s_t value_x[Q * S * VS]", tensor_source)
         self.assertIn("s_t stage_x[Q * S * VS]", tensor_source)
-        self.assertIn("for (int lane = 0; lane < nelems; ++lane)", local_source)
+        self.assertIn("for (int lane = 0; lane < ne; ++lane)", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
             "tensor_gradient<s_t, NQ, NS, VS, 2, 2>",
@@ -1289,7 +1289,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("s_t value_x[Q * S * S * VS]", tensor_source)
         self.assertIn("s_t value_xy[Q * Q * S * VS]", tensor_source)
         self.assertIn("s_t stage_xy_x[Q * S * S * VS]", tensor_source)
-        self.assertIn("for (int lane = 0; lane < nelems; ++lane)", local_source)
+        self.assertIn("for (int lane = 0; lane < ne; ++lane)", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
             "tensor_gradient<s_t, NQ, NS, VS, 3, 3>",
@@ -1537,7 +1537,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn("idx_t **const RSTR elements", operator_source)
-        self.assertIn("const geom_t *const RSTR g_jacobian_adjugate0", operator_source)
+        self.assertIn("const geom_t *const RSTR g_adj0", operator_source)
         self.assertIn("std::is_same<g_t, s_t>()", operator_source)
         self.assertIn(
             "ageom_stream<s_t, g_t, VS>",
@@ -1552,7 +1552,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             1,
         )[0]
         self.assertIn("s_t bjacobian_adjugate0_data[VS]", affine_mesh_source)
-        self.assertNotIn("g_jacobian_adjugate[(evb + lane)", affine_mesh_source)
+        self.assertNotIn("g_adj[(evb + lane)", affine_mesh_source)
         self.assertIn(
             "const g_t *const *const RSTR points",
             operator_source,

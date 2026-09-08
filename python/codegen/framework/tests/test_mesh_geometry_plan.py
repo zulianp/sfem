@@ -39,7 +39,7 @@ class MeshGeometryPlanTest(unittest.TestCase):
         streams = mesh_geometry_streams(Dependencies(True), 3, metric_components=6)
         self.assertEqual([s.role for s in streams], ["metric"] * 6)
         self.assertNotIn(
-            "g_jacobian_determinant0", [s.name for s in streams]
+            "g_det0", [s.name for s in streams]
         )
 
     def test_the_adjugate_form_is_components_then_determinant(self):
@@ -47,14 +47,14 @@ class MeshGeometryPlanTest(unittest.TestCase):
         streams = mesh_geometry_streams(Dependencies(True), 3)
         self.assertEqual(
             [s.name for s in streams],
-            ["g_jacobian_adjugate%d" % i for i in range(9)]
-            + ["g_jacobian_determinant0"],
+            ["g_adj%d" % i for i in range(9)]
+            + ["g_det0"],
         )
 
     def test_a_form_that_needs_no_adjugate_still_takes_the_determinant(self):
         """The determinant weights the integral whether or not a gradient maps."""
         streams = mesh_geometry_streams(Dependencies(False), 3)
-        self.assertEqual([s.name for s in streams], ["g_jacobian_determinant0"])
+        self.assertEqual([s.name for s in streams], ["g_det0"])
 
     def test_arguments_and_parameters_describe_the_same_buffers(self):
         """A signature and its call cannot disagree if both come from here."""

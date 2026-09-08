@@ -24,6 +24,7 @@ distinction.  Writing the derivation once is what makes that visible; it is
 preserved as a single predicate here rather than as two that must agree.
 """
 
+from codegen.framework.plans.conventions import abi_geometry_name
 from dataclasses import dataclass
 
 
@@ -120,7 +121,7 @@ def mesh_geometry_streams(dependencies, dim, metric_components=None):
 
     This was spelled by hand at twenty-five sites in the residual emitter and
     four in the energy one, as three separate literal patterns --
-    ``g_geom_metric%d``, ``g_jacobian_adjugate%d`` and the determinant -- each
+    ``g_met%d``, ``g_adj%d`` and the determinant -- each
     with its own ``if`` chain deciding which applied.  The wrapper made the
     same choice a third time, and got it wrong: it spelled the adjugate
     unconditionally, so laplace generated for TRI3 or TET4 alone handed five
@@ -130,16 +131,16 @@ def mesh_geometry_streams(dependencies, dim, metric_components=None):
     """
     if metric_components:
         return tuple(
-            MeshGeometryStream("g_geom_metric%d" % index, "metric")
+            MeshGeometryStream(abi_geometry_name("geom_metric%d" % index), "metric")
             for index in range(int(metric_components))
         )
     streams = []
     if getattr(dependencies, "uses_adjugate", False):
         streams.extend(
-            MeshGeometryStream("g_jacobian_adjugate%d" % index, "adjugate")
+            MeshGeometryStream(abi_geometry_name("adj%d" % index), "adjugate")
             for index in range(dim * dim)
         )
-    streams.append(MeshGeometryStream("g_jacobian_determinant0", "determinant"))
+    streams.append(MeshGeometryStream(abi_geometry_name("det0"), "determinant"))
     return tuple(streams)
 
 

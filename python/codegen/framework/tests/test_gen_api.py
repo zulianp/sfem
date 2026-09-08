@@ -221,7 +221,7 @@ def _assert_lane_loops_request_simd(test_case, path):
     )
     lane_loop_count = 0
     for index, line in enumerate(lines):
-        if "for (int lane = 0; lane < nelems; ++lane) {" not in line:
+        if "for (int lane = 0; lane < ne; ++lane) {" not in line:
             continue
         lane_loop_count += 1
         previous = index - 1
@@ -283,14 +283,14 @@ class GenApiTest(unittest.TestCase):
                 ),
                 BufferDeclNode(
                     "const int",
-                    "nelems",
+                    "ne",
                     (),
                     "(int)MIN((ptrdiff_t)VS, nelements - evb)",
                 ),
                 LoopNode(
                     LoopKind.SIMD,
                     iterator("lane", "int"),
-                    iteration_range(0, expr_ref("nelems", "tile_extent")),
+                    iteration_range(0, expr_ref("ne", "tile_extent")),
                     pre_increment(iterator("lane", "int")),
                     (
                         AssignmentNode(
@@ -317,9 +317,9 @@ class GenApiTest(unittest.TestCase):
             printer.print_ast(ast),
             (
                 "for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-                "const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+                "const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
                 "#pragma omp simd",
-                "for (int lane = 0; lane < nelems; ++lane) {",
+                "for (int lane = 0; lane < ne; ++lane) {",
                 "    bvalue[lane] = s_t(0);",
                 "}",
                 "#pragma omp atomic update",
@@ -437,7 +437,7 @@ class GenApiTest(unittest.TestCase):
                         LoopNode(
                             LoopKind.SIMD,
                             lane,
-                            iteration_range(0, expr_ref("nelems", "tile_extent")),
+                            iteration_range(0, expr_ref("ne", "tile_extent")),
                             pre_increment(lane),
                             (
                                 AssignmentNode(
@@ -459,7 +459,7 @@ class GenApiTest(unittest.TestCase):
                 "for (ptrdiff_t evb = 0; evb < nelements; evb += VS)",
                 result.lowered,
             )
-            self.assertIn("for (int lane = 0; lane < nelems; lane += 1)", result.lowered)
+            self.assertIn("for (int lane = 0; lane < ne; lane += 1)", result.lowered)
             self.assertIn("const double acc = acc + value;", result.lowered)
         else:
             self.assertFalse(result.success)
@@ -469,7 +469,7 @@ class GenApiTest(unittest.TestCase):
         ast = KernelAST(
             "pystencils_memory_ops",
             nodes=(
-                BufferDeclNode("const int", "nelems", (), 1),
+                BufferDeclNode("const int", "ne", (), 1),
                 GatherNode(symbol_ref("value"), symbol_ref("input"), symbol_ref("node")),
                 ScatterNode(
                     buffer_access("out", symbol_ref("node")),
@@ -483,7 +483,7 @@ class GenApiTest(unittest.TestCase):
         result = PystencilsKernelASTAdapter().generate_c(ast)
         if result.available.available:
             self.assertTrue(result.success)
-            self.assertIn("const int nelems = 1;", result.lowered)
+            self.assertIn("const int ne = 1;", result.lowered)
             self.assertIn("const double value = input[node];", result.lowered)
             self.assertIn("out[node] = value;", result.lowered)
         else:
@@ -496,7 +496,7 @@ class GenApiTest(unittest.TestCase):
             nodes=(
                 BufferDeclNode(
                     "const int",
-                    "nelems",
+                    "ne",
                     (),
                     "(int)MIN((ptrdiff_t)VS, nelements - evb)",
                 ),
@@ -538,7 +538,7 @@ class GenApiTest(unittest.TestCase):
             OpenMPEnergySoASourceBuilder().mesh_loop_lines(),
             (
                 "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-                "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+                "        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
             ),
         )
 
@@ -1155,7 +1155,7 @@ class GenApiTest(unittest.TestCase):
                 declarations,
             )
             self.assertIn(
-                "const geom_t *const RSTR g_jacobian_determinant0",
+                "const geom_t *const RSTR g_det0",
                 declarations,
             )
             manifest = os.path.join(
@@ -1843,7 +1843,7 @@ int main() {
                 declarations,
             )
             self.assertIn(
-                "const geom_t *const RSTR g_jacobian_determinant0",
+                "const geom_t *const RSTR g_det0",
                 declarations,
             )
             self.assertIn(
@@ -2747,7 +2747,7 @@ int main() {
             self.assertGreater(_assert_lane_loops_request_simd(self, source), 0)
         self.assertIn(
             "#pragma omp simd\n"
-            "        for (int lane = 0; lane < nelems; ++lane) {\n"
+            "        for (int lane = 0; lane < ne; ++lane) {\n"
             "            bvalue[lane] = s_t(0);",
             contents,
         )
@@ -4157,13 +4157,13 @@ int main() {
                 "laplace_tet4_residual_affine_mesh_soa("
             )
             affine_source = operator_source[affine_begin:affine_end]
-            self.assertIn("g_geom_metric0", affine_source)
+            self.assertIn("g_met0", affine_source)
             self.assertIn("for (ptrdiff_t i = 0; i < nelements; ++i)", affine_source)
             self.assertIn("const idx_t ev0 = elements[0][i];", affine_source)
             self.assertIn("const idx_t ev3 = elements[3][i];", affine_source)
             self.assertIn("const s_t metric_factor = kappa;", affine_source)
             self.assertIn(
-                "const s_t fff0 = metric_factor * s_t(g_geom_metric0[i]);",
+                "const s_t fff0 = metric_factor * s_t(g_met0[i]);",
                 affine_source,
             )
             self.assertIn(
@@ -4178,12 +4178,12 @@ int main() {
             self.assertNotIn("laplace_d3_simplex_tet4_residual_block<", affine_source)
             self.assertNotIn("affine_shape", affine_source)
             self.assertNotIn("affine_grad_ref", affine_source)
-            self.assertNotIn("g_jacobian_adjugate0", affine_source)
-            self.assertNotIn("g_jacobian_determinant0", affine_source)
+            self.assertNotIn("g_adj0", affine_source)
+            self.assertNotIn("g_det0", affine_source)
             self.assertIn("laplace_tet4_residual_affine_mesh_soa_aos", operator_source)
             self.assertIn("laplace_tet4_residual_affine_mesh_soa_aos_unit", operator_source)
             self.assertIn(
-                "fff[k] = s_t(g_geom_metric[i * 6 + k]);",
+                "fff[k] = s_t(g_met[i * 6 + k]);",
                 operator_source,
             )
 
@@ -4305,13 +4305,13 @@ int main() {
                 "laplace_tri3_residual_affine_mesh_soa("
             )
             affine_source = operator_source[affine_begin:affine_end]
-            self.assertIn("g_geom_metric0", affine_source)
+            self.assertIn("g_met0", affine_source)
             self.assertIn("for (ptrdiff_t i = 0; i < nelements; ++i)", affine_source)
             self.assertIn("const idx_t ev0 = elements[0][i];", affine_source)
             self.assertIn("const idx_t ev2 = elements[2][i];", affine_source)
             self.assertIn("const s_t metric_factor = kappa;", affine_source)
             self.assertIn(
-                "const s_t fff0 = metric_factor * s_t(g_geom_metric0[i]);",
+                "const s_t fff0 = metric_factor * s_t(g_met0[i]);",
                 affine_source,
             )
             self.assertIn(
@@ -4326,8 +4326,8 @@ int main() {
             self.assertNotIn("laplace_d2_simplex_tri3_residual_block<", affine_source)
             self.assertNotIn("affine_shape", affine_source)
             self.assertNotIn("affine_grad_ref", affine_source)
-            self.assertNotIn("g_jacobian_adjugate0", affine_source)
-            self.assertNotIn("g_jacobian_determinant0", affine_source)
+            self.assertNotIn("g_adj0", affine_source)
+            self.assertNotIn("g_det0", affine_source)
             self.assertNotIn("laplace_d2_simplex_tri3_jacobian_action_block<", operator_source)
             self.assertIn("laplace_tri3_residual_affine_mesh_soa_aos", operator_source)
             self.assertIn("laplace_tri3_residual_affine_mesh_soa_aos_unit", operator_source)
@@ -4462,7 +4462,7 @@ int main() {
                 "linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_impl",
                 'extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit',
             )
-            self.assertIn("g_jacobian_adjugate_aos + element * 9", fast_apply)
+            self.assertIn("g_adj_aos + element * 9", fast_apply)
             self.assertIn("const s_t q0 = a0 * m5 + a1 * m1 + a2 * m2;", fast_apply)
             self.assertNotIn("bh_data", fast_apply)
             self.assertNotIn("linear_elasticity_d3_simplex_tet4_apply_block<", fast_apply)

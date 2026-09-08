@@ -135,7 +135,7 @@ class TargetPlatform:
             lines.append("%s%s" % (indent, pragma))
         index = policy.lane_index
         lines.append(
-            "%sfor (%s %s = 0; %s < nelems; ++%s) {"
+            "%sfor (%s %s = 0; %s < ne; ++%s) {"
             % (indent, policy.lane_index_type, index, index, index)
         )
         return tuple(lines)

@@ -117,32 +117,40 @@ def restrict_prelude(definition="__restrict__", indent=""):
     ]
 
 
-#: The frozen C ABI spelling of each geometry stream.
+#: The C ABI spelling of each geometry stream, as `g_` plus this.
 #:
 #: The local name and the ABI name used to be the same string with a `g_` in
 #: front, which meant the local one could not be shortened without moving a
-#: parameter name that `tools/reproducibility.py` binds by regex -- and that
-#: binding seeds the test input, so moving it would have silently changed every
-#: recorded digest.  They are two names for one quantity with two different
-#: owners, and this is where they are told apart.
+#: parameter name `tools/reproducibility.py` matches by regex.  They are two
+#: names for one quantity with two different owners, and this is where they are
+#: told apart -- which is also what made it safe to shorten both.
+#:
+#: These are *not* seeded: the binder maps them structurally to mesh data, so a
+#: rename changes no input and moves no digest.  It does require the binder's
+#: patterns to move with them, and they are derived from this table for exactly
+#: that reason.
 ABI_GEOMETRY = (
-    ("adj", "jacobian_adjugate"),
-    ("det", "jacobian_determinant"),
-    ("geom_metric", "geom_metric"),
+    ("adj", "adj"),
+    ("det", "det"),
+    ("geom_metric", "met"),
 )
 
 
 def abi_geometry_name(local):
     """The frozen C ABI parameter name for a local geometry stream name.
 
-    `adj0` -> `g_jacobian_adjugate0`.  Call this wherever the ABI parameter is
+    `adj0` -> `g_adj0`.  Call this wherever the ABI parameter is
     spelled; never `"g_%s" % stream`, which derives the frozen name from the one
     that is free to change.
     """
     local = str(local)
     for short, frozen in ABI_GEOMETRY:
-        if local.startswith(short) and local[len(short):].isdigit():
-            return "g_%s%s" % (frozen, local[len(short):])
+        rest = local[len(short):]
+        # The bare form (no index) is the AoS spelling of the same quantity, and
+        # must map like the indexed ones or the binder builds a pattern that
+        # matches nothing.
+        if local.startswith(short) and (rest == "" or rest.isdigit()):
+            return "g_%s%s" % (frozen, rest)
     return "g_%s" % local
 
 
@@ -183,6 +191,11 @@ INDICES = {
     "shape": "s",
     "element": "e",
     "pack_node": "k",
+    # The element count a local kernel is given.  Local kernels are called
+    # positionally, including from hand-written SFEM, so this name is the
+    # generator's alone -- unlike the mesh-level `nelements`, which is a C ABI
+    # parameter the reproducibility binder matches by name.
+    "local_element_count": "ne",
 }
 
 #: Memory spaces, for the targets that have them.  `g_` is NOT available for

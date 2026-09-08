@@ -26,7 +26,7 @@ How a kernel is driven
 Nothing here knows anything about any particular material.  The generated
 manifest lists every C ABI entry point with its full declaration, and the
 parameter *names* in those declarations are the ABI that ``plans/streams.py``
-defines: ``nelements``, ``elements``, ``points``, ``g_jacobian_adjugate<i>``,
+defines: ``nelements``, ``elements``, ``points``, ``g_adj<i>``,
 ``<role>_stride``, ``<field>``, ``<field>_old``, ``<field>_direction``,
 ``<field>_out``.  Binding a call is therefore a matter of reading names, not of
 knowing physics, and a material added tomorrow is driven without touching this
@@ -269,6 +269,15 @@ N_STEPS = 3
 #: `skipped` entry -- which is a hole in the gate, not a failure of it.
 _RSTR = conventions.QUALIFIERS["restrict"]
 
+#: Geometry parameters are bound structurally -- to mesh data, not to a seeded
+#: value -- so their names are free to change.  What is not free is this binder
+#: falling behind them: a parameter it stops recognising becomes a `skipped`
+#: kernel whose digest is no longer checked.  The patterns are built from the
+#: naming table so the two cannot drift.
+_ADJ_PATTERN = r"%s(\d+)" % re.escape(conventions.abi_geometry_name("adj").rstrip("0123456789"))
+_MET_PATTERN = r"%s(\d+)" % re.escape(conventions.abi_geometry_name("geom_metric").rstrip("0123456789"))
+_MET_AOS = conventions.abi_geometry_name("geom_metric")
+
 #: Pointer element types that name a field the kernel reads or writes.
 IN_FIELDS = (
     "const double *const %s" % _RSTR,
@@ -398,15 +407,15 @@ def _bind(params, element, components, block_values=None):
             args.append("%s.element_ptrs.data()" % mesh)
         elif name == "points" and "*const *const" in ctype:
             args.append("%s.point_ptrs.data()" % mesh)
-        elif re.fullmatch(r"g_jacobian_adjugate(\d+)", name or ""):
-            index = int(re.fullmatch(r"g_jacobian_adjugate(\d+)", name).group(1))
+        elif re.fullmatch(_ADJ_PATTERN, name or ""):
+            index = int(re.fullmatch(_ADJ_PATTERN, name).group(1))
             args.append("%s.adjugate[%d].data()" % (mesh, index))
-        elif name == "g_jacobian_determinant0":
+        elif name == conventions.abi_geometry_name("det0"):
             args.append("%s.determinant.data()" % mesh)
-        elif re.fullmatch(r"g_geom_metric(\d+)", name or ""):
-            index = int(re.fullmatch(r"g_geom_metric(\d+)", name).group(1))
+        elif re.fullmatch(_MET_PATTERN, name or ""):
+            index = int(re.fullmatch(_MET_PATTERN, name).group(1))
             args.append("%s.metric[%d].data()" % (mesh, index))
-        elif name == "g_geom_metric":
+        elif name == _MET_AOS:
             args.append("%s.metric_aos.data()" % mesh)
         elif "PrimitiveType" in ctype:
             args.append(RUNTIME_TYPE_VALUE)

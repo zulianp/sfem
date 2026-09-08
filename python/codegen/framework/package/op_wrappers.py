@@ -2379,12 +2379,12 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         const ptrdiff_t *const RSTR n_shared_nodes,
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_geom_metric0,
-        const geom_t *const RSTR g_geom_metric1,
-        const geom_t *const RSTR g_geom_metric2,
-        const geom_t *const RSTR g_geom_metric3,
-        const geom_t *const RSTR g_geom_metric4,
-        const geom_t *const RSTR g_geom_metric5,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
         const double kappa,
         const ptrdiff_t direction_stride,
         const double *const RSTR u_direction,
@@ -2409,7 +2409,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         const ptrdiff_t *const RSTR n_shared_nodes,
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_geom_metric,
+        const geom_t *const RSTR g_met,
         const double kappa,
         const ptrdiff_t direction_stride,
         const double *const RSTR u_direction,
@@ -5302,7 +5302,7 @@ def _geometry_qualified_dispatch_name(name, params):
     Only the metric is qualified; the adjugate keeps the plain name because it
     is the shape every element can be handed.
     """
-    if not any("g_geom_metric0" in parameter for parameter in params):
+    if not any("g_met0" in parameter for parameter in params):
         return name
     marker = "_mesh_"
     index = name.rfind(marker)
@@ -8663,13 +8663,13 @@ def _affine_dispatch_uses_metric(kernel_sources, name):
 
     The wrapper does not re-derive whether this operator's contraction factors
     through the metric.  The kernel already says so -- it declares
-    `g_geom_metric0` or it declares `g_jacobian_adjugate0` -- and reading that
+    `g_met0` or it declares `g_adj0` -- and reading that
     is what keeps the two sides from agreeing only by coincidence.  See
     ARCHITECTURE.html OP 16 for what the wrapper deriving geometry
     independently cost the last time.
     """
     parameters = _affine_dispatch_parameters(kernel_sources, name)
-    return bool(parameters) and "g_geom_metric0" in parameters
+    return bool(parameters) and "g_met0" in parameters
 
 
 def _affine_geometry_call_args(kernel_sources, name, dim):
@@ -8736,7 +8736,7 @@ def _c_abi_function_uses_cached_metric(kernel_sources, function_name):
     if not signature:
         return False
     return any(
-        parameter.name == "g_geom_metric0" for parameter in signature.parameters
+        parameter.name == "g_met0" for parameter in signature.parameters
     )
 
 
