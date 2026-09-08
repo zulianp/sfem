@@ -390,9 +390,17 @@ int main(int argc, char **argv) {
     // packed, colored and store sweeps carry their element data through Hex8RhieChowPack
     // and that staging is not wired up here yet; asking for it there has to fail rather
     // than quietly return a number measured without it.
-    if (rhie_chow && layout != "atomic") {
-        std::fprintf(stderr, "--rhie-chow is implemented for --layout atomic only (got '%s')\n",
-                     layout.c_str());
+    // The residual carries Rhie-Chow on atomic and on the packed/store SIMD sumfact path.
+    // The colored sweep and the assembled Jacobian on the packed layouts still need their
+    // staging extended, so those combinations are refused rather than measured without it.
+    const bool rc_layout_ok = layout == "atomic" || ((layout == "packed" || layout == "store") &&
+                                                     !assemble && !assemble_diag && !bsr_apply && !jac_action);
+    if (rhie_chow && !rc_layout_ok) {
+        std::fprintf(stderr,
+                     "--rhie-chow is implemented for --layout atomic, and for the residual on "
+                     "--layout packed|store (got '%s'%s)\n",
+                     layout.c_str(),
+                     (assemble || assemble_diag || bsr_apply || jac_action) ? " with a non-residual operation" : "");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
