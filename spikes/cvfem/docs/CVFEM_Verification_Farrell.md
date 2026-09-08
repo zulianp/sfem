@@ -137,11 +137,11 @@ Ordered by how much work each is, not by importance.
 
 1. **A body force in the CVFEM operator.** The MMS is driven by
    `f = −(1/Re)Δu + (u·∇)u + ∇p`, and there is no source term anywhere in
-   `cvfem_hex8_ns_core.hpp` or the operator. Without it the manufactured solution cannot be
+   `src/hex8/cvfem_hex8_ns_core.hpp` or the operator. Without it the manufactured solution cannot be
    imposed at all. This is a kernel change: the forcing has to be integrated over each
    sub-control volume the same way the other terms are.
 2. **Geometry-aware boundary faces.** `hex8_face_on_domain` in
-   `cvfem_hex8_boundary_scs.hpp` decides a face is on the boundary by testing all four nodes
+   `src/hex8/cvfem_hex8_boundary_scs.hpp` decides a face is on the boundary by testing all four nodes
    against `x=0, x=Lx, y=0, y=Ly, z=0, z=Lz`. That is hard-coded for a box and is simply
    wrong on the L-shaped step domain, where the step faces at `x=1 (y<1)` and `y=1 (x<1)` are
    boundary but lie on no such plane. Needs a real boundary-face marking rather than a
@@ -152,7 +152,7 @@ Ordered by how much work each is, not by importance.
    **Correction.** An earlier revision of this document claimed that with `|Γ_N| > 0` the
    pressure pin must be dropped because the pressure becomes determined. That is true of the
    FEM do-nothing condition but **false for this discretisation.** Reading
-   `cvfem_hex8_boundary_scs.hpp:170-174`, the boundary term is
+   `src/hex8/cvfem_hex8_boundary_scs.hpp:170-174`, the boundary term is
 
    ```c
    const scalar_t mdot = rho * (ux[i]*ax + uy[i]*ay + uz[i]*az);
@@ -254,6 +254,6 @@ quadratic. Unconstrained outlet with `p_i·a` retained: diverges, `|dx|_inf` 108
 Unconstrained and unpinned: linear solve diverges outright — confirming the nullspace
 survives. Prescribing `(pI − τ)·n = 0` fixes the gauge and lets the pin come off.
 
-**Known limitation:** multigrid does not yet work for this case. `cvfem_ss_galerkin.hpp` still
+**Known limitation:** multigrid does not yet work for this case. `src/ss/cvfem_ss_galerkin.hpp` still
 calls the boundary term without the masks, so the coarse operator is inconsistent and the
 solve stalls at zero Krylov iterations.

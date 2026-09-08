@@ -27,7 +27,7 @@ kernel is correct only with `blockDim.x == 1`.
 
 About 200× slower in the only configuration where it is correct.
 
-**What replaced it.** Element colouring (`cvfem_element_coloring.hpp`,
+**What replaced it.** Element colouring (`src/core/cvfem_element_coloring.hpp`,
 `cvfem_cuda_assemble_ecolored`), which colours elements rather than packs and so removes
 the race that actually exists on the device. It is the fastest GPU assembly measured:
 **277.3 MDOF/s** with the `sympy_block` kernel at n=128, against 238.3 for the best atomic
