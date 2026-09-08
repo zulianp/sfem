@@ -61,14 +61,14 @@ static SFEM_INLINE int laplace_tet10_energy_element_geometry_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             bu_streams[stream] = u_streams[stream] + evb;
         }
         s_t *const bvalue = values + evb;
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             bvalue[lane] = s_t(0);
         }
         s_t badj0[NQ * VS];
@@ -83,7 +83,7 @@ static SFEM_INLINE int laplace_tet10_energy_element_geometry_soa(
         s_t bdet0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
                 badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
                 badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
@@ -96,7 +96,7 @@ static SFEM_INLINE int laplace_tet10_energy_element_geometry_soa(
                 bdet0[q * VS + lane] = det[q * nelements + evb + lane];
             }
         }
-        laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
+        laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -116,20 +116,20 @@ static SFEM_INLINE int laplace_tet10_energy_element_coords_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             bu_streams[stream] = u_streams[stream] + evb;
         }
         s_t *const bvalue = values + evb;
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             bvalue[lane] = s_t(0);
         }
         s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
@@ -158,39 +158,39 @@ static SFEM_INLINE int laplace_tet10_energy_element_coords_soa(
             s_t J21_values[VS];
             s_t J22_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J00_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J01_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J02_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J10_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J11_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J12_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J20_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J21_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J22_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
@@ -198,44 +198,44 @@ static SFEM_INLINE int laplace_tet10_energy_element_coords_soa(
                 const s_t g1 = grad_ref_y[q * NS + shape];
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = J00_values[lane];
                 const s_t J01 = J01_values[lane];
                 const s_t J02 = J02_values[lane];
@@ -250,7 +250,7 @@ static SFEM_INLINE int laplace_tet10_energy_element_coords_soa(
                         badj_streams, bdet0, q * VS + lane);
             }
         }
-        laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
+        laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -270,20 +270,20 @@ static SFEM_INLINE int laplace_tet10_energy_element_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             bu_streams[stream] = u_streams[stream] + evb;
         }
         s_t *const bvalue = values + evb;
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             bvalue[lane] = s_t(0);
         }
         s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
@@ -312,39 +312,39 @@ static SFEM_INLINE int laplace_tet10_energy_element_soa(
             s_t J21_values[VS];
             s_t J22_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J00_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J01_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J02_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J10_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J11_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J12_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J20_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J21_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J22_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
@@ -352,44 +352,44 @@ static SFEM_INLINE int laplace_tet10_energy_element_soa(
                 const s_t g1 = grad_ref_y[q * NS + shape];
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = J00_values[lane];
                 const s_t J01 = J01_values[lane];
                 const s_t J02 = J02_values[lane];
@@ -404,7 +404,7 @@ static SFEM_INLINE int laplace_tet10_energy_element_soa(
                         badj_streams, bdet0, q * VS + lane);
             }
         }
-        laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
+        laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -426,7 +426,7 @@ static SFEM_INLINE int laplace_tet10_gradient_element_geometry_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             bu_streams[stream] = u_streams[stream] + evb;
@@ -435,7 +435,7 @@ static SFEM_INLINE int laplace_tet10_gradient_element_geometry_soa(
         for (int stream = 0; stream < NDOFS; ++stream) {
             bout_streams[stream] = out_streams[stream] + evb;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_streams[stream][lane] = s_t(0);
             }
         }
@@ -451,7 +451,7 @@ static SFEM_INLINE int laplace_tet10_gradient_element_geometry_soa(
         s_t bdet0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
                 badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
                 badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
@@ -464,7 +464,7 @@ static SFEM_INLINE int laplace_tet10_gradient_element_geometry_soa(
                 bdet0[q * VS + lane] = det[q * nelements + evb + lane];
             }
         }
-        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -484,7 +484,7 @@ static SFEM_INLINE int laplace_tet10_gradient_element_coords_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             bu_streams[stream] = u_streams[stream] + evb;
@@ -493,14 +493,14 @@ static SFEM_INLINE int laplace_tet10_gradient_element_coords_soa(
         for (int stream = 0; stream < NDOFS; ++stream) {
             bout_streams[stream] = out_streams[stream] + evb;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_streams[stream][lane] = s_t(0);
             }
         }
         s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
@@ -529,39 +529,39 @@ static SFEM_INLINE int laplace_tet10_gradient_element_coords_soa(
             s_t J21_values[VS];
             s_t J22_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J00_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J01_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J02_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J10_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J11_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J12_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J20_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J21_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J22_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
@@ -569,44 +569,44 @@ static SFEM_INLINE int laplace_tet10_gradient_element_coords_soa(
                 const s_t g1 = grad_ref_y[q * NS + shape];
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = J00_values[lane];
                 const s_t J01 = J01_values[lane];
                 const s_t J02 = J02_values[lane];
@@ -621,7 +621,7 @@ static SFEM_INLINE int laplace_tet10_gradient_element_coords_soa(
                         badj_streams, bdet0, q * VS + lane);
             }
         }
-        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -641,7 +641,7 @@ static SFEM_INLINE int laplace_tet10_gradient_element_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             bu_streams[stream] = u_streams[stream] + evb;
@@ -650,14 +650,14 @@ static SFEM_INLINE int laplace_tet10_gradient_element_soa(
         for (int stream = 0; stream < NDOFS; ++stream) {
             bout_streams[stream] = out_streams[stream] + evb;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_streams[stream][lane] = s_t(0);
             }
         }
         s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
@@ -686,39 +686,39 @@ static SFEM_INLINE int laplace_tet10_gradient_element_soa(
             s_t J21_values[VS];
             s_t J22_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J00_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J01_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J02_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J10_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J11_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J12_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J20_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J21_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J22_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
@@ -726,44 +726,44 @@ static SFEM_INLINE int laplace_tet10_gradient_element_soa(
                 const s_t g1 = grad_ref_y[q * NS + shape];
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = J00_values[lane];
                 const s_t J01 = J01_values[lane];
                 const s_t J02 = J02_values[lane];
@@ -778,7 +778,7 @@ static SFEM_INLINE int laplace_tet10_gradient_element_soa(
                         badj_streams, bdet0, q * VS + lane);
             }
         }
-        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -799,7 +799,7 @@ static SFEM_INLINE int laplace_tet10_hessian_element_geometry_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t badj0[NQ * VS];
         s_t badj1[NQ * VS];
         s_t badj2[NQ * VS];
@@ -812,7 +812,7 @@ static SFEM_INLINE int laplace_tet10_hessian_element_geometry_soa(
         s_t bdet0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
                 badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
                 badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
@@ -836,16 +836,16 @@ static SFEM_INLINE int laplace_tet10_hessian_element_geometry_soa(
         for (int col = 0; col < NDOFS; ++col) {
             for (int stream = 0; stream < NDOFS; ++stream) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+            laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     matrix_stream[lane] = bout_data[row][lane];
                 }
             }
@@ -868,11 +868,11 @@ static SFEM_INLINE int laplace_tet10_hessian_element_coords_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
@@ -901,39 +901,39 @@ static SFEM_INLINE int laplace_tet10_hessian_element_coords_soa(
             s_t J21_values[VS];
             s_t J22_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J00_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J01_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J02_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J10_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J11_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J12_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J20_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J21_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J22_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
@@ -941,44 +941,44 @@ static SFEM_INLINE int laplace_tet10_hessian_element_coords_soa(
                 const s_t g1 = grad_ref_y[q * NS + shape];
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = J00_values[lane];
                 const s_t J01 = J01_values[lane];
                 const s_t J02 = J02_values[lane];
@@ -1004,16 +1004,16 @@ static SFEM_INLINE int laplace_tet10_hessian_element_coords_soa(
         for (int col = 0; col < NDOFS; ++col) {
             for (int stream = 0; stream < NDOFS; ++stream) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+            laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     matrix_stream[lane] = bout_data[row][lane];
                 }
             }
@@ -1036,11 +1036,11 @@ static SFEM_INLINE int laplace_tet10_hessian_element_soa(
     static constexpr int NDOFS = NC * NS;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
@@ -1069,39 +1069,39 @@ static SFEM_INLINE int laplace_tet10_hessian_element_soa(
             s_t J21_values[VS];
             s_t J22_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J00_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J01_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J02_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J10_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J11_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J12_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J20_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J21_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J22_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
@@ -1109,44 +1109,44 @@ static SFEM_INLINE int laplace_tet10_hessian_element_soa(
                 const s_t g1 = grad_ref_y[q * NS + shape];
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = J00_values[lane];
                 const s_t J01 = J01_values[lane];
                 const s_t J02 = J02_values[lane];
@@ -1172,16 +1172,16 @@ static SFEM_INLINE int laplace_tet10_hessian_element_soa(
         for (int col = 0; col < NDOFS; ++col) {
             for (int stream = 0; stream < NDOFS; ++stream) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+            laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     matrix_stream[lane] = bout_data[row][lane];
                 }
             }

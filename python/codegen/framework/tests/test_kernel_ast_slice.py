@@ -73,7 +73,7 @@ class QuadratureLaneKernelTest(unittest.TestCase):
             [
                 "    for (int q = 0; q < NQ; ++q) {",
                 "        #pragma omp simd",
-                "        for (int lane = 0; lane < nelems; ++lane) {",
+                "        for (int lane = 0; lane < ne; ++lane) {",
                 "            const s_t x = current[0][lane];",
                 "        }",
                 "    }",
@@ -88,7 +88,7 @@ class QuadratureLaneKernelTest(unittest.TestCase):
         lane = [i for i, l in enumerate(lines) if "for (int lane" in l]
         self.assertEqual(len(lane), 1, "expected exactly one lane loop")
         index = lane[0]
-        self.assertEqual(lines[index].strip(), "for (int lane = 0; lane < nelems; ++lane) {")
+        self.assertEqual(lines[index].strip(), "for (int lane = 0; lane < ne; ++lane) {")
         self.assertEqual(lines[index - 1].strip(), "#pragma omp simd")
         body = lines[index + 1 : -2]
         self.assertFalse(

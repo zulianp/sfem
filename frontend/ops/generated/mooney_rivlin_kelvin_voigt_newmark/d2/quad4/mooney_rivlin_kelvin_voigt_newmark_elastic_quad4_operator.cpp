@@ -220,11 +220,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double eta_b,
         const double eta_s,
         const double newmark_velocity_alpha,
@@ -245,11 +245,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float eta_b,
         const float eta_s,
         const float newmark_velocity_alpha,
@@ -270,11 +270,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double eta_b,
         const double eta_s,
         const double newmark_velocity_alpha,
@@ -292,11 +292,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float eta_b,
         const float eta_s,
         const float newmark_velocity_alpha,
@@ -666,11 +666,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double eta_b,
         const double eta_s,
         const double newmark_velocity_alpha,
@@ -693,18 +693,18 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float eta_b,
         const float eta_s,
         const float newmark_velocity_alpha,
@@ -727,18 +727,18 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double eta_b,
         const double eta_s,
         const double newmark_velocity_alpha,
@@ -758,18 +758,18 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_affine_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float eta_b,
         const float eta_s,
         const float newmark_velocity_alpha,
@@ -789,7 +789,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_affine_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_soa_diagnostics(

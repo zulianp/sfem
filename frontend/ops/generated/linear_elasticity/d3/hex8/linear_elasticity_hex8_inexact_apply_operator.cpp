@@ -5,16 +5,16 @@
 extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa(
         const ptrdiff_t nelements,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -26,7 +26,7 @@ extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa(
         metric_tensor_t *const RSTR tangent
 ) {
     return sfem::codegen::linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_impl<double, geom_t, metric_tensor_t>(
-            nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0,
+            nelements, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0,
             lmbda, mu,
             u_stride, ux, uy, uz,
             tangent_element_stride, tangent_component_stride, tangent);
@@ -80,16 +80,16 @@ extern "C" int linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa(
 extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -101,7 +101,7 @@ extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_floa
         metric_tensor_t *const RSTR tangent
 ) {
     return sfem::codegen::linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_impl<float, geom_t, metric_tensor_t>(
-            nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0,
+            nelements, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0,
             lmbda, mu,
             u_stride, ux, uy, uz,
             tangent_element_stride, tangent_component_stride, tangent);

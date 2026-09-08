@@ -872,7 +872,7 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_affine_me
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -881,7 +881,7 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_affine_me
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -890,11 +890,11 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -925,11 +925,11 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_affine_mesh_soa_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -960,7 +960,7 @@ extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_affine_me
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -969,7 +969,7 @@ extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_affine_me
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -978,11 +978,11 @@ extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -1011,11 +1011,11 @@ extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_residual_affine_mesh_soa_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -1044,11 +1044,11 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_affin
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1079,11 +1079,11 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_affin
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1114,7 +1114,7 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -1123,7 +1123,7 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -1132,11 +1132,11 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_affin
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1167,11 +1167,11 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_affin
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1202,7 +1202,7 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -1211,7 +1211,7 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -1220,11 +1220,11 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_affin
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -1253,11 +1253,11 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_affin
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -1286,7 +1286,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -1295,7 +1295,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -1304,11 +1304,11 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_affin
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -1337,11 +1337,11 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_affin
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -1370,7 +1370,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -1379,7 +1379,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -1388,11 +1388,11 @@ extern "C" int two_phase_flow_proteus_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -1428,11 +1428,11 @@ extern "C" int two_phase_flow_proteus_quad4_jacobian_action_affine_mesh_soa_floa
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -1468,11 +1468,11 @@ extern "C" int two_phase_flow_proteus_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -1508,11 +1508,11 @@ extern "C" int two_phase_flow_proteus_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -2963,7 +2963,7 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -2974,14 +2974,14 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -2992,18 +2992,18 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_affine_mesh_soa_f
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -3036,18 +3036,18 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_residual_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_1_p_c_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_1_p_c_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -3080,14 +3080,14 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_residual_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_1_p_c_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_1_p_c_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -3098,14 +3098,14 @@ extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -3116,18 +3116,18 @@ extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_affine_mesh_soa_f
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -3158,18 +3158,18 @@ extern "C" int two_phase_flow_form_1_p_w_quad4_residual_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_1_p_w_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_1_p_w_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -3200,18 +3200,18 @@ extern "C" int two_phase_flow_form_1_p_w_quad4_residual_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_1_p_w_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_1_p_w_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -3244,18 +3244,18 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -3288,14 +3288,14 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -3306,14 +3306,14 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -3324,18 +3324,18 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_affine_mesh_soa_floa
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -3368,18 +3368,18 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -3412,14 +3412,14 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -3430,14 +3430,14 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -3448,18 +3448,18 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_affine_mesh_soa_floa
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -3490,18 +3490,18 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -3532,14 +3532,14 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -3550,14 +3550,14 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -3568,18 +3568,18 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_affine_mesh_soa_floa
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -3610,18 +3610,18 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -3652,14 +3652,14 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         double *const RSTR p_w_out,
         double *const RSTR p_c_out
@@ -3670,14 +3670,14 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         float *const RSTR p_w_out,
         float *const RSTR p_c_out
@@ -3688,18 +3688,18 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_affine_mesh_soa_floa
         elements[3],
         elements[2]
     };
-    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_quad4_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3737,18 +3737,18 @@ extern "C" int two_phase_flow_quad4_jacobian_action_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_quad4_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3786,18 +3786,18 @@ extern "C" int two_phase_flow_quad4_jacobian_action_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_quad4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3835,18 +3835,18 @@ extern "C" int two_phase_flow_quad4_residual_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_quad4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3884,7 +3884,7 @@ extern "C" int two_phase_flow_quad4_residual_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return two_phase_flow_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * two_phase_flow_form_1_p_c_quad4_jacobian_action_element_soa_diagnostics(

@@ -327,7 +327,7 @@ def _affine_geometry_stream_conversion_lines(streams, indent):
         % (indent, n_streams),
         "%s    bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>("
         % indent,
-        "%s            nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());"
+        "%s            ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());"
         % indent,
         "%s}" % indent,
     ]
@@ -349,7 +349,7 @@ def _affine_geometry_stream_helper_lines():
         "",
         "template <typename s_t, typename g_t, int VS>",
         "%s const s_t *ageom_stream(" % _inline_qualifier(),
-        "        const int nelems,",
+        "        const int ne,",
         "        const g_t *const RSTR source,",
         "        s_t *const RSTR converted,",
         "        std::false_type) {",
@@ -359,7 +359,7 @@ def _affine_geometry_stream_helper_lines():
         lines.append("    %s" % pragma)
     lines.extend(
         [
-            "    for (int lane = 0; lane < nelems; ++lane) {",
+            "    for (int lane = 0; lane < ne; ++lane) {",
             "        converted[lane] = s_t(source[lane]);",
             "    }",
             "    return converted;",
@@ -383,7 +383,7 @@ def _uses_cached_affine_metric(gradient_metric):
 def _direct_atomic_scatter_lines(pointer, node_expr, value_expr, indent):
     lines = [
         "%s{" % indent,
-        "%s    for (int scatter = 0; scatter < nelems; ++scatter) {" % indent,
+        "%s    for (int scatter = 0; scatter < ne; ++scatter) {" % indent,
         "%s        %s" % (indent, _atomic_update_pragma()),
         "%s        %s[%s] += %s;"
         % (indent, pointer, node_expr % "scatter", value_expr % "scatter"),
@@ -395,7 +395,7 @@ def _direct_atomic_scatter_lines(pointer, node_expr, value_expr, indent):
 
 def _metric_component_load(component, scale, source=None):
     if source is None:
-        source = "s_t(g_geom_metric%d[i])" % component
+        source = "s_t(g_met%d[i])" % component
     if scale == "1":
         return source
     return "metric_factor * %s" % source
@@ -452,7 +452,7 @@ def _simplex_metric_scalar_affine_loop_lines(
             "%s    s_t element_vector[4];" % indent,
             "%s    s_t fff[6];" % indent,
             "%s    for (int k = 0; k < 6; ++k) {" % indent,
-            "%s        fff[k] = s_t(g_geom_metric[i * 6 + k]);" % indent,
+            "%s        fff[k] = s_t(g_met[i * 6 + k]);" % indent,
             "%s    }" % indent,
             "%s    const idx_t ev0 = elements[0][i];" % indent,
             "%s    const idx_t ev1 = elements[1][i];" % indent,
@@ -505,12 +505,12 @@ def _simplex_metric_scalar_affine_loop_lines(
     metric_components = system.dim * (system.dim + 1) // 2
     for component in range(metric_components):
         if metric_layout == "aos":
-            source = "s_t(g_geom_metric[i * %d + %d])" % (
+            source = "s_t(g_met[i * %d + %d])" % (
                 metric_components,
                 component,
             )
         else:
-            source = "s_t(g_geom_metric%d[i])" % component
+            source = "s_t(g_met%d[i])" % component
         lines.append(
             "%s    const s_t fff%d = %s;"
             % (
@@ -677,7 +677,7 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
             "idx_t **const RSTR elements",
-            "const geom_t *const RSTR g_geom_metric",
+            "const geom_t *const RSTR g_met",
         ]
         params.extend(
             "const %s %s" % (scalar_type, parameter)
@@ -774,7 +774,7 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
                 "const ptrdiff_t nelements",
                 "const ptrdiff_t nnodes",
                 "idx_t **const RSTR elements",
-                "const geom_t *const RSTR g_geom_metric",
+                "const geom_t *const RSTR g_met",
             ]
             for role in live_field_roles(dependencies):
                 unit_params.extend(
@@ -960,7 +960,7 @@ def _mesh_block_scatter_loop_lines(indent, loop, accumulation_line):
     lines.extend(loop.setup_lines)
     lines.extend(
         [
-            "%sfor (int scatter = 0; scatter < nelems; ++scatter) {"
+            "%sfor (int scatter = 0; scatter < ne; ++scatter) {"
             % loop.scatter_indent,
             "%s    %s" % (loop.scatter_indent, _atomic_update_pragma()),
             accumulation_line,
@@ -2133,7 +2133,7 @@ def _mixed_local_function(
     dim = system.dim
     layout = MixedFieldLayout.create(system, rule, field_element_types)
     params = [
-        "const int nelems",
+        "const int ne",
         "const ptrdiff_t geometry_stride",
         "const s_t *const RSTR determinant",
     ]
@@ -2334,7 +2334,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                     [
                         "    %s<s_t, NQ, %s, VS, ND, 1>("
                         % (tensor_evaluate_name, shape_name),
-                        "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s, %s_%s_value, %s_%s_grad_ref);"
+                        "            ne, field_shape_1d[%d], field_grad_1d[%d], %s, %s_%s_value, %s_%s_grad_ref);"
                         % (
                             reference_index,
                             reference_index,
@@ -2351,7 +2351,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                     [
                         "    %s<s_t, NQ, %s, VS, ND, 1>("
                         % (tensor_evaluate_value_name, shape_name),
-                        "            nelems, field_shape_1d[%d], %s, %s_%s_value);"
+                        "            ne, field_shape_1d[%d], %s, %s_%s_value);"
                         % (reference_index, stream_arg, group.name, field.name),
                     ]
                 )
@@ -2467,7 +2467,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 [
                     "    %s<s_t, NQ, %s, VS, ND, 1>("
                     % (tensor_integrate_name, shape_name),
-                    "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s_value_coeff, %s_grad_coeff_ref, %s);"
+                    "            ne, field_shape_1d[%d], field_grad_1d[%d], %s_value_coeff, %s_grad_coeff_ref, %s);"
                     % (reference_index, reference_index, field.name, field.name, output_arg),
                 ]
             )
@@ -2476,7 +2476,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 [
                     "    %s<s_t, NQ, %s, VS, ND, 1>("
                     % (tensor_integrate_value_name, shape_name),
-                    "            nelems, field_shape_1d[%d], %s_value_coeff, %s);"
+                    "            ne, field_shape_1d[%d], %s_value_coeff, %s);"
                     % (reference_index, field.name, output_arg),
                 ]
             )
@@ -2786,7 +2786,7 @@ def _local_function(
     )
     # Which streams cross this kernel's boundary is a planning decision; this
     # function only spells the declarations.  The order is the kernel's ABI.
-    params = ["const int nelems", "const ptrdiff_t geometry_stride"]
+    params = ["const int ne", "const ptrdiff_t geometry_stride"]
     params.extend(
         _declare_stream(stream)
         for stream in local_kernel_stream_plans(
@@ -3350,7 +3350,7 @@ def _work_item_loop_node(body):
     return LoopNode(
         LoopKind.SIMD,
         lane,
-        iteration_range(0, expr_ref("nelems", "tile_extent")),
+        iteration_range(0, expr_ref("ne", "tile_extent")),
         pre_increment(lane),
         body=tuple(body),
         vectorized=bool(pragma),
@@ -3596,7 +3596,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             nodes.append(
                 CallNode(
                     "tensor_evaluate%s" % suffix,
-                    ("nelems", "shape_1d", "grad_1d", group,
+                    ("ne", "shape_1d", "grad_1d", group,
                      "%s_value" % group, "%s_grad_ref" % group),
                     templates,
                     wrap_arguments=True,
@@ -3606,7 +3606,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             nodes.append(
                 CallNode(
                     "tensor_evaluate_value%s" % suffix,
-                    ("nelems", "shape_1d", group, "%s_value" % group),
+                    ("ne", "shape_1d", group, "%s_value" % group),
                     templates,
                     wrap_arguments=True,
                 )
@@ -3724,7 +3724,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         nodes.append(
             CallNode(
                 "tensor_integrate%s" % suffix,
-                ("nelems", "shape_1d", "grad_1d", "value_coeff",
+                ("ne", "shape_1d", "grad_1d", "value_coeff",
                  "grad_coeff_ref", "output"),
                 templates,
                 wrap_arguments=True,
@@ -3734,7 +3734,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         nodes.append(
             CallNode(
                 "tensor_integrate_value%s" % suffix,
-                ("nelems", "shape_1d", "value_coeff", "output"),
+                ("ne", "shape_1d", "value_coeff", "output"),
                 templates,
                 wrap_arguments=True,
             )
@@ -4125,7 +4125,7 @@ def _operator_source(
         block = "%s_%s_block" % (local_prefix, form)
         for scalar_type, suffix in precision_axis():
             params = [
-                "const int nelems",
+                "const int ne",
                 "const ptrdiff_t geometry_stride",
                 "const %s *const RSTR determinant" % scalar_type,
             ]
@@ -4154,7 +4154,7 @@ def _operator_source(
                     "        %s%s"
                     % (param, "," if index + 1 < len(params) else "")
                 )
-            call_args = ["nelems", "geometry_stride"]
+            call_args = ["ne", "geometry_stride"]
             pre_call_lines = []
             if gradient_metric is not None:
                 pre_call_lines.extend(
@@ -4596,7 +4596,7 @@ def _mixed_affine_function(
             "",
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-            "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+            "        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
         ]
     )
     for role in live_field_roles(dependencies):
@@ -4644,7 +4644,7 @@ def _mixed_affine_function(
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
     call_args = [
-        "nelems",
+        "ne",
         "0",
         "bageom_streams[%d]"
         % affine_geometry_stream_indices["det0"],
@@ -4807,7 +4807,7 @@ def _mixed_isoparametric_function(
         [
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-            "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+            "        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
             "        s_t bcoordinates[ND * CELL_NS][VS];",
             "        s_t badjugate_data[ND * ND][NQ * VS];",
             "        s_t bdeterminant[NQ * VS];",
@@ -4911,7 +4911,7 @@ def _mixed_isoparametric_function(
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
     call_args = [
-        "nelems",
+        "ne",
         "VS",
         "bdeterminant",
     ]
@@ -5444,7 +5444,7 @@ def _mesh_operator_source(
             "",
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-            "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+            "        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
         ]
     )
     for role in live_field_roles(dependencies):
@@ -5549,7 +5549,7 @@ def _mesh_operator_source(
                 ),
             )
         )
-    call_args = ["nelems", "0"]
+    call_args = ["ne", "0"]
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -6383,7 +6383,7 @@ def _scalar_crs_matrix_assembly_source(
             "#pragma omp parallel for schedule(static)",
             "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
             "        const ptrdiff_t evb = element;",
-            "        const int nelems = 1;",
+            "        const int ne = 1;",
             "        idx_t ev[NS];",
             "        s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
             "        s_t bcoordinates[ND * NS][VS];",
@@ -6789,7 +6789,7 @@ def _scalar_crs_matrix_assembly_source(
             [
                 "",
                 "            for (ptrdiff_t element = e_start; element < e_end; ++element) {",
-                "                const int nelems = 1;",
+                "                const int ne = 1;",
                 "                s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
                 "                s_t bcoordinates[ND * NS][VS];",
                 "                s_t badjugate_data[ND * ND][NQ * VS];",
@@ -7099,7 +7099,7 @@ def _isoparametric_mesh_operator_source(
             "",
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-            "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+            "        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
             "        s_t bcoordinates[%d * NS][VS];"
             % dim,
             "        s_t badjugate_data[%d][NQ * VS];"
@@ -7233,7 +7233,7 @@ def _isoparametric_mesh_operator_source(
                 ),
             )
         )
-    call_args = ["nelems", "VS"]
+    call_args = ["ne", "VS"]
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -7474,7 +7474,7 @@ def _scalar_packed_jacobian_action_source(
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
-            "                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);",
+            "                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
             "                s_t bcoordinates[ND * NS][VS];",
             "                s_t badjugate_data[ND * ND][NQ * VS];",
             "                s_t bdeterminant[NQ * VS];",
@@ -7494,7 +7494,7 @@ def _scalar_packed_jacobian_action_source(
             "                    const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
             "                    for (int d = 0; d < ND; ++d) {",
             _vectorize_pragma(),
-            "                        for (int lane = 0; lane < nelems; ++lane) {",
+            "                        for (int lane = 0; lane < ne; ++lane) {",
             "                            bcoordinates[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[evb + lane]];",
             "                        }",
             "                    }",
@@ -7504,7 +7504,7 @@ def _scalar_packed_jacobian_action_source(
         lines.extend(
             [
                 _vectorize_pragma(),
-                "                    for (int lane = 0; lane < nelems; ++lane) {",
+                "                    for (int lane = 0; lane < ne; ++lane) {",
                 "                        b%s[shape][lane] = pk_%s[field_shape[evb + lane]];"
                 % (role.name, role.name),
                 "                    }",
@@ -7513,7 +7513,7 @@ def _scalar_packed_jacobian_action_source(
     lines.extend(
         [
             _vectorize_pragma(),
-            "                    for (int lane = 0; lane < nelems; ++lane) {",
+            "                    for (int lane = 0; lane < ne; ++lane) {",
             "                        bdirection[shape][lane] = pk_direction[field_shape[evb + lane]];",
             "                        boutput[shape][lane] = s_t(0);",
             "                    }",
@@ -7584,7 +7584,7 @@ def _scalar_packed_jacobian_action_source(
                 for component in range(dim * dim)
             )
         )
-    call_args = ["nelems", "VS"]
+    call_args = ["ne", "VS"]
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -7604,7 +7604,7 @@ def _scalar_packed_jacobian_action_source(
             "                for (int shape = 0; shape < NS; ++shape) {",
             "                    const uint16_t *const RSTR field_shape = %s[shape];"
             % field_element_array,
-            "                    for (int lane = 0; lane < nelems; ++lane) {",
+            "                    for (int lane = 0; lane < ne; ++lane) {",
             "                        pk_out[field_shape[evb + lane]] += boutput[shape][lane];",
             "                    }",
             "                }",
@@ -7779,20 +7779,20 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
-            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VS, e_end - evb);",
+            "                const ptrdiff_t ne = MIN((ptrdiff_t)VS, e_end - evb);",
             "                const s_t metric_factor = UnitKappa ? s_t(1) : %s;" % kappa_name,
             "",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
-            "                    fff0[lane] = metric_factor * s_t(g_geom_metric0[element]);",
-            "                    fff1[lane] = metric_factor * s_t(g_geom_metric1[element]);",
-            "                    fff2[lane] = metric_factor * s_t(g_geom_metric2[element]);",
-            "                    fff3[lane] = metric_factor * s_t(g_geom_metric3[element]);",
-            "                    fff4[lane] = metric_factor * s_t(g_geom_metric4[element]);",
-            "                    fff5[lane] = metric_factor * s_t(g_geom_metric5[element]);",
+            "                    fff0[lane] = metric_factor * s_t(g_met0[element]);",
+            "                    fff1[lane] = metric_factor * s_t(g_met1[element]);",
+            "                    fff2[lane] = metric_factor * s_t(g_met2[element]);",
+            "                    fff3[lane] = metric_factor * s_t(g_met3[element]);",
+            "                    fff4[lane] = metric_factor * s_t(g_met4[element]);",
+            "                    fff5[lane] = metric_factor * s_t(g_met5[element]);",
             "                }",
             "",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
             "                    u0[lane] = pk_direction[elements[0][element]];",
             "                    u1[lane] = pk_direction[elements[1][element]];",
@@ -7801,14 +7801,14 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "                }",
             "",
             _vectorize_pragma(),
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    tet4_laplacian_apply_fff_soa_tpl<s_t, s_t>(",
             "                            fff0[lane], fff1[lane], fff2[lane], fff3[lane], fff4[lane], fff5[lane],",
             "                            u0[lane], u1[lane], u2[lane], u3[lane],",
             "                            &out0[lane], &out1[lane], &out2[lane], &out3[lane]);",
             "                }",
             "",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
             "                    pk_out[elements[0][element]] += out0[lane];",
             "                    pk_out[elements[1][element]] += out1[lane];",
@@ -7849,13 +7849,13 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "        return %s_kernel<s_t, g_t, true>(" % impl,
             "                n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
             "                elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
-            "                g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+            "                g_met0, g_met1, g_met2, g_met3, g_met4, g_met5,",
             "                %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
             "    }",
             "    return %s_kernel<s_t, g_t, false>(" % impl,
             "            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
             "            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
-            "            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+            "            g_met0, g_met1, g_met2, g_met3, g_met4, g_met5,",
             "            %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
             "}",
             "",
@@ -7878,7 +7878,7 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
                 "    return sfem::codegen::%s<%s, geom_t>(" % (impl, scalar_type),
                 "            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
                 "            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
-                "            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+                "            g_met0, g_met1, g_met2, g_met3, g_met4, g_met5,",
                 "            %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
                 "}",
                 "",
@@ -7953,17 +7953,17 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
-            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VS, e_end - evb);",
+            "                const ptrdiff_t ne = MIN((ptrdiff_t)VS, e_end - evb);",
             "                const s_t metric_factor = UnitKappa ? s_t(1) : %s;" % kappa_name,
             "",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
-            "                    const s_t inv_det = (metric_factor * %s) / s_t(g_jacobian_determinant0[element]);" % metric_measure,
+            "                    const s_t inv_det = (metric_factor * %s) / s_t(g_det0[element]);" % metric_measure,
         ]
     )
     for component in range(9):
         lines.append(
-            "                    const s_t adj%d = s_t(g_jacobian_adjugate%d[element]);"
+            "                    const s_t adj%d = s_t(g_adj%d[element]);"
             % (component, component)
         )
     metric_terms = (
@@ -7980,7 +7980,7 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
         [
             "                }",
             "",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
         ]
     )
@@ -7989,7 +7989,7 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "                    u%d[lane] = pk_direction[elements[%d][element]];"
             % (shape, primitive_shape_order[shape])
         )
-    lines.extend(["                }", "", _vectorize_pragma(), "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    lines.extend(["                }", "", _vectorize_pragma(), "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {"])
     primitive_args = (
         ["fff%d[lane]" % component for component in range(6)]
         + ["u%d[lane]" % shape for shape in range(n_shape)]
@@ -7999,7 +7999,7 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
         "                    %s%s(%s);"
         % (primitive, primitive_template, ", ".join(primitive_args))
     )
-    lines.extend(["                }", "", "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "                    const ptrdiff_t element = evb + lane;"])
+    lines.extend(["                }", "", "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {", "                    const ptrdiff_t element = evb + lane;"])
     for shape in range(n_shape):
         lines.append(
             "                    pk_out[elements[%d][element]] += out%d[lane];"
@@ -8046,8 +8046,8 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
         "n_shared_nodes",
         "ghost_ptr",
         "ghost_idx",
-        *(("g_jacobian_adjugate%d" % component) for component in range(9)),
-        "g_jacobian_determinant0",
+        *(("g_adj%d" % component) for component in range(9)),
+        "g_det0",
         kappa_name,
         "direction_stride",
         "%s_direction" % field_name,
@@ -8114,7 +8114,7 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
         "const ptrdiff_t *const RSTR n_shared_nodes",
         "const ptrdiff_t *const RSTR ghost_ptr",
         "const idx_t *const RSTR ghost_idx",
-        "const g_t *const RSTR g_geom_metric",
+        "const g_t *const RSTR g_met",
         "const s_t %s" % kappa_name,
         "const ptrdiff_t direction_stride",
         "const s_t *const RSTR %s_direction" % field_name,
@@ -8132,7 +8132,7 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
         "n_shared_nodes",
         "ghost_ptr",
         "ghost_idx",
-        "g_geom_metric",
+        "g_met",
         kappa_name,
         "direction_stride",
         "%s_direction" % field_name,
@@ -8188,24 +8188,24 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
-            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VS, e_end - evb);",
+            "                const ptrdiff_t ne = MIN((ptrdiff_t)VS, e_end - evb);",
             "                const s_t metric_factor = UnitKappa ? s_t(1) : %s;" % kappa_name,
             "",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
             "                    const ptrdiff_t metric_offset = element * 6;",
         ]
     )
     for component in range(6):
         lines.append(
-            "                    fff%d[lane] = metric_factor * s_t(g_geom_metric[metric_offset + %d]);"
+            "                    fff%d[lane] = metric_factor * s_t(g_met[metric_offset + %d]);"
             % (component, component)
         )
     lines.extend(
         [
             "                }",
             "",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
         ]
     )
@@ -8224,11 +8224,11 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "                }",
             "",
             _vectorize_pragma(),
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    %s%s(%s);" % (primitive, primitive_template, ", ".join(primitive_args)),
             "                }",
             "",
-            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                for (ptrdiff_t lane = 0; lane < ne; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
         ]
     )
@@ -8586,7 +8586,7 @@ def _scalar_packed_affine_jacobian_action_source(
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
-            "                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);",
+            "                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
         ]
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
@@ -8606,7 +8606,7 @@ def _scalar_packed_affine_jacobian_action_source(
         lines.extend(
             [
                 _vectorize_pragma(),
-                "                    for (int lane = 0; lane < nelems; ++lane) {",
+                "                    for (int lane = 0; lane < ne; ++lane) {",
                 "                        b%s[shape][lane] = pk_%s[field_shape[evb + lane]];"
                 % (role.name, role.name),
                 "                    }",
@@ -8615,7 +8615,7 @@ def _scalar_packed_affine_jacobian_action_source(
     lines.extend(
         [
             _vectorize_pragma(),
-            "                    for (int lane = 0; lane < nelems; ++lane) {",
+            "                    for (int lane = 0; lane < ne; ++lane) {",
             "                        bdirection[shape][lane] = pk_direction[field_shape[evb + lane]];",
             "                        boutput[shape][lane] = s_t(0);",
             "                    }",
@@ -8681,7 +8681,7 @@ def _scalar_packed_affine_jacobian_action_source(
                 ),
             )
         )
-    call_args = ["nelems", "0"]
+    call_args = ["ne", "0"]
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -8704,7 +8704,7 @@ def _scalar_packed_affine_jacobian_action_source(
             "",
             "                for (int shape = 0; shape < NS; ++shape) {",
             "                    const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
-            "                    for (int lane = 0; lane < nelems; ++lane) {",
+            "                    for (int lane = 0; lane < ne; ++lane) {",
             "                        pk_out[field_shape[evb + lane]] += boutput[shape][lane];",
             "                    }",
             "                }",

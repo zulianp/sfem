@@ -33,12 +33,12 @@ SFEM_INLINE const s_t *ageom_stream(
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int nelems,
+        const int ne,
         const g_t *const RSTR source,
         s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
-    for (int lane = 0; lane < nelems; ++lane) {
+    for (int lane = 0; lane < ne; ++lane) {
         converted[lane] = s_t(source[lane]);
     }
     return converted;
@@ -252,7 +252,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bu_base_data[NS * NC][VS];
@@ -268,7 +268,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -277,7 +277,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev[shape * VS + lane]];
                 }
             }
@@ -293,7 +293,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                     bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
@@ -303,35 +303,35 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+                ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
                 coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+                ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
                 coordinate_grad_ref + 1 * NQ * ND * VS);
 
         s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+                ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
             for (int shape = 0; shape < NS; ++shape) {
                 for (int d = 0; d < NC; ++d) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
                     }
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bvalue[lane] = s_t(0);
             }
 
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bvalue);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bvalue);
 
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
             }
         }
@@ -547,7 +547,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
@@ -561,7 +561,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -570,7 +570,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev[shape * VS + lane]];
                 }
             }
@@ -580,7 +580,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                 }
@@ -588,7 +588,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         }
         for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_data[stream][lane] = s_t(0);
             }
         }
@@ -604,24 +604,24 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+                ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
                 coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+                ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
                 coordinate_grad_ref + 1 * NQ * ND * VS);
 
         s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+                ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                    for (int scatter = 0; scatter < ne; ++scatter) {
                         #pragma omp atomic update
                         out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
                     }
@@ -837,7 +837,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bh_data[NS * NC][VS];
@@ -852,7 +852,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -861,7 +861,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev[shape * VS + lane]];
                 }
             }
@@ -872,7 +872,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                     bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
@@ -881,7 +881,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         }
         for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_data[stream][lane] = s_t(0);
             }
         }
@@ -901,24 +901,24 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+                ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
                 coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+                ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
                 coordinate_grad_ref + 1 * NQ * ND * VS);
 
         s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+                ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                    for (int scatter = 0; scatter < ne; ++scatter) {
                         #pragma omp atomic update
                         out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
                     }

@@ -34,7 +34,7 @@ namespace codegen {
 
 template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR adjugate[4],
@@ -53,7 +53,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
     static constexpr int P_NS = 3;
     for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
             const s_t adj0 = adjugate[0][goff];
@@ -130,7 +130,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
 
 template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_contiguous(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR adjugate[4],
@@ -149,7 +149,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_c
     static constexpr int P_NS = 3;
     for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
             const s_t adj0 = adjugate[0][goff];
@@ -226,7 +226,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_c
 
 template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR field_shape[2],
@@ -242,7 +242,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_
     static constexpr int P_NS = 3;
     for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
         }
@@ -251,7 +251,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_
 
 template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_block_contiguous(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR field_shape[2],
@@ -267,7 +267,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_
     static constexpr int P_NS = 3;
     for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
         }

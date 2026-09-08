@@ -44,12 +44,12 @@ SFEM_INLINE const s_t *ageom_stream(
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int nelems,
+        const int ne,
         const g_t *const RSTR source,
         s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
-    for (int lane = 0; lane < nelems; ++lane) {
+    for (int lane = 0; lane < ne; ++lane) {
         converted[lane] = s_t(source[lane]);
     }
     return converted;
@@ -397,7 +397,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_residual_affine_mesh_m
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         s_t *const RSTR u_out[2],
         s_t *const RSTR p_out
@@ -451,11 +451,11 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_adjugate0,
-        const g_t *const RSTR g_jacobian_adjugate1,
-        const g_t *const RSTR g_jacobian_adjugate2,
-        const g_t *const RSTR g_jacobian_adjugate3,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
         const ptrdiff_t direction_stride,
         const s_t *const RSTR u_direction_data[2],
         const s_t *const RSTR p_direction_data,
@@ -476,7 +476,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t bdirection[N_FIELD_STREAMS][VS];
         s_t boutput[N_FIELD_STREAMS][VS];
 
@@ -484,7 +484,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
             const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 0 + local_shape;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const idx_t node = element_shape[evb + lane];
                 bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
             }
@@ -493,7 +493,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
             const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 6 + local_shape;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const idx_t node = element_shape[evb + lane];
                 bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
             }
@@ -502,7 +502,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
             const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 12 + local_shape;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const idx_t node = element_shape[evb + lane];
                 bdirection[stream][lane] = p_direction_data[node * direction_stride];
             }
@@ -510,30 +510,30 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
 
         for (int stream = 0; stream < 15; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 boutput[stream][lane] = s_t(0);
             }
         }
-        const g_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_determinant0 + evb};
+        const g_t *const affine_geometry_sources[5] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_det0 + evb};
         s_t baffine_geometry_data[5][VS];
         const s_t *bageom_streams[5];
         for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
             bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+                    ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
         const s_t *badjugate[ND * ND];
         for (int component = 0; component < ND * ND; ++component) {
             badjugate[component] = bageom_streams[component];
         }
 
-        navier_stokes_form_2_p_u_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(nelems, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_p_u_affine_reference_data<s_t>::q_weight(), bdirection, boutput);
+        navier_stokes_form_2_p_u_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_p_u_affine_reference_data<s_t>::q_weight(), bdirection, boutput);
 
         {
             s_t *const RSTR out = u_out[0];
             for (int local_shape = 0; local_shape < 6; ++local_shape) {
                 const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 0 + local_shape;
-                for (int scatter = 0; scatter < nelems; ++scatter) {
+                for (int scatter = 0; scatter < ne; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
@@ -544,7 +544,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
             for (int local_shape = 0; local_shape < 6; ++local_shape) {
                 const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 6 + local_shape;
-                for (int scatter = 0; scatter < nelems; ++scatter) {
+                for (int scatter = 0; scatter < ne; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
@@ -555,7 +555,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
             for (int local_shape = 0; local_shape < 3; ++local_shape) {
                 const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 12 + local_shape;
-                for (int scatter = 0; scatter < nelems; ++scatter) {
+                for (int scatter = 0; scatter < ne; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
@@ -572,11 +572,11 @@ extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_so
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t direction_stride,
         const double *const RSTR u_direction_data[2],
         const double *const RSTR p_direction_data,
@@ -584,18 +584,18 @@ extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_so
         double *const RSTR u_out[2],
         double *const RSTR p_out
 ) {
-    return sfem::codegen::navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    return sfem::codegen::navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
 }
 
 extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const ptrdiff_t direction_stride,
         const float *const RSTR u_direction_data[2],
         const float *const RSTR p_direction_data,
@@ -603,7 +603,7 @@ extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_so
         float *const RSTR u_out[2],
         float *const RSTR p_out
 ) {
-    return sfem::codegen::navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    return sfem::codegen::navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
 }
 
 namespace sfem {
@@ -634,7 +634,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
     const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::tri6_grad_ref_y();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t bcoordinates[ND * CELL_NS][VS];
         s_t badjugate_data[ND * ND][NQ * VS];
         s_t bdeterminant[NQ * VS];
@@ -646,7 +646,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
             const idx_t *const RSTR element_shape = elements[shape];
             for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = element_shape[evb + lane];
                     bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
@@ -657,7 +657,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
             const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 0 + local_shape;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const idx_t node = element_shape[evb + lane];
                 bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
             }
@@ -666,7 +666,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
             const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 6 + local_shape;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const idx_t node = element_shape[evb + lane];
                 bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
             }
@@ -675,7 +675,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
             const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 12 + local_shape;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const idx_t node = element_shape[evb + lane];
                 bdirection[stream][lane] = p_direction_data[node * direction_stride];
             }
@@ -683,7 +683,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
 
         for (int stream = 0; stream < 15; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 boutput[stream][lane] = s_t(0);
             }
         }
@@ -691,7 +691,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
         s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = bcoordinates[0][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 0] + bcoordinates[2][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[4][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[6][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[8][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[10][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
                 const s_t J01 = bcoordinates[0][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 0] + bcoordinates[2][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[4][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[6][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[8][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[10][lane] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
                 const s_t J10 = bcoordinates[1][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 0] + bcoordinates[3][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[5][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[7][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[9][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[11][lane] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
@@ -705,14 +705,14 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
         const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::tri6_grad_ref_x(), sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::tri6_grad_ref_y(), sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::tri3_grad_ref_x(), sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::tri3_grad_ref_y()};
         const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-        navier_stokes_form_2_p_u_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(nelems, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::q_weight(), bdirection, boutput);
+        navier_stokes_form_2_p_u_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::q_weight(), bdirection, boutput);
 
         {
             s_t *const RSTR out = u_out[0];
             for (int local_shape = 0; local_shape < 6; ++local_shape) {
                 const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 0 + local_shape;
-                for (int scatter = 0; scatter < nelems; ++scatter) {
+                for (int scatter = 0; scatter < ne; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
@@ -723,7 +723,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
             for (int local_shape = 0; local_shape < 6; ++local_shape) {
                 const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 6 + local_shape;
-                for (int scatter = 0; scatter < nelems; ++scatter) {
+                for (int scatter = 0; scatter < ne; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
@@ -734,7 +734,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
             for (int local_shape = 0; local_shape < 3; ++local_shape) {
                 const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 12 + local_shape;
-                for (int scatter = 0; scatter < nelems; ++scatter) {
+                for (int scatter = 0; scatter < ne; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }

@@ -34,7 +34,7 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_residual_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR shape,
@@ -45,13 +45,13 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_residual_block(
     static constexpr int NC = 2;
     for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
         }
         for (int test = 0; test < NS; ++test) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t goff = q * geometry_stride + lane;
                 const s_t det = determinant[goff];
                 const s_t test_value = shape[q * NS + test];
@@ -62,7 +62,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_residual_block(
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_residual_block_contiguous(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR shape,
@@ -73,13 +73,13 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_residual_block_
     static constexpr int NC = 2;
     for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
         }
         for (int test = 0; test < NS; ++test) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t goff = q * geometry_stride + lane;
                 const s_t det = determinant[goff];
                 const s_t test_value = shape[q * NS + test];
@@ -90,7 +90,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_residual_block_
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_residual_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR shape,
@@ -101,13 +101,13 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_residual_b
     static constexpr int NC = 2;
     for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
         }
         for (int test = 0; test < NS; ++test) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t goff = q * geometry_stride + lane;
                 const s_t det = determinant[goff];
                 const s_t test_value = shape[q * NS + test];
@@ -118,7 +118,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_residual_b
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_residual_block_contiguous(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR shape,
@@ -129,13 +129,13 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_residual_b
     static constexpr int NC = 2;
     for (int q = 0; q < NQ; ++q) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
         }
         for (int test = 0; test < NS; ++test) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t goff = q * geometry_stride + lane;
                 const s_t det = determinant[goff];
                 const s_t test_value = shape[q * NS + test];
@@ -146,7 +146,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_residual_b
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR adjugate[4],
@@ -191,20 +191,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
         s_t grad_coeff0_0_values[VS];
         s_t grad_coeff0_1_values[VS];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = current[trial * NC + 0][lane];
                 p_w_values[lane] += coeff * shape[q * NS + trial];
                 p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -212,20 +212,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = direction[trial * NC + 0][lane];
                 p_w_direction_values[lane] += coeff * shape[q * NS + trial];
                 p_w_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -233,20 +233,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = current[trial * NC + 1][lane];
                 p_c_values[lane] += coeff * shape[q * NS + trial];
                 p_c_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -254,20 +254,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = direction[trial * NC + 1][lane];
                 p_c_direction_values[lane] += coeff * shape[q * NS + trial];
                 p_c_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -275,7 +275,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
             const s_t adj0 = adjugate[0][goff];
@@ -344,7 +344,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
         }
         for (int test = 0; test < NS; ++test) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t goff = q * geometry_stride + lane;
                 const s_t det = determinant[goff];
                 const s_t test_value = shape[q * NS + test];
@@ -362,7 +362,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action_block_contiguous(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR adjugate[4],
@@ -407,20 +407,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
         s_t grad_coeff0_0_values[VS];
         s_t grad_coeff0_1_values[VS];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = current[trial * NC + 0][lane];
                 p_w_values[lane] += coeff * shape[q * NS + trial];
                 p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -428,20 +428,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = direction[trial * NC + 0][lane];
                 p_w_direction_values[lane] += coeff * shape[q * NS + trial];
                 p_w_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -449,20 +449,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = current[trial * NC + 1][lane];
                 p_c_values[lane] += coeff * shape[q * NS + trial];
                 p_c_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -470,20 +470,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = direction[trial * NC + 1][lane];
                 p_c_direction_values[lane] += coeff * shape[q * NS + trial];
                 p_c_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -491,7 +491,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
             const s_t adj0 = adjugate[0][goff];
@@ -560,7 +560,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
         }
         for (int test = 0; test < NS; ++test) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t goff = q * geometry_stride + lane;
                 const s_t det = determinant[goff];
                 const s_t test_value = shape[q * NS + test];
@@ -578,7 +578,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_action_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR adjugate[4],
@@ -623,20 +623,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
         s_t grad_coeff0_0_values[VS];
         s_t grad_coeff0_1_values[VS];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = current[trial * NC + 0][lane];
                 p_w_values[lane] += coeff * shape[q * NS + trial];
                 p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -644,20 +644,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = direction[trial * NC + 0][lane];
                 p_w_direction_values[lane] += coeff * shape[q * NS + trial];
                 p_w_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -665,20 +665,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = current[trial * NC + 1][lane];
                 p_c_values[lane] += coeff * shape[q * NS + trial];
                 p_c_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -686,20 +686,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = direction[trial * NC + 1][lane];
                 p_c_direction_values[lane] += coeff * shape[q * NS + trial];
                 p_c_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -707,7 +707,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
             const s_t adj0 = adjugate[0][goff];
@@ -776,7 +776,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
         }
         for (int test = 0; test < NS; ++test) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t goff = q * geometry_stride + lane;
                 const s_t det = determinant[goff];
                 const s_t test_value = shape[q * NS + test];
@@ -794,7 +794,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_action_block_contiguous(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR adjugate[4],
@@ -839,20 +839,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
         s_t grad_coeff0_0_values[VS];
         s_t grad_coeff0_1_values[VS];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = current[trial * NC + 0][lane];
                 p_w_values[lane] += coeff * shape[q * NS + trial];
                 p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -860,20 +860,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_w_direction_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = direction[trial * NC + 0][lane];
                 p_w_direction_values[lane] += coeff * shape[q * NS + trial];
                 p_w_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -881,20 +881,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = current[trial * NC + 1][lane];
                 p_c_values[lane] += coeff * shape[q * NS + trial];
                 p_c_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -902,20 +902,20 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_grad_0_ref_values[lane] = s_t(0);
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             p_c_direction_grad_1_ref_values[lane] = s_t(0);
         }
         for (int trial = 0; trial < NS; ++trial) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t coeff = direction[trial * NC + 1][lane];
                 p_c_direction_values[lane] += coeff * shape[q * NS + trial];
                 p_c_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
@@ -923,7 +923,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
             }
         }
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
             const s_t adj0 = adjugate[0][goff];
@@ -992,7 +992,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d2_simplex_tri3_jacobian_a
         }
         for (int test = 0; test < NS; ++test) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t goff = q * geometry_stride + lane;
                 const s_t det = determinant[goff];
                 const s_t test_value = shape[q * NS + test];

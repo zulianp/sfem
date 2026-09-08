@@ -7,11 +7,11 @@ template <typename s_t, typename g_t, typename tangent_t>
 static SFEM_INLINE int linear_elasticity_tri3_inexact_apply_tangent_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_adjugate0,
-        const g_t *const RSTR g_jacobian_adjugate1,
-        const g_t *const RSTR g_jacobian_adjugate2,
-        const g_t *const RSTR g_jacobian_adjugate3,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
@@ -26,11 +26,11 @@ static SFEM_INLINE int linear_elasticity_tri3_inexact_apply_tangent_affine_mesh_
         const idx_t ev0 = elements[0][element];
         const idx_t ev1 = elements[1][element];
         const idx_t ev2 = elements[2][element];
-        const s_t adjugate0 = s_t(g_jacobian_adjugate0[element]);
-        const s_t adjugate1 = s_t(g_jacobian_adjugate1[element]);
-        const s_t adjugate2 = s_t(g_jacobian_adjugate2[element]);
-        const s_t adjugate3 = s_t(g_jacobian_adjugate3[element]);
-        const s_t determinant = s_t(g_jacobian_determinant0[element]);
+        const s_t adjugate0 = s_t(g_adj0[element]);
+        const s_t adjugate1 = s_t(g_adj1[element]);
+        const s_t adjugate2 = s_t(g_adj2[element]);
+        const s_t adjugate3 = s_t(g_adj3[element]);
+        const s_t determinant = s_t(g_det0[element]);
         const s_t tangent_t0 = pow_m1(determinant);
         const s_t tangent_t1 = pow_2(adjugate1);
         const s_t tangent_t2 = pow_2(adjugate0);

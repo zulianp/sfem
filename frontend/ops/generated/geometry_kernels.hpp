@@ -67,13 +67,13 @@ static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_3(
 template <typename s_t, int NQ, int VS>
 struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ, VS> {
     static SFEM_INLINE void eval(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR coordinate_grad_ref,
             s_t *const *const RSTR adjugate,
             s_t *const RSTR determinant) {
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t offset = q * VS + lane;
                 const s_t J00 = coordinate_grad_ref[((0 * NQ + q) * 2 + 0) * VS + lane];
                 const s_t J01 = coordinate_grad_ref[((0 * NQ + q) * 2 + 1) * VS + lane];
@@ -89,13 +89,13 @@ struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ, VS> {
 template <typename s_t, int NQ, int VS>
 struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ, VS> {
     static SFEM_INLINE void eval(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR coordinate_grad_ref,
             s_t *const *const RSTR adjugate,
             s_t *const RSTR determinant) {
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const ptrdiff_t offset = q * VS + lane;
                 const s_t J00 = coordinate_grad_ref[((0 * NQ + q) * 3 + 0) * VS + lane];
                 const s_t J01 = coordinate_grad_ref[((0 * NQ + q) * 3 + 1) * VS + lane];
@@ -116,12 +116,12 @@ struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ, VS> {
 
 template <typename s_t, int ND, int NQ, int VS>
 static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant(
-        const int nelems,
+        const int ne,
         const s_t *const RSTR coordinate_grad_ref,
         s_t *const *const RSTR adjugate,
         s_t *const RSTR determinant) {
     GeometryJacobianAdjugateDeterminant<s_t, ND, NQ, VS>::eval(
-            nelems, coordinate_grad_ref, adjugate, determinant);
+            ne, coordinate_grad_ref, adjugate, determinant);
 }
 
 } // namespace codegen

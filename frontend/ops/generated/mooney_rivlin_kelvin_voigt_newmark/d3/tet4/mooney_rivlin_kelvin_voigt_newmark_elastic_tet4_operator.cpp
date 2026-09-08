@@ -33,12 +33,12 @@ SFEM_INLINE const s_t *ageom_stream(
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int nelems,
+        const int ne,
         const g_t *const RSTR source,
         s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
-    for (int lane = 0; lane < nelems; ++lane) {
+    for (int lane = 0; lane < ne; ++lane) {
         converted[lane] = s_t(source[lane]);
     }
     return converted;
@@ -239,16 +239,16 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_adjugate0,
-        const g_t *const RSTR g_jacobian_adjugate1,
-        const g_t *const RSTR g_jacobian_adjugate2,
-        const g_t *const RSTR g_jacobian_adjugate3,
-        const g_t *const RSTR g_jacobian_adjugate4,
-        const g_t *const RSTR g_jacobian_adjugate5,
-        const g_t *const RSTR g_jacobian_adjugate6,
-        const g_t *const RSTR g_jacobian_adjugate7,
-        const g_t *const RSTR g_jacobian_adjugate8,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
@@ -272,7 +272,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bu_base_data[NS * NC][VS];
@@ -282,7 +282,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -297,7 +297,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                     bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
@@ -306,54 +306,54 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective
         }
         s_t badj0_data[VS];
         const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
         s_t badj1_data[VS];
         const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
         s_t badj2_data[VS];
         const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
         s_t badj3_data[VS];
         const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
         s_t badj4_data[VS];
         const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<g_t, s_t>());
+                ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
         s_t badj5_data[VS];
         const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<g_t, s_t>());
+                ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
         s_t badj6_data[VS];
         const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<g_t, s_t>());
+                ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
         s_t badj7_data[VS];
         const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<g_t, s_t>());
+                ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
         s_t badj8_data[VS];
         const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<g_t, s_t>());
+                ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
         s_t bdet0_data[VS];
         const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
             for (int shape = 0; shape < NS; ++shape) {
                 for (int d = 0; d < NC; ++d) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
                     }
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bvalue[lane] = s_t(0);
             }
 
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
 
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
             }
         }
@@ -369,16 +369,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_a
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -393,23 +393,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_a
         const double *const RSTR steps,
         double *const RSTR value
 ) {
-    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -424,7 +424,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_a
         const float *const RSTR steps,
         float *const RSTR value
 ) {
-    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 namespace sfem {
@@ -441,16 +441,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_p
         const ptrdiff_t *const RSTR n_shared_nodes,
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -510,7 +510,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_p
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bu_base_data[NS * NC][VS];
                 s_t bh_data[NS * NC][VS];
@@ -522,7 +522,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_p
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
                             bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -532,54 +532,54 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_p
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
                 for (int step = 0; step < nsteps; ++step) {
                     const s_t alpha = steps[step];
                     for (int shape = 0; shape < NS; ++shape) {
                         for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                            for (int lane = 0; lane < nelems; ++lane) {
+                            for (int lane = 0; lane < ne; ++lane) {
                                 bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
                             }
                         }
                     }
 #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         bvalue[lane] = s_t(0);
                     }
 
-                    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
+                    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
 
 #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
                     }
                 }
@@ -600,16 +600,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_p
         const ptrdiff_t *const RSTR n_shared_nodes,
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -669,7 +669,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_p
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bu_base_data[NS * NC][VS];
                 s_t bh_data[NS * NC][VS];
@@ -681,7 +681,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_p
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
                             bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -691,54 +691,54 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_objective_steps_p
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
                 for (int step = 0; step < nsteps; ++step) {
                     const s_t alpha = steps[step];
                     for (int shape = 0; shape < NS; ++shape) {
                         for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                            for (int lane = 0; lane < nelems; ++lane) {
+                            for (int lane = 0; lane < ne; ++lane) {
                                 bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
                             }
                         }
                     }
 #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         bvalue[lane] = s_t(0);
                     }
 
-                    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
+                    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
 
 #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
                     }
                 }
@@ -889,16 +889,16 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_adjugate0,
-        const g_t *const RSTR g_jacobian_adjugate1,
-        const g_t *const RSTR g_jacobian_adjugate2,
-        const g_t *const RSTR g_jacobian_adjugate3,
-        const g_t *const RSTR g_jacobian_adjugate4,
-        const g_t *const RSTR g_jacobian_adjugate5,
-        const g_t *const RSTR g_jacobian_adjugate6,
-        const g_t *const RSTR g_jacobian_adjugate7,
-        const g_t *const RSTR g_jacobian_adjugate8,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
@@ -919,7 +919,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
@@ -927,7 +927,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -936,7 +936,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                 }
@@ -944,7 +944,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
         }
         for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_data[stream][lane] = s_t(0);
             }
         }
@@ -959,43 +959,43 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
         }
         s_t badj0_data[VS];
         const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
         s_t badj1_data[VS];
         const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
         s_t badj2_data[VS];
         const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
         s_t badj3_data[VS];
         const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
         s_t badj4_data[VS];
         const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<g_t, s_t>());
+                ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
         s_t badj5_data[VS];
         const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<g_t, s_t>());
+                ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
         s_t badj6_data[VS];
         const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<g_t, s_t>());
+                ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
         s_t badj7_data[VS];
         const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<g_t, s_t>());
+                ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
         s_t badj8_data[VS];
         const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<g_t, s_t>());
+                ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
         s_t bdet0_data[VS];
         const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy, outz};
 
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                    for (int scatter = 0; scatter < ne; ++scatter) {
                         #pragma omp atomic update
                         out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
                     }
@@ -1014,16 +1014,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_affine_m
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -1035,23 +1035,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_affine_m
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -1063,7 +1063,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_affine_m
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
@@ -1080,16 +1080,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_a
         const ptrdiff_t *const RSTR n_shared_nodes,
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -1148,7 +1148,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_a
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 const s_t *bu_streams[NS * NC];
@@ -1164,7 +1164,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_a
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
                             bout_data[shape * NC + d][lane] = s_t(0);
@@ -1174,42 +1174,42 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_a
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
                         s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
                     }
@@ -1250,16 +1250,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_a
         const ptrdiff_t *const RSTR n_shared_nodes,
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -1318,7 +1318,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_a
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 const s_t *bu_streams[NS * NC];
@@ -1334,7 +1334,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_a
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
                             bout_data[shape * NC + d][lane] = s_t(0);
@@ -1344,42 +1344,42 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_a
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
                         s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
                     }
@@ -1426,16 +1426,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_t
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
         double *const RSTR ghost_buf,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -1494,7 +1494,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_t
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 const s_t *bu_streams[NS * NC];
@@ -1510,7 +1510,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_t
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
                             bout_data[shape * NC + d][lane] = s_t(0);
@@ -1520,42 +1520,42 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_t
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
                         s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
                     }
@@ -1613,16 +1613,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_t
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
         float *const RSTR ghost_buf,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -1681,7 +1681,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_t
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 const s_t *bu_streams[NS * NC];
@@ -1697,7 +1697,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_t
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
                             bout_data[shape * NC + d][lane] = s_t(0);
@@ -1707,42 +1707,42 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_packed_t
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
                         s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
                     }
@@ -1924,16 +1924,16 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_aff
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_adjugate0,
-        const g_t *const RSTR g_jacobian_adjugate1,
-        const g_t *const RSTR g_jacobian_adjugate2,
-        const g_t *const RSTR g_jacobian_adjugate3,
-        const g_t *const RSTR g_jacobian_adjugate4,
-        const g_t *const RSTR g_jacobian_adjugate5,
-        const g_t *const RSTR g_jacobian_adjugate6,
-        const g_t *const RSTR g_jacobian_adjugate7,
-        const g_t *const RSTR g_jacobian_adjugate8,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
@@ -1958,7 +1958,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_aff
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bh_data[NS * NC][VS];
@@ -1967,7 +1967,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_aff
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -1977,7 +1977,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_aff
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                     bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
@@ -1986,7 +1986,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_aff
         }
         for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_data[stream][lane] = s_t(0);
             }
         }
@@ -2005,43 +2005,43 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_aff
         }
         s_t badj0_data[VS];
         const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
         s_t badj1_data[VS];
         const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
         s_t badj2_data[VS];
         const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
         s_t badj3_data[VS];
         const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
         s_t badj4_data[VS];
         const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<g_t, s_t>());
+                ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
         s_t badj5_data[VS];
         const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<g_t, s_t>());
+                ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
         s_t badj6_data[VS];
         const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<g_t, s_t>());
+                ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
         s_t badj7_data[VS];
         const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<g_t, s_t>());
+                ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
         s_t badj8_data[VS];
         const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<g_t, s_t>());
+                ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
         s_t bdet0_data[VS];
         const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy, outz};
 
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                    for (int scatter = 0; scatter < ne; ++scatter) {
                         #pragma omp atomic update
                         out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
                     }
@@ -2060,16 +2060,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -2085,23 +2085,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -2117,7 +2117,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
@@ -2134,16 +2134,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_affi
         const ptrdiff_t *const RSTR n_shared_nodes,
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -2212,7 +2212,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_affi
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bh_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
@@ -2233,7 +2233,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_affi
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
                             bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -2244,42 +2244,42 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_affi
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
                         s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
                     }
@@ -2320,16 +2320,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_affi
         const ptrdiff_t *const RSTR n_shared_nodes,
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -2398,7 +2398,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_affi
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bh_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
@@ -2419,7 +2419,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_affi
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
                             bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -2430,42 +2430,42 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_affi
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
                         s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
                     }
@@ -2512,16 +2512,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_two_
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
         double *const RSTR ghost_buf,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -2590,7 +2590,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_two_
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bh_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
@@ -2611,7 +2611,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_two_
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
                             bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -2622,42 +2622,42 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_two_
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
                         s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
                     }
@@ -2715,16 +2715,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_two_
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
         float *const RSTR ghost_buf,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_adjugate4,
-        const geom_t *const RSTR g_jacobian_adjugate5,
-        const geom_t *const RSTR g_jacobian_adjugate6,
-        const geom_t *const RSTR g_jacobian_adjugate7,
-        const geom_t *const RSTR g_jacobian_adjugate8,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -2793,7 +2793,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_two_
             }
 
             for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
+                const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t bu_data[NS * NC][VS];
                 s_t bh_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
@@ -2814,7 +2814,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_two_
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             const uint16_t packed_node = element_shape[evb + lane];
                             bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
                             bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -2825,42 +2825,42 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_packed_two_
 
                 s_t badj0_data[VS];
                 const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
                 s_t badj1_data[VS];
                 const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
                 s_t badj2_data[VS];
                 const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
                 s_t badj3_data[VS];
                 const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
                 s_t badj4_data[VS];
                 const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
                 s_t badj5_data[VS];
                 const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
                 s_t badj6_data[VS];
                 const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
                 s_t badj7_data[VS];
                 const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
                 s_t badj8_data[VS];
                 const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                        ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
                 s_t bdet0_data[VS];
                 const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+                        ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+                mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
                         s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
+                        for (int lane = 0; lane < ne; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
                     }

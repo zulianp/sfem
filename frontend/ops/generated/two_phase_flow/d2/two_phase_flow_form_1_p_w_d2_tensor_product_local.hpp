@@ -34,7 +34,7 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR adjugate[4],
@@ -64,10 +64,10 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
     s_t current_value[NC * NQ * VS];
     s_t current_grad_ref[NC * NQ * ND * VS];
     tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-            nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);
+            ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
     s_t previous_value[NC * NQ * VS];
     tensor_evaluate_value<s_t, NQ, NS, VS, ND, NC>(
-            nelems, shape_1d, previous, previous_value);
+            ne, shape_1d, previous, previous_value);
     s_t value_coeff[NC * NQ * VS];
     s_t grad_coeff_ref[NC * NQ * ND * VS];
     static constexpr int NQ1 = integer_root(NQ, ND);
@@ -76,7 +76,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
         const int qy = q / NQ1;
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
             const s_t adj0 = adjugate[0][goff];
@@ -116,12 +116,12 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
         }
     }
     tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
-            nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+            ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_block_contiguous(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR adjugate[4],
@@ -151,10 +151,10 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
     s_t current_value[NC * NQ * VS];
     s_t current_grad_ref[NC * NQ * ND * VS];
     tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-            nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);
+            ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
     s_t previous_value[NC * NQ * VS];
     tensor_evaluate_value_contiguous<s_t, NQ, NS, VS, ND, NC>(
-            nelems, shape_1d, previous, previous_value);
+            ne, shape_1d, previous, previous_value);
     s_t value_coeff[NC * NQ * VS];
     s_t grad_coeff_ref[NC * NQ * ND * VS];
     static constexpr int NQ1 = integer_root(NQ, ND);
@@ -163,7 +163,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
         const int qy = q / NQ1;
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t det = determinant[goff];
             const s_t adj0 = adjugate[0][goff];
@@ -203,12 +203,12 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
         }
     }
     tensor_integrate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-            nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+            ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_jacobian_action_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR shape_1d,
@@ -221,7 +221,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_jacobian_act
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_jacobian_action_block_contiguous(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR determinant,
         const s_t *const RSTR shape_1d,

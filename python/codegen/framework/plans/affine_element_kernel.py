@@ -185,7 +185,7 @@ def p1_simplex_metric_value_plan(
     here, and is what says the 0-form and the 1-form describe one operator.
 
     As with the apply plan the scale is not in here: the emitter folds it into
-    the metric components it loads, so ``fff_i = scale * g_geom_metric_i`` makes
+    the metric components it loads, so ``fff_i = scale * g_met_i`` makes
     this the scaled energy without the plan knowing the scale exists.
     """
     dim = int(dim)

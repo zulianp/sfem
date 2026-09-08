@@ -31,7 +31,7 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_objective_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -55,41 +55,41 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_ob
             s_t gu_ref2_values[VS];
             s_t gu_ref3_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref0_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref1_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref2_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref3_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref0_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref1_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref2_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref3_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * NS + shape];
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -121,7 +121,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_ob
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_objective_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -139,7 +139,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
         { const int q = 0;  // constant-P1 simplex
             const s_t qw = q_weight[q];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -171,7 +171,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gradient_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -199,41 +199,41 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gr
             s_t loperand2_values[VS];
             s_t loperand3_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref0_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref1_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref2_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref3_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref0_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref1_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref2_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref3_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * NS + shape];
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -275,11 +275,11 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gr
             }
             for (int shape = 0; shape < NS; ++shape) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     out_streams[shape * 2 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     out_streams[shape * 2 + 1][lane] += loperand2_values[lane] * grad_ref_x[q * NS + shape] + loperand3_values[lane] * grad_ref_y[q * NS + shape];
                 }
             }
@@ -288,7 +288,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gr
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_gradient_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -306,7 +306,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
         { const int q = 0;  // constant-P1 simplex
             const s_t qw = q_weight[q];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -353,7 +353,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_apply_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -386,49 +386,49 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_ap
             s_t loperand2_values[VS];
             s_t loperand3_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref0_values[lane] = s_t(0);
                 grad_h_ref0_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref1_values[lane] = s_t(0);
                 grad_h_ref1_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref2_values[lane] = s_t(0);
                 grad_h_ref2_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 gu_ref3_values[lane] = s_t(0);
                 grad_h_ref3_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref0_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_x[q * NS + shape];
                     grad_h_ref0_values[lane] += h_streams[shape * 2 + 0][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref1_values[lane] += u_streams[shape * 2 + 0][lane] * grad_ref_y[q * NS + shape];
                     grad_h_ref1_values[lane] += h_streams[shape * 2 + 0][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref2_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_x[q * NS + shape];
                     grad_h_ref2_values[lane] += h_streams[shape * 2 + 1][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     gu_ref3_values[lane] += u_streams[shape * 2 + 1][lane] * grad_ref_y[q * NS + shape];
                     grad_h_ref3_values[lane] += h_streams[shape * 2 + 1][lane] * grad_ref_y[q * NS + shape];
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -487,11 +487,11 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_ap
             }
             for (int shape = 0; shape < NS; ++shape) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     out_streams[shape * 2 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     out_streams[shape * 2 + 1][lane] += loperand2_values[lane] * grad_ref_x[q * NS + shape] + loperand3_values[lane] * grad_ref_y[q * NS + shape];
                 }
             }
@@ -500,7 +500,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_ap
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_apply_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -519,7 +519,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
         { const int q = 0;  // constant-P1 simplex
             const s_t qw = q_weight[q];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];

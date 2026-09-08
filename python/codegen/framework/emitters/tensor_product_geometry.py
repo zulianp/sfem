@@ -28,7 +28,7 @@ def _work_item_loop_lines(indent, *, work_item_index=None, simd_lines=None, sing
         return ("%s{" % indent,)
     work_item = _target_work_item_index(work_item_index)
     return tuple("%s%s" % (indent, line) for line in _target_simd_lines(simd_lines)) + (
-        "%sfor (int %s = 0; %s < nelems; ++%s) {"
+        "%sfor (int %s = 0; %s < ne; ++%s) {"
         % (indent, work_item, work_item, work_item),
     )
 
@@ -170,7 +170,7 @@ def sfem_geometry_kernels_header_source(
             "template <typename s_t, int NQ, int VS>",
             "struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ, VS> {",
             "    static %s void eval(" % inline_qualifier,
-            "            const int nelems,",
+            "            const int ne,",
             "            const s_t *const RSTR coordinate_grad_ref,",
             "            s_t *const *const RSTR adjugate,",
             "            s_t *const RSTR determinant) {",
@@ -191,7 +191,7 @@ def sfem_geometry_kernels_header_source(
             "template <typename s_t, int NQ, int VS>",
             "struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ, VS> {",
             "    static %s void eval(" % inline_qualifier,
-            "            const int nelems,",
+            "            const int ne,",
             "            const s_t *const RSTR coordinate_grad_ref,",
             "            s_t *const *const RSTR adjugate,",
             "            s_t *const RSTR determinant) {",
@@ -217,12 +217,12 @@ def sfem_geometry_kernels_header_source(
             "",
             "template <typename s_t, int ND, int NQ, int VS>",
             "static %s void geometry_jacobian_adjugate_and_determinant(" % inline_qualifier,
-            "        const int nelems,",
+            "        const int ne,",
             "        const s_t *const RSTR coordinate_grad_ref,",
             "        s_t *const *const RSTR adjugate,",
             "        s_t *const RSTR determinant) {",
             "    GeometryJacobianAdjugateDeterminant<s_t, ND, NQ, VS>::eval(",
-            "            nelems, coordinate_grad_ref, adjugate, determinant);",
+            "            ne, coordinate_grad_ref, adjugate, determinant);",
             "}",
             "",
             "} // namespace codegen",
@@ -430,7 +430,7 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
             % evaluator_indent,
             "%s%s<s_t, NQ, NS, VS, ND, ND>("
             % (evaluator_indent, tensor_evaluate),
-            "%s        nelems, %s, %s, %s,"
+            "%s        ne, %s, %s, %s,"
             % (evaluator_indent, shape_name, grad_name, streams),
             "%s        coordinate_value, %s);" % (evaluator_indent, gradient),
         ]
@@ -488,7 +488,7 @@ def tensor_product_coordinate_gradient_lines(
             [
                 "%s%s<s_t, NQ, NS, VS, %d>("
                 % (indent, tensor_gradient, dim),
-                "%s        nelems, %s, %s, %s, %d,"
+                "%s        ne, %s, %s, %s, %d,"
                 % (indent, shape_name, grad_name, evaluator_streams, component),
                 "%s        %s + %d * NQ * %s * VS);"
                 % (indent, gradient_name, component, dim_name),
@@ -624,7 +624,7 @@ def tensor_product_adjugate_determinant_lines(
             % (indent, gradient_name, dim_name, dim_name, ", ".join(adjugate_streams)),
             "%sgeometry_jacobian_adjugate_and_determinant<s_t, %s, NQ, VS>("
             % (indent, dim_name),
-            "%s        nelems, %s, %s_adjugate_streams, %s);"
+            "%s        ne, %s, %s_adjugate_streams, %s);"
             % (indent, gradient_name, gradient_name, determinant_stream),
         ]
 

@@ -249,12 +249,12 @@ def _gather_lines(role, component, n_nodes, wanted, indent="        "):
 
 def _geometry_lines(dim, indent="        "):
     lines = [
-        "%sconst s_t adjugate%d = s_t(g_jacobian_adjugate%d[element]);"
+        "%sconst s_t adjugate%d = s_t(g_adj%d[element]);"
         % (indent, index, index)
         for index in range(dim * dim)
     ]
     lines.append(
-        "%sconst s_t determinant = s_t(g_jacobian_determinant0[element]);"
+        "%sconst s_t determinant = s_t(g_det0[element]);"
         % indent
     )
     return lines
@@ -262,10 +262,10 @@ def _geometry_lines(dim, indent="        "):
 
 def _geometry_arguments(dim):
     lines = [
-        "        const g_t *const RSTR g_jacobian_adjugate%d," % index
+        "        const g_t *const RSTR g_adj%d," % index
         for index in range(dim * dim)
     ]
-    lines.append("        const g_t *const RSTR g_jacobian_determinant0,")
+    lines.append("        const g_t *const RSTR g_det0,")
     return lines
 
 
@@ -460,10 +460,10 @@ def _abi_stream(scalar, role, component, const="const "):
 
 def _abi_geometry(dim):
     lines = [
-        "        const geom_t *const RSTR g_jacobian_adjugate%d," % index
+        "        const geom_t *const RSTR g_adj%d," % index
         for index in range(dim * dim)
     ]
-    lines.append("        const geom_t *const RSTR g_jacobian_determinant0,")
+    lines.append("        const geom_t *const RSTR g_det0,")
     return lines
 
 
@@ -483,8 +483,8 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
     """
     geometry_call = ", ".join(
         ["nelements", "elements"]
-        + ["g_jacobian_adjugate%d" % index for index in range(dim * dim)]
-        + ["g_jacobian_determinant0"]
+        + ["g_adj%d" % index for index in range(dim * dim)]
+        + ["g_det0"]
     )
     previous_signature = _PREVIOUS_ABI_BY_USE[bool(used_previous)]
     previous_call = _PREVIOUS_CALL_BY_USE[bool(used_previous)]

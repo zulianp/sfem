@@ -37,7 +37,7 @@ template <typename s_t, int NQ, int NS, int VS>
 struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
     template <int NC>
     static SFEM_INLINE void gradient_impl(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR streams[NC * NS],
@@ -50,7 +50,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
         for (int qx = 0; qx < NQ1; ++qx) {
             for (int sy = 0; sy < NS1; ++sy) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     s_t v = s_t(0);
                     s_t gx = s_t(0);
                     for (int sx = 0; sx < NS1; ++sx) {
@@ -69,7 +69,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
             for (int qx = 0; qx < NQ1; ++qx) {
                 const int q = qx + NQ1 * qy;
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     s_t gx = s_t(0);
                     s_t gy = s_t(0);
                     for (int sy = 0; sy < NS1; ++sy) {
@@ -86,7 +86,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void gradient_impl(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t streams[NC * NS][VS],
@@ -99,7 +99,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
         for (int qx = 0; qx < NQ1; ++qx) {
             for (int sy = 0; sy < NS1; ++sy) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     s_t v = s_t(0);
                     s_t gx = s_t(0);
                     for (int sx = 0; sx < NS1; ++sx) {
@@ -118,7 +118,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
             for (int qx = 0; qx < NQ1; ++qx) {
                 const int q = qx + NQ1 * qy;
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     s_t gx = s_t(0);
                     s_t gy = s_t(0);
                     for (int sy = 0; sy < NS1; ++sy) {
@@ -135,29 +135,29 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void gradient(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR streams[NS * NC],
             const int component,
             s_t *const RSTR gradient) {
-        gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
+        gradient_impl<NC>(ne, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static SFEM_INLINE void gradient_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t streams[NS * NC][VS],
             const int component,
             s_t *const RSTR gradient) {
-        gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
+        gradient_impl<NC>(ne, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static SFEM_INLINE void test(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR flux,
@@ -170,7 +170,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
         for (int qx = 0; qx < NQ1; ++qx) {
             for (int sy = 0; sy < NS1; ++sy) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     s_t tx = s_t(0);
                     s_t ty = s_t(0);
                     for (int qy = 0; qy < NQ1; ++qy) {
@@ -188,7 +188,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
             for (int sx = 0; sx < NS1; ++sx) {
                 const int shape = sx + NS1 * sy;
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     s_t value = s_t(0);
                     for (int qx = 0; qx < NQ1; ++qx) {
                         const int i = (qx * NS1 + sy) * VS + lane;
@@ -206,7 +206,7 @@ template <typename s_t, int NQ, int NS, int VS>
 struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
     template <int NC>
     static SFEM_INLINE void gradient_impl(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR streams[NC * NS],
@@ -223,7 +223,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
             for (int sy = 0; sy < NS1; ++sy) {
                 for (int sz = 0; sz < NS1; ++sz) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t v = s_t(0);
                         s_t gx = s_t(0);
                         for (int sx = 0; sx < NS1; ++sx) {
@@ -243,7 +243,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
             for (int qy = 0; qy < NQ1; ++qy) {
                 for (int sz = 0; sz < NS1; ++sz) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t v = s_t(0);
                         s_t gx = s_t(0);
                         s_t gy = s_t(0);
@@ -266,7 +266,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
                 for (int qx = 0; qx < NQ1; ++qx) {
                     const int q = qx + NQ1 * (qy + NQ1 * qz);
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t gx = s_t(0);
                         s_t gy = s_t(0);
                         s_t gz = s_t(0);
@@ -287,7 +287,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void gradient_impl(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t streams[NC * NS][VS],
@@ -304,7 +304,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
             for (int sy = 0; sy < NS1; ++sy) {
                 for (int sz = 0; sz < NS1; ++sz) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t v = s_t(0);
                         s_t gx = s_t(0);
                         for (int sx = 0; sx < NS1; ++sx) {
@@ -324,7 +324,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
             for (int qy = 0; qy < NQ1; ++qy) {
                 for (int sz = 0; sz < NS1; ++sz) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t v = s_t(0);
                         s_t gx = s_t(0);
                         s_t gy = s_t(0);
@@ -347,7 +347,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
                 for (int qx = 0; qx < NQ1; ++qx) {
                     const int q = qx + NQ1 * (qy + NQ1 * qz);
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t gx = s_t(0);
                         s_t gy = s_t(0);
                         s_t gz = s_t(0);
@@ -368,29 +368,29 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void gradient(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR streams[NS * NC],
             const int component,
             s_t *const RSTR gradient) {
-        gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
+        gradient_impl<NC>(ne, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static SFEM_INLINE void gradient_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t streams[NS * NC][VS],
             const int component,
             s_t *const RSTR gradient) {
-        gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
+        gradient_impl<NC>(ne, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static SFEM_INLINE void test(
-            const int nelems,
+            const int ne,
             const s_t *const RSTR shape_1d,
             const s_t *const RSTR grad_1d,
             const s_t *const RSTR flux,
@@ -408,7 +408,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
             for (int qy = 0; qy < NQ1; ++qy) {
                 for (int sz = 0; sz < NS1; ++sz) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t tx = s_t(0);
                         s_t ty = s_t(0);
                         s_t tz = s_t(0);
@@ -430,7 +430,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
             for (int sy = 0; sy < NS1; ++sy) {
                 for (int sz = 0; sz < NS1; ++sz) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t tx = s_t(0);
                         s_t ty = s_t(0);
                         s_t tz = s_t(0);
@@ -453,7 +453,7 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
                 for (int sx = 0; sx < NS1; ++sx) {
                     const int shape = sx + NS1 * (sy + NS1 * sz);
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         s_t value = s_t(0);
                         for (int qx = 0; qx < NQ1; ++qx) {
                             const int j = ((qx * NS1 + sy) * NS1 + sz) * VS + lane;
@@ -470,38 +470,38 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static SFEM_INLINE void tensor_gradient(
-        const int nelems,
+        const int ne,
         const s_t *const RSTR shape_1d,
         const s_t *const RSTR grad_1d,
         const s_t *const RSTR streams[NS * NC],
         const int component,
         s_t *const RSTR gradient) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template gradient<NC>(
-            nelems, shape_1d, grad_1d, streams, component, gradient);
+            ne, shape_1d, grad_1d, streams, component, gradient);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static SFEM_INLINE void tensor_gradient_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const RSTR shape_1d,
         const s_t *const RSTR grad_1d,
         const s_t streams[NS * NC][VS],
         const int component,
         s_t *const RSTR gradient) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template gradient_contiguous<NC>(
-            nelems, shape_1d, grad_1d, streams, component, gradient);
+            ne, shape_1d, grad_1d, streams, component, gradient);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static SFEM_INLINE void tensor_test(
-        const int nelems,
+        const int ne,
         const s_t *const RSTR shape_1d,
         const s_t *const RSTR grad_1d,
         const s_t *const RSTR flux,
         s_t *const RSTR out_streams[NS * NC],
         const int component) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template test<NC>(
-            nelems, shape_1d, grad_1d, flux, out_streams, component);
+            ne, shape_1d, grad_1d, flux, out_streams, component);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND>
@@ -511,7 +511,7 @@ template <typename s_t, int NQ, int NS, int VS>
 struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
     template <int NC>
     static SFEM_INLINE void evaluate(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t *const RSTR streams[NC * NS],
@@ -523,7 +523,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t gx[NC * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g = s_t(0);
                 for (int sx = 0; sx < NS1; ++sx) {
@@ -540,7 +540,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
             const int q = qx + NQ1 * qy;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g0 = s_t(0);
                 s_t g1 = s_t(0);
@@ -559,7 +559,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void evaluate_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t streams[NC * NS][VS],
@@ -571,7 +571,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t gx[NC * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g = s_t(0);
                 for (int sx = 0; sx < NS1; ++sx) {
@@ -588,7 +588,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
             const int q = qx + NQ1 * qy;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g0 = s_t(0);
                 s_t g1 = s_t(0);
@@ -607,7 +607,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void evaluate_value(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const RSTR streams[NC * NS],
             s_t *const value) {
@@ -616,7 +616,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t vx[NC * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sx = 0; sx < NS1; ++sx) {
                     const int s = sx + NS1 * sy;
@@ -628,7 +628,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
             const int q = qx + NQ1 * qy;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sy = 0; sy < NS1; ++sy) {
                     v += vx[((f * NQ1 + qx) * NS1 + sy) * VS + lane] * shape_1d[qy * NS1 + sy];
@@ -640,7 +640,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void evaluate_value_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t streams[NC * NS][VS],
             s_t *const value) {
@@ -649,7 +649,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t vx[NC * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sx = 0; sx < NS1; ++sx) {
                     const int s = sx + NS1 * sy;
@@ -661,7 +661,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
             const int q = qx + NQ1 * qy;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sy = 0; sy < NS1; ++sy) {
                     v += vx[((f * NQ1 + qx) * NS1 + sy) * VS + lane] * shape_1d[qy * NS1 + sy];
@@ -673,7 +673,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void integrate(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t *const value_coeff,
@@ -685,7 +685,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t sg[NC * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 s_t b = s_t(0);
                 for (int qy = 0; qy < NQ1; ++qy) {
@@ -702,7 +702,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
             const int s = sx + NS1 * sy;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int qx = 0; qx < NQ1; ++qx) {
                     const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + lane;
@@ -715,7 +715,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void integrate_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t *const value_coeff,
@@ -727,7 +727,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t sg[NC * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 s_t b = s_t(0);
                 for (int qy = 0; qy < NQ1; ++qy) {
@@ -744,7 +744,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
             const int s = sx + NS1 * sy;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int qx = 0; qx < NQ1; ++qx) {
                     const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + lane;
@@ -757,7 +757,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void integrate_value(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const value_coeff,
             s_t *const RSTR output[NC * NS]) {
@@ -766,7 +766,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t sv[NC * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 for (int qy = 0; qy < NQ1; ++qy) {
                     const int q = qx + NQ1 * qy;
@@ -778,7 +778,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
             const int s = sx + NS1 * sy;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int qx = 0; qx < NQ1; ++qx) {
                     v += sv[((f * NQ1 + qx) * NS1 + sy) * VS + lane] * shape_1d[qx * NS1 + sx];
@@ -790,7 +790,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
 
     template <int NC>
     static SFEM_INLINE void integrate_value_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const value_coeff,
             s_t output[NC * NS][VS]) {
@@ -799,7 +799,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t sv[NC * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 for (int qy = 0; qy < NQ1; ++qy) {
                     const int q = qx + NQ1 * qy;
@@ -811,7 +811,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
             const int s = sx + NS1 * sy;
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int qx = 0; qx < NQ1; ++qx) {
                     v += sv[((f * NQ1 + qx) * NS1 + sy) * VS + lane] * shape_1d[qx * NS1 + sx];
@@ -826,7 +826,7 @@ template <typename s_t, int NQ, int NS, int VS>
 struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
     template <int NC>
     static SFEM_INLINE void evaluate(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t *const RSTR streams[NC * NS],
@@ -841,7 +841,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t g1xy[NC * NQ1 * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g = s_t(0);
                 for (int sx = 0; sx < NS1; ++sx) {
@@ -857,7 +857,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         }
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g0 = s_t(0);
                 s_t g1 = s_t(0);
@@ -876,7 +876,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
             const int q = qx + NQ1 * (qy + NQ1 * qz);
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g0 = s_t(0);
                 s_t g1 = s_t(0);
@@ -898,7 +898,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void evaluate_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t streams[NC * NS][VS],
@@ -913,7 +913,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t g1xy[NC * NQ1 * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g = s_t(0);
                 for (int sx = 0; sx < NS1; ++sx) {
@@ -929,7 +929,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         }
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g0 = s_t(0);
                 s_t g1 = s_t(0);
@@ -948,7 +948,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
             const int q = qx + NQ1 * (qy + NQ1 * qz);
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 s_t g0 = s_t(0);
                 s_t g1 = s_t(0);
@@ -970,7 +970,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void evaluate_value(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const RSTR streams[NC * NS],
             s_t *const value) {
@@ -980,7 +980,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t vxy[NC * NQ1 * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sx = 0; sx < NS1; ++sx) {
                     const int s = sx + NS1 * (sy + NS1 * sz);
@@ -991,7 +991,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         }
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sy = 0; sy < NS1; ++sy) {
                     v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + lane] * shape_1d[qy * NS1 + sy];
@@ -1002,7 +1002,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
             const int q = qx + NQ1 * (qy + NQ1 * qz);
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sz = 0; sz < NS1; ++sz) {
                     v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + lane] * shape_1d[qz * NS1 + sz];
@@ -1014,7 +1014,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void evaluate_value_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t streams[NC * NS][VS],
             s_t *const value) {
@@ -1024,7 +1024,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t vxy[NC * NQ1 * NQ1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sx = 0; sx < NS1; ++sx) {
                     const int s = sx + NS1 * (sy + NS1 * sz);
@@ -1035,7 +1035,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         }
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sy = 0; sy < NS1; ++sy) {
                     v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + lane] * shape_1d[qy * NS1 + sy];
@@ -1046,7 +1046,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
             const int q = qx + NQ1 * (qy + NQ1 * qz);
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int sz = 0; sz < NS1; ++sz) {
                     v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + lane] * shape_1d[qz * NS1 + sz];
@@ -1058,7 +1058,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void integrate(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t *const value_coeff,
@@ -1073,7 +1073,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t yz1[NC * NQ1 * NS1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 s_t b = s_t(0);
                 s_t c = s_t(0);
@@ -1092,7 +1092,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         }
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 s_t b = s_t(0);
                 for (int qy = 0; qy < NQ1; ++qy) {
@@ -1108,7 +1108,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
             const int s = sx + NS1 * (sy + NS1 * sz);
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int qx = 0; qx < NQ1; ++qx) {
                     const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + lane;
@@ -1121,7 +1121,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void integrate_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const grad_1d,
             const s_t *const value_coeff,
@@ -1136,7 +1136,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t yz1[NC * NQ1 * NS1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 s_t b = s_t(0);
                 s_t c = s_t(0);
@@ -1155,7 +1155,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         }
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 s_t b = s_t(0);
                 for (int qy = 0; qy < NQ1; ++qy) {
@@ -1171,7 +1171,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
             const int s = sx + NS1 * (sy + NS1 * sz);
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int qx = 0; qx < NQ1; ++qx) {
                     const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + lane;
@@ -1184,7 +1184,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void integrate_value(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const value_coeff,
             s_t *const RSTR output[NC * NS]) {
@@ -1194,7 +1194,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t yz0[NC * NQ1 * NS1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 for (int qz = 0; qz < NQ1; ++qz) {
                     const int q = qx + NQ1 * (qy + NQ1 * qz);
@@ -1205,7 +1205,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         }
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 for (int qy = 0; qy < NQ1; ++qy) {
                     a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + lane] * shape_1d[qy * NS1 + sy];
@@ -1216,7 +1216,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
             const int s = sx + NS1 * (sy + NS1 * sz);
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int qx = 0; qx < NQ1; ++qx) {
                     v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + lane] * shape_1d[qx * NS1 + sx];
@@ -1228,7 +1228,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
     template <int NC>
     static SFEM_INLINE void integrate_value_contiguous(
-            const int nelems,
+            const int ne,
             const s_t *const shape_1d,
             const s_t *const value_coeff,
             s_t output[NC * NS][VS]) {
@@ -1238,7 +1238,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t yz0[NC * NQ1 * NS1 * NS1 * VS];
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 for (int qz = 0; qz < NQ1; ++qz) {
                     const int q = qx + NQ1 * (qy + NQ1 * qz);
@@ -1249,7 +1249,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         }
         for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t a = s_t(0);
                 for (int qy = 0; qy < NQ1; ++qy) {
                     a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + lane] * shape_1d[qy * NS1 + sy];
@@ -1260,7 +1260,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
             const int s = sx + NS1 * (sy + NS1 * sz);
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 s_t v = s_t(0);
                 for (int qx = 0; qx < NQ1; ++qx) {
                     v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + lane] * shape_1d[qx * NS1 + sx];
@@ -1273,90 +1273,90 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static SFEM_INLINE void tensor_evaluate(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
         const s_t *const RSTR streams[NC * NS],
         s_t *const value,
         s_t *const gradient) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate<NC>(
-            nelems, shape_1d, grad_1d, streams, value, gradient);
+            ne, shape_1d, grad_1d, streams, value, gradient);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static SFEM_INLINE void tensor_evaluate_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
         const s_t streams[NC * NS][VS],
         s_t *const value,
         s_t *const gradient) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_contiguous<NC>(
-            nelems, shape_1d, grad_1d, streams, value, gradient);
+            ne, shape_1d, grad_1d, streams, value, gradient);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static SFEM_INLINE void tensor_evaluate_value(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const RSTR streams[NC * NS],
         s_t *const value) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_value<NC>(
-            nelems, shape_1d, streams, value);
+            ne, shape_1d, streams, value);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static SFEM_INLINE void tensor_evaluate_value_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t streams[NC * NS][VS],
         s_t *const value) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_value_contiguous<NC>(
-            nelems, shape_1d, streams, value);
+            ne, shape_1d, streams, value);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static SFEM_INLINE void tensor_integrate(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
         const s_t *const value_coeff,
         const s_t *const grad_coeff,
         s_t *const RSTR output[NC * NS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate<NC>(
-            nelems, shape_1d, grad_1d, value_coeff, grad_coeff, output);
+            ne, shape_1d, grad_1d, value_coeff, grad_coeff, output);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static SFEM_INLINE void tensor_integrate_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
         const s_t *const value_coeff,
         const s_t *const grad_coeff,
         s_t output[NC * NS][VS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_contiguous<NC>(
-            nelems, shape_1d, grad_1d, value_coeff, grad_coeff, output);
+            ne, shape_1d, grad_1d, value_coeff, grad_coeff, output);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static SFEM_INLINE void tensor_integrate_value(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const value_coeff,
         s_t *const RSTR output[NC * NS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_value<NC>(
-            nelems, shape_1d, value_coeff, output);
+            ne, shape_1d, value_coeff, output);
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static SFEM_INLINE void tensor_integrate_value_contiguous(
-        const int nelems,
+        const int ne,
         const s_t *const shape_1d,
         const s_t *const value_coeff,
         s_t output[NC * NS][VS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_value_contiguous<NC>(
-            nelems, shape_1d, value_coeff, output);
+            ne, shape_1d, value_coeff, output);
 }
 
 } // namespace codegen

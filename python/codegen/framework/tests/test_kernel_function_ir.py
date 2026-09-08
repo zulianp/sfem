@@ -38,7 +38,7 @@ class FunctionDefPrintingTest(unittest.TestCase):
     def test_prints_the_signature_the_emitter_used_to_build(self):
         node = FunctionDefNode(
             "laplace_block",
-            params=("const int nelems", "s_t output[1][VS]"),
+            params=("const int ne", "s_t output[1][VS]"),
             body=(BufferDeclNode("static constexpr int", "ND", (), expr_ref("3")),),
             qualifier="static SFEM_INLINE",
             template_params=("typename s_t", "int NQ"),
@@ -48,7 +48,7 @@ class FunctionDefPrintingTest(unittest.TestCase):
             (
                 "template <typename s_t, int NQ>",
                 "static SFEM_INLINE void laplace_block(",
-                "        const int nelems,",
+                "        const int ne,",
                 "        s_t output[1][VS]",
                 ") {",
                 "    static constexpr int ND = 3;",
@@ -64,14 +64,14 @@ class FunctionDefPrintingTest(unittest.TestCase):
                 LoopNode(
                     LoopKind.SIMD,
                     lane,
-                    iteration_range(0, expr_ref("nelems")),
+                    iteration_range(0, expr_ref("ne")),
                     pre_increment(lane),
                     body=(BufferDeclNode("const s_t", "x", (), expr_ref("1")),),
                 ),
             ),
         )
         lines = CLikeKernelASTPrinter().print_node(node)
-        self.assertIn("    for (int lane = 0; lane < nelems; ++lane) {", lines)
+        self.assertIn("    for (int lane = 0; lane < ne; ++lane) {", lines)
         self.assertIn("        const s_t x = 1;", lines)
         self.assertEqual(
             "".join(lines).count("{"), "".join(lines).count("}"), "unbalanced braces"
@@ -250,7 +250,7 @@ class BlockAndLoopHeaderTest(unittest.TestCase):
         """
         lane = iterator("lane", "int")
         loop = LoopNode(
-            LoopKind.SIMD, lane, iteration_range(0, expr_ref("nelems")), pre_increment(lane)
+            LoopKind.SIMD, lane, iteration_range(0, expr_ref("ne")), pre_increment(lane)
         )
         lines = CLikeKernelASTPrinter().print_node(loop)
         self.assertEqual("".join(lines).count("{"), "".join(lines).count("}"))
@@ -258,10 +258,10 @@ class BlockAndLoopHeaderTest(unittest.TestCase):
     def test_loop_header_node_leaves_the_brace_to_the_caller(self):
         lane = iterator("lane", "int")
         loop = LoopNode(
-            LoopKind.SIMD, lane, iteration_range(0, expr_ref("nelems")), pre_increment(lane)
+            LoopKind.SIMD, lane, iteration_range(0, expr_ref("ne")), pre_increment(lane)
         )
         lines = CLikeKernelASTPrinter().print_node(LoopHeaderNode(loop))
-        self.assertEqual(lines, ("for (int lane = 0; lane < nelems; ++lane) {",))
+        self.assertEqual(lines, ("for (int lane = 0; lane < ne; ++lane) {",))
 
     def test_header_only_loops_are_now_declared_rather_than_implied(self):
         """No emitter may rely on an empty body to suppress a brace."""

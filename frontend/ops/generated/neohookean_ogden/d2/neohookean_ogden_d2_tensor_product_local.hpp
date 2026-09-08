@@ -31,7 +31,7 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_tensor_product_objective_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -53,14 +53,14 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_objective_block(
     static_assert(ipow(NQ1, 2) == NQ, "NQ must be tensor-product compatible");
     static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
     s_t gu_ref_q[NQ * 4 * VS];
-    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 2 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 2 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 2 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 2 * VS]);
     for (int q = 0; q < NQ; ++q) {
         const int qx = q % NQ1;
         const int qy = q / NQ1;
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -88,7 +88,7 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_objective_block(
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -111,14 +111,14 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
     static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
     s_t gu_ref_q[NQ * 4 * VS];
     s_t loperand_q[NQ * 4 * VS];
-    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 2 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 2 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 2 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 2 * VS]);
     for (int q = 0; q < NQ; ++q) {
         const int qx = q % NQ1;
         const int qy = q / NQ1;
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -161,13 +161,13 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
             loperand_q[((1 * NQ + q) * 2 + 1) * VS + lane] = loperand[3];
         }
     }
-    tensor_test<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, &loperand_q[0 * NQ * 2 * VS], out_streams, 0);
-    tensor_test<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, &loperand_q[1 * NQ * 2 * VS], out_streams, 1);
+    tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0 * NQ * 2 * VS], out_streams, 0);
+    tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[1 * NQ * 2 * VS], out_streams, 1);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -192,16 +192,16 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
     s_t gu_ref_q[NQ * 4 * VS];
     s_t grad_h_ref_q[NQ * 4 * VS];
     s_t loperand_q[NQ * 4 * VS];
-    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 2 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * NQ * 2 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 2 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * NQ * 2 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 2 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * NQ * 2 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 2 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * NQ * 2 * VS]);
     for (int q = 0; q < NQ; ++q) {
         const int qx = q % NQ1;
         const int qy = q / NQ1;
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -274,8 +274,8 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
             loperand_q[((1 * NQ + q) * 2 + 1) * VS + lane] = loperand[3];
         }
     }
-    tensor_test<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, &loperand_q[0 * NQ * 2 * VS], out_streams, 0);
-    tensor_test<s_t, NQ, NS, VS, 2, 2>(nelems, shape_1d, grad_1d, &loperand_q[1 * NQ * 2 * VS], out_streams, 1);
+    tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0 * NQ * 2 * VS], out_streams, 0);
+    tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[1 * NQ * 2 * VS], out_streams, 1);
 }
 
 } // namespace codegen

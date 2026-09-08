@@ -42,7 +42,7 @@ def _lane_loop(body, vectorized=True):
     return LoopNode(
         LoopKind.SIMD,
         lane,
-        iteration_range(0, expr_ref("nelems")),
+        iteration_range(0, expr_ref("ne")),
         pre_increment(lane),
         body=tuple(body),
         vectorized=vectorized,

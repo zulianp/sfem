@@ -34,12 +34,12 @@ SFEM_INLINE const s_t *ageom_stream(
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int nelems,
+        const int ne,
         const g_t *const RSTR source,
         s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
-    for (int lane = 0; lane < nelems; ++lane) {
+    for (int lane = 0; lane < ne; ++lane) {
         converted[lane] = s_t(source[lane]);
     }
     return converted;
@@ -232,9 +232,9 @@ static SFEM_INLINE int laplace_tri3_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_geom_metric0,
-        const g_t *const RSTR g_geom_metric1,
-        const g_t *const RSTR g_geom_metric2,
+        const g_t *const RSTR g_met0,
+        const g_t *const RSTR g_met1,
+        const g_t *const RSTR g_met2,
         const s_t kappa,
         const ptrdiff_t u_stride,
         const s_t *const RSTR ux,
@@ -257,9 +257,9 @@ static SFEM_INLINE int laplace_tri3_objective_steps_affine_mesh_soa_impl(
         const s_t h0 = hx[ev0 * h_stride];
         const s_t h1 = hx[ev1 * h_stride];
         const s_t h2 = hx[ev2 * h_stride];
-        const s_t fff0 = kappa * s_t(g_geom_metric0[element]);
-        const s_t fff1 = kappa * s_t(g_geom_metric1[element]);
-        const s_t fff2 = kappa * s_t(g_geom_metric2[element]);
+        const s_t fff0 = kappa * s_t(g_met0[element]);
+        const s_t fff1 = kappa * s_t(g_met1[element]);
+        const s_t fff2 = kappa * s_t(g_met2[element]);
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
             const s_t u0 = x0 + alpha * h0;
@@ -281,9 +281,9 @@ extern "C" int laplace_tri3_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_geom_metric0,
-        const geom_t *const RSTR g_geom_metric1,
-        const geom_t *const RSTR g_geom_metric2,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
         const double kappa,
         const ptrdiff_t u_stride,
         const double *const RSTR ux,
@@ -293,16 +293,16 @@ extern "C" int laplace_tri3_objective_steps_affine_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 ) {
-    return sfem::codegen::laplace_tri3_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+    return sfem::codegen::laplace_tri3_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
 }
 
 extern "C" int laplace_tri3_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_geom_metric0,
-        const geom_t *const RSTR g_geom_metric1,
-        const geom_t *const RSTR g_geom_metric2,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
         const float kappa,
         const ptrdiff_t u_stride,
         const float *const RSTR ux,
@@ -312,7 +312,7 @@ extern "C" int laplace_tri3_objective_steps_affine_mesh_soa_float(
         const float *const RSTR steps,
         float *const RSTR value
 ) {
-    return sfem::codegen::laplace_tri3_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+    return sfem::codegen::laplace_tri3_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
 }
 
 
@@ -453,9 +453,9 @@ static SFEM_INLINE int laplace_tri3_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_geom_metric0,
-        const g_t *const RSTR g_geom_metric1,
-        const g_t *const RSTR g_geom_metric2,
+        const g_t *const RSTR g_met0,
+        const g_t *const RSTR g_met1,
+        const g_t *const RSTR g_met2,
         const s_t kappa,
         const ptrdiff_t u_stride,
         const s_t *const RSTR ux,
@@ -472,9 +472,9 @@ static SFEM_INLINE int laplace_tri3_gradient_affine_mesh_soa_impl(
         const s_t u0 = ux[ev0 * u_stride];
         const s_t u1 = ux[ev1 * u_stride];
         const s_t u2 = ux[ev2 * u_stride];
-        const s_t fff0 = kappa * s_t(g_geom_metric0[element]);
-        const s_t fff1 = kappa * s_t(g_geom_metric1[element]);
-        const s_t fff2 = kappa * s_t(g_geom_metric2[element]);
+        const s_t fff0 = kappa * s_t(g_met0[element]);
+        const s_t fff1 = kappa * s_t(g_met1[element]);
+        const s_t fff2 = kappa * s_t(g_met2[element]);
         const s_t t0 = -u0 + u1;
         const s_t t1 = -u0 + u2;
         const s_t t2 = fff0*t0 + fff1*t1;
@@ -500,32 +500,32 @@ extern "C" int laplace_tri3_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_geom_metric0,
-        const geom_t *const RSTR g_geom_metric1,
-        const geom_t *const RSTR g_geom_metric2,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
         const double kappa,
         const ptrdiff_t u_stride,
         const double *const RSTR ux,
         const ptrdiff_t out_stride,
         double *const RSTR outx
 ) {
-    return sfem::codegen::laplace_tri3_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, u_stride, ux, out_stride, outx);
+    return sfem::codegen::laplace_tri3_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, ux, out_stride, outx);
 }
 
 extern "C" int laplace_tri3_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_geom_metric0,
-        const geom_t *const RSTR g_geom_metric1,
-        const geom_t *const RSTR g_geom_metric2,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
         const float kappa,
         const ptrdiff_t u_stride,
         const float *const RSTR ux,
         const ptrdiff_t out_stride,
         float *const RSTR outx
 ) {
-    return sfem::codegen::laplace_tri3_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, u_stride, ux, out_stride, outx);
+    return sfem::codegen::laplace_tri3_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, ux, out_stride, outx);
 }
 
 
@@ -666,9 +666,9 @@ static SFEM_INLINE int laplace_tri3_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_geom_metric0,
-        const g_t *const RSTR g_geom_metric1,
-        const g_t *const RSTR g_geom_metric2,
+        const g_t *const RSTR g_met0,
+        const g_t *const RSTR g_met1,
+        const g_t *const RSTR g_met2,
         const s_t kappa,
         const ptrdiff_t h_stride,
         const s_t *const RSTR hx,
@@ -685,9 +685,9 @@ static SFEM_INLINE int laplace_tri3_apply_affine_mesh_soa_impl(
         const s_t u0 = hx[ev0 * h_stride];
         const s_t u1 = hx[ev1 * h_stride];
         const s_t u2 = hx[ev2 * h_stride];
-        const s_t fff0 = kappa * s_t(g_geom_metric0[element]);
-        const s_t fff1 = kappa * s_t(g_geom_metric1[element]);
-        const s_t fff2 = kappa * s_t(g_geom_metric2[element]);
+        const s_t fff0 = kappa * s_t(g_met0[element]);
+        const s_t fff1 = kappa * s_t(g_met1[element]);
+        const s_t fff2 = kappa * s_t(g_met2[element]);
         const s_t t0 = -u0 + u1;
         const s_t t1 = -u0 + u2;
         const s_t t2 = fff0*t0 + fff1*t1;
@@ -713,32 +713,32 @@ extern "C" int laplace_tri3_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_geom_metric0,
-        const geom_t *const RSTR g_geom_metric1,
-        const geom_t *const RSTR g_geom_metric2,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
         const double kappa,
         const ptrdiff_t h_stride,
         const double *const RSTR hx,
         const ptrdiff_t out_stride,
         double *const RSTR outx
 ) {
-    return sfem::codegen::laplace_tri3_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, h_stride, hx, out_stride, outx);
+    return sfem::codegen::laplace_tri3_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, h_stride, hx, out_stride, outx);
 }
 
 extern "C" int laplace_tri3_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_geom_metric0,
-        const geom_t *const RSTR g_geom_metric1,
-        const geom_t *const RSTR g_geom_metric2,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
         const float kappa,
         const ptrdiff_t h_stride,
         const float *const RSTR hx,
         const ptrdiff_t out_stride,
         float *const RSTR outx
 ) {
-    return sfem::codegen::laplace_tri3_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_geom_metric0, g_geom_metric1, g_geom_metric2, kappa, h_stride, hx, out_stride, outx);
+    return sfem::codegen::laplace_tri3_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, h_stride, hx, out_stride, outx);
 }
 
 
@@ -876,7 +876,7 @@ static int laplace_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
         s_t bh_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
-        static constexpr int nelems = VS;
+        static constexpr int ne = VS;
         s_t badj0[NQ * VS];
         s_t badj1[NQ * VS];
         s_t badj2[NQ * VS];
@@ -908,43 +908,43 @@ static int laplace_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
             s_t J10_values[VS];
             s_t J11_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J00_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J01_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J10_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J11_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
                 const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
                 const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J00_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J01_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J10_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J11_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g1;
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = J00_values[lane];
                 const s_t J01 = J01_values[lane];
                 const s_t J10 = J10_values[lane];

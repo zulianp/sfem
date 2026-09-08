@@ -33,12 +33,12 @@ SFEM_INLINE const s_t *ageom_stream(
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-        const int nelems,
+        const int ne,
         const g_t *const RSTR source,
         s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
-    for (int lane = 0; lane < nelems; ++lane) {
+    for (int lane = 0; lane < ne; ++lane) {
         converted[lane] = s_t(source[lane]);
     }
     return converted;
@@ -231,11 +231,11 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_imp
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_adjugate0,
-        const g_t *const RSTR g_jacobian_adjugate1,
-        const g_t *const RSTR g_jacobian_adjugate2,
-        const g_t *const RSTR g_jacobian_adjugate3,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
@@ -257,7 +257,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_imp
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bu_base_data[NS * NC][VS];
@@ -267,7 +267,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_imp
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -282,7 +282,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_imp
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                     bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
@@ -291,39 +291,39 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_imp
         }
         s_t badj0_data[VS];
         const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
         s_t badj1_data[VS];
         const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
         s_t badj2_data[VS];
         const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
         s_t badj3_data[VS];
         const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
         s_t bdet0_data[VS];
         const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
             for (int shape = 0; shape < NS; ++shape) {
                 for (int d = 0; d < NC; ++d) {
                     #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
+                    for (int lane = 0; lane < ne; ++lane) {
                         bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
                     }
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bvalue[lane] = s_t(0);
             }
 
-            neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
+            neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
 
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
             }
         }
@@ -339,11 +339,11 @@ extern "C" int neohookean_ogden_tri3_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -356,18 +356,18 @@ extern "C" int neohookean_ogden_tri3_objective_steps_affine_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::neohookean_ogden_tri3_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 extern "C" int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -380,7 +380,7 @@ extern "C" int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_float(
         const float *const RSTR steps,
         float *const RSTR value
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::neohookean_ogden_tri3_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 
@@ -521,11 +521,11 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_adjugate0,
-        const g_t *const RSTR g_jacobian_adjugate1,
-        const g_t *const RSTR g_jacobian_adjugate2,
-        const g_t *const RSTR g_jacobian_adjugate3,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
@@ -544,7 +544,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_affine_mesh_soa_impl(
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
@@ -552,7 +552,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_affine_mesh_soa_impl(
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -561,7 +561,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_affine_mesh_soa_impl(
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                 }
@@ -569,7 +569,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_affine_mesh_soa_impl(
         }
         for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_data[stream][lane] = s_t(0);
             }
         }
@@ -584,28 +584,28 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_affine_mesh_soa_impl(
         }
         s_t badj0_data[VS];
         const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
         s_t badj1_data[VS];
         const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
         s_t badj2_data[VS];
         const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
         s_t badj3_data[VS];
         const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
         s_t bdet0_data[VS];
         const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-        neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+        neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                    for (int scatter = 0; scatter < ne; ++scatter) {
                         #pragma omp atomic update
                         out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
                     }
@@ -624,11 +624,11 @@ extern "C" int neohookean_ogden_tri3_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -638,18 +638,18 @@ extern "C" int neohookean_ogden_tri3_gradient_affine_mesh_soa(
         double *const RSTR outx,
         double *const RSTR outy
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_tri3_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 extern "C" int neohookean_ogden_tri3_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -659,7 +659,7 @@ extern "C" int neohookean_ogden_tri3_gradient_affine_mesh_soa_float(
         float *const RSTR outx,
         float *const RSTR outy
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_tri3_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 
@@ -800,11 +800,11 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const g_t *const RSTR g_jacobian_adjugate0,
-        const g_t *const RSTR g_jacobian_adjugate1,
-        const g_t *const RSTR g_jacobian_adjugate2,
-        const g_t *const RSTR g_jacobian_adjugate3,
-        const g_t *const RSTR g_jacobian_determinant0,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
@@ -826,7 +826,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_affine_mesh_soa_impl(
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
+        const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t bu_data[NS * NC][VS];
         s_t bh_data[NS * NC][VS];
@@ -835,7 +835,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_affine_mesh_soa_impl(
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
@@ -845,7 +845,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_affine_mesh_soa_impl(
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
                     bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                     bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
@@ -854,7 +854,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_affine_mesh_soa_impl(
         }
         for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 bout_data[stream][lane] = s_t(0);
             }
         }
@@ -873,28 +873,28 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_affine_mesh_soa_impl(
         }
         s_t badj0_data[VS];
         const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+                ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
         s_t badj1_data[VS];
         const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+                ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
         s_t badj2_data[VS];
         const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+                ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
         s_t badj3_data[VS];
         const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+                ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
         s_t bdet0_data[VS];
         const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+                ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-        neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+        neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
         for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
                 {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
+                    for (int scatter = 0; scatter < ne; ++scatter) {
                         #pragma omp atomic update
                         out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
                     }
@@ -913,11 +913,11 @@ extern "C" int neohookean_ogden_tri3_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
@@ -930,18 +930,18 @@ extern "C" int neohookean_ogden_tri3_apply_affine_mesh_soa(
         double *const RSTR outx,
         double *const RSTR outy
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_tri3_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 extern "C" int neohookean_ogden_tri3_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_jacobian_adjugate0,
-        const geom_t *const RSTR g_jacobian_adjugate1,
-        const geom_t *const RSTR g_jacobian_adjugate2,
-        const geom_t *const RSTR g_jacobian_adjugate3,
-        const geom_t *const RSTR g_jacobian_determinant0,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
@@ -954,7 +954,7 @@ extern "C" int neohookean_ogden_tri3_apply_affine_mesh_soa_float(
         float *const RSTR outx,
         float *const RSTR outy
 ) {
-    return sfem::codegen::neohookean_ogden_tri3_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::neohookean_ogden_tri3_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 
@@ -1057,7 +1057,7 @@ static int neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
         s_t bh_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
-        static constexpr int nelems = VS;
+        static constexpr int ne = VS;
         s_t bu_data[NS * NC][VS];
         s_t badj0[NQ * VS];
         s_t badj1[NQ * VS];
@@ -1095,43 +1095,43 @@ static int neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
             s_t J10_values[VS];
             s_t J11_values[VS];
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J00_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J01_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J10_values[lane] = s_t(0);
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 J11_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
                 const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
                 const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J00_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J01_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g1;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J10_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g0;
                 }
                 #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
+                for (int lane = 0; lane < ne; ++lane) {
                     J11_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g1;
                 }
             }
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
+            for (int lane = 0; lane < ne; ++lane) {
                 const s_t J00 = J00_values[lane];
                 const s_t J01 = J01_values[lane];
                 const s_t J10 = J10_values[lane];

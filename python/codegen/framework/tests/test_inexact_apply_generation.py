@@ -80,8 +80,8 @@ class InexactApplyGenerationTest(unittest.TestCase):
         # writes the tangent.
         body = source[source.index(assembly):source.index(stored)]
         for expected in (
-            "g_jacobian_adjugate8",
-            "g_jacobian_determinant0",
+            "g_adj8",
+            "g_det0",
             "const s_t mu",
             "const s_t lmbda",
             "tangent_t *const RSTR tangent",
@@ -92,8 +92,8 @@ class InexactApplyGenerationTest(unittest.TestCase):
         # The apply takes neither, and no state either.
         body = source[source.index(stored):source.index(compressed)]
         for absent in (
-            "g_jacobian_adjugate",
-            "g_jacobian_determinant",
+            "g_adj",
+            "g_det",
             "const s_t mu",
             "const s_t lmbda",
             "u_stride",

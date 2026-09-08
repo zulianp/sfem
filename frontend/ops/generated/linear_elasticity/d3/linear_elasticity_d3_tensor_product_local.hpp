@@ -31,7 +31,7 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d3_tensor_product_objective_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -58,16 +58,16 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_objective_block(
     static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
     static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
     s_t gu_ref_q[NQ * 9 * VS];
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 3 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 3 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[2 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[2 * NQ * 3 * VS]);
     for (int q = 0; q < NQ; ++q) {
         const int qx = q % NQ1;
         const int qy = (q / NQ1) % NQ1;
         const int qz = q / (NQ1 * NQ1);
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -107,7 +107,7 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_objective_block(
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d3_tensor_product_gradient_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -135,16 +135,16 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_gradient_block(
     static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
     s_t gu_ref_q[NQ * 9 * VS];
     s_t loperand_q[NQ * 9 * VS];
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 3 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 3 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[2 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[2 * NQ * 3 * VS]);
     for (int q = 0; q < NQ; ++q) {
         const int qx = q % NQ1;
         const int qy = (q / NQ1) % NQ1;
         const int qz = q / (NQ1 * NQ1);
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -215,14 +215,14 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_gradient_block(
             loperand_q[((2 * NQ + q) * 3 + 2) * VS + lane] = loperand[8];
         }
     }
-    tensor_test<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[0 * NQ * 3 * VS], out_streams, 0);
-    tensor_test<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[1 * NQ * 3 * VS], out_streams, 1);
-    tensor_test<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[2 * NQ * 3 * VS], out_streams, 2);
+    tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0 * NQ * 3 * VS], out_streams, 0);
+    tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[1 * NQ * 3 * VS], out_streams, 1);
+    tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[2 * NQ * 3 * VS], out_streams, 2);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d3_tensor_product_apply_block(
-        const int nelems,
+        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -250,16 +250,16 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_apply_block(
     static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
     s_t grad_h_ref_q[NQ * 9 * VS];
     s_t loperand_q[NQ * 9 * VS];
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * NQ * 3 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * NQ * 3 * VS]);
-    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[2 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * NQ * 3 * VS]);
+    tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[2 * NQ * 3 * VS]);
     for (int q = 0; q < NQ; ++q) {
         const int qx = q % NQ1;
         const int qy = (q / NQ1) % NQ1;
         const int qz = q / (NQ1 * NQ1);
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
+        for (int lane = 0; lane < ne; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
             const s_t adj_lane0 = adj0[goff];
             const s_t adj_lane1 = adj1[goff];
@@ -330,9 +330,9 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_apply_block(
             loperand_q[((2 * NQ + q) * 3 + 2) * VS + lane] = loperand[8];
         }
     }
-    tensor_test<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[0 * NQ * 3 * VS], out_streams, 0);
-    tensor_test<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[1 * NQ * 3 * VS], out_streams, 1);
-    tensor_test<s_t, NQ, NS, VS, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[2 * NQ * 3 * VS], out_streams, 2);
+    tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0 * NQ * 3 * VS], out_streams, 0);
+    tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[1 * NQ * 3 * VS], out_streams, 1);
+    tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[2 * NQ * 3 * VS], out_streams, 2);
 }
 
 } // namespace codegen

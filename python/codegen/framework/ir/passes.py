@@ -9,7 +9,7 @@ blocking and per-warp variants held nothing.
 The first real pass is an analysis rather than a transform, deliberately.  The
 vectorisation contract these kernels depend on is currently enforced by
 reading the *generated text* -- ``test_gen_api`` finds a line that says
-``for (int lane = 0; lane < nelems; ++lane) {``, walks backwards looking for a
+``for (int lane = 0; lane < ne; ++lane) {``, walks backwards looking for a
 pragma, then counts braces to decide where the loop body ends and scans it for
 nested loops and atomics.  Every one of those steps is recovering structure
 that the tree already has exactly.  Checking it on the tree is the same
