@@ -17,7 +17,10 @@ set -u
 mkdir -p "$CVRUN_DIR"
 tag=$1; shift
 bin=$1; shift
-: ${CVRUN_FILTER:="^newton |^stage |^continuation|^ *upwind |band eps|smoother|sweep |^[0-9]+\	|highest Re SOLVED|newton_converged|lin_it_total|t_solve|u_l|sum of continuity|active set|fd_at_it|eps "}
+# nnodes/nelements/ndof are in the default filter deliberately: a timing without the
+# problem size it was measured on is not a result, and the drivers already print the
+# line during setup, so this is a matter of not dropping it.
+: ${CVRUN_FILTER:="^newton |^stage |^continuation|^ *upwind |band eps|smoother|sweep |^[0-9]+\	|highest Re SOLVED|newton_converged|lin_it_total|t_solve|u_l|sum of continuity|active set|fd_at_it|eps |nnodes:|nelements:|ndof:"}
 echo ">>> START $tag  $(date +%H:%M:%S)  raw: $CVRUN_DIR/$tag.log"
 # stdbuf on the BINARY as well as the filter. Line-buffering only the filter is not enough:
 # the program's own stdout is block-buffered when it is a pipe, so its output reaches the raw
