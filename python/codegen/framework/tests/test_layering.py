@@ -1,9 +1,10 @@
 """Enforce the framework's layering rule: imports may only point up.
 
 The framework is organised as a lowering pipeline.  ``README.md`` states the
-order and ``LAYERING.html`` gives the target architecture; the rule both imply
-is that a layer may name the artifact it *receives* -- something produced
-earlier in the pipeline -- and must never name a layer that comes after it.
+package layout and ``PRESCRIBED_ARCHITECTURE.md`` states the rule this enforces,
+"One direction": a layer may name the artifact it *receives* -- something
+produced earlier in the pipeline -- and must never name a layer that comes after
+it.
 Reading the stack top-down as specification to generated text, legal imports
 point up and illegal ones point down.
 

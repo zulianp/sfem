@@ -857,7 +857,7 @@ def run(material, default_out_dir, argv=None):
         "--matrix-format",
         action="append",
         dest="matrix_formats",
-        help="Matrix assembly format to emit: crs, bsr, dia, coo, patch, or all. May be repeated or comma-separated.",
+        help="Matrix assembly format to emit: crs, bsr, block_diag_sym, or all. May be repeated or comma-separated.",
     )
     parser.add_argument(
         "--matrix-layout",

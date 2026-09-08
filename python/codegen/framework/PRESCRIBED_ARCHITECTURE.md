@@ -3,6 +3,45 @@
 What each layer must own, and the rules that make the boundaries real. Prescriptive only —
 for what is actually built, see `ARCHITECTURE.html`.
 
+## Scope and targets
+
+It is a code generator. The runs happen by compiling the kernels and executing them inside SFEM.
+
+**Input.** The user writes either the system energy or the residual, as an `EquationSystem`.
+Both lower to the same forms (see *Design invariants*).
+
+**Output.** Per material, per element, per target:
+
+- matrix-free apply — Hessian/Jacobian action and gradient action, over standard and packed
+  mesh layouts (packed one-pass and two-pass), element-based and patch-based, with per-thread
+  and per-warp variants where the target has them;
+- assembled matrices — CRS, BSR, DIA, COO, BlockDiagSym, and patch-based assembly with an
+  index for specific nodes;
+- objective/energy evaluation (`value_steps`) where one exists, a residual merit otherwise;
+- FLOP-count and arithmetic-intensity functions on every kernel, so performance reports are
+  generated rather than written.
+
+**Targets.** OpenMP · CUDA/HIP · AVX512 · ARM SVE and SME. Tensor-product elements use sum
+factorization and, where the hardware has them, matrix units (tensor cores, matrix cores, SME).
+
+**Style.** Procedural kernels with an OOP wrapper. SoA first; AoS and AoSoSoA where they earn it.
+Reference shape functions and gradients are passed as arrays and the code is dimension-generic —
+specialised for 1D/2D/3D, with element sizes as template parameters — so any element runs the
+same mathematics.
+
+**The generator is expected to reason, not transcribe:** recognise structure and name optimal
+intermediates, decide from the expression graph what belongs in which loop scope (trial, test,
+quadrature, mesh), and carry heuristics for arithmetic intensity and register pressure.
+
+**What ships today is narrower than this, on purpose.** The generated surface was cut to reduce
+scope while the framework is being reworked: five materials and most non-default elements left
+the default generation set, and the DIA, COO and patch matrix formats were deleted along with
+their assembly plans and scatter emitters, leaving CRS, BSR and BlockDiagSym.
+
+That is a scope reduction, not a decision against the capability. The goals above are the target
+and stay whole; the removed formats are recoverable from history and expected back once the
+rework settles. `ARCHITECTURE.html` OP 23 records what was cut and why.
+
 ## Lowering order
 
 ```
