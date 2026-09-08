@@ -10,30 +10,37 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from run_torsion_history_compare import CASE, POLICIES, compare_runs, load_case, read_history, run, scalar_errors
+from run_torsion_history_compare import CASE, POLICIES, RESOLUTIONS, compare_runs, load_case, read_history, run, scalar_errors
 
 
 def check(root):
-    for setting in (None, "0", "1"):
+    assert RESOLUTIONS == {"coarse": (41, 9, 9), "medium": (81, 17, 17), "fine": (161, 33, 33)}
+    for setting, resolution in zip((None, "0", "1", "1"), (None, "coarse", "medium", "fine")):
         environment = dict(os.environ)
+        environment.update(PRONY_NX="16", PRONY_NY="5", PRONY_NZ="5")
         environment.pop("SFEM_HISTORY_CHECK", None)
         if setting is not None:
             environment["SFEM_HISTORY_CHECK"] = setting
         expected = "1" if setting is None else setting
-        folder = root / f"diagnostics_{setting}"
+        folder = root / f"diagnostics_{setting}_{resolution}"
         with patch.dict(os.environ, environment, clear=True), \
              patch("run_torsion_history_compare.subprocess.run") as launch, \
              patch("run_torsion_history_compare.subprocess.check_output", return_value="test-commit"), \
              patch("run_torsion_history_compare.read_history"), \
              patch("run_torsion_history_compare.compare_runs"):
             launch.return_value.returncode = 0
-            run(folder, Path(sys.executable), 0.025)
+            run(folder, Path(sys.executable), 0.025, resolution)
             assert launch.call_count == 1 + len(POLICIES)
+            command = launch.call_args_list[0].args[0]
+            nodes = tuple(int(command[command.index(flag) + 1]) for flag in ("-x", "-y", "-z"))
+            assert nodes == (RESOLUTIONS[resolution] if resolution else (16, 5, 5))
             assert all(call.kwargs["env"]["SFEM_HISTORY_CHECK"] == expected
                        for call in launch.call_args_list)
         assert json.loads((folder / "manifest.json").read_text())["history_check"] == expected
+        assert json.loads((folder / "manifest.json").read_text())["resolution"] == resolution
 
     original = yaml.safe_load(CASE.read_text())
+    assert original["time"] == {"dt": 0.005, "t_end": 30.0}
     assert original["dynamics"] == {"type": "newmark", "density": 1.0, "beta": 0.64, "gamma": 0.6}
     assert original["material"]["prony"] == [
         {"g": 0.4, "tau": 1}, {"g": 0.4, "tau": 2}, {"g": 0.1, "tau": 5}, {"g": 0.05, "tau": 10}]
@@ -41,7 +48,7 @@ def check(root):
     assert shortened["time"]["t_end"] == 0.025
     shortened["time"]["t_end"] = original["time"]["t_end"]
     assert shortened == original == load_case()
-    for invalid in (0, -1, float("nan"), float("inf"), 0.007, 81):
+    for invalid in (0, -1, float("nan"), float("inf"), 0.007, 30.005):
         try:
             load_case(invalid)
         except ValueError:

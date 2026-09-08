@@ -41,7 +41,7 @@ material:
     enabled: false
 time:
   dt: 0.005
-  t_end: 80.0
+  t_end: 30.0
 dynamics:
   type: newmark
   density: 1.0

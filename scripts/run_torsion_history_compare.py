@@ -21,6 +21,8 @@ from compare_mr_visco_history import (
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE = ROOT / "spikes/prony-series/cases/newmark_torsion_release.yaml"
+# Node counts: the study specifies 40x8x8, 80x16x16 and 160x32x32 elements.
+RESOLUTIONS = {"coarse": (41, 9, 9), "medium": (81, 17, 17), "fine": (161, 33, 33)}
 POLICIES = {
     "fp64": ("float64", "none"),
     "fp32": ("float32", "none"),
@@ -158,7 +160,7 @@ def compare_runs(out):
     print(f"[done] Plots and error tables: {plots}", flush=True)
 
 
-def run(out, exe, end_time=None):
+def run(out, exe, end_time=None, resolution=None):
     if out.exists():
         raise FileExistsError(f"Refusing to overwrite {out}; use a new --out or --plot-only")
     if not exe.is_file() or not os.access(exe, os.X_OK):
@@ -173,9 +175,11 @@ def run(out, exe, end_time=None):
     env.setdefault("OMP_NUM_THREADS", "1")
     env["SFEM_HISTORY_MODE"] = "per_qp"
     env.setdefault("SFEM_HISTORY_CHECK", "1")
+    nodes = RESOLUTIONS[resolution] if resolution is not None else (
+        env.get("PRONY_NX", "16"), env.get("PRONY_NY", "5"), env.get("PRONY_NZ", "5"))
     mesh_command = [sys.executable, str(ROOT / "python/sfem/mesh/box_mesh.py"), str(out / "mesh"),
-                    "--cell_type=HEX8", "-x", env.get("PRONY_NX", "16"),
-                    "-y", env.get("PRONY_NY", "5"), "-z", env.get("PRONY_NZ", "5"),
+                    "--cell_type=HEX8", "-x", str(nodes[0]),
+                    "-y", str(nodes[1]), "-z", str(nodes[2]),
                     "--width=1.0", "--height=0.2", "--depth=0.2"]
     subprocess.run(mesh_command, check=True, env=env)
     manifest = {
@@ -183,7 +187,8 @@ def run(out, exe, end_time=None):
         "executable": str(exe), "executable_sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),
         "case_sha256": hashlib.sha256((out / "case.yaml").read_bytes()).hexdigest(),
         "source_case": str(CASE), "dynamics": case["dynamics"], "time": case["time"],
-        "mesh_command": mesh_command, "omp_num_threads": env["OMP_NUM_THREADS"],
+        "mesh_command": mesh_command, "resolution": resolution,
+        "omp_num_threads": env["OMP_NUM_THREADS"],
         "history_mode": "per_qp", "history_check": env["SFEM_HISTORY_CHECK"], "runs": {},
     }
     for name, (storage, scaling) in POLICIES.items():
@@ -215,13 +220,15 @@ def main():
         "PRONY_EXE", str(ROOT / "spikes/prony-series/build/prony_visco_torsion")))
     parser.add_argument("--plot-only", action="store_true", help="Recreate comparison plots from this runner's outputs")
     parser.add_argument("--end-time", type=float, help="Shorten the run for testing; only the saved YAML copy is changed")
+    parser.add_argument("--resolution", choices=RESOLUTIONS,
+                        help="Study mesh preset; overrides PRONY_NX/NY/NZ. Omit for the existing custom/smoke mesh")
     args = parser.parse_args()
     if args.plot_only:
-        if args.end_time is not None:
-            parser.error("--end-time cannot be used with --plot-only")
+        if args.end_time is not None or args.resolution is not None:
+            parser.error("--end-time and --resolution cannot be used with --plot-only")
         compare_runs(args.out.resolve())
     else:
-        run(args.out.resolve(), args.exe.resolve(), args.end_time)
+        run(args.out.resolve(), args.exe.resolve(), args.end_time, args.resolution)
 
 
 if __name__ == "__main__":
