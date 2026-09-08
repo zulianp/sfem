@@ -53,6 +53,33 @@ Options, all `CVFEM_ENABLE_*`: `TRACE` (on), `SUBPAR`, `BLAS`, `CUDA`. They and 
 performance flag set live in `cmake/CVFEMCMakeFunctions.cmake`; the `-fno-finite-math-only`
 comment there is load-bearing and explains why `cvfem_guard_selftest` exists.
 
+## Checking for performance regressions
+
+The gate is the **packed matrix-free throughput** — the residual and Jacobian action of
+`cvfem_hex8_ns_upwind_bench` at `--layout packed`, which reach >2000 MDOF/s on a Grace
+socket. Those kernels are the fast path, they are what the numbers in `docs/` quote, and
+they are what the compiler flags were tuned on. A slower driver is not a substitute:
+`cvfem_ns_apply_bench` saturates near 267 MDOF/s and agreement there says close to nothing
+about a kernel running nine times faster.
+
+Run it for any change that could touch code generation, compiler flags, memory layout or
+the build:
+
+```sh
+# The real gate: new binary against one built from the commit you are comparing to,
+# both measured in one allocation with the order alternating. Bands at 5%.
+sbatch --export=ALL,REF_BIN=/path/to/old/cvfem_hex8_ns_upwind_bench jobs/perf_regression.sbatch
+
+# Coarse check against perf/baseline_grace.csv. Bands at 12%, because the same binary
+# varies 5-11% between Grace nodes. Use it as a smoke test, not to clear a change.
+sbatch jobs/perf_regression.sbatch
+```
+
+`scripts/perf_regression.sh --help` explains the two modes, why three configurations are
+recorded but not gated in baseline mode, and which two are too bimodal to measure at all.
+Re-record the baseline (`RECORD=1`) only deliberately, and say in the commit message what
+changed and on what evidence.
+
 ## Running something long
 
 Use `scripts/cvrun.sh`, not a hand-rolled `driver | grep` pipeline. It keeps a complete
