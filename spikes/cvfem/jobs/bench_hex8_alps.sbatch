@@ -36,8 +36,10 @@ set -euo pipefail
 
 # Locate the spike root -- the directory holding CMakeLists.txt, drivers/ and src/.
 # Candidates cover submitting from the spike root, submitting from jobs/, an explicit
-# CVFEM_DIR, and running the script by path. SCRIPT_DIR keeps its name below: everything
-# downstream uses it as the spike root.
+# CVFEM_DIR, and running the script by path. SLURM_SUBMIT_DIR is the one that matters
+# under sbatch: Slurm copies the batch script to /var/spool/slurmd/job<id>/, so the
+# BASH_SOURCE candidate is only live when the script is run directly. SCRIPT_DIR keeps
+# its name below: everything downstream uses it as the spike root.
 _cvfem_probe=drivers/cvfem_hex8_ns_upwind_bench.cpp
 SCRIPT_DIR=""
 for _cand in "${SLURM_SUBMIT_DIR:-}" "${SLURM_SUBMIT_DIR:-}/.." "${CVFEM_DIR:-}" \
