@@ -27,10 +27,15 @@ material:
   C10: 0.3
   C01: 0.05
   K: 50.0
+  # Same four Prony branches as the cantilever precision-comparison case; g_inf = 0.05.
   prony:
   - g: 0.4
     tau: 1.0
-  - g: 0.3
+  - g: 0.4
+    tau: 2.0
+  - g: 0.1
+    tau: 5.0
+  - g: 0.05
     tau: 10.0
   wlf:
     enabled: false
