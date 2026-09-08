@@ -28,11 +28,11 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d2_tensor_product_direct_hessian_tensor_product_element_matrix(
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT block_jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate0,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate1,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate2,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate3,
+        const s_t *const SFEM_RESTRICT bjacobian_determinant0,
         const s_t *const SFEM_RESTRICT shape_1d,
         const s_t *const SFEM_RESTRICT grad_1d,
         const s_t *const SFEM_RESTRICT q_weight_1d,
@@ -59,11 +59,11 @@ static SFEM_INLINE void linear_elasticity_d2_tensor_product_direct_hessian_tenso
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         const int lane = 0;
         const ptrdiff_t goff = q * VS + lane;
-        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[goff];
-        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[goff];
-        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[goff];
-        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[goff];
-        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[goff];
+        const s_t jacobian_adjugate_lane0 = bjacobian_adjugate0[goff];
+        const s_t jacobian_adjugate_lane1 = bjacobian_adjugate1[goff];
+        const s_t jacobian_adjugate_lane2 = bjacobian_adjugate2[goff];
+        const s_t jacobian_adjugate_lane3 = bjacobian_adjugate3[goff];
+        const s_t jacobian_determinant_lane0 = bjacobian_determinant0[goff];
         const s_t idet = s_t(1) / jacobian_determinant_lane0;
         for (int trial_component = 0; trial_component < NC; ++trial_component) {
             for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {

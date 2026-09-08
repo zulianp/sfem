@@ -63,41 +63,41 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_energy_e
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
+        const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_u_streams[stream] = u_streams[stream] + evb;
+            bu_streams[stream] = u_streams[stream] + evb;
         }
-        s_t *const block_value = values + evb;
+        s_t *const bvalue = values + evb;
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_value[lane] = s_t(0);
+            bvalue[lane] = s_t(0);
         }
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_jacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                block_jacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                block_jacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                block_jacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                block_jacobian_adjugate4[q * VS + lane] = jacobian_adjugate[4][q * nelements + evb + lane];
-                block_jacobian_adjugate5[q * VS + lane] = jacobian_adjugate[5][q * nelements + evb + lane];
-                block_jacobian_adjugate6[q * VS + lane] = jacobian_adjugate[6][q * nelements + evb + lane];
-                block_jacobian_adjugate7[q * VS + lane] = jacobian_adjugate[7][q * nelements + evb + lane];
-                block_jacobian_adjugate8[q * VS + lane] = jacobian_adjugate[8][q * nelements + evb + lane];
-                block_jacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
+                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
+                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
+                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
+                bjacobian_adjugate4[q * VS + lane] = jacobian_adjugate[4][q * nelements + evb + lane];
+                bjacobian_adjugate5[q * VS + lane] = jacobian_adjugate[5][q * nelements + evb + lane];
+                bjacobian_adjugate6[q * VS + lane] = jacobian_adjugate[6][q * nelements + evb + lane];
+                bjacobian_adjugate7[q * VS + lane] = jacobian_adjugate[7][q * nelements + evb + lane];
+                bjacobian_adjugate8[q * VS + lane] = jacobian_adjugate[8][q * nelements + evb + lane];
+                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
             }
         }
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_value);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -119,37 +119,37 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_energy_e
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
+        const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_u_streams[stream] = u_streams[stream] + evb;
+            bu_streams[stream] = u_streams[stream] + evb;
         }
-        s_t *const block_value = values + evb;
+        s_t *const bvalue = values + evb;
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_value[lane] = s_t(0);
+            bvalue[lane] = s_t(0);
         }
-        s_t block_coordinate_data[NDOFS][VS];
+        s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_coordinate_data[stream][lane] = coords[stream][evb + lane];
+                bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
         const s_t *const grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
         for (int q = 0; q < NQ; ++q) {
-            s_t *block_jacobian_adjugate_streams[ND * ND] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -201,39 +201,39 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_energy_e
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g0;
+                    J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g1;
+                    J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J02_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g2;
+                    J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g0;
+                    J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g1;
+                    J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J12_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g2;
+                    J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J20_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g0;
+                    J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J21_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g1;
+                    J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J22_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g2;
+                    J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
@@ -249,10 +249,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_energy_e
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VS + lane);
+                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
             }
         }
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_value);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -274,37 +274,37 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_energy_e
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
+        const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_u_streams[stream] = u_streams[stream] + evb;
+            bu_streams[stream] = u_streams[stream] + evb;
         }
-        s_t *const block_value = values + evb;
+        s_t *const bvalue = values + evb;
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            block_value[lane] = s_t(0);
+            bvalue[lane] = s_t(0);
         }
-        s_t block_coordinate_data[NDOFS][VS];
+        s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_coordinate_data[stream][lane] = coords[stream][evb + lane];
+                bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
         const s_t *const grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
         for (int q = 0; q < NQ; ++q) {
-            s_t *block_jacobian_adjugate_streams[ND * ND] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -356,39 +356,39 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_energy_e
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g0;
+                    J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g1;
+                    J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J02_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g2;
+                    J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g0;
+                    J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g1;
+                    J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J12_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g2;
+                    J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J20_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g0;
+                    J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J21_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g1;
+                    J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J22_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g2;
+                    J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
@@ -404,10 +404,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_energy_e
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VS + lane);
+                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
             }
         }
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_value);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -431,44 +431,44 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
+        const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_u_streams[stream] = u_streams[stream] + evb;
+            bu_streams[stream] = u_streams[stream] + evb;
         }
-        s_t *block_out_streams[NDOFS];
+        s_t *bout_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_out_streams[stream] = out_streams[stream] + evb;
+            bout_streams[stream] = out_streams[stream] + evb;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_out_streams[stream][lane] = s_t(0);
+                bout_streams[stream][lane] = s_t(0);
             }
         }
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_jacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                block_jacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                block_jacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                block_jacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                block_jacobian_adjugate4[q * VS + lane] = jacobian_adjugate[4][q * nelements + evb + lane];
-                block_jacobian_adjugate5[q * VS + lane] = jacobian_adjugate[5][q * nelements + evb + lane];
-                block_jacobian_adjugate6[q * VS + lane] = jacobian_adjugate[6][q * nelements + evb + lane];
-                block_jacobian_adjugate7[q * VS + lane] = jacobian_adjugate[7][q * nelements + evb + lane];
-                block_jacobian_adjugate8[q * VS + lane] = jacobian_adjugate[8][q * nelements + evb + lane];
-                block_jacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
+                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
+                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
+                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
+                bjacobian_adjugate4[q * VS + lane] = jacobian_adjugate[4][q * nelements + evb + lane];
+                bjacobian_adjugate5[q * VS + lane] = jacobian_adjugate[5][q * nelements + evb + lane];
+                bjacobian_adjugate6[q * VS + lane] = jacobian_adjugate[6][q * nelements + evb + lane];
+                bjacobian_adjugate7[q * VS + lane] = jacobian_adjugate[7][q * nelements + evb + lane];
+                bjacobian_adjugate8[q * VS + lane] = jacobian_adjugate[8][q * nelements + evb + lane];
+                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
             }
         }
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_out_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -490,40 +490,40 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
+        const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_u_streams[stream] = u_streams[stream] + evb;
+            bu_streams[stream] = u_streams[stream] + evb;
         }
-        s_t *block_out_streams[NDOFS];
+        s_t *bout_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_out_streams[stream] = out_streams[stream] + evb;
+            bout_streams[stream] = out_streams[stream] + evb;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_out_streams[stream][lane] = s_t(0);
+                bout_streams[stream][lane] = s_t(0);
             }
         }
-        s_t block_coordinate_data[NDOFS][VS];
+        s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_coordinate_data[stream][lane] = coords[stream][evb + lane];
+                bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
         const s_t *const grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
         for (int q = 0; q < NQ; ++q) {
-            s_t *block_jacobian_adjugate_streams[ND * ND] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -575,39 +575,39 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g0;
+                    J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g1;
+                    J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J02_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g2;
+                    J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g0;
+                    J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g1;
+                    J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J12_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g2;
+                    J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J20_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g0;
+                    J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J21_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g1;
+                    J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J22_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g2;
+                    J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
@@ -623,10 +623,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VS + lane);
+                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
             }
         }
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_out_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -648,40 +648,40 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
+        const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_u_streams[stream] = u_streams[stream] + evb;
+            bu_streams[stream] = u_streams[stream] + evb;
         }
-        s_t *block_out_streams[NDOFS];
+        s_t *bout_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_out_streams[stream] = out_streams[stream] + evb;
+            bout_streams[stream] = out_streams[stream] + evb;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_out_streams[stream][lane] = s_t(0);
+                bout_streams[stream][lane] = s_t(0);
             }
         }
-        s_t block_coordinate_data[NDOFS][VS];
+        s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_coordinate_data[stream][lane] = coords[stream][evb + lane];
+                bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
         const s_t *const grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
         for (int q = 0; q < NQ; ++q) {
-            s_t *block_jacobian_adjugate_streams[ND * ND] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -733,39 +733,39 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g0;
+                    J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g1;
+                    J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J02_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g2;
+                    J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g0;
+                    J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g1;
+                    J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J12_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g2;
+                    J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J20_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g0;
+                    J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J21_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g1;
+                    J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J22_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g2;
+                    J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
@@ -781,10 +781,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VS + lane);
+                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
             }
         }
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_out_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -808,55 +808,55 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_hessian_
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
-        for (int stream = 0; stream < NDOFS; ++stream) block_u_streams[stream] = u_streams[stream] + evb;
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        const s_t *bu_streams[NDOFS];
+        for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_jacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                block_jacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                block_jacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                block_jacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                block_jacobian_adjugate4[q * VS + lane] = jacobian_adjugate[4][q * nelements + evb + lane];
-                block_jacobian_adjugate5[q * VS + lane] = jacobian_adjugate[5][q * nelements + evb + lane];
-                block_jacobian_adjugate6[q * VS + lane] = jacobian_adjugate[6][q * nelements + evb + lane];
-                block_jacobian_adjugate7[q * VS + lane] = jacobian_adjugate[7][q * nelements + evb + lane];
-                block_jacobian_adjugate8[q * VS + lane] = jacobian_adjugate[8][q * nelements + evb + lane];
-                block_jacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
+                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
+                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
+                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
+                bjacobian_adjugate4[q * VS + lane] = jacobian_adjugate[4][q * nelements + evb + lane];
+                bjacobian_adjugate5[q * VS + lane] = jacobian_adjugate[5][q * nelements + evb + lane];
+                bjacobian_adjugate6[q * VS + lane] = jacobian_adjugate[6][q * nelements + evb + lane];
+                bjacobian_adjugate7[q * VS + lane] = jacobian_adjugate[7][q * nelements + evb + lane];
+                bjacobian_adjugate8[q * VS + lane] = jacobian_adjugate[8][q * nelements + evb + lane];
+                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
             }
         }
-        s_t block_h_data[NDOFS][VS];
-        s_t block_out_data[NDOFS][VS];
-        const s_t *block_h_streams[NDOFS];
-        s_t *block_out_streams[NDOFS];
+        s_t bh_data[NDOFS][VS];
+        s_t bout_data[NDOFS][VS];
+        const s_t *bh_streams[NDOFS];
+        s_t *bout_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_h_streams[stream] = block_h_data[stream];
-            block_out_streams[stream] = block_out_data[stream];
+            bh_streams[stream] = bh_data[stream];
+            bout_streams[stream] = bout_data[stream];
         }
         for (int col = 0; col < NDOFS; ++col) {
             for (int stream = 0; stream < NDOFS; ++stream) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_h_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
-                    block_out_data[stream][lane] = s_t(0);
+                    bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
+                    bout_data[stream][lane] = s_t(0);
                 }
             }
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    matrix_stream[lane] = block_out_data[row][lane];
+                    matrix_stream[lane] = bout_data[row][lane];
                 }
             }
         }
@@ -881,30 +881,30 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_hessian_
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
-        for (int stream = 0; stream < NDOFS; ++stream) block_u_streams[stream] = u_streams[stream] + evb;
-        s_t block_coordinate_data[NDOFS][VS];
+        const s_t *bu_streams[NDOFS];
+        for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
+        s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_coordinate_data[stream][lane] = coords[stream][evb + lane];
+                bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
         const s_t *const grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
         for (int q = 0; q < NQ; ++q) {
-            s_t *block_jacobian_adjugate_streams[ND * ND] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -956,39 +956,39 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_hessian_
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g0;
+                    J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g1;
+                    J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J02_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g2;
+                    J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g0;
+                    J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g1;
+                    J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J12_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g2;
+                    J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J20_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g0;
+                    J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J21_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g1;
+                    J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J22_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g2;
+                    J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
@@ -1004,31 +1004,31 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_hessian_
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VS + lane);
+                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
             }
         }
-        s_t block_h_data[NDOFS][VS];
-        s_t block_out_data[NDOFS][VS];
-        const s_t *block_h_streams[NDOFS];
-        s_t *block_out_streams[NDOFS];
+        s_t bh_data[NDOFS][VS];
+        s_t bout_data[NDOFS][VS];
+        const s_t *bh_streams[NDOFS];
+        s_t *bout_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_h_streams[stream] = block_h_data[stream];
-            block_out_streams[stream] = block_out_data[stream];
+            bh_streams[stream] = bh_data[stream];
+            bout_streams[stream] = bout_data[stream];
         }
         for (int col = 0; col < NDOFS; ++col) {
             for (int stream = 0; stream < NDOFS; ++stream) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_h_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
-                    block_out_data[stream][lane] = s_t(0);
+                    bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
+                    bout_data[stream][lane] = s_t(0);
                 }
             }
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    matrix_stream[lane] = block_out_data[row][lane];
+                    matrix_stream[lane] = bout_data[row][lane];
                 }
             }
         }
@@ -1053,30 +1053,30 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_hessian_
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        const s_t *block_u_streams[NDOFS];
-        for (int stream = 0; stream < NDOFS; ++stream) block_u_streams[stream] = u_streams[stream] + evb;
-        s_t block_coordinate_data[NDOFS][VS];
+        const s_t *bu_streams[NDOFS];
+        for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
+        s_t bcoordinate_data[NDOFS][VS];
         for (int stream = 0; stream < NDOFS; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_coordinate_data[stream][lane] = coords[stream][evb + lane];
+                bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_adjugate4[NQ * VS];
-        s_t block_jacobian_adjugate5[NQ * VS];
-        s_t block_jacobian_adjugate6[NQ * VS];
-        s_t block_jacobian_adjugate7[NQ * VS];
-        s_t block_jacobian_adjugate8[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_adjugate4[NQ * VS];
+        s_t bjacobian_adjugate5[NQ * VS];
+        s_t bjacobian_adjugate6[NQ * VS];
+        s_t bjacobian_adjugate7[NQ * VS];
+        s_t bjacobian_adjugate8[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
         const s_t *const grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
         for (int q = 0; q < NQ; ++q) {
-            s_t *block_jacobian_adjugate_streams[ND * ND] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -1128,39 +1128,39 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_hessian_
                 const s_t g2 = grad_ref_z[q * NS + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g0;
+                    J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g1;
+                    J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J02_values[lane] += block_coordinate_data[shape * 3 + 0][lane] * g2;
+                    J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g0;
+                    J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g1;
+                    J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J12_values[lane] += block_coordinate_data[shape * 3 + 1][lane] * g2;
+                    J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J20_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g0;
+                    J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J21_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g1;
+                    J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J22_values[lane] += block_coordinate_data[shape * 3 + 2][lane] * g2;
+                    J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
                 }
             }
             #pragma omp simd
@@ -1176,31 +1176,31 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_hessian_
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VS + lane);
+                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
             }
         }
-        s_t block_h_data[NDOFS][VS];
-        s_t block_out_data[NDOFS][VS];
-        const s_t *block_h_streams[NDOFS];
-        s_t *block_out_streams[NDOFS];
+        s_t bh_data[NDOFS][VS];
+        s_t bout_data[NDOFS][VS];
+        const s_t *bh_streams[NDOFS];
+        s_t *bout_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) {
-            block_h_streams[stream] = block_h_data[stream];
-            block_out_streams[stream] = block_out_data[stream];
+            bh_streams[stream] = bh_data[stream];
+            bout_streams[stream] = bout_data[stream];
         }
         for (int col = 0; col < NDOFS; ++col) {
             for (int stream = 0; stream < NDOFS; ++stream) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    block_h_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
-                    block_out_data[stream][lane] = s_t(0);
+                    bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);
+                    bout_data[stream][lane] = s_t(0);
                 }
             }
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    matrix_stream[lane] = block_out_data[row][lane];
+                    matrix_stream[lane] = bout_data[row][lane];
                 }
             }
         }

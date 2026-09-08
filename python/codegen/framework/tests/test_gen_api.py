@@ -294,7 +294,7 @@ class GenApiTest(unittest.TestCase):
                     pre_increment(iterator("lane", "int")),
                     (
                         AssignmentNode(
-                            buffer_access("block_value", expr_ref("lane", "lane_index")),
+                            buffer_access("bvalue", expr_ref("lane", "lane_index")),
                             expr_ref("s_t(0)", "zero_value"),
                         ),
                     ),
@@ -302,7 +302,7 @@ class GenApiTest(unittest.TestCase):
                 ),
                 ScatterNode(
                     buffer_access("out", expr_ref("node * out_stride", "global_output_index")),
-                    buffer_access("block_out", expr_ref("lane", "lane_index")),
+                    buffer_access("bout", expr_ref("lane", "lane_index")),
                     "+=",
                     atomic=True,
                 ),
@@ -320,10 +320,10 @@ class GenApiTest(unittest.TestCase):
                 "const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
                 "#pragma omp simd",
                 "for (int lane = 0; lane < nelems; ++lane) {",
-                "    block_value[lane] = s_t(0);",
+                "    bvalue[lane] = s_t(0);",
                 "}",
                 "#pragma omp atomic update",
-                "out[node * out_stride] += block_out[lane];",
+                "out[node * out_stride] += bout[lane];",
             ),
         )
         dump = ast.to_dict()
@@ -343,10 +343,10 @@ class GenApiTest(unittest.TestCase):
             "geometry_pa",
             partial_assembly_strategy=PartialAssemblyStrategy.ISOPARAMETRIC_GEOMETRY_PA,
             nodes=(
-                BufferDeclNode("s_t", "block_adjugate", ("NQ", "ND * ND", "VS")),
+                BufferDeclNode("s_t", "badjugate", ("NQ", "ND * ND", "VS")),
                 GeometryNode(
                     GeometryNodeKind.TRANSIENT_JACOBIAN,
-                    inputs=("block_coordinate_data", "grad_ref"),
+                    inputs=("bcoordinate_data", "grad_ref"),
                     outputs=("J",),
                     scope="quadrature_lane",
                     persist=False,
@@ -354,21 +354,21 @@ class GenApiTest(unittest.TestCase):
                 GeometryNode(
                     GeometryNodeKind.ADJUGATE,
                     inputs=("J",),
-                    outputs=("block_adjugate",),
+                    outputs=("badjugate",),
                     scope="quadrature_lane",
                     persist=True,
                 ),
                 GeometryNode(
                     GeometryNodeKind.DETERMINANT,
                     inputs=("J",),
-                    outputs=("block_determinant",),
+                    outputs=("bdeterminant",),
                     scope="quadrature_lane",
                     persist=True,
                 ),
                 GeometryNode(
                     GeometryNodeKind.MEASURE,
-                    inputs=("block_determinant", "q_weight"),
-                    outputs=("block_measure",),
+                    inputs=("bdeterminant", "q_weight"),
+                    outputs=("bmeasure",),
                     scope="quadrature_lane",
                     persist=True,
                 ),
@@ -2404,10 +2404,10 @@ int main() {
             3,
             8,
             tuple(range(24)),
-            lambda stream: "block_coordinates[%d]" % stream,
+            lambda stream: "bcoordinates[%d]" % stream,
         )
-        self.assertEqual(coordinate_streams[:6], ("block_coordinates[0]", "block_coordinates[1]", "block_coordinates[2]", "block_coordinates[3]", "block_coordinates[4]", "block_coordinates[5]"))
-        self.assertEqual(coordinate_streams[6:12], ("block_coordinates[9]", "block_coordinates[10]", "block_coordinates[11]", "block_coordinates[6]", "block_coordinates[7]", "block_coordinates[8]"))
+        self.assertEqual(coordinate_streams[:6], ("bcoordinates[0]", "bcoordinates[1]", "bcoordinates[2]", "bcoordinates[3]", "bcoordinates[4]", "bcoordinates[5]"))
+        self.assertEqual(coordinate_streams[6:12], ("bcoordinates[9]", "bcoordinates[10]", "bcoordinates[11]", "bcoordinates[6]", "bcoordinates[7]", "bcoordinates[8]"))
 
         residual_lines = "\n".join(
             tensor_product_evaluated_isoparametric_geometry_lines(
@@ -2748,7 +2748,7 @@ int main() {
         self.assertIn(
             "#pragma omp simd\n"
             "        for (int lane = 0; lane < nelems; ++lane) {\n"
-            "            block_value[lane] = s_t(0);",
+            "            bvalue[lane] = s_t(0);",
             contents,
         )
 
@@ -3639,7 +3639,7 @@ int main() {
             self.assertGreater(_assert_lane_loops_request_simd(self, mesh), 0)
             self.assertIn(
                 "const idx_t node = element_shape[evb + lane];\n"
-                "                block_current[stream][lane] =",
+                "                bcurrent[stream][lane] =",
                 mesh_contents,
             )
 
@@ -3849,9 +3849,9 @@ int main() {
                 "stokes_d3_tensor_product_mixed_residual_block_contiguous",
                 contents,
             )
-            self.assertNotIn("block_current_streams[89]", contents)
-            self.assertNotIn("block_direction_streams[89]", contents)
-            self.assertNotIn("block_output_streams[89]", contents)
+            self.assertNotIn("bcurrent_streams[89]", contents)
+            self.assertNotIn("bdirection_streams[89]", contents)
+            self.assertNotIn("boutput_streams[89]", contents)
             self.assertIn("static constexpr int NC = 2;", contents)
             self.assertIn("s_t *const SFEM_RESTRICT u_out[3]", contents)
             self.assertNotIn("u0_out", contents)
@@ -3980,12 +3980,12 @@ int main() {
             self.assertIn("const g_t *const affine_geometry_sources", operator_source)
             self.assertIn("for (int geometry_stream = 0;", operator_source)
             self.assertIn("bageom_streams[geometry_stream]", operator_source)
-            self.assertNotIn("block_jacobian_adjugate0_data", operator_source)
-            self.assertNotIn("const s_t *const block_jacobian_adjugate0", operator_source)
-            self.assertIn("block_direction, mu, block_output", operator_source)
+            self.assertNotIn("bjacobian_adjugate0_data", operator_source)
+            self.assertNotIn("const s_t *const bjacobian_adjugate0", operator_source)
+            self.assertIn("bdirection, mu, boutput", operator_source)
             self.assertNotIn("ContiguousBlockStreams", operator_source)
-            self.assertNotIn("block_direction_streams[stream] = block_direction[stream]", operator_source)
-            self.assertNotIn("block_output_streams[stream] = block_output[stream]", operator_source)
+            self.assertNotIn("bdirection_streams[stream] = bdirection[stream]", operator_source)
+            self.assertNotIn("boutput_streams[stream] = boutput[stream]", operator_source)
             subprocess.run(
                 [
                     compiler,
@@ -4171,9 +4171,9 @@ int main() {
                 affine_source,
             )
             self.assertIn("u_out[ev0 * out_stride] += e0;", affine_source)
-            self.assertNotIn("block_current", affine_source)
-            self.assertNotIn("block_output", affine_source)
-            self.assertNotIn("block_geom_metric", affine_source)
+            self.assertNotIn("bcurrent", affine_source)
+            self.assertNotIn("boutput", affine_source)
+            self.assertNotIn("bgeom_metric", affine_source)
             self.assertNotIn("cached_affine_metric_q_weight", affine_source)
             self.assertNotIn("laplace_d3_simplex_tet4_residual_block<", affine_source)
             self.assertNotIn("affine_shape", affine_source)
@@ -4319,9 +4319,9 @@ int main() {
                 affine_source,
             )
             self.assertIn("u_out[ev0 * out_stride] += e0;", affine_source)
-            self.assertNotIn("block_current", affine_source)
-            self.assertNotIn("block_output", affine_source)
-            self.assertNotIn("block_geom_metric", affine_source)
+            self.assertNotIn("bcurrent", affine_source)
+            self.assertNotIn("boutput", affine_source)
+            self.assertNotIn("bgeom_metric", affine_source)
             self.assertNotIn("cached_affine_metric_q_weight", affine_source)
             self.assertNotIn("laplace_d2_simplex_tri3_residual_block<", affine_source)
             self.assertNotIn("affine_shape", affine_source)
@@ -4464,7 +4464,7 @@ int main() {
             )
             self.assertIn("g_jacobian_adjugate_aos + element * 9", fast_apply)
             self.assertIn("const s_t q0 = a0 * m5 + a1 * m1 + a2 * m2;", fast_apply)
-            self.assertNotIn("block_h_data", fast_apply)
+            self.assertNotIn("bh_data", fast_apply)
             self.assertNotIn("linear_elasticity_d3_simplex_tet4_apply_block<", fast_apply)
             self.assertIn(
                 "linear_elasticity_d3_simplex_tet4_apply_block<",

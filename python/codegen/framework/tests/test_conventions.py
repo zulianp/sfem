@@ -67,10 +67,21 @@ class ReservationIsEnforcedTest(unittest.TestCase):
                     conventions.check_material("demo", [name])
 
     def test_a_reserved_prefix_is_refused(self):
-        for name in ("g_metric", "block_u", "pack_u", "sh_tile"):
+        for name in ("g_metric", "pk_u", "sh_tile", "gl_tile"):
             with self.subTest(name=name):
                 with self.assertRaises(conventions.NameCollision):
                     conventions.check_material("demo", [name])
+
+    def test_a_one_character_prefix_is_not_reserved(self):
+        """`b` prefixes staged buffers, but reserving it would refuse `beta`.
+
+        A single letter is far more of the material author's namespace than the
+        generator can claim.  The buffers are protected by their full names.
+        """
+        self.assertTrue(conventions.check_material("demo", ["beta", "b0", "bulk"]))
+        for prefix in conventions.RESERVED_PREFIXES:
+            with self.subTest(prefix=prefix):
+                self.assertGreater(len(prefix), 1)
 
     def test_the_refusal_names_the_material_and_the_name(self):
         """A collision is the material author's to fix, so both must be in the message."""

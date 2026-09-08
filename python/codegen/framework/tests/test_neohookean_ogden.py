@@ -1235,8 +1235,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             "tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>",
             section,
         )
-        self.assertNotIn("block_coordinate_streams", section)
-        self.assertIn("block_coordinate_data[NS * ND]", section)
+        self.assertNotIn("bcoordinate_streams", section)
+        self.assertIn("bcoordinate_data[NS * ND]", section)
 
     def test_generated_hex27_weak_form_uses_q2_tensor_product_api(self):
         compiler = shutil.which("c++")
@@ -1386,16 +1386,16 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("s_t element_vector[NS", shared_local)
         self.assertNotIn("static_assert(NS == 8", shared_local)
         self.assertNotIn("static_assert(NS == 27", shared_local)
-        self.assertNotIn("s_t block_ux7[VS]", operator_by_element["HEX8"])
-        self.assertIn("s_t block_u_data[NS * ND][VS];", operator_by_element["HEX8"])
-        self.assertIn("const s_t *const block_u_streams[NS * ND]", operator_by_element["HEX8"])
-        self.assertNotIn("block_coordinate_streams", operator_by_element["HEX8"])
-        self.assertIn("block_coordinate_data[NS * ND]", operator_by_element["HEX8"])
-        self.assertNotIn("s_t block_ux26[VS]", operator_by_element["HEX27"])
-        self.assertIn("s_t block_u_data[NS * ND][VS];", operator_by_element["HEX27"])
-        self.assertIn("const s_t *const block_u_streams[NS * ND]", operator_by_element["HEX27"])
-        self.assertNotIn("block_coordinate_streams", operator_by_element["HEX27"])
-        self.assertIn("block_coordinate_data[NS * ND]", operator_by_element["HEX27"])
+        self.assertNotIn("s_t bux7[VS]", operator_by_element["HEX8"])
+        self.assertIn("s_t bu_data[NS * ND][VS];", operator_by_element["HEX8"])
+        self.assertIn("const s_t *const bu_streams[NS * ND]", operator_by_element["HEX8"])
+        self.assertNotIn("bcoordinate_streams", operator_by_element["HEX8"])
+        self.assertIn("bcoordinate_data[NS * ND]", operator_by_element["HEX8"])
+        self.assertNotIn("s_t bux26[VS]", operator_by_element["HEX27"])
+        self.assertIn("s_t bu_data[NS * ND][VS];", operator_by_element["HEX27"])
+        self.assertIn("const s_t *const bu_streams[NS * ND]", operator_by_element["HEX27"])
+        self.assertNotIn("bcoordinate_streams", operator_by_element["HEX27"])
+        self.assertIn("bcoordinate_data[NS * ND]", operator_by_element["HEX27"])
 
     def test_generated_neohookean_action_matches_python_reference(self):
         compiler = shutil.which("c++")
@@ -1517,15 +1517,15 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertNotIn("const real_t *const SFEM_RESTRICT x0", operator_source)
-        self.assertNotIn("block_coordinate_streams", operator_source)
-        self.assertIn("block_coordinate_data[NS * ND]", operator_source)
+        self.assertNotIn("bcoordinate_streams", operator_source)
+        self.assertIn("bcoordinate_data[NS * ND]", operator_source)
         self.assertIn(
             '#include "geometry_kernels.hpp"',
             operator_source,
         )
         self.assertIn("geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>", operator_source)
         self.assertNotIn(
-            "block_jacobian_determinant0[q * VS + lane] = J00 * (J11 * J22",
+            "bjacobian_determinant0[q * VS + lane] = J00 * (J11 * J22",
             operator_source,
         )
         self.assertIn(
@@ -1551,7 +1551,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             % prefix,
             1,
         )[0]
-        self.assertIn("s_t block_jacobian_adjugate0_data[VS]", affine_mesh_source)
+        self.assertIn("s_t bjacobian_adjugate0_data[VS]", affine_mesh_source)
         self.assertNotIn("g_jacobian_adjugate[(evb + lane)", affine_mesh_source)
         self.assertIn(
             "const g_t *const *const SFEM_RESTRICT points",
@@ -1622,8 +1622,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             "tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>",
             isoparametric_mesh_source,
         )
-        self.assertNotIn("block_coordinate_streams", isoparametric_mesh_source)
-        self.assertIn("block_coordinate_data[NS * ND]", isoparametric_mesh_source)
+        self.assertNotIn("bcoordinate_streams", isoparametric_mesh_source)
+        self.assertIn("bcoordinate_data[NS * ND]", isoparametric_mesh_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             library = compile_generated_shared_library(
@@ -2204,12 +2204,12 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("static constexpr int NQ = 1;", operator_source)
         self.assertIn("static constexpr int NS = 3;", operator_source)
         self.assertIn("for (int q = 0; q < NQ; ++q)", operator_source)
-        self.assertIn("block_ux0[VS]", operator_source)
-        self.assertIn("block_jacobian_adjugate0[VS]", operator_source)
-        self.assertIn("block_jacobian_determinant0[VS]", operator_source)
-        self.assertIn("block_jacobian_adjugate_streams[ND * ND]", operator_source)
+        self.assertIn("bux0[VS]", operator_source)
+        self.assertIn("bjacobian_adjugate0[VS]", operator_source)
+        self.assertIn("bjacobian_determinant0[VS]", operator_source)
+        self.assertIn("bjacobian_adjugate_streams[ND * ND]", operator_source)
         self.assertIn("geometry_jacobian_adjugate_and_determinant_2<s_t>", operator_source)
-        self.assertNotIn("block_jacobian_adjugate0[lane] = J11", operator_source)
+        self.assertNotIn("bjacobian_adjugate0[lane] = J11", operator_source)
         self.assertNotIn("const real_t *const SFEM_RESTRICT ux0", operator_source)
         self.assertIn("#pragma omp simd", local_source)
         self.assertIn("template <typename s_t, int NQ, int NS, int VS>", local_source)

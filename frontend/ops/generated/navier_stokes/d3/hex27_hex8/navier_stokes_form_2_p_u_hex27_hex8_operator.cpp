@@ -467,8 +467,8 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_direction[N_FIELD_STREAMS][VS];
-        s_t block_output[N_FIELD_STREAMS][VS];
+        s_t bdirection[N_FIELD_STREAMS][VS];
+        s_t boutput[N_FIELD_STREAMS][VS];
 
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
             const idx_t *const SFEM_RESTRICT element_shape = field_0_elements[local_shape];
@@ -476,7 +476,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const idx_t node = element_shape[evb + lane];
-                block_direction[stream][lane] = u_direction_data[0][node * direction_stride];
+                bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
@@ -485,7 +485,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const idx_t node = element_shape[evb + lane];
-                block_direction[stream][lane] = u_direction_data[1][node * direction_stride];
+                bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
@@ -494,7 +494,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const idx_t node = element_shape[evb + lane];
-                block_direction[stream][lane] = u_direction_data[2][node * direction_stride];
+                bdirection[stream][lane] = u_direction_data[2][node * direction_stride];
             }
         }
         for (int local_shape = 0; local_shape < 8; ++local_shape) {
@@ -503,29 +503,29 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const idx_t node = element_shape[evb + lane];
-                block_direction[stream][lane] = p_direction_data[node * direction_stride];
+                bdirection[stream][lane] = p_direction_data[node * direction_stride];
             }
         }
 
         for (int stream = 0; stream < 89; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
         const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_adjugate4 + evb, g_jacobian_adjugate5 + evb, g_jacobian_adjugate6 + evb, g_jacobian_adjugate7 + evb, g_jacobian_adjugate8 + evb, g_jacobian_determinant0 + evb};
-        s_t block_affine_geometry_data[10][VS];
+        s_t baffine_geometry_data[10][VS];
         const s_t *bageom_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
             bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+                    nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const s_t *block_adjugate[ND * ND];
+        const s_t *badjugate[ND * ND];
         for (int component = 0; component < ND * ND; ++component) {
-            block_adjugate[component] = bageom_streams[component];
+            badjugate[component] = bageom_streams[component];
         }
 
-        navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(nelems, 0, bageom_streams[9], block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_form_2_p_u_affine_reference_data<s_t>::q_weight_1d(), block_direction, block_output);
+        navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(nelems, 0, bageom_streams[9], badjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_form_2_p_u_affine_reference_data<s_t>::q_weight_1d(), bdirection, boutput);
 
         {
             s_t *const SFEM_RESTRICT out = u_out[0];
@@ -534,7 +534,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
                 const int stream = 0 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -545,7 +545,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
                 const int stream = 27 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -556,7 +556,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
                 const int stream = 54 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -567,7 +567,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
                 const int stream = 81 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -660,11 +660,11 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_coordinates[ND * CELL_NS][VS];
-        s_t block_adjugate_data[ND * ND][NQ * VS];
-        s_t block_determinant[NQ * VS];
-        s_t block_direction[N_FIELD_STREAMS][VS];
-        s_t block_output[N_FIELD_STREAMS][VS];
+        s_t bcoordinates[ND * CELL_NS][VS];
+        s_t badjugate_data[ND * ND][NQ * VS];
+        s_t bdeterminant[NQ * VS];
+        s_t bdirection[N_FIELD_STREAMS][VS];
+        s_t boutput[N_FIELD_STREAMS][VS];
 
         const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
         for (int shape = 0; shape < NS; ++shape) {
@@ -673,7 +673,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
+                    bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
         }
@@ -684,7 +684,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const idx_t node = element_shape[evb + lane];
-                block_direction[stream][lane] = u_direction_data[0][node * direction_stride];
+                bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
@@ -693,7 +693,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const idx_t node = element_shape[evb + lane];
-                block_direction[stream][lane] = u_direction_data[1][node * direction_stride];
+                bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
             }
         }
         for (int local_shape = 0; local_shape < 27; ++local_shape) {
@@ -702,7 +702,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const idx_t node = element_shape[evb + lane];
-                block_direction[stream][lane] = u_direction_data[2][node * direction_stride];
+                bdirection[stream][lane] = u_direction_data[2][node * direction_stride];
             }
         }
         for (int local_shape = 0; local_shape < 8; ++local_shape) {
@@ -711,37 +711,37 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const idx_t node = element_shape[evb + lane];
-                block_direction[stream][lane] = p_direction_data[node * direction_stride];
+                bdirection[stream][lane] = p_direction_data[node * direction_stride];
             }
         }
 
         for (int stream = 0; stream < 89; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
                 coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
                 coordinate_grad_ref + 1 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
+                nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
                 coordinate_grad_ref + 2 * NQ * ND * VS);
 
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
         geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
         const s_t *const field_shape_1d[NC] = {sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::hex27_shape_1d(), sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::hex8_shape_1d()};
         const s_t *const field_grad_1d[NC] = {sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::hex27_grad_1d(), sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::hex8_grad_1d()};
-        const s_t *const block_adjugate[ND * ND] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-        navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(nelems, VS, block_determinant, block_adjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::q_weight_1d(), block_direction, block_output);
+        navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(nelems, VS, bdeterminant, badjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_form_2_p_u_isoparametric_reference_data<s_t>::q_weight_1d(), bdirection, boutput);
 
         {
             s_t *const SFEM_RESTRICT out = u_out[0];
@@ -750,7 +750,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
                 const int stream = 0 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -761,7 +761,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
                 const int stream = 27 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -772,7 +772,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
                 const int stream = 54 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -783,7 +783,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
                 const int stream = 81 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }

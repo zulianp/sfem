@@ -2,6 +2,15 @@ from dataclasses import dataclass
 
 import sympy as sp
 
+from codegen.framework.plans.conventions import PREFIXES
+
+#: The staged-buffer and per-thread-scratch prefixes, from the one
+#: table that owns them.  Spelling either here again is what made the
+#: declaration and the use disagree six times over.
+_BLOCK = PREFIXES["block"]
+_BLOCK_FMT = _BLOCK + "%s"
+_PACK_FMT = PREFIXES["pack"] + "%s"
+
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
     assembled_matrix_dependencies,
@@ -310,7 +319,7 @@ def _affine_geometry_stream_conversion_lines(streams, indent):
             n_streams,
             ", ".join("g_%s + evb" % stream for stream in streams),
         ),
-        "%ss_t block_affine_geometry_data[%d][VS];"
+        "%ss_t baffine_geometry_data[%d][VS];"
         % (indent, n_streams),
         "%sconst s_t *bageom_streams[%d];"
         % (indent, n_streams),
@@ -318,7 +327,7 @@ def _affine_geometry_stream_conversion_lines(streams, indent):
         % (indent, n_streams),
         "%s    bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>("
         % indent,
-        "%s            nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());"
+        "%s            nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());"
         % indent,
         "%s}" % indent,
     ]
@@ -987,7 +996,7 @@ def _field_gather_lines(system, dependencies, indent, element_array="elements"):
     # is already in ABI order, so direction still lands last.
     for role in live_field_roles(dependencies):
         assignment_lines.append(
-            "%s            block_%s[stream][lane] = %s_components[field][node * %s];"
+            "%s            b%s[stream][lane] = %s_components[field][node * %s];"
             % (indent, role.name, role.name, role.stride)
         )
     lines.extend(
@@ -1030,7 +1039,7 @@ def _coordinate_gather_lines(dim, indent, element_array="elements", pointer_type
                 lane_indent="%s        " % indent,
             ),
             [
-                "%s            block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];"
+                "%s            bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];"
                 % indent
             ],
         ),
@@ -1055,7 +1064,7 @@ def _field_atomic_scatter_lines(system, indent, element_array="elements"):
                 close_lines=("%s    }" % indent,),
                 scatter_indent="%s        " % indent,
             ),
-            "%s            out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];"
+            "%s            out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];"
             % indent,
         ),
     ]
@@ -1452,10 +1461,10 @@ def _mixed_block_stream_pointer_lines(
 ):
     if force_contiguous:
         args = {
-            group.name: "block_%s" % group.name
+            group.name: _BLOCK_FMT % group.name
             for group in _dependency_stream_groups(dependencies)
         }
-        args["output"] = "block_output"
+        args["output"] = "boutput"
         return [], args
 
     field_stream_order = _mixed_tensor_product_field_stream_order(
@@ -1469,8 +1478,8 @@ def _mixed_block_stream_pointer_lines(
     for group in _dependency_stream_groups(dependencies):
         group_lines, group_arg = _block_stream_argument(
             "const s_t *",
-            "block_%s_streams" % group.name,
-            "block_%s" % group.name,
+            "b%s_streams" % group.name,
+            _BLOCK_FMT % group.name,
             layout.total_streams,
             field_stream_order,
             indent,
@@ -1480,8 +1489,8 @@ def _mixed_block_stream_pointer_lines(
         args[group.name] = group_arg
     output_lines, output_arg = _block_stream_argument(
         "s_t *",
-        "block_output_streams",
-        "block_output",
+        "boutput_streams",
+        "boutput",
         layout.total_streams,
         field_stream_order,
         indent,
@@ -1501,10 +1510,10 @@ def _single_field_block_stream_arguments(
 ):
     if force_contiguous:
         args = {
-            group.name: "block_%s" % group.name
+            group.name: _BLOCK_FMT % group.name
             for group in _dependency_stream_groups(dependencies)
         }
-        args["output"] = "block_output"
+        args["output"] = "boutput"
         return [], args
 
     lines = []
@@ -1512,8 +1521,8 @@ def _single_field_block_stream_arguments(
     for group in _dependency_stream_groups(dependencies):
         group_lines, group_arg = _block_stream_argument(
             "const s_t *",
-            "block_%s_streams" % group.name,
-            "block_%s" % group.name,
+            "b%s_streams" % group.name,
+            _BLOCK_FMT % group.name,
             n_streams,
             field_stream_order,
             indent,
@@ -1523,8 +1532,8 @@ def _single_field_block_stream_arguments(
         args[group.name] = group_arg
     output_lines, output_arg = _block_stream_argument(
         "s_t *",
-        "block_output_streams",
-        "block_output",
+        "boutput_streams",
+        "boutput",
         n_streams,
         field_stream_order,
         indent,
@@ -1546,7 +1555,7 @@ def _mixed_field_gather_lines(system, layout, dependencies, indent, field_elemen
         field_lines = []
         for group in dependency_groups:
             field_lines.append(
-                "%sblock_%s[stream][lane] = %s[node * %s];"
+                ("%s" + _BLOCK + "%s[stream][lane] = %s[node * %s];")
                 % (
                     indent + "        ",
                     group.name,
@@ -1598,7 +1607,7 @@ def _mixed_field_atomic_scatter_lines(system, layout, indent, field_element_arra
                         ),
                         scatter_indent="%s        " % indent,
                     ),
-                    "%s            out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];"
+                    "%s            out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];"
                     % indent,
                 ),
                 "%s}" % indent,
@@ -2621,7 +2630,7 @@ def _block_call_argument(stream, mode, names=None):
 
     Reference data is addressed through the mesh's reference tables and
     material parameters by their own name; everything else is a block-local
-    buffer and carries the ``block_`` prefix those buffers use.  ``names``
+    buffer and carries the ``b`` prefix those buffers use.  ``names``
     overrides the sites that pass something else -- a stream pointer array, an
     offset into a shared output, a geometry stream read out of the affine
     bundle, or the quadrature weights a cached affine metric carries with it.
@@ -2636,7 +2645,7 @@ def _block_call_argument(stream, mode, names=None):
         return _mesh_reference_name(mode, stream.name)
     if stream.role is DataStreamRole.MATERIAL_PARAMETER:
         return str(stream.name)
-    return "block_%s" % stream.name
+    return _BLOCK_FMT % stream.name
 
 
 def _affine_block_names(geometry_stream_indices, uses_cached_affine_metric, names=None):
@@ -4596,17 +4605,17 @@ def _mixed_affine_function(
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "        s_t block_%s[N_FIELD_STREAMS][VS];" % role.name
+            "        s_t b%s[N_FIELD_STREAMS][VS];" % role.name
         )
     lines.extend(
         [
-            "        s_t block_output[N_FIELD_STREAMS][VS];",
+            "        s_t boutput[N_FIELD_STREAMS][VS];",
         ]
     )
     field_gather = _mixed_field_gather_lines(system, layout, dependencies, "        ", field_element_arrays)
     if field_gather:
         lines.extend(["", *field_gather])
-    lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
+    lines.extend(["", *_zero_block_output_lines("boutput", layout.total_streams, "        ")])
     affine_geometry_streams = tuple(
         "jacobian_adjugate%d" % i
         for i in _adjugate_components(dependencies, dim)
@@ -4618,12 +4627,12 @@ def _mixed_affine_function(
     lines.extend(
         line
         for _buffer in _geometry_buffer_arguments(
-            dependencies, dim, {"adjugate": "block_adjugate"}
+            dependencies, dim, {"adjugate": "badjugate"}
         )
         for line in (
-            "        const s_t *block_adjugate[ND * ND];",
+            "        const s_t *badjugate[ND * ND];",
             "        for (int component = 0; component < ND * ND; ++component) {",
-            "            block_adjugate[component] = bageom_streams[component];",
+            "            badjugate[component] = bageom_streams[component];",
             "        }",
         )
     )
@@ -4645,7 +4654,7 @@ def _mixed_affine_function(
         % affine_geometry_stream_indices["jacobian_determinant0"],
     ]
     call_args.extend(
-        _geometry_buffer_arguments(dependencies, dim, {"adjugate": "block_adjugate"})
+        _geometry_buffer_arguments(dependencies, dim, {"adjugate": "badjugate"})
     )
     call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
@@ -4803,25 +4812,25 @@ def _mixed_isoparametric_function(
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
             "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
-            "        s_t block_coordinates[ND * CELL_NS][VS];",
-            "        s_t block_adjugate_data[ND * ND][NQ * VS];",
-            "        s_t block_determinant[NQ * VS];",
+            "        s_t bcoordinates[ND * CELL_NS][VS];",
+            "        s_t badjugate_data[ND * ND][NQ * VS];",
+            "        s_t bdeterminant[NQ * VS];",
         ]
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "        s_t block_%s[N_FIELD_STREAMS][VS];" % role.name
+            "        s_t b%s[N_FIELD_STREAMS][VS];" % role.name
         )
     lines.extend(
         [
-            "        s_t block_output[N_FIELD_STREAMS][VS];",
+            "        s_t boutput[N_FIELD_STREAMS][VS];",
         ]
     )
     lines.extend(["", *_coordinate_gather_lines(dim, "        ", coordinate_element_array)])
     field_gather = _mixed_field_gather_lines(system, layout, dependencies, "        ", field_element_arrays)
     if field_gather:
         lines.extend(["", *field_gather])
-    lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
+    lines.extend(["", *_zero_block_output_lines("boutput", layout.total_streams, "        ")])
     if tensor_product_geometry:
         lines.append("")
         lines.extend(
@@ -4830,19 +4839,19 @@ def _mixed_isoparametric_function(
                 n_shape=cell_rule.n_shape,
                 n_qp=cell_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams="block_coordinates",
+                coordinate_streams="bcoordinates",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "block_adjugate_data[%d][%s]" % (component, index)
+                    "badjugate_data[%d][%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "block_determinant[%s]" % index
+                    "bdeterminant[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "block_adjugate_data[%d]" % component
+                    "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="block_determinant",
+                determinant_stream="bdeterminant",
                 shape_name="%s_shape_1d" % reference_stage,
                 grad_name="%s_grad_1d" % reference_stage,
             )
@@ -4851,9 +4860,9 @@ def _mixed_isoparametric_function(
         lines.extend(
             [
                 "",
-                "        s_t *block_adjugate_streams[ND * ND] = {%s};"
+                "        s_t *badjugate_streams[ND * ND] = {%s};"
                 % ", ".join(
-                    "block_adjugate_data[%d]" % component
+                    "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
                 "        for (int q = 0; q < NQ; ++q) {",
@@ -4863,7 +4872,7 @@ def _mixed_isoparametric_function(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "block_coordinates[%d][lane] * %s_cell_grad_ref_%d[q * CELL_NS + %d]"
+                    "bcoordinates[%d][lane] * %s_cell_grad_ref_%d[q * CELL_NS + %d]"
                     % (
                         shape * dim + i,
                         reference_stage,
@@ -4891,8 +4900,8 @@ def _mixed_isoparametric_function(
         )
     )
     lines.append(
-        "        const s_t *const block_adjugate[ND * ND] = {%s};"
-        % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
+        "        const s_t *const badjugate[ND * ND] = {%s};"
+        % ", ".join("badjugate_data[%d]" % i for i in range(dim * dim))
     )
     block_stream_lines, block_stream_args = _mixed_block_stream_pointer_lines(
         layout,
@@ -4908,10 +4917,10 @@ def _mixed_isoparametric_function(
     call_args = [
         "nelems",
         "VS",
-        "block_determinant",
+        "bdeterminant",
     ]
     call_args.extend(
-        _geometry_buffer_arguments(dependencies, dim, {"adjugate": "block_adjugate"})
+        _geometry_buffer_arguments(dependencies, dim, {"adjugate": "badjugate"})
     )
     call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
@@ -5444,16 +5453,16 @@ def _mesh_operator_source(
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "        s_t block_%s[NC * NS][VS];" % role.name
+            "        s_t b%s[NC * NS][VS];" % role.name
         )
     if gradient_metric is not None and not uses_cached_affine_metric:
         lines.append(
-            "        s_t block_geom_metric_data[%d][VS];"
+            "        s_t bgeom_metric_data[%d][VS];"
             % gradient_metric.metric_components
         )
     lines.extend(
         [
-            "        s_t block_output[NC * NS][VS];",
+            "        s_t boutput[NC * NS][VS];",
         ]
     )
     # The element loop runs four phases.  MeshPhasePlan states which and in
@@ -5463,7 +5472,7 @@ def _mesh_operator_source(
     # call -- and moving them would be a different change.
     gather, geometry, local_call, scatter = [], [], [], []
     gather.extend(_field_gather_lines(system, dependencies, "        ", field_element_array))
-    gather.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        "), ""])
+    gather.extend(["", *_zero_block_output_lines("boutput", n_fields * n_shape, "        "), ""])
     block_stream_lines, block_stream_args = _single_field_block_stream_arguments(
         dependencies,
         n_fields * n_shape,
@@ -5493,16 +5502,16 @@ def _mesh_operator_source(
     if dependencies.uses_adjugate and not uses_cached_affine_metric:
         geometry.extend(
             [
-                "        const s_t *block_adjugate[%d];" % (dim * dim),
+                "        const s_t *badjugate[%d];" % (dim * dim),
                 "        for (int component = 0; component < %d; ++component) {"
                 % (dim * dim),
-                "            block_adjugate[component] = bageom_streams[component];",
+                "            badjugate[component] = bageom_streams[component];",
                 "        }",
             ]
         )
     if uses_cached_affine_metric:
         geometry.append(
-            "        const s_t *const block_geom_metric[%d] = {%s};"
+            "        const s_t *const bgeom_metric[%d] = {%s};"
             % (
                 gradient_metric.metric_components,
                 _indexed_geometry_metric_stream_initializer(
@@ -5528,18 +5537,18 @@ def _mesh_operator_source(
                 % affine_geometry_stream_indices["jacobian_determinant0"],
                 lambda component: "bageom_streams[%d][lane]"
                 % affine_geometry_stream_indices["jacobian_adjugate%d" % component],
-                lambda component: "block_geom_metric_data[%d][lane]" % component,
+                lambda component: "bgeom_metric_data[%d][lane]" % component,
                 "            ",
                 "metric",
             )
         )
         geometry.append("        }")
         geometry.append(
-            "        const s_t *const block_geom_metric[%d] = %s;"
+            "        const s_t *const bgeom_metric[%d] = %s;"
             % (
                 gradient_metric.metric_components,
                 _geometry_metric_stream_initializer(
-                    "block_geom_metric_data",
+                    "bgeom_metric_data",
                     dim,
                 ),
             )
@@ -6381,19 +6390,19 @@ def _scalar_crs_matrix_assembly_source(
             "        const int nelems = 1;",
             "        idx_t ev[NS];",
             "        s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
-            "        s_t block_coordinates[ND * NS][VS];",
-            "        s_t block_adjugate_data[ND * ND][NQ * VS];",
-            "        s_t block_determinant[NQ * VS];",
+            "        s_t bcoordinates[ND * NS][VS];",
+            "        s_t badjugate_data[ND * ND][NQ * VS];",
+            "        s_t bdeterminant[NQ * VS];",
         ]
     )
     for role in live_field_roles(state_dependencies):
         lines.append(
-            "        s_t block_%s[N_STREAMS][VS];" % role.name
+            "        s_t b%s[N_STREAMS][VS];" % role.name
         )
     lines.extend(
         [
-            "        s_t block_direction[N_STREAMS][VS];",
-            "        s_t block_output[N_STREAMS][VS];",
+            "        s_t bdirection[N_STREAMS][VS];",
+            "        s_t boutput[N_STREAMS][VS];",
             "        const geom_t *const coordinate_components[ND] = {%s};"
             % ", ".join("points[%d]" % d for d in range(dim)),
             "",
@@ -6402,7 +6411,7 @@ def _scalar_crs_matrix_assembly_source(
             "            const idx_t coordinate_node = %s[shape][element];" % coordinate_element_array,
             "            ev[shape] = node;",
             "            for (int d = 0; d < ND; ++d) {",
-            "                block_coordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);",
+            "                bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);",
             "            }",
         ]
     )
@@ -6414,13 +6423,13 @@ def _scalar_crs_matrix_assembly_source(
                 lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "            block_%s[shape * NC + %d][0] = %s[field_node * %s];"
+                    "            b%s[shape * NC + %d][0] = %s[field_node * %s];"
                     % (role.name, field_index, role.field_pointer(field.name), role.stride)
                 )
         else:
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "            block_%s[%d * NS + shape][0] = %s[node * %s];"
+                    "            b%s[%d * NS + shape][0] = %s[node * %s];"
                     % (role.name, field_index, role.field_pointer(field.name), role.stride)
                 )
     lines.extend(
@@ -6436,19 +6445,19 @@ def _scalar_crs_matrix_assembly_source(
                 n_shape=n_shape,
                 n_qp=rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams="block_coordinates",
+                coordinate_streams="bcoordinates",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "block_adjugate_data[%d][%s]" % (component, index)
+                    "badjugate_data[%d][%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "block_determinant[%s]" % index
+                    "bdeterminant[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "block_adjugate_data[%d]" % component
+                    "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="block_determinant",
+                determinant_stream="bdeterminant",
                 shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
                 grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
             )
@@ -6456,9 +6465,9 @@ def _scalar_crs_matrix_assembly_source(
     else:
         lines.extend(
             [
-                "        s_t *block_adjugate_streams[ND * ND] = {%s};"
+                "        s_t *badjugate_streams[ND * ND] = {%s};"
                 % ", ".join(
-                    "block_adjugate_data[%d]" % component
+                    "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
                 "        for (int q = 0; q < NQ; ++q) {",
@@ -6468,7 +6477,7 @@ def _scalar_crs_matrix_assembly_source(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "block_coordinates[%d][lane] * %s[q * NS + %d]"
+                    "bcoordinates[%d][lane] * %s[q * NS + %d]"
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
@@ -6487,19 +6496,19 @@ def _scalar_crs_matrix_assembly_source(
         lines.extend(["        }"])
     if field_element_lines:
         state_stream_args = {
-            role.name: "block_%s" % role.name
+            role.name: _BLOCK_FMT % role.name
             for role in live_field_roles(state_dependencies)
         }
-        direction_arg = "block_direction"
-        output_arg = "block_output"
+        direction_arg = "bdirection"
+        output_arg = "boutput"
         block_function = "%s_contiguous" % block
     else:
         state_stream_args = {}
         for role in live_field_roles(state_dependencies, roles=STATE_FIELD_ROLES):
             role_lines, role_arg = _block_stream_argument(
                 "const s_t *",
-                "block_%s_streams" % role.name,
-                "block_%s" % role.name,
+                "b%s_streams" % role.name,
+                _BLOCK_FMT % role.name,
                 n_streams,
                 field_stream_order,
                 "        ",
@@ -6509,8 +6518,8 @@ def _scalar_crs_matrix_assembly_source(
             state_stream_args[role.name] = role_arg
         direction_lines, direction_arg = _block_stream_argument(
             "const s_t *",
-            "block_direction_streams",
-            "block_direction",
+            "bdirection_streams",
+            "bdirection",
             n_streams,
             field_stream_order,
             "        ",
@@ -6518,8 +6527,8 @@ def _scalar_crs_matrix_assembly_source(
         )
         output_lines, output_arg = _block_stream_argument(
             "s_t *",
-            "block_output_streams",
-            "block_output",
+            "boutput_streams",
+            "boutput",
             n_streams,
             field_stream_order,
             "        ",
@@ -6533,8 +6542,8 @@ def _scalar_crs_matrix_assembly_source(
             else "%s_contiguous" % block
         )
     lines.append(
-        "        const s_t *const block_adjugate[ND * ND] = {%s};"
-        % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
+        "        const s_t *const badjugate[ND * ND] = {%s};"
+        % ", ".join("badjugate_data[%d]" % i for i in range(dim * dim))
     )
     call_args = ["1", "1"]
     call_args.extend(
@@ -6565,17 +6574,17 @@ def _scalar_crs_matrix_assembly_source(
             "            const int trial = %s;"
             % _local_index_mapping_expr("col_tensor_stream", column_tensor_streams, "trial_local"),
             "            for (int stream = 0; stream < N_STREAMS; ++stream) {",
-            "                block_direction[stream][0] = s_t(0);",
-            "                block_output[stream][0] = s_t(0);",
+            "                bdirection[stream][0] = s_t(0);",
+            "                boutput[stream][0] = s_t(0);",
             "            }",
-            "            block_direction[trial][0] = s_t(1);",
+            "            bdirection[trial][0] = s_t(1);",
             "            %s<s_t, NQ, NS, VS>(%s);"
             % (block_function, ", ".join(call_args)),
             "            for (int test_local = 0; test_local < %d; ++test_local) {"
             % len(row_streams),
             "                const int test = %s;"
             % _local_index_mapping_expr("row_tensor_stream", row_tensor_streams, "test_local"),
-            "                element_matrix[test_local * %d + trial_local] = block_output[test][0];"
+            "                element_matrix[test_local * %d + trial_local] = boutput[test][0];"
             % len(column_streams),
             "            }",
             "        }",
@@ -6717,13 +6726,13 @@ def _scalar_crs_matrix_assembly_source(
                 "",
                 "#pragma omp parallel",
                 "    {",
-                "        s_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
+                "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
             ]
         )
         for role in live_field_roles(state_dependencies):
             # Slot 0 holds the coordinates; the roles follow in ABI order.
             lines.append(
-                "        s_t *const SFEM_RESTRICT pack_%s = sfem::codegen::thread_scratch<s_t>(%d, (size_t)NC * (size_t)max_nodes_per_pack);"
+                "        s_t *const SFEM_RESTRICT pk_%s = sfem::codegen::thread_scratch<s_t>(%d, (size_t)NC * (size_t)max_nodes_per_pack);"
                 % (role.name, role.index + 1)
             )
         lines.extend(
@@ -6739,13 +6748,13 @@ def _scalar_crs_matrix_assembly_source(
                 "            const geom_t *const coordinate_components[ND] = {%s};"
                 % ", ".join("points[%d]" % d for d in range(dim)),
                 "            for (int d = 0; d < ND; ++d) {",
-                "                s_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;",
+                "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
                 "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
                 "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                "                    pack_coordinate[k] = s_t(coordinate_component[owned_nodes_ptr[pack] + k]);",
+                "                    pk_coordinate[k] = s_t(coordinate_component[owned_nodes_ptr[pack] + k]);",
                 "                }",
                 "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                    pack_coordinate[n_contiguous + k] = s_t(coordinate_component[ghosts[k]]);",
+                "                    pk_coordinate[n_contiguous + k] = s_t(coordinate_component[ghosts[k]]);",
                 "                }",
                 "            }",
             ]
@@ -6755,12 +6764,12 @@ def _scalar_crs_matrix_assembly_source(
                 lines.extend(
                     [
                         "            {",
-                        "                s_t *const SFEM_RESTRICT pack_field = pack_current + %d * max_nodes_per_pack;" % field_index,
+                        "                s_t *const SFEM_RESTRICT pk_field = pk_current + %d * max_nodes_per_pack;" % field_index,
                         "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                        "                    pack_field[k] = %s[(owned_nodes_ptr[pack] + k) * current_stride];" % field.name,
+                        "                    pk_field[k] = %s[(owned_nodes_ptr[pack] + k) * current_stride];" % field.name,
                         "                }",
                         "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                        "                    pack_field[n_contiguous + k] = %s[ghosts[k] * current_stride];" % field.name,
+                        "                    pk_field[n_contiguous + k] = %s[ghosts[k] * current_stride];" % field.name,
                         "                }",
                         "            }",
                     ]
@@ -6770,12 +6779,12 @@ def _scalar_crs_matrix_assembly_source(
                 lines.extend(
                     [
                         "            {",
-                        "                s_t *const SFEM_RESTRICT pack_field = pack_previous + %d * max_nodes_per_pack;" % field_index,
+                        "                s_t *const SFEM_RESTRICT pk_field = pk_previous + %d * max_nodes_per_pack;" % field_index,
                         "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                        "                    pack_field[k] = %s_old[(owned_nodes_ptr[pack] + k) * previous_stride];" % field.name,
+                        "                    pk_field[k] = %s_old[(owned_nodes_ptr[pack] + k) * previous_stride];" % field.name,
                         "                }",
                         "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                        "                    pack_field[n_contiguous + k] = %s_old[ghosts[k] * previous_stride];" % field.name,
+                        "                    pk_field[n_contiguous + k] = %s_old[ghosts[k] * previous_stride];" % field.name,
                         "                }",
                         "            }",
                     ]
@@ -6786,26 +6795,26 @@ def _scalar_crs_matrix_assembly_source(
                 "            for (ptrdiff_t element = e_start; element < e_end; ++element) {",
                 "                const int nelems = 1;",
                 "                s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
-                "                s_t block_coordinates[ND * NS][VS];",
-                "                s_t block_adjugate_data[ND * ND][NQ * VS];",
-                "                s_t block_determinant[NQ * VS];",
+                "                s_t bcoordinates[ND * NS][VS];",
+                "                s_t badjugate_data[ND * ND][NQ * VS];",
+                "                s_t bdeterminant[NQ * VS];",
             ]
         )
         for role in live_field_roles(state_dependencies):
             lines.append(
-                "                s_t block_%s[N_STREAMS][VS];"
+                "                s_t b%s[N_STREAMS][VS];"
                 % role.name
             )
         lines.extend(
             [
-                "                s_t block_direction[N_STREAMS][VS];",
-                "                s_t block_output[N_STREAMS][VS];",
+                "                s_t bdirection[N_STREAMS][VS];",
+                "                s_t boutput[N_STREAMS][VS];",
                 "",
                 "                for (int shape = 0; shape < NS; ++shape) {",
                 "                    const uint16_t packed_node = elements[shape][element];",
                 "                    const uint16_t coordinate_packed_node = %s[shape][element];" % packed_coordinate_element_array,
                 "                    for (int d = 0; d < ND; ++d) {",
-                "                        block_coordinates[shape * ND + d][0] = pack_coordinates[d * max_nodes_per_pack + coordinate_packed_node];",
+                "                        bcoordinates[shape * ND + d][0] = pk_coordinates[d * max_nodes_per_pack + coordinate_packed_node];",
                 "                }",
             ]
         )
@@ -6815,13 +6824,13 @@ def _scalar_crs_matrix_assembly_source(
                     lines.append("                    const uint16_t field_packed_node = %s[shape][element];" % packed_field_element_array)
                 for field_index in range(len(system.fields)):
                     lines.append(
-                        "                    block_%s[shape * NC + %d][0] = pack_%s[%d * max_nodes_per_pack + field_packed_node];"
+                        "                    b%s[shape * NC + %d][0] = pk_%s[%d * max_nodes_per_pack + field_packed_node];"
                         % (role.name, field_index, role.name, field_index)
                     )
             else:
                 for field_index in range(len(system.fields)):
                     lines.append(
-                        "                    block_%s[%d * NS + shape][0] = pack_%s[%d * max_nodes_per_pack + packed_node];"
+                        "                    b%s[%d * NS + shape][0] = pk_%s[%d * max_nodes_per_pack + packed_node];"
                         % (role.name, field_index, role.name, field_index)
                     )
         lines.extend(["                }", ""])
@@ -6832,19 +6841,19 @@ def _scalar_crs_matrix_assembly_source(
                     n_shape=n_shape,
                     n_qp=rule.n_qp,
                     local_prefix=local_prefix,
-                    coordinate_streams="block_coordinates",
+                    coordinate_streams="bcoordinates",
                     contiguous_coordinate_streams=True,
                     adjugate_target=lambda component, index: (
-                        "block_adjugate_data[%d][%s]" % (component, index)
+                        "badjugate_data[%d][%s]" % (component, index)
                     ),
                     determinant_target=lambda index: (
-                        "block_determinant[%s]" % index
+                        "bdeterminant[%s]" % index
                     ),
                     adjugate_streams=tuple(
-                        "block_adjugate_data[%d]" % component
+                        "badjugate_data[%d]" % component
                         for component in range(dim * dim)
                     ),
-                    determinant_stream="block_determinant",
+                    determinant_stream="bdeterminant",
                     shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
                     grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
                 )
@@ -6852,9 +6861,9 @@ def _scalar_crs_matrix_assembly_source(
         else:
             lines.extend(
                 [
-                    "            s_t *block_adjugate_streams[ND * ND] = {%s};"
+                    "            s_t *badjugate_streams[ND * ND] = {%s};"
                     % ", ".join(
-                        "block_adjugate_data[%d]" % component
+                        "badjugate_data[%d]" % component
                         for component in range(dim * dim)
                     ),
                     "            for (int q = 0; q < NQ; ++q) {",
@@ -6864,7 +6873,7 @@ def _scalar_crs_matrix_assembly_source(
             for i in range(dim):
                 for j in range(dim):
                     terms = [
-                        "block_coordinates[%d][lane] * %s[q * NS + %d]"
+                        "bcoordinates[%d][lane] * %s[q * NS + %d]"
                         % (
                             shape * dim + i,
                             _mesh_reference_name(
@@ -6883,19 +6892,19 @@ def _scalar_crs_matrix_assembly_source(
             lines.extend(["            }"])
         if packed_field_element_lines:
             state_stream_args.update(
-                (role.name, "block_%s" % role.name)
+                (role.name, _BLOCK_FMT % role.name)
                 for role in live_field_roles(
                     state_dependencies, roles=STATE_FIELD_ROLES
                 )
             )
-            direction_arg = "block_direction"
-            output_arg = "block_output"
+            direction_arg = "bdirection"
+            output_arg = "boutput"
         else:
             for role in live_field_roles(state_dependencies, roles=STATE_FIELD_ROLES):
                 role_lines, role_arg = _block_stream_argument(
                     "const s_t *",
-                    "block_%s_streams" % role.name,
-                    "block_%s" % role.name,
+                    "b%s_streams" % role.name,
+                    _BLOCK_FMT % role.name,
                     n_streams,
                     field_stream_order,
                     "            ",
@@ -6905,8 +6914,8 @@ def _scalar_crs_matrix_assembly_source(
                 state_stream_args[role.name] = role_arg
             direction_lines, direction_arg = _block_stream_argument(
                 "const s_t *",
-                "block_direction_streams",
-                "block_direction",
+                "bdirection_streams",
+                "bdirection",
                 n_streams,
                 field_stream_order,
                 "            ",
@@ -6914,8 +6923,8 @@ def _scalar_crs_matrix_assembly_source(
             )
             output_lines, output_arg = _block_stream_argument(
                 "s_t *",
-                "block_output_streams",
-                "block_output",
+                "boutput_streams",
+                "boutput",
                 n_streams,
                 field_stream_order,
                 "            ",
@@ -6924,8 +6933,8 @@ def _scalar_crs_matrix_assembly_source(
             lines.extend(direction_lines)
             lines.extend(output_lines)
         lines.append(
-            "            const s_t *const block_adjugate[ND * ND] = {%s};"
-            % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
+            "            const s_t *const badjugate[ND * ND] = {%s};"
+            % ", ".join("badjugate_data[%d]" % i for i in range(dim * dim))
         )
         packed_call_args = list(call_args)
         if state_dependencies.current:
@@ -6950,17 +6959,17 @@ def _scalar_crs_matrix_assembly_source(
                 "                const int trial = %s;"
                 % _local_index_mapping_expr("col_tensor_stream", column_tensor_streams, "trial_local"),
                 "                for (int stream = 0; stream < N_STREAMS; ++stream) {",
-                "                    block_direction[stream][0] = s_t(0);",
-                "                    block_output[stream][0] = s_t(0);",
+                "                    bdirection[stream][0] = s_t(0);",
+                "                    boutput[stream][0] = s_t(0);",
                 "                }",
-                "                block_direction[trial][0] = s_t(1);",
+                "                bdirection[trial][0] = s_t(1);",
                 "                %s<s_t, NQ, NS, VS>(%s);"
                 % (block_function, ", ".join(packed_call_args)),
                 "                for (int test_local = 0; test_local < %d; ++test_local) {"
                 % len(row_streams),
                 "                    const int test = %s;"
                 % _local_index_mapping_expr("row_tensor_stream", row_tensor_streams, "test_local"),
-                "                    element_matrix[test_local * %d + trial_local] = block_output[test][0];"
+                "                    element_matrix[test_local * %d + trial_local] = boutput[test][0];"
                 % len(column_streams),
                 "                }",
                 "            }",
@@ -7095,30 +7104,30 @@ def _isoparametric_mesh_operator_source(
             _parallel_for_pragma("static"),
             "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
             "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
-            "        s_t block_coordinates[%d * NS][VS];"
+            "        s_t bcoordinates[%d * NS][VS];"
             % dim,
-            "        s_t block_adjugate_data[%d][NQ * VS];"
+            "        s_t badjugate_data[%d][NQ * VS];"
             % (dim * dim),
-            "        s_t block_determinant[NQ * VS];",
+            "        s_t bdeterminant[NQ * VS];",
         ]
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "        s_t block_%s[NC * NS][VS];" % role.name
+            "        s_t b%s[NC * NS][VS];" % role.name
         )
     if gradient_metric is not None:
         lines.append(
-            "        s_t block_geom_metric_data[%d][NQ * VS];"
+            "        s_t bgeom_metric_data[%d][NQ * VS];"
             % gradient_metric.metric_components
         )
     lines.extend(
         [
-            "        s_t block_output[NC * NS][VS];",
+            "        s_t boutput[NC * NS][VS];",
         ]
     )
     lines.extend(["", *_coordinate_gather_lines(dim, "        ", coordinate_element_array)])
     lines.extend(_field_gather_lines(system, dependencies, "        ", field_element_array))
-    lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        ")])
+    lines.extend(["", *_zero_block_output_lines("boutput", n_fields * n_shape, "        ")])
     if tensor_product_geometry:
         lines.append("")
         lines.extend(
@@ -7127,19 +7136,19 @@ def _isoparametric_mesh_operator_source(
                 n_shape=n_shape,
                 n_qp=rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams="block_coordinates",
+                coordinate_streams="bcoordinates",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "block_adjugate_data[%d][%s]" % (component, index)
+                    "badjugate_data[%d][%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "block_determinant[%s]" % index
+                    "bdeterminant[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "block_adjugate_data[%d]" % component
+                    "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="block_determinant",
+                determinant_stream="bdeterminant",
                 shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
                 grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
             )
@@ -7148,9 +7157,9 @@ def _isoparametric_mesh_operator_source(
         lines.extend(
             [
                 "",
-                "        s_t *block_adjugate_streams[ND * ND] = {%s};"
+                "        s_t *badjugate_streams[ND * ND] = {%s};"
                 % ", ".join(
-                    "block_adjugate_data[%d]" % component
+                    "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
                 *quadrature_scope_lines(rule.element_type, "        "),
@@ -7160,7 +7169,7 @@ def _isoparametric_mesh_operator_source(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "block_coordinates[%d][lane] * %s[q * NS + %d]"
+                    "bcoordinates[%d][lane] * %s[q * NS + %d]"
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
@@ -7189,9 +7198,9 @@ def _isoparametric_mesh_operator_source(
         lines.extend(
             _geometry_metric_grouping_lines(
                 dim,
-                "block_determinant[goff]",
-                lambda component: "block_adjugate_data[%d][goff]" % component,
-                lambda component: "block_geom_metric_data[%d][goff]" % component,
+                "bdeterminant[goff]",
+                lambda component: "badjugate_data[%d][goff]" % component,
+                lambda component: "bgeom_metric_data[%d][goff]" % component,
                 "                ",
                 "metric",
             )
@@ -7209,21 +7218,21 @@ def _isoparametric_mesh_operator_source(
     block_function = "%s_contiguous" % block if not block_stream_lines else block
     if dependencies.uses_adjugate:
         lines.append(
-            "        const s_t *const block_adjugate[%d] = {%s};"
+            "        const s_t *const badjugate[%d] = {%s};"
             % (
                 dim * dim,
                 ", ".join(
-                    "block_adjugate_data[%d]" % i for i in range(dim * dim)
+                    "badjugate_data[%d]" % i for i in range(dim * dim)
                 ),
             )
         )
     if gradient_metric is not None:
         lines.append(
-            "        const s_t *const block_geom_metric[%d] = %s;"
+            "        const s_t *const bgeom_metric[%d] = %s;"
             % (
                 gradient_metric.metric_components,
                 _geometry_metric_stream_initializer(
-                    "block_geom_metric_data",
+                    "bgeom_metric_data",
                     dim,
                 ),
             )
@@ -7400,7 +7409,7 @@ def _scalar_packed_jacobian_action_source(
             "",
             "#pragma omp parallel",
             "    {",
-            "        s_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
         ]
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
@@ -7412,13 +7421,13 @@ def _scalar_packed_jacobian_action_source(
         # than corrected: the gate on this branch is byte-identity, and a fix
         # belongs with a case that can exercise it.  ARCHITECTURE.html OP 12.
         lines.append(
-            "        s_t *const SFEM_RESTRICT pack_%s = sfem::codegen::thread_scratch<s_t>(1, (size_t)max_nodes_per_pack);"
+            "        s_t *const SFEM_RESTRICT pk_%s = sfem::codegen::thread_scratch<s_t>(1, (size_t)max_nodes_per_pack);"
             % role.name
         )
     lines.extend(
         [
-            "        s_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "",
             "#pragma omp for schedule(static)",
             "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
@@ -7432,13 +7441,13 @@ def _scalar_packed_jacobian_action_source(
             "            const geom_t *const coordinate_components[ND] = {%s};"
             % ", ".join("points[%d]" % d for d in range(dim)),
             "            for (int d = 0; d < ND; ++d) {",
-            "                s_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;",
+            "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
             "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
             "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-            "                    pack_coordinate[k] = s_t(coordinate_component[owned_nodes_ptr[pack] + k]);",
+            "                    pk_coordinate[k] = s_t(coordinate_component[owned_nodes_ptr[pack] + k]);",
             "                }",
             "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "                    pack_coordinate[n_contiguous + k] = s_t(coordinate_component[ghosts[k]]);",
+            "                    pk_coordinate[n_contiguous + k] = s_t(coordinate_component[ghosts[k]]);",
             "                }",
             "            }",
         ]
@@ -7449,11 +7458,11 @@ def _scalar_packed_jacobian_action_source(
             [
                 "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                pack_%s[k] = %s[node * %s];"
+                "                pk_%s[k] = %s[node * %s];"
                 % (role.name, role.field_pointer(field.name), role.stride),
                 "            }",
                 "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                pack_%s[n_contiguous + k] = %s[ghosts[k] * %s];"
+                "                pk_%s[n_contiguous + k] = %s[ghosts[k] * %s];"
                 % (role.name, role.field_pointer(field.name), role.stride),
                 "            }",
             ]
@@ -7462,27 +7471,27 @@ def _scalar_packed_jacobian_action_source(
         [
             "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
             "                const idx_t node = owned_nodes_ptr[pack] + k;",
-            "                pack_direction[k] = %s_direction[node * direction_stride];" % field.name,
+            "                pk_direction[k] = %s_direction[node * direction_stride];" % field.name,
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field.name,
+            "                pk_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field.name,
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
             "                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);",
-            "                s_t block_coordinates[ND * NS][VS];",
-            "                s_t block_adjugate_data[ND * ND][NQ * VS];",
-            "                s_t block_determinant[NQ * VS];",
+            "                s_t bcoordinates[ND * NS][VS];",
+            "                s_t badjugate_data[ND * ND][NQ * VS];",
+            "                s_t bdeterminant[NQ * VS];",
         ]
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.append(
-            "                s_t block_%s[N_STREAMS][VS];" % role.name
+            "                s_t b%s[N_STREAMS][VS];" % role.name
         )
     lines.extend(
         [
-            "                s_t block_direction[N_STREAMS][VS];",
-            "                s_t block_output[N_STREAMS][VS];",
+            "                s_t bdirection[N_STREAMS][VS];",
+            "                s_t boutput[N_STREAMS][VS];",
             "",
             "                for (int shape = 0; shape < NS; ++shape) {",
             "                    const uint16_t *const SFEM_RESTRICT coordinate_shape = %s[shape];" % coordinate_element_array,
@@ -7490,7 +7499,7 @@ def _scalar_packed_jacobian_action_source(
             "                    for (int d = 0; d < ND; ++d) {",
             _vectorize_pragma(),
             "                        for (int lane = 0; lane < nelems; ++lane) {",
-            "                            block_coordinates[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + coordinate_shape[evb + lane]];",
+            "                            bcoordinates[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[evb + lane]];",
             "                        }",
             "                    }",
         ]
@@ -7500,7 +7509,7 @@ def _scalar_packed_jacobian_action_source(
             [
                 _vectorize_pragma(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        block_%s[shape][lane] = pack_%s[field_shape[evb + lane]];"
+                "                        b%s[shape][lane] = pk_%s[field_shape[evb + lane]];"
                 % (role.name, role.name),
                 "                    }",
             ]
@@ -7509,8 +7518,8 @@ def _scalar_packed_jacobian_action_source(
         [
             _vectorize_pragma(),
             "                    for (int lane = 0; lane < nelems; ++lane) {",
-            "                        block_direction[shape][lane] = pack_direction[field_shape[evb + lane]];",
-            "                        block_output[shape][lane] = s_t(0);",
+            "                        bdirection[shape][lane] = pk_direction[field_shape[evb + lane]];",
+            "                        boutput[shape][lane] = s_t(0);",
             "                    }",
             "                }",
         ]
@@ -7523,17 +7532,17 @@ def _scalar_packed_jacobian_action_source(
                 n_shape=n_shape,
                 n_qp=rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams="block_coordinates",
+                coordinate_streams="bcoordinates",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "block_adjugate_data[%d][%s]" % (component, index)
+                    "badjugate_data[%d][%s]" % (component, index)
                 ),
-                determinant_target=lambda index: ("block_determinant[%s]" % index),
+                determinant_target=lambda index: ("bdeterminant[%s]" % index),
                 adjugate_streams=tuple(
-                    "block_adjugate_data[%d]" % component
+                    "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="block_determinant",
+                determinant_stream="bdeterminant",
                 shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
                 grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
             )
@@ -7542,9 +7551,9 @@ def _scalar_packed_jacobian_action_source(
         lines.extend(
             [
                 "",
-                "                s_t *block_adjugate_streams[ND * ND] = {%s};"
+                "                s_t *badjugate_streams[ND * ND] = {%s};"
                 % ", ".join(
-                    "block_adjugate_data[%d]" % component
+                    "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
                 "                for (int q = 0; q < NQ; ++q) {",
@@ -7554,7 +7563,7 @@ def _scalar_packed_jacobian_action_source(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "block_coordinates[%d][lane] * %s[q * NS + %d]"
+                    "bcoordinates[%d][lane] * %s[q * NS + %d]"
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
@@ -7573,9 +7582,9 @@ def _scalar_packed_jacobian_action_source(
         lines.extend(["                    }", "                }"])
     if dependencies.uses_adjugate:
         lines.append(
-            "                const s_t *const block_adjugate[ND * ND] = {%s};"
+            "                const s_t *const badjugate[ND * ND] = {%s};"
             % ", ".join(
-                "block_adjugate_data[%d]" % component
+                "badjugate_data[%d]" % component
                 for component in range(dim * dim)
             )
         )
@@ -7600,7 +7609,7 @@ def _scalar_packed_jacobian_action_source(
             "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];"
             % field_element_array,
             "                    for (int lane = 0; lane < nelems; ++lane) {",
-            "                        pack_out[field_shape[evb + lane]] += block_output[shape][lane];",
+            "                        pk_out[field_shape[evb + lane]] += boutput[shape][lane];",
             "                    }",
             "                }",
             "            }",
@@ -7612,12 +7621,12 @@ def _scalar_packed_jacobian_action_source(
             [
                 "            const ptrdiff_t ghost_off = ghost_ptr[pack];",
                 "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
-                "                pack_out[k] = s_t(0);",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field.name,
+                "                pk_out[k] = s_t(0);",
                 "            }",
                 "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                ghost_buf[ghost_off + k] = pack_out[n_contiguous + k];",
-                "                pack_out[n_contiguous + k] = s_t(0);",
+                "                ghost_buf[ghost_off + k] = pk_out[n_contiguous + k];",
+                "                pk_out[n_contiguous + k] = s_t(0);",
                 "            }",
                 "        }",
                 "    }",
@@ -7645,18 +7654,18 @@ def _scalar_packed_jacobian_action_source(
         lines.extend(
             [
                 "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
-                "                pack_out[k] = s_t(0);",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field.name,
+                "                pk_out[k] = s_t(0);",
                 "            }",
                 "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
                 _atomic_update_pragma(),
-                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
-                "                pack_out[k] = s_t(0);",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field.name,
+                "                pk_out[k] = s_t(0);",
                 "            }",
                 "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
                 _atomic_update_pragma(),
-                "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field.name,
-                "                pack_out[n_contiguous + k] = s_t(0);",
+                "                %s_out[ghosts[k] * out_stride] += pk_out[n_contiguous + k];" % field.name,
+                "                pk_out[n_contiguous + k] = s_t(0);",
                 "            }",
                 "        }",
                 "    }",
@@ -7740,8 +7749,8 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "",
             "#pragma omp parallel",
             "    {",
-            "        s_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "        s_t out0[VS];",
             "        s_t out1[VS];",
             "        s_t out2[VS];",
@@ -7767,10 +7776,10 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
             "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
             "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-            "                pack_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
+            "                pk_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field_name,
+            "                pk_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field_name,
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
@@ -7789,10 +7798,10 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "",
             "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
-            "                    u0[lane] = pack_direction[elements[0][element]];",
-            "                    u1[lane] = pack_direction[elements[1][element]];",
-            "                    u2[lane] = pack_direction[elements[2][element]];",
-            "                    u3[lane] = pack_direction[elements[3][element]];",
+            "                    u0[lane] = pk_direction[elements[0][element]];",
+            "                    u1[lane] = pk_direction[elements[1][element]];",
+            "                    u2[lane] = pk_direction[elements[2][element]];",
+            "                    u3[lane] = pk_direction[elements[3][element]];",
             "                }",
             "",
             _vectorize_pragma(),
@@ -7805,26 +7814,26 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "",
             "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             "                    const ptrdiff_t element = evb + lane;",
-            "                    pack_out[elements[0][element]] += out0[lane];",
-            "                    pack_out[elements[1][element]] += out1[lane];",
-            "                    pack_out[elements[2][element]] += out2[lane];",
-            "                    pack_out[elements[3][element]] += out3[lane];",
+            "                    pk_out[elements[0][element]] += out0[lane];",
+            "                    pk_out[elements[1][element]] += out1[lane];",
+            "                    pk_out[elements[2][element]] += out2[lane];",
+            "                    pk_out[elements[3][element]] += out3[lane];",
             "                }",
             "            }",
             "",
             "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
-            "                pack_out[k] = s_t(0);",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field_name,
+            "                pk_out[k] = s_t(0);",
             "            }",
             "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
             _atomic_update_pragma(),
-            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
-            "                pack_out[k] = s_t(0);",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field_name,
+            "                pk_out[k] = s_t(0);",
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
             _atomic_update_pragma(),
-            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field_name,
-            "                pack_out[n_contiguous + k] = s_t(0);",
+            "                %s_out[ghosts[k] * out_stride] += pk_out[n_contiguous + k];" % field_name,
+            "                pk_out[n_contiguous + k] = s_t(0);",
             "            }",
             "        }",
             "    }",
@@ -7918,8 +7927,8 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "",
             "#pragma omp parallel",
             "    {",
-            "        s_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
         ]
     )
     for shape in range(n_shape):
@@ -7941,10 +7950,10 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
             "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
             "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-            "                pack_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
+            "                pk_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field_name,
+            "                pk_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field_name,
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
@@ -7981,7 +7990,7 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
     )
     for shape in range(n_shape):
         lines.append(
-            "                    u%d[lane] = pack_direction[elements[%d][element]];"
+            "                    u%d[lane] = pk_direction[elements[%d][element]];"
             % (shape, primitive_shape_order[shape])
         )
     lines.extend(["                }", "", _vectorize_pragma(), "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
@@ -7997,7 +8006,7 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
     lines.extend(["                }", "", "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "                    const ptrdiff_t element = evb + lane;"])
     for shape in range(n_shape):
         lines.append(
-            "                    pack_out[elements[%d][element]] += out%d[lane];"
+            "                    pk_out[elements[%d][element]] += out%d[lane];"
             % (primitive_shape_order[shape], shape)
         )
     lines.extend(
@@ -8006,18 +8015,18 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "            }",
             "",
             "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
-            "                pack_out[k] = s_t(0);",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field_name,
+            "                pk_out[k] = s_t(0);",
             "            }",
             "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
             _atomic_update_pragma(),
-            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
-            "                pack_out[k] = s_t(0);",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field_name,
+            "                pk_out[k] = s_t(0);",
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
             _atomic_update_pragma(),
-            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field_name,
-            "                pack_out[n_contiguous + k] = s_t(0);",
+            "                %s_out[ghosts[k] * out_stride] += pk_out[n_contiguous + k];" % field_name,
+            "                pk_out[n_contiguous + k] = s_t(0);",
             "            }",
             "        }",
             "    }",
@@ -8154,8 +8163,8 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "",
             "#pragma omp parallel",
             "    {",
-            "        s_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
         ]
     )
     for shape in range(n_shape):
@@ -8176,10 +8185,10 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
             "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
             "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
-            "            s_t *const SFEM_RESTRICT ghost_out = &pack_out[n_contiguous];",
-            "            memcpy(pack_direction, &%s_direction[owned_nodes_ptr[pack]], (size_t)n_contiguous * sizeof(s_t));" % field_name,
+            "            s_t *const SFEM_RESTRICT ghost_out = &pk_out[n_contiguous];",
+            "            memcpy(pk_direction, &%s_direction[owned_nodes_ptr[pack]], (size_t)n_contiguous * sizeof(s_t));" % field_name,
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k]];" % field_name,
+            "                pk_direction[n_contiguous + k] = %s_direction[ghosts[k]];" % field_name,
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
@@ -8206,7 +8215,7 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
     )
     for shape in range(n_shape):
         lines.append(
-            "                    u%d[lane] = pack_direction[elements[%d][element]];"
+            "                    u%d[lane] = pk_direction[elements[%d][element]];"
             % (shape, primitive_shape_order[shape])
         )
     primitive_args = (
@@ -8229,7 +8238,7 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
     )
     for shape in range(n_shape):
         lines.append(
-            "                    pack_out[elements[%d][element]] += out%d[lane];"
+            "                    pk_out[elements[%d][element]] += out%d[lane];"
             % (primitive_shape_order[shape], shape)
         )
     lines.extend(
@@ -8239,13 +8248,13 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "",
             "            s_t *const SFEM_RESTRICT acc = &%s_out[owned_nodes_ptr[pack]];" % field_name,
             "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-            "                acc[k] += pack_out[k];",
-            "                pack_out[k] = s_t(0);",
+            "                acc[k] += pk_out[k];",
+            "                pk_out[k] = s_t(0);",
             "            }",
             "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
             _atomic_update_pragma(),
-            "                acc[k] += pack_out[k];",
-            "                pack_out[k] = s_t(0);",
+            "                acc[k] += pk_out[k];",
+            "                pk_out[k] = s_t(0);",
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
             _atomic_update_pragma(),
@@ -8537,13 +8546,13 @@ def _scalar_packed_affine_jacobian_action_source(
         # than corrected: the gate on this branch is byte-identity, and a fix
         # belongs with a case that can exercise it.  ARCHITECTURE.html OP 12.
         lines.append(
-            "        s_t *const SFEM_RESTRICT pack_%s = sfem::codegen::thread_scratch<s_t>(1, (size_t)max_nodes_per_pack);"
+            "        s_t *const SFEM_RESTRICT pk_%s = sfem::codegen::thread_scratch<s_t>(1, (size_t)max_nodes_per_pack);"
             % role.name
         )
     lines.extend(
         [
-            "        s_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "",
             "#pragma omp for schedule(static)",
             "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
@@ -8561,11 +8570,11 @@ def _scalar_packed_affine_jacobian_action_source(
             [
                 "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                pack_%s[k] = %s[node * %s];"
+                "                pk_%s[k] = %s[node * %s];"
                 % (role.name, role.field_pointer(field.name), role.stride),
                 "            }",
                 "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                pack_%s[n_contiguous + k] = %s[ghosts[k] * %s];"
+                "                pk_%s[n_contiguous + k] = %s[ghosts[k] * %s];"
                 % (role.name, role.field_pointer(field.name), role.stride),
                 "            }",
             ]
@@ -8574,10 +8583,10 @@ def _scalar_packed_affine_jacobian_action_source(
         [
             "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
             "                const idx_t node = owned_nodes_ptr[pack] + k;",
-            "                pack_direction[k] = %s_direction[node * direction_stride];" % field.name,
+            "                pk_direction[k] = %s_direction[node * direction_stride];" % field.name,
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field.name,
+            "                pk_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field.name,
             "            }",
             "",
             "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
@@ -8586,12 +8595,12 @@ def _scalar_packed_affine_jacobian_action_source(
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.append(
-            "                s_t block_%s[N_STREAMS][VS];" % role.name
+            "                s_t b%s[N_STREAMS][VS];" % role.name
         )
     lines.extend(
         [
-            "                s_t block_direction[N_STREAMS][VS];",
-            "                s_t block_output[N_STREAMS][VS];",
+            "                s_t bdirection[N_STREAMS][VS];",
+            "                s_t boutput[N_STREAMS][VS];",
             "",
             "                for (int shape = 0; shape < NS; ++shape) {",
             "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
@@ -8602,7 +8611,7 @@ def _scalar_packed_affine_jacobian_action_source(
             [
                 _vectorize_pragma(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        block_%s[shape][lane] = pack_%s[field_shape[evb + lane]];"
+                "                        b%s[shape][lane] = pk_%s[field_shape[evb + lane]];"
                 % (role.name, role.name),
                 "                    }",
             ]
@@ -8611,8 +8620,8 @@ def _scalar_packed_affine_jacobian_action_source(
         [
             _vectorize_pragma(),
             "                    for (int lane = 0; lane < nelems; ++lane) {",
-            "                        block_direction[shape][lane] = pack_direction[field_shape[evb + lane]];",
-            "                        block_output[shape][lane] = s_t(0);",
+            "                        bdirection[shape][lane] = pk_direction[field_shape[evb + lane]];",
+            "                        boutput[shape][lane] = s_t(0);",
             "                    }",
             "                }",
         ]
@@ -8621,16 +8630,16 @@ def _scalar_packed_affine_jacobian_action_source(
     if dependencies.uses_adjugate and not uses_cached_affine_metric:
         lines.extend(
             [
-                "                const s_t *block_adjugate[%d];" % (dim * dim),
+                "                const s_t *badjugate[%d];" % (dim * dim),
                 "                for (int component = 0; component < %d; ++component) {"
                 % (dim * dim),
-                "                    block_adjugate[component] = bageom_streams[component];",
+                "                    badjugate[component] = bageom_streams[component];",
                 "                }",
             ]
         )
     if uses_cached_affine_metric:
         lines.append(
-            "                const s_t *const block_geom_metric[%d] = {%s};"
+            "                const s_t *const bgeom_metric[%d] = {%s};"
             % (
                 gradient_metric.metric_components,
                 _indexed_geometry_metric_stream_initializer(
@@ -8649,7 +8658,7 @@ def _scalar_packed_affine_jacobian_action_source(
         )
     elif gradient_metric is not None:
         lines.append(
-            "                s_t block_geom_metric_data[%d][VS];"
+            "                s_t bgeom_metric_data[%d][VS];"
             % gradient_metric.metric_components
         )
         lines.extend(["", *_work_item_loop_lines("                ")])
@@ -8660,18 +8669,18 @@ def _scalar_packed_affine_jacobian_action_source(
                 % affine_geometry_stream_indices["jacobian_determinant0"],
                 lambda component: "bageom_streams[%d][lane]"
                 % affine_geometry_stream_indices["jacobian_adjugate%d" % component],
-                lambda component: "block_geom_metric_data[%d][lane]" % component,
+                lambda component: "bgeom_metric_data[%d][lane]" % component,
                 "                    ",
                 "metric",
             )
         )
         lines.append("                }")
         lines.append(
-            "                const s_t *const block_geom_metric[%d] = %s;"
+            "                const s_t *const bgeom_metric[%d] = %s;"
             % (
                 gradient_metric.metric_components,
                 _geometry_metric_stream_initializer(
-                    "block_geom_metric_data",
+                    "bgeom_metric_data",
                     dim,
                 ),
             )
@@ -8700,24 +8709,24 @@ def _scalar_packed_affine_jacobian_action_source(
             "                for (int shape = 0; shape < NS; ++shape) {",
             "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
             "                    for (int lane = 0; lane < nelems; ++lane) {",
-            "                        pack_out[field_shape[evb + lane]] += block_output[shape][lane];",
+            "                        pk_out[field_shape[evb + lane]] += boutput[shape][lane];",
             "                    }",
             "                }",
             "            }",
             "",
             "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
-            "                pack_out[k] = s_t(0);",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field.name,
+            "                pk_out[k] = s_t(0);",
             "            }",
             "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
             _atomic_update_pragma(),
-            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
-            "                pack_out[k] = s_t(0);",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field.name,
+            "                pk_out[k] = s_t(0);",
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
             _atomic_update_pragma(),
-            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field.name,
-            "                pack_out[n_contiguous + k] = s_t(0);",
+            "                %s_out[ghosts[k] * out_stride] += pk_out[n_contiguous + k];" % field.name,
+            "                pk_out[n_contiguous + k] = s_t(0);",
             "            }",
             "        }",
             "    }",
@@ -8781,8 +8790,8 @@ def _isoparametric_geometry_assignment_lines(dim, indent):
         dim=dim,
         indent=indent,
         index="q * VS + lane",
-        stream_array_name="block_adjugate_streams",
-        determinant_stream="block_determinant",
+        stream_array_name="badjugate_streams",
+        determinant_stream="bdeterminant",
     )
 
 

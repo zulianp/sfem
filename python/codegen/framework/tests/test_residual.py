@@ -503,7 +503,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn(
-                    "block_adjugate_data[%d][NQ * VS]"
+                    "badjugate_data[%d][NQ * VS]"
                     % (dim * dim),
                     operator_source,
                 )
@@ -512,7 +512,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn(
-                    "block_current[NC * NS][VS]",
+                    "bcurrent[NC * NS][VS]",
                     operator_source,
                 )
                 action_local = local_source.split(
@@ -608,7 +608,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                         )
                         self.assertNotIn("geometry_grad_ref", section)
                         self.assertNotIn(
-                            "block_coordinates[0][lane] *",
+                            "bcoordinates[0][lane] *",
                             section,
                         )
                 else:
@@ -703,9 +703,9 @@ class CoupledResidualSystemTest(unittest.TestCase):
             tensor_source,
         )
         self.assertIn(
-            "block_coordinates[0], block_coordinates[1], block_coordinates[2], "
-            "block_coordinates[24], block_coordinates[25], block_coordinates[26], "
-            "block_coordinates[3], block_coordinates[4], block_coordinates[5]",
+            "bcoordinates[0], bcoordinates[1], bcoordinates[2], "
+            "bcoordinates[24], bcoordinates[25], bcoordinates[26], "
+            "bcoordinates[3], bcoordinates[4], bcoordinates[5]",
             section,
         )
 

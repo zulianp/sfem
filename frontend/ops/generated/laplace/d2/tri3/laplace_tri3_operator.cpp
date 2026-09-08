@@ -873,36 +873,36 @@ static int laplace_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
     for (ptrdiff_t element = 0; element < nelements; ++element) {
         idx_t ev[NS];
         s_t element_matrix[NDOFS * NDOFS];
-        s_t block_h_data[NS * NC][VS];
-        s_t block_out_data[NS * NC][VS];
-        s_t block_coordinate_data[NS * ND][VS];
+        s_t bh_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        s_t bcoordinate_data[NS * ND][VS];
         static constexpr int nelems = VS;
-        s_t block_jacobian_adjugate0[NQ * VS];
-        s_t block_jacobian_adjugate1[NQ * VS];
-        s_t block_jacobian_adjugate2[NQ * VS];
-        s_t block_jacobian_adjugate3[NQ * VS];
-        s_t block_jacobian_determinant0[NQ * VS];
-        s_t *block_jacobian_adjugate_streams[ND * ND] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
-        const s_t *block_h_streams[NS * NC];
+        s_t bjacobian_adjugate0[NQ * VS];
+        s_t bjacobian_adjugate1[NQ * VS];
+        s_t bjacobian_adjugate2[NQ * VS];
+        s_t bjacobian_adjugate3[NQ * VS];
+        s_t bjacobian_determinant0[NQ * VS];
+        s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+        const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
-            block_h_streams[stream] = block_h_data[stream];
+            bh_streams[stream] = bh_data[stream];
         }
-        s_t *block_out_streams[NS * NC];
+        s_t *bout_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
-            block_out_streams[stream] = block_out_data[stream];
+            bout_streams[stream] = bout_data[stream];
         }
 
         for (int shape = 0; shape < NS; ++shape) {
             const idx_t node = elements[shape][element];
             ev[shape] = node;
             for (int d = 0; d < ND; ++d) {
-                block_coordinate_data[shape * ND + d][0] = s_t(points[d][node]);
+                bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
             }
         }
 
 
         for (int q = 0; q < NQ; ++q) {
-            s_t *block_jacobian_adjugate_streams[ND * ND] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -928,19 +928,19 @@ static int laplace_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
                 const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J00_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g0;
+                    J00_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J01_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g1;
+                    J01_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g1;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J10_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g0;
+                    J10_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g0;
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    J11_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g1;
+                    J11_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g1;
                 }
             }
             #pragma omp simd
@@ -950,11 +950,11 @@ static int laplace_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
             }
         }
 
-        laplace_d2_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, kappa, element_matrix);
+        laplace_d2_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, kappa, element_matrix);
 
         if constexpr (FORMAT == 1) {
             laplace_tri3_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

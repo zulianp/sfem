@@ -190,9 +190,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_current[NC * NS][VS];
-        s_t block_previous[NC * NS][VS];
-        s_t block_output[NC * NS][VS];
+        s_t bcurrent[NC * NS][VS];
+        s_t bprevious[NC * NS][VS];
+        s_t boutput[NC * NS][VS];
         const s_t *const current_components[NC] = {u0, u1, u2};
         const s_t *const previous_components[NC] = {u0_old, u1_old, u2_old};
 
@@ -203,8 +203,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
+                    bcurrent[stream][lane] = current_components[field][node * current_stride];
+                    bprevious[stream][lane] = previous_components[field][node * previous_stride];
                 }
             }
         }
@@ -212,23 +212,23 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
         for (int stream = 0; stream < 30; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
         const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_adjugate4 + evb, g_jacobian_adjugate5 + evb, g_jacobian_adjugate6 + evb, g_jacobian_adjugate7 + evb, g_jacobian_adjugate8 + evb, g_jacobian_determinant0 + evb};
-        s_t block_affine_geometry_data[10][VS];
+        s_t baffine_geometry_data[10][VS];
         const s_t *bageom_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
             bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+                    nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const s_t *block_adjugate[9];
+        const s_t *badjugate[9];
         for (int component = 0; component < 9; ++component) {
-            block_adjugate[component] = bageom_streams[component];
+            badjugate[component] = bageom_streams[component];
         }
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[9], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[9], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, eta_b, eta_s, newmark_velocity_alpha, boutput);
 
         s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -238,7 +238,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -356,12 +356,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_coordinates[3 * NS][VS];
-        s_t block_adjugate_data[9][NQ * VS];
-        s_t block_determinant[NQ * VS];
-        s_t block_current[NC * NS][VS];
-        s_t block_previous[NC * NS][VS];
-        s_t block_output[NC * NS][VS];
+        s_t bcoordinates[3 * NS][VS];
+        s_t badjugate_data[9][NQ * VS];
+        s_t bdeterminant[NQ * VS];
+        s_t bcurrent[NC * NS][VS];
+        s_t bprevious[NC * NS][VS];
+        s_t boutput[NC * NS][VS];
 
         const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
         for (int shape = 0; shape < NS; ++shape) {
@@ -370,7 +370,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
+                    bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
         }
@@ -384,8 +384,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
+                    bcurrent[stream][lane] = current_components[field][node * current_stride];
+                    bprevious[stream][lane] = previous_components[field][node * previous_stride];
                 }
             }
         }
@@ -393,32 +393,32 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
         for (int stream = 0; stream < 30; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
-        s_t *block_adjugate_streams[ND * ND] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                const s_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_x[q * NS + 9];
-                const s_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_y[q * NS + 9];
-                const s_t J02 = block_coordinates[0][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_z[q * NS + 9];
-                const s_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_x[q * NS + 9];
-                const s_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_y[q * NS + 9];
-                const s_t J12 = block_coordinates[1][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_z[q * NS + 9];
-                const s_t J20 = block_coordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_x[q * NS + 9];
-                const s_t J21 = block_coordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_y[q * NS + 9];
-                const s_t J22 = block_coordinates[2][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J00 = bcoordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[12][lane] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[15][lane] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[18][lane] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[21][lane] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[24][lane] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[27][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J01 = bcoordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[12][lane] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[15][lane] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[18][lane] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[21][lane] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[24][lane] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[27][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J02 = bcoordinates[0][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[12][lane] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[15][lane] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[18][lane] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[21][lane] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[24][lane] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[27][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J10 = bcoordinates[1][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[13][lane] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[16][lane] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[19][lane] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[22][lane] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[25][lane] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[28][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J11 = bcoordinates[1][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[13][lane] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[16][lane] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[19][lane] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[22][lane] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[25][lane] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[28][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J12 = bcoordinates[1][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[13][lane] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[16][lane] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[19][lane] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[22][lane] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[25][lane] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[28][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J20 = bcoordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[14][lane] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[17][lane] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[20][lane] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[23][lane] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[26][lane] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[29][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J21 = bcoordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[14][lane] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[17][lane] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[20][lane] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[23][lane] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[26][lane] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[29][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J22 = bcoordinates[2][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[14][lane] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[17][lane] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[20][lane] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[23][lane] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[26][lane] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[29][lane] * isoparametric_grad_ref_z[q * NS + 9];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_adjugate_streams, block_determinant, q * VS + lane);
+                        badjugate_streams, bdeterminant, q * VS + lane);
             }
         }
 
-        const s_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        const s_t *const badjugate[9] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, VS, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, VS, bdeterminant, badjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, bcurrent, bprevious, eta_b, eta_s, newmark_velocity_alpha, boutput);
 
         s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -428,7 +428,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -601,10 +601,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_current[NC * NS][VS];
-        s_t block_previous[NC * NS][VS];
-        s_t block_direction[NC * NS][VS];
-        s_t block_output[NC * NS][VS];
+        s_t bcurrent[NC * NS][VS];
+        s_t bprevious[NC * NS][VS];
+        s_t bdirection[NC * NS][VS];
+        s_t boutput[NC * NS][VS];
         const s_t *const current_components[NC] = {u0, u1, u2};
         const s_t *const previous_components[NC] = {u0_old, u1_old, u2_old};
         const s_t *const direction_components[NC] = {u0_direction, u1_direction, u2_direction};
@@ -616,9 +616,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
-                    block_direction[stream][lane] = direction_components[field][node * direction_stride];
+                    bcurrent[stream][lane] = current_components[field][node * current_stride];
+                    bprevious[stream][lane] = previous_components[field][node * previous_stride];
+                    bdirection[stream][lane] = direction_components[field][node * direction_stride];
                 }
             }
         }
@@ -626,23 +626,23 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
         for (int stream = 0; stream < 30; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
         const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_adjugate4 + evb, g_jacobian_adjugate5 + evb, g_jacobian_adjugate6 + evb, g_jacobian_adjugate7 + evb, g_jacobian_adjugate8 + evb, g_jacobian_determinant0 + evb};
-        s_t block_affine_geometry_data[10][VS];
+        s_t baffine_geometry_data[10][VS];
         const s_t *bageom_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
             bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+                    nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const s_t *block_adjugate[9];
+        const s_t *badjugate[9];
         for (int component = 0; component < 9; ++component) {
-            block_adjugate[component] = bageom_streams[component];
+            badjugate[component] = bageom_streams[component];
         }
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[9], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[9], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, newmark_velocity_alpha, boutput);
 
         s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -652,7 +652,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -782,13 +782,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_coordinates[3 * NS][VS];
-        s_t block_adjugate_data[9][NQ * VS];
-        s_t block_determinant[NQ * VS];
-        s_t block_current[NC * NS][VS];
-        s_t block_previous[NC * NS][VS];
-        s_t block_direction[NC * NS][VS];
-        s_t block_output[NC * NS][VS];
+        s_t bcoordinates[3 * NS][VS];
+        s_t badjugate_data[9][NQ * VS];
+        s_t bdeterminant[NQ * VS];
+        s_t bcurrent[NC * NS][VS];
+        s_t bprevious[NC * NS][VS];
+        s_t bdirection[NC * NS][VS];
+        s_t boutput[NC * NS][VS];
 
         const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
         for (int shape = 0; shape < NS; ++shape) {
@@ -797,7 +797,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
+                    bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
         }
@@ -812,9 +812,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
-                    block_direction[stream][lane] = direction_components[field][node * direction_stride];
+                    bcurrent[stream][lane] = current_components[field][node * current_stride];
+                    bprevious[stream][lane] = previous_components[field][node * previous_stride];
+                    bdirection[stream][lane] = direction_components[field][node * direction_stride];
                 }
             }
         }
@@ -822,32 +822,32 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
         for (int stream = 0; stream < 30; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
-        s_t *block_adjugate_streams[ND * ND] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                const s_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_x[q * NS + 9];
-                const s_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_y[q * NS + 9];
-                const s_t J02 = block_coordinates[0][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[12][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[15][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[18][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[21][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[24][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[27][lane] * isoparametric_grad_ref_z[q * NS + 9];
-                const s_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_x[q * NS + 9];
-                const s_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_y[q * NS + 9];
-                const s_t J12 = block_coordinates[1][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[13][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[16][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[19][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[22][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[25][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[28][lane] * isoparametric_grad_ref_z[q * NS + 9];
-                const s_t J20 = block_coordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_x[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_x[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_x[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_x[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_x[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_x[q * NS + 9];
-                const s_t J21 = block_coordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_y[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_y[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_y[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_y[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_y[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_y[q * NS + 9];
-                const s_t J22 = block_coordinates[2][lane] * isoparametric_grad_ref_z[q * NS + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_z[q * NS + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_z[q * NS + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_z[q * NS + 3] + block_coordinates[14][lane] * isoparametric_grad_ref_z[q * NS + 4] + block_coordinates[17][lane] * isoparametric_grad_ref_z[q * NS + 5] + block_coordinates[20][lane] * isoparametric_grad_ref_z[q * NS + 6] + block_coordinates[23][lane] * isoparametric_grad_ref_z[q * NS + 7] + block_coordinates[26][lane] * isoparametric_grad_ref_z[q * NS + 8] + block_coordinates[29][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J00 = bcoordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[12][lane] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[15][lane] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[18][lane] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[21][lane] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[24][lane] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[27][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J01 = bcoordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[12][lane] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[15][lane] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[18][lane] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[21][lane] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[24][lane] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[27][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J02 = bcoordinates[0][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[12][lane] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[15][lane] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[18][lane] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[21][lane] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[24][lane] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[27][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J10 = bcoordinates[1][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[13][lane] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[16][lane] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[19][lane] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[22][lane] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[25][lane] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[28][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J11 = bcoordinates[1][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[13][lane] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[16][lane] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[19][lane] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[22][lane] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[25][lane] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[28][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J12 = bcoordinates[1][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[13][lane] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[16][lane] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[19][lane] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[22][lane] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[25][lane] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[28][lane] * isoparametric_grad_ref_z[q * NS + 9];
+                const s_t J20 = bcoordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[14][lane] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[17][lane] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[20][lane] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[23][lane] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[26][lane] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[29][lane] * isoparametric_grad_ref_x[q * NS + 9];
+                const s_t J21 = bcoordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[14][lane] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[17][lane] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[20][lane] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[23][lane] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[26][lane] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[29][lane] * isoparametric_grad_ref_y[q * NS + 9];
+                const s_t J22 = bcoordinates[2][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[14][lane] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[17][lane] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[20][lane] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[23][lane] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[26][lane] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[29][lane] * isoparametric_grad_ref_z[q * NS + 9];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        block_adjugate_streams, block_determinant, q * VS + lane);
+                        badjugate_streams, bdeterminant, q * VS + lane);
             }
         }
 
-        const s_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        const s_t *const badjugate[9] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, VS, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, VS, bdeterminant, badjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, newmark_velocity_alpha, boutput);
 
         s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -857,7 +857,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }

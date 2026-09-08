@@ -259,10 +259,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
-        s_t block_u_data[NS * NC][VS];
-        s_t block_u_base_data[NS * NC][VS];
-        s_t block_h_data[NS * NC][VS];
-        s_t block_value[VS];
+        s_t bu_data[NS * NC][VS];
+        s_t bu_base_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+        s_t bvalue[VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -274,9 +274,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
 
         const s_t *const u_components[NC] = {ux, uy};
         const s_t *const h_components[NC] = {hx, hy};
-        const s_t *block_u_streams[NS * NC];
+        const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
+            bu_streams[stream] = bu_data[stream];
         }
 
         for (int shape = 0; shape < NS; ++shape) {
@@ -284,26 +284,26 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
-                    block_u_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-                    block_h_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+                    bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+                    bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
                 }
             }
         }
-        s_t block_jacobian_adjugate0_data[VS];
-        const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate1_data[VS];
-        const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate2_data[VS];
-        const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate3_data[VS];
-        const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_determinant0_data[VS];
-        const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate0_data[VS];
+        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate1_data[VS];
+        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate2_data[VS];
+        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate3_data[VS];
+        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_determinant0_data[VS];
+        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
@@ -311,20 +311,20 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
                 for (int d = 0; d < NC; ++d) {
                     #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
-                        block_u_data[shape * NC + d][lane] = block_u_base_data[shape * NC + d][lane] + alpha * block_h_data[shape * NC + d][lane];
+                        bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
                     }
                 }
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_value[lane] = s_t(0);
+                bvalue[lane] = s_t(0);
             }
 
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_value);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];
+                value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
             }
         }
     }
@@ -546,8 +546,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
-        s_t block_u_data[NS * NC][VS];
-        s_t block_out_data[NS * NC][VS];
+        s_t bu_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -563,42 +563,42 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
-                    block_u_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+                    bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
                 }
             }
         }
         for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_out_data[stream][lane] = s_t(0);
+                bout_data[stream][lane] = s_t(0);
             }
         }
 
-        const s_t *block_u_streams[NS * NC];
+        const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
+            bu_streams[stream] = bu_data[stream];
         }
-        s_t *block_out_streams[NS * NC];
+        s_t *bout_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
-            block_out_streams[stream] = block_out_data[stream];
+            bout_streams[stream] = bout_data[stream];
         }
-        s_t block_jacobian_adjugate0_data[VS];
-        const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate1_data[VS];
-        const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate2_data[VS];
-        const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate3_data[VS];
-        const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_determinant0_data[VS];
-        const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate0_data[VS];
+        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate1_data[VS];
+        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate2_data[VS];
+        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate3_data[VS];
+        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_determinant0_data[VS];
+        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
 
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_out_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
@@ -607,7 +607,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[shape * VS + scatter] * out_stride] += block_out_data[shape * NC + d][scatter];
+                        out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
                     }
                 }
             }
@@ -828,9 +828,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_aff
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
-        s_t block_u_data[NS * NC][VS];
-        s_t block_h_data[NS * NC][VS];
-        s_t block_out_data[NS * NC][VS];
+        s_t bu_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -847,47 +847,47 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_aff
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = ev[shape * VS + lane];
-                    block_u_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-                    block_h_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+                    bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+                    bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
                 }
             }
         }
         for (int stream = 0; stream < NS * NC; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_out_data[stream][lane] = s_t(0);
+                bout_data[stream][lane] = s_t(0);
             }
         }
 
-        const s_t *block_u_streams[NS * NC];
+        const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
+            bu_streams[stream] = bu_data[stream];
         }
-        const s_t *block_h_streams[NS * NC];
+        const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
-            block_h_streams[stream] = block_h_data[stream];
+            bh_streams[stream] = bh_data[stream];
         }
-        s_t *block_out_streams[NS * NC];
+        s_t *bout_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
-            block_out_streams[stream] = block_out_data[stream];
+            bout_streams[stream] = bout_data[stream];
         }
-        s_t block_jacobian_adjugate0_data[VS];
-        const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate1_data[VS];
-        const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate2_data[VS];
-        const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_adjugate3_data[VS];
-        const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t block_jacobian_determinant0_data[VS];
-        const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate0_data[VS];
+        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate1_data[VS];
+        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate2_data[VS];
+        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_adjugate3_data[VS];
+        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        s_t bjacobian_determinant0_data[VS];
+        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
 
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, affine_q_weight, lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
@@ -896,7 +896,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_aff
                 {
                     for (int scatter = 0; scatter < nelems; ++scatter) {
                         #pragma omp atomic update
-                        out_components[d][ev[shape * VS + scatter] * out_stride] += block_out_data[shape * NC + d][scatter];
+                        out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
                     }
                 }
             }

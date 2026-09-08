@@ -845,9 +845,9 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa_i
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_current[NC * NS][VS];
-        s_t block_previous[NC * NS][VS];
-        s_t block_output[NC * NS][VS];
+        s_t bcurrent[NC * NS][VS];
+        s_t bprevious[NC * NS][VS];
+        s_t boutput[NC * NS][VS];
         const s_t *const current_components[NC] = {p_w, p_c};
         const s_t *const previous_components[NC] = {p_w_old, p_c_old};
 
@@ -858,8 +858,8 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa_i
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
+                    bcurrent[stream][lane] = current_components[field][node * current_stride];
+                    bprevious[stream][lane] = previous_components[field][node * previous_stride];
                 }
             }
         }
@@ -867,23 +867,23 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa_i
         for (int stream = 0; stream < 8; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
         const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_adjugate4 + evb, g_jacobian_adjugate5 + evb, g_jacobian_adjugate6 + evb, g_jacobian_adjugate7 + evb, g_jacobian_adjugate8 + evb, g_jacobian_determinant0 + evb};
-        s_t block_affine_geometry_data[10][VS];
+        s_t baffine_geometry_data[10][VS];
         const s_t *bageom_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
             bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+                    nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const s_t *block_adjugate[9];
+        const s_t *badjugate[9];
         for (int component = 0; component < 9; ++component) {
-            block_adjugate[component] = bageom_streams[component];
+            badjugate[component] = bageom_streams[component];
         }
 
-        two_phase_flow_form_1_p_c_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[9], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current, block_previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, block_output);
+        two_phase_flow_form_1_p_c_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[9], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, boutput);
 
         s_t *const output_components[NC] = {p_w_out, p_c_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -893,7 +893,7 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa_i
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -1049,24 +1049,24 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_tet4_jacobian_action_affine_mes
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_output[NC * NS][VS];
+        s_t boutput[NC * NS][VS];
 
         for (int stream = 0; stream < 8; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
         const g_t *const affine_geometry_sources[1] = {g_jacobian_determinant0 + evb};
-        s_t block_affine_geometry_data[1][VS];
+        s_t baffine_geometry_data[1][VS];
         const s_t *bageom_streams[1];
         for (int geometry_stream = 0; geometry_stream < 1; ++geometry_stream) {
             bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+                    nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
 
-        two_phase_flow_form_1_p_c_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[0], affine_shape, affine_q_weight, block_output);
+        two_phase_flow_form_1_p_c_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[0], affine_shape, affine_q_weight, boutput);
 
         s_t *const output_components[NC] = {p_w_out, p_c_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -1076,7 +1076,7 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_tet4_jacobian_action_affine_mes
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }

@@ -173,9 +173,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_current[NC * NS][VS];
-        s_t block_previous[NC * NS][VS];
-        s_t block_output[NC * NS][VS];
+        s_t bcurrent[NC * NS][VS];
+        s_t bprevious[NC * NS][VS];
+        s_t boutput[NC * NS][VS];
         const s_t *const current_components[NC] = {u0, u1};
         const s_t *const previous_components[NC] = {u0_old, u1_old};
 
@@ -186,8 +186,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
+                    bcurrent[stream][lane] = current_components[field][node * current_stride];
+                    bprevious[stream][lane] = previous_components[field][node * previous_stride];
                 }
             }
         }
@@ -195,23 +195,23 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_
         for (int stream = 0; stream < 6; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
         const g_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_determinant0 + evb};
-        s_t block_affine_geometry_data[5][VS];
+        s_t baffine_geometry_data[5][VS];
         const s_t *bageom_streams[5];
         for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
             bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+                    nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const s_t *block_adjugate[4];
+        const s_t *badjugate[4];
         for (int component = 0; component < 4; ++component) {
-            block_adjugate[component] = bageom_streams[component];
+            badjugate[component] = bageom_streams[component];
         }
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[4], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[4], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, bcurrent, bprevious, eta_b, eta_s, newmark_velocity_alpha, boutput);
 
         s_t *const output_components[NC] = {u0_out, u1_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -221,7 +221,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }
@@ -360,10 +360,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
-        s_t block_current[NC * NS][VS];
-        s_t block_previous[NC * NS][VS];
-        s_t block_direction[NC * NS][VS];
-        s_t block_output[NC * NS][VS];
+        s_t bcurrent[NC * NS][VS];
+        s_t bprevious[NC * NS][VS];
+        s_t bdirection[NC * NS][VS];
+        s_t boutput[NC * NS][VS];
         const s_t *const current_components[NC] = {u0, u1};
         const s_t *const previous_components[NC] = {u0_old, u1_old};
         const s_t *const direction_components[NC] = {u0_direction, u1_direction};
@@ -375,9 +375,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
                     const idx_t node = element_shape[evb + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                    block_previous[stream][lane] = previous_components[field][node * previous_stride];
-                    block_direction[stream][lane] = direction_components[field][node * direction_stride];
+                    bcurrent[stream][lane] = current_components[field][node * current_stride];
+                    bprevious[stream][lane] = previous_components[field][node * previous_stride];
+                    bdirection[stream][lane] = direction_components[field][node * direction_stride];
                 }
             }
         }
@@ -385,23 +385,23 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_
         for (int stream = 0; stream < 6; ++stream) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = s_t(0);
+                boutput[stream][lane] = s_t(0);
             }
         }
 
         const g_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_determinant0 + evb};
-        s_t block_affine_geometry_data[5][VS];
+        s_t baffine_geometry_data[5][VS];
         const s_t *bageom_streams[5];
         for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
             bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+                    nelems, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
-        const s_t *block_adjugate[4];
+        const s_t *badjugate[4];
         for (int component = 0; component < 4; ++component) {
-            block_adjugate[component] = bageom_streams[component];
+            badjugate[component] = bageom_streams[component];
         }
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[4], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[4], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, newmark_velocity_alpha, boutput);
 
         s_t *const output_components[NC] = {u0_out, u1_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -411,7 +411,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
                 }
             }
         }

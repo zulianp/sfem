@@ -28,16 +28,16 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_direct_hessian_reference_element_matrix(
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate4,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate5,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate6,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate7,
-        const s_t *const SFEM_RESTRICT block_jacobian_adjugate8,
-        const s_t *const SFEM_RESTRICT block_jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate0,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate1,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate2,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate3,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate4,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate5,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate6,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate7,
+        const s_t *const SFEM_RESTRICT bjacobian_adjugate8,
+        const s_t *const SFEM_RESTRICT bjacobian_determinant0,
         const s_t *const SFEM_RESTRICT grad_ref_x,
         const s_t *const SFEM_RESTRICT grad_ref_y,
         const s_t *const SFEM_RESTRICT grad_ref_z,
@@ -58,16 +58,16 @@ static SFEM_INLINE void laplace_d3_simplex_direct_hessian_reference_element_matr
         const s_t qw = q_weight[q];
         const int lane = 0;
         const ptrdiff_t goff = q * VS + lane;
-        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[goff];
-        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[goff];
-        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[goff];
-        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[goff];
-        const s_t jacobian_adjugate_lane4 = block_jacobian_adjugate4[goff];
-        const s_t jacobian_adjugate_lane5 = block_jacobian_adjugate5[goff];
-        const s_t jacobian_adjugate_lane6 = block_jacobian_adjugate6[goff];
-        const s_t jacobian_adjugate_lane7 = block_jacobian_adjugate7[goff];
-        const s_t jacobian_adjugate_lane8 = block_jacobian_adjugate8[goff];
-        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[goff];
+        const s_t jacobian_adjugate_lane0 = bjacobian_adjugate0[goff];
+        const s_t jacobian_adjugate_lane1 = bjacobian_adjugate1[goff];
+        const s_t jacobian_adjugate_lane2 = bjacobian_adjugate2[goff];
+        const s_t jacobian_adjugate_lane3 = bjacobian_adjugate3[goff];
+        const s_t jacobian_adjugate_lane4 = bjacobian_adjugate4[goff];
+        const s_t jacobian_adjugate_lane5 = bjacobian_adjugate5[goff];
+        const s_t jacobian_adjugate_lane6 = bjacobian_adjugate6[goff];
+        const s_t jacobian_adjugate_lane7 = bjacobian_adjugate7[goff];
+        const s_t jacobian_adjugate_lane8 = bjacobian_adjugate8[goff];
+        const s_t jacobian_determinant_lane0 = bjacobian_determinant0[goff];
         const s_t idet = s_t(1) / jacobian_determinant_lane0;
         for (int trial_component = 0; trial_component < NC; ++trial_component) {
             for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
