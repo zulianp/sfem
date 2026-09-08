@@ -139,17 +139,27 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
     scalar_t *const SFEM_RESTRICT       rz = d.rz.data();
     scalar_t *const SFEM_RESTRICT       rc = d.rc.data();
     const size_t                        scratch_n = packed_scratch_n(p);
+    // Rhie-Chow needs the coordinates and the nodal gradient staged per pack, six arrays
+    // rather than three, so slot 3 is sized for six when it is on. This is the solver's
+    // own arrangement (packed_rc_n, cvfem_hex8_ns_packed.hpp) and the constant already
+    // lives in the shared cvfem_hex8_pack_common.hpp.
+    const int                           with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
     {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                geom_kind == GeomKind::Isoparam ? thread_scratch<scalar_t>(3, packed_xyz_n(p)) : nullptr;
+                (geom_kind == GeomKind::Isoparam || with_rc)
+                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
+                        : nullptr;
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
@@ -165,6 +175,9 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
 
             fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
+                                               pack_z, pack_pgx, pack_pgy, pack_pgz);
 
             if (geom_kind == GeomKind::Isoparam) {
                 fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
@@ -185,6 +198,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                 alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
                 Hex8InputPack    in;
                 Hex8ResidualPack outp;
+                Hex8RhieChowPack rcp;
                 for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                     const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                     gather_hex8_simd_from_pack(p.elems,
@@ -203,8 +217,12 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                cof7,
                                                cof8,
                                                det);
+                    if (with_rc)
+                        cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy,
+                                                       pack_pgz, begin, nlanes, rcp);
                     cvfem_hex8_ns_upwind_residual_sumfact_simd(
-                            rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp);
+                            rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
+                            with_rc ? &rcp : nullptr, d.rhie_chow_scale);
                     scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
                 }
             } else {
