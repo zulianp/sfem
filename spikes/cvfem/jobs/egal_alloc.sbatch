@@ -31,10 +31,23 @@
 #   allocator is the cause and the fix is to hoist the scratch out of the per-call path
 
 set -u
-# Locate the spike root -- the directory holding CMakeLists.txt, drivers/ and src/.
-# Resolved from this script's own path rather than a hardcoded scratch path, so the job
-# does not carry one user's $SCRATCH layout and works from any checkout.
-SPIKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Locate the spike root -- the directory holding CMakeLists.txt, drivers/ and scripts/.
+# Resolved rather than hardcoded, so the job does not carry one user's $SCRATCH layout.
+#
+# BASH_SOURCE is NOT usable on its own here. Slurm copies the batch script to
+# /var/spool/slurmd/job<id>/slurm_script before running it, so under sbatch the script's
+# own path says nothing about where the tree is -- it resolves to /var/spool/slurmd and
+# every relative path after it fails. SLURM_SUBMIT_DIR, the directory sbatch was invoked
+# from, is the reliable one; the rest are for running the script directly.
+_cvfem_probe=scripts/alps_env.sh
+SPIKE_ROOT=""
+for _cand in "${SLURM_SUBMIT_DIR:-}" "${SLURM_SUBMIT_DIR:-}/.." "${CVFEM_DIR:-}" \
+             "$(dirname "${BASH_SOURCE[0]}")/.."; do
+    [ -n "${_cand}" ] && [ -f "${_cand}/${_cvfem_probe}" ] || continue
+    SPIKE_ROOT="$(cd "${_cand}" && pwd)"; break
+done
+[ -n "${SPIKE_ROOT}" ] || {
+    echo "error: could not locate spikes/cvfem; sbatch from there or set CVFEM_DIR" >&2; exit 1; }
 cd "$SPIKE_ROOT"
 
 UENV_IMAGE="prgenv-gnu/24.11:v2"
