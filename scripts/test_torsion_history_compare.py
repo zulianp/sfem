@@ -6,11 +6,28 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from run_torsion_history_compare import POLICIES, compare_runs, read_history, run, scalar_errors
+from run_torsion_history_compare import CASE, POLICIES, compare_runs, load_case, read_history, run, scalar_errors
 
 
 def check(root):
+    original = yaml.safe_load(CASE.read_text())
+    assert original["dynamics"] == {"type": "newmark", "density": 1.0, "beta": 0.64, "gamma": 0.6}
+    assert original["material"]["prony"] == [
+        {"g": 0.4, "tau": 1}, {"g": 0.4, "tau": 2}, {"g": 0.1, "tau": 5}, {"g": 0.05, "tau": 10}]
+    shortened = load_case(0.025)
+    assert shortened["time"]["t_end"] == 0.025
+    shortened["time"]["t_end"] = original["time"]["t_end"]
+    assert shortened == original == load_case()
+    for invalid in (0, -1, float("nan"), float("inf"), 0.007, 81):
+        try:
+            load_case(invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"Must reject invalid end time: {invalid}")
     case = {"time": {"dt": 1, "t_end": 2}, "solver": {"newton": {"tol": 1e-8}},
+            "dynamics": original["dynamics"],
+            "output": {"path": "results_newmark", "history_csv": "history.csv"},
             "torsion": {"release": {"time": 2}}}
     (root / "case.yaml").write_text(yaml.safe_dump(case))
     ref = pd.DataFrame({"time": [1, 2], "angle": [0.6, 0], "released": [0, 1],
@@ -25,7 +42,7 @@ def check(root):
     assert np.allclose(errors.control_peak_normalized_percent, 1)
 
     for i, name in enumerate(POLICIES):
-        folder = root / name / "results_release"
+        folder = root / name / "results_newmark"
         (folder / "out").mkdir(parents=True)
         data = ref.copy()
         data["torque"] += i * 0.02
@@ -43,7 +60,7 @@ def check(root):
     for name in ("torsion_comparison.pdf", "coupled_comparison.pdf", "torsion_errors.csv"):
         assert (root / "compare" / name).stat().st_size > 0
 
-    path = root / "fp64/results_release/history.csv"
+    path = root / "fp64/results_newmark/history.csv"
     for bad, message in ((ref.iloc[:1], "incomplete"),
                          (ref.assign(gnorm=1e-5), "unconverged"),
                          (ref.assign(torque=np.nan), "non-finite"),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the five history-storage policies on the same torsion-release case."""
+"""Compare five history-storage policies on Newmark torsion with inertia."""
 import argparse
 import hashlib
 import json
@@ -20,7 +20,7 @@ from compare_mr_visco_history import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-CASE = ROOT / "spikes/prony-series/cases/torsion_release.yaml"
+CASE = ROOT / "spikes/prony-series/cases/newmark_torsion_release.yaml"
 POLICIES = {
     "fp64": ("float64", "none"),
     "fp32": ("float32", "none"),
@@ -28,6 +28,19 @@ POLICIES = {
     "fp16_tensor": ("float16", "tensor"),
     "fp16_element_prony": ("float16", "element_prony"),
 }
+
+
+def load_case(end_time=None):
+    case = yaml.safe_load(CASE.read_text())
+    if end_time is not None:
+        dt = case["time"]["dt"]
+        if not np.isfinite(end_time) or end_time < dt or end_time > case["time"]["t_end"]:
+            raise ValueError("--end-time must be finite and between dt and the YAML end time")
+        steps = end_time / dt
+        if not np.isclose(steps, round(steps), rtol=0, atol=1e-8):
+            raise ValueError("--end-time must be an integer multiple of dt")
+        case["time"]["t_end"] = end_time
+    return case
 
 
 def read_history(path, case):
@@ -74,8 +87,9 @@ def scalar_errors(reference, candidate):
 
 def compare_runs(out):
     case = yaml.safe_load((out / "case.yaml").read_text())
-    results = {name: out / name / "results_release" for name in POLICIES}
-    histories = {name: read_history(path / "history.csv", case) for name, path in results.items()}
+    results = {name: out / name / case["output"]["path"] for name in POLICIES}
+    histories = {name: read_history(path / case["output"]["history_csv"], case)
+                 for name, path in results.items()}
     # The driver exports an initial zero field and always exports the final step.
     # Check exact coverage before reusing the older, looser field-comparison helper.
     for name, path in results.items():
@@ -96,7 +110,7 @@ def compare_runs(out):
         style = ("-", "--", "-.", ":", "--")[i]
         color = ("black", "tab:blue", "tab:orange", "tab:green", "tab:red")[i]
         axes[0, 0].plot(data.time, data.torque, color=color, linestyle=style, label=name)
-        axes[0, 1].plot(data.time, np.hypot(data.uy, data.uz), color=color, linestyle=style, label=name)
+        axes[0, 1].plot(data.time, data.uy, color=color, linestyle=style, label=name)
         errors = scalar_errors(reference, data)
         summaries.append({
             "candidate": name,
@@ -119,19 +133,21 @@ def compare_runs(out):
         fields[name] = compare_displacement(
             results["fp64"], results[name], plots / name, "out", "fp64", name)
     axes[0, 0].set(title="Reaction torque", ylabel="Torque (model units)")
-    axes[0, 1].set(title="Control-point transverse displacement", ylabel=r"$\sqrt{u_y^2+u_z^2}$ (length units)")
+    axes[0, 1].set(title="Control-point signed displacement", ylabel=r"$u_y$ (length units)")
     axes[1, 0].set(title="Torque error / FP64 peak torque", ylabel="Peak-normalized error (%)")
     axes[1, 1].set(title="Control-vector error / FP64 peak vector norm", ylabel="Peak-normalized error (%)")
     for ax in axes[1]:
         if any(np.any(line.get_ydata() > 0) for line in ax.lines):
             ax.set_yscale("log")
     for ax in axes.flat:
-        ax.axvline(case["torsion"]["release"]["time"], color="gray", linestyle=":", alpha=0.6)
+        if case["torsion"]["release"]["time"] <= reference.time.iloc[-1]:
+            ax.axvline(case["torsion"]["release"]["time"], color="gray", linestyle=":", alpha=0.6)
         ax.set_xlabel("Time [s]")
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=8)
-    fig.suptitle("Torsion release: coupled history-storage comparison")
-    fig.text(0.5, 0.01, "Vertical line: release. Zero errors omitted on log axes; retained in CSV.", ha="center")
+    integrator = case.get("dynamics", {}).get("type", "quasi_static")
+    fig.suptitle(f"Torsion release ({integrator}): coupled history-storage comparison")
+    fig.text(0.5, 0.01, "Dotted vertical line, if shown: release. Zero log errors omitted; retained in CSV.", ha="center")
     fig.tight_layout(rect=(0, 0.04, 1, 0.96))
     for extension in ("png", "pdf"):
         fig.savefig(plots / f"torsion_comparison.{extension}", dpi=180)
@@ -142,13 +158,17 @@ def compare_runs(out):
     print(f"[done] Plots and error tables: {plots}", flush=True)
 
 
-def run(out, exe):
+def run(out, exe, end_time=None):
     if out.exists():
         raise FileExistsError(f"Refusing to overwrite {out}; use a new --out or --plot-only")
     if not exe.is_file() or not os.access(exe, os.X_OK):
         raise FileNotFoundError(f"Build torsion first; missing executable: {exe}")
+    case = load_case(end_time)
     out.mkdir(parents=True)
-    shutil.copy2(CASE, out / "case.yaml")
+    if end_time is None:
+        shutil.copy2(CASE, out / "case.yaml")
+    else:
+        (out / "case.yaml").write_text(yaml.safe_dump(case, sort_keys=False))
     env = os.environ.copy()
     env.setdefault("OMP_NUM_THREADS", "1")
     env["SFEM_HISTORY_MODE"] = "per_qp"
@@ -162,10 +182,10 @@ def run(out, exe):
         "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "executable": str(exe), "executable_sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),
         "case_sha256": hashlib.sha256((out / "case.yaml").read_bytes()).hexdigest(),
+        "source_case": str(CASE), "dynamics": case["dynamics"], "time": case["time"],
         "mesh_command": mesh_command, "omp_num_threads": env["OMP_NUM_THREADS"],
         "history_mode": "per_qp", "history_check": "1", "runs": {},
     }
-    case = yaml.safe_load((out / "case.yaml").read_text())
     for name, (storage, scaling) in POLICIES.items():
         folder = out / name
         folder.mkdir()
@@ -183,7 +203,7 @@ def run(out, exe):
         (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         if completed.returncode:
             raise RuntimeError(f"{name} failed ({completed.returncode}); see {folder / 'run.log'}")
-        read_history(folder / "results_release/history.csv", case)
+        read_history(folder / case["output"]["path"] / case["output"]["history_csv"], case)
         print(f"[ok] {name}: complete and all recorded steps converged", flush=True)
     compare_runs(out)
 
@@ -194,11 +214,14 @@ def main():
     parser.add_argument("--exe", type=Path, default=os.environ.get(
         "PRONY_EXE", str(ROOT / "spikes/prony-series/build/prony_visco_torsion")))
     parser.add_argument("--plot-only", action="store_true", help="Recreate comparison plots from this runner's outputs")
+    parser.add_argument("--end-time", type=float, help="Shorten the run for testing; only the saved YAML copy is changed")
     args = parser.parse_args()
     if args.plot_only:
+        if args.end_time is not None:
+            parser.error("--end-time cannot be used with --plot-only")
         compare_runs(args.out.resolve())
     else:
-        run(args.out.resolve(), args.exe.resolve())
+        run(args.out.resolve(), args.exe.resolve(), args.end_time)
 
 
 if __name__ == "__main__":
