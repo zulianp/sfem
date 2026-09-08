@@ -5,8 +5,8 @@ from codegen.framework.plans.affine_element_kernel import (
     metric_symbols,
     p1_simplex_metric_apply_plan,
 )
+from codegen.framework.plans.geometry_variants import geometry_variant_plan
 from codegen.framework.plans.form_transformations import (
-    cached_metric_geometry,
     metric_value_scale,
 )
 from codegen.framework.plans.form_emission import (
@@ -823,7 +823,7 @@ def _sfem_soa_local_header(
             # coordinates and has an adjugate rather than a cached metric, so
             # the two modes genuinely need different kernels.  That is the
             # shape the residual path already has.
-            metric = cached_metric_geometry(form.weak_form, specialized_rule)
+            metric = geometry_variant_plan(form.weak_form, specialized_rule).cached_metric
             if metric is not None:
                 metric_array_inputs = _metric_array_inputs(array_inputs, dim)
                 lines.extend(
@@ -1378,14 +1378,14 @@ def _sfem_soa_weak_form_block_function(
         # The geometry this block was given says which kernel it is: the metric
         # block is emitted with metric inputs, the general one with the
         # adjugate, and the body follows.
-        metric=(
-            cached_metric_geometry(form.weak_form, quadrature_rule)
-            if any(
+        metric=geometry_variant_plan(
+            form.weak_form,
+            quadrature_rule,
+            specialized=any(
                 getattr(entry, "name", "") == "geom_metric"
                 for entry in shared.element_inputs
-            )
-            else None
-        ),
+            ),
+        ).cached_metric,
     )
     lines.append("}")
     return lines
@@ -4569,11 +4569,11 @@ def _sfem_soa_mesh_operator_function(
     # The isoparametric one cannot: it builds its geometry from coordinates and
     # holds an adjugate, so it keeps the general kernel.  This is the one place
     # the two modes take different arguments for the same form.
-    metric = (
-        cached_metric_geometry(form.weak_form, quadrature_rule)
-        if geometry_mode == "affine" and specialized_prefix is not None
-        else None
-    )
+    metric = geometry_variant_plan(
+        form.weak_form,
+        quadrature_rule,
+        specialized=geometry_mode == "affine" and specialized_prefix is not None,
+    ).cached_metric
     # The packed entry points build their own adjugate arguments and have not
     # been converted, so they keep the general block.  Only the kernel whose
     # arguments are built below moves to the metric one.
@@ -5798,11 +5798,11 @@ def _sfem_soa_mesh_objective_steps_function(
     # The third member of the triple takes the cached metric on the same terms
     # the other two do, and additionally only when the energy really is the
     # quadratic invariant the metric can express.
-    metric = (
-        cached_metric_geometry(form.weak_form, quadrature_rule)
-        if geometry_mode == "affine" and specialized_prefix is not None
-        else None
-    )
+    metric = geometry_variant_plan(
+        form.weak_form,
+        quadrature_rule,
+        specialized=geometry_mode == "affine" and specialized_prefix is not None,
+    ).cached_metric
     value_plan = expanded_simplex_metric_value_plan(
         metric,
         dim,
