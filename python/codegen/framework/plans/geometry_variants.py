@@ -136,20 +136,28 @@ def geometry_variant_plan(weak_form, rule, *, specialized=True, assembles_matrix
     constant_p1 = _is_constant_p1_simplex_rule(rule)
     metric = cached_metric_geometry(weak_form, rule) if specialized else None
     return GeometryVariantPlan(
-        # Both geometry modes, for now.  The rules below are written down and
-        # the emitters already iterate them, but turning them on drops kernels
-        # that four tests still expect and, in one case, that a Taylor-Hood
-        # material appears to need: enabling them made
-        # `poro_hyperelasticity_solid_gradient_2d_isoparametric_mesh_soa`
-        # disappear on TRI6_TRI3, and TRI6 is not a constant-P1 simplex, so the
-        # rule as written should not have touched it.  Something about the
-        # compatible-element rule is not what this function assumes, and
-        # shipping a kernel-dropping policy whose behaviour is not understood
-        # is how a material quietly stops working.
+        # Both geometry modes, for now.  The rules are written down and the
+        # emitters already iterate them; what is missing is one change in the
+        # wrapper layer.
         #
         #     emits_affine=constant_p1 or dim == 3,
         #     emits_isoparametric=(not constant_p1) or assembles_matrix,
         #
+        # An energy form's dimension-level dispatch is emitted as an
+        # affine/isoparametric *pair* in `package/op_wrappers.py`: one `if
+        # (impl_->..._uses_affine) { affine } else { isoparametric }`, built
+        # from both names together.  Drop either variant and the wrapper stops
+        # calling the other one too -- the entry point is still generated and
+        # still in the dispatch file, but nothing reaches it.  That is what
+        # made `poro_hyperelasticity_solid_gradient_2d_isoparametric_mesh_soa`
+        # look like it had disappeared on TRI6_TRI3 when only the 2D *affine*
+        # kernel had been dropped.  TRI6 is not a constant-P1 simplex and the
+        # P1 rule never touched it.
+        #
+        # So the prerequisite is to emit those two branches independently,
+        # each guarded on its own entry point existing, the way the packed
+        # dispatch already is.  That is why packed could be switched on and
+        # these two cannot yet.
         emits_affine=True,
         emits_isoparametric=True,
         emits_packed=dim == 3,
