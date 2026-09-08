@@ -16,6 +16,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
@@ -30,18 +33,18 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT adj0,
-        const s_t *const SFEM_RESTRICT adj1,
-        const s_t *const SFEM_RESTRICT adj2,
-        const s_t *const SFEM_RESTRICT adj3,
-        const s_t *const SFEM_RESTRICT det0,
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const SFEM_RESTRICT u_streams[NS * 2],
-        s_t *const SFEM_RESTRICT value
+        const s_t *const RSTR u_streams[NS * 2],
+        s_t *const RSTR value
 ) {
     static_assert(NQ > 0, "NQ must be positive");
     static_assert(VS > 0, "VS must be positive");
@@ -93,18 +96,18 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT adj0,
-        const s_t *const SFEM_RESTRICT adj1,
-        const s_t *const SFEM_RESTRICT adj2,
-        const s_t *const SFEM_RESTRICT adj3,
-        const s_t *const SFEM_RESTRICT det0,
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const SFEM_RESTRICT u_streams[NS * 2],
-        s_t *const SFEM_RESTRICT out_streams[NS * 2]
+        const s_t *const RSTR u_streams[NS * 2],
+        s_t *const RSTR out_streams[NS * 2]
 ) {
     static_assert(NQ > 0, "NQ must be positive");
     static_assert(VS > 0, "VS must be positive");
@@ -174,19 +177,19 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT adj0,
-        const s_t *const SFEM_RESTRICT adj1,
-        const s_t *const SFEM_RESTRICT adj2,
-        const s_t *const SFEM_RESTRICT adj3,
-        const s_t *const SFEM_RESTRICT det0,
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const SFEM_RESTRICT u_streams[NS * 2],
-        const s_t *const SFEM_RESTRICT h_streams[NS * 2],
-        s_t *const SFEM_RESTRICT out_streams[NS * 2]
+        const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        s_t *const RSTR out_streams[NS * 2]
 ) {
     static_assert(NQ > 0, "NQ must be positive");
     static_assert(VS > 0, "VS must be positive");

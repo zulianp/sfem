@@ -1,3 +1,4 @@
+from codegen.framework.plans.conventions import restrict_prelude
 from codegen.framework.targets import current_target
 
 
@@ -35,12 +36,12 @@ def _expand_residual_stream_method(method):
     )
     pointer_method = pointer_method.replace(
         "const StreamContainer streams,",
-        "const s_t *const SFEM_RESTRICT streams[NC * NS],",
+        "const s_t *const RSTR streams[NC * NS],",
         1,
     )
     pointer_method = pointer_method.replace(
         "StreamContainer output)",
-        "s_t *const SFEM_RESTRICT output[NC * NS])",
+        "s_t *const RSTR output[NC * NS])",
         1,
     )
 
@@ -112,8 +113,8 @@ def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
 def _restrict_define_line(restrict_definition):
     restrict_definition = str(restrict_definition)
     if restrict_definition:
-        return "#define SFEM_RESTRICT %s" % restrict_definition
-    return "#define SFEM_RESTRICT"
+        return "#define RSTR %s" % restrict_definition
+    return "#define RSTR"
 
 
 def sfem_tensor_product_kernels_header_source(
@@ -142,7 +143,7 @@ def sfem_tensor_product_kernels_header_source(
         ),
         "inline_qualifier": inline_qualifier,
         "inline_definition": inline_definition,
-        "restrict_definition_line": _restrict_define_line(restrict_definition),
+        "restrict_prelude": "\n".join(restrict_prelude(restrict_definition or "")),
         "work_item": work_item_index,
     }
     for indent_size in (12, 16, 20):
@@ -162,9 +163,7 @@ _TENSOR_PRODUCT_KERNELS_TEMPLATE = r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNE
 #include <stddef.h>
 
 %(sfem_inline_block)s
-#ifndef SFEM_RESTRICT
-%(restrict_definition_line)s
-#endif
+%(restrict_prelude)s
 
 namespace sfem {
 namespace codegen {
@@ -189,11 +188,11 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void gradient_impl(
             const int nelems,
-            const s_t *const SFEM_RESTRICT shape_1d,
-            const s_t *const SFEM_RESTRICT grad_1d,
+            const s_t *const RSTR shape_1d,
+            const s_t *const RSTR grad_1d,
             const StreamContainer streams,
             const int component,
-            s_t *const SFEM_RESTRICT gradient) {
+            s_t *const RSTR gradient) {
         static constexpr int NQ1 = integer_root(NQ, 2);
         static constexpr int NS1 = integer_root(NS, 2);
         s_t value_x[NQ1 * NS1 * VS];
@@ -236,32 +235,32 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
     template <int NC>
     static %(inline_qualifier)s void gradient(
             const int nelems,
-            const s_t *const SFEM_RESTRICT shape_1d,
-            const s_t *const SFEM_RESTRICT grad_1d,
-            const s_t *const SFEM_RESTRICT streams[NS * NC],
+            const s_t *const RSTR shape_1d,
+            const s_t *const RSTR grad_1d,
+            const s_t *const RSTR streams[NS * NC],
             const int component,
-            s_t *const SFEM_RESTRICT gradient) {
+            s_t *const RSTR gradient) {
         gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static %(inline_qualifier)s void gradient_contiguous(
             const int nelems,
-            const s_t *const SFEM_RESTRICT shape_1d,
-            const s_t *const SFEM_RESTRICT grad_1d,
+            const s_t *const RSTR shape_1d,
+            const s_t *const RSTR grad_1d,
             const s_t streams[NS * NC][VS],
             const int component,
-            s_t *const SFEM_RESTRICT gradient) {
+            s_t *const RSTR gradient) {
         gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static %(inline_qualifier)s void test(
             const int nelems,
-            const s_t *const SFEM_RESTRICT shape_1d,
-            const s_t *const SFEM_RESTRICT grad_1d,
-            const s_t *const SFEM_RESTRICT flux,
-            s_t *const SFEM_RESTRICT out_streams[NS * NC],
+            const s_t *const RSTR shape_1d,
+            const s_t *const RSTR grad_1d,
+            const s_t *const RSTR flux,
+            s_t *const RSTR out_streams[NS * NC],
             const int component) {
         static constexpr int NQ1 = integer_root(NQ, 2);
         static constexpr int NS1 = integer_root(NS, 2);
@@ -305,11 +304,11 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
     template <int NC, typename StreamContainer>
     static %(inline_qualifier)s void gradient_impl(
             const int nelems,
-            const s_t *const SFEM_RESTRICT shape_1d,
-            const s_t *const SFEM_RESTRICT grad_1d,
+            const s_t *const RSTR shape_1d,
+            const s_t *const RSTR grad_1d,
             const StreamContainer streams,
             const int component,
-            s_t *const SFEM_RESTRICT gradient) {
+            s_t *const RSTR gradient) {
         static constexpr int NQ1 = integer_root(NQ, 3);
         static constexpr int NS1 = integer_root(NS, 3);
         s_t value_x[NQ1 * NS1 * NS1 * VS];
@@ -383,32 +382,32 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
     template <int NC>
     static %(inline_qualifier)s void gradient(
             const int nelems,
-            const s_t *const SFEM_RESTRICT shape_1d,
-            const s_t *const SFEM_RESTRICT grad_1d,
-            const s_t *const SFEM_RESTRICT streams[NS * NC],
+            const s_t *const RSTR shape_1d,
+            const s_t *const RSTR grad_1d,
+            const s_t *const RSTR streams[NS * NC],
             const int component,
-            s_t *const SFEM_RESTRICT gradient) {
+            s_t *const RSTR gradient) {
         gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static %(inline_qualifier)s void gradient_contiguous(
             const int nelems,
-            const s_t *const SFEM_RESTRICT shape_1d,
-            const s_t *const SFEM_RESTRICT grad_1d,
+            const s_t *const RSTR shape_1d,
+            const s_t *const RSTR grad_1d,
             const s_t streams[NS * NC][VS],
             const int component,
-            s_t *const SFEM_RESTRICT gradient) {
+            s_t *const RSTR gradient) {
         gradient_impl<NC>(nelems, shape_1d, grad_1d, streams, component, gradient);
     }
 
     template <int NC>
     static %(inline_qualifier)s void test(
             const int nelems,
-            const s_t *const SFEM_RESTRICT shape_1d,
-            const s_t *const SFEM_RESTRICT grad_1d,
-            const s_t *const SFEM_RESTRICT flux,
-            s_t *const SFEM_RESTRICT out_streams[NS * NC],
+            const s_t *const RSTR shape_1d,
+            const s_t *const RSTR grad_1d,
+            const s_t *const RSTR flux,
+            s_t *const RSTR out_streams[NS * NC],
             const int component) {
         static constexpr int NQ1 = integer_root(NQ, 3);
         static constexpr int NS1 = integer_root(NS, 3);
@@ -482,11 +481,11 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_gradient(
         const int nelems,
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT streams[NS * NC],
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR streams[NS * NC],
         const int component,
-        s_t *const SFEM_RESTRICT gradient) {
+        s_t *const RSTR gradient) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template gradient<NC>(
             nelems, shape_1d, grad_1d, streams, component, gradient);
 }
@@ -494,11 +493,11 @@ static %(inline_qualifier)s void tensor_gradient(
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_gradient_contiguous(
         const int nelems,
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
         const s_t streams[NS * NC][VS],
         const int component,
-        s_t *const SFEM_RESTRICT gradient) {
+        s_t *const RSTR gradient) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template gradient_contiguous<NC>(
             nelems, shape_1d, grad_1d, streams, component, gradient);
 }
@@ -506,10 +505,10 @@ static %(inline_qualifier)s void tensor_gradient_contiguous(
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_test(
         const int nelems,
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT flux,
-        s_t *const SFEM_RESTRICT out_streams[NS * NC],
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR flux,
+        s_t *const RSTR out_streams[NS * NC],
         const int component) {
     TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template test<NC>(
             nelems, shape_1d, grad_1d, flux, out_streams, component);
@@ -888,7 +887,7 @@ static %(inline_qualifier)s void tensor_evaluate(
         const int nelems,
         const s_t *const shape_1d,
         const s_t *const grad_1d,
-        const s_t *const SFEM_RESTRICT streams[NC * NS],
+        const s_t *const RSTR streams[NC * NS],
         s_t *const value,
         s_t *const gradient) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate<NC>(
@@ -911,7 +910,7 @@ template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
 static %(inline_qualifier)s void tensor_evaluate_value(
         const int nelems,
         const s_t *const shape_1d,
-        const s_t *const SFEM_RESTRICT streams[NC * NS],
+        const s_t *const RSTR streams[NC * NS],
         s_t *const value) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_value<NC>(
             nelems, shape_1d, streams, value);
@@ -934,7 +933,7 @@ static %(inline_qualifier)s void tensor_integrate(
         const s_t *const grad_1d,
         const s_t *const value_coeff,
         const s_t *const grad_coeff,
-        s_t *const SFEM_RESTRICT output[NC * NS]) {
+        s_t *const RSTR output[NC * NS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate<NC>(
             nelems, shape_1d, grad_1d, value_coeff, grad_coeff, output);
 }
@@ -956,7 +955,7 @@ static %(inline_qualifier)s void tensor_integrate_value(
         const int nelems,
         const s_t *const shape_1d,
         const s_t *const value_coeff,
-        s_t *const SFEM_RESTRICT output[NC * NS]) {
+        s_t *const RSTR output[NC * NS]) {
     TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_value<NC>(
             nelems, shape_1d, value_coeff, output);
 }

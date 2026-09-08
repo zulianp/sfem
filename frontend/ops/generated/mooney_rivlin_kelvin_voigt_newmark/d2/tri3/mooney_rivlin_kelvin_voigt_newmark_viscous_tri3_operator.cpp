@@ -32,8 +32,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT,
+        const g_t *const RSTR source,
+        s_t *const RSTR,
         std::true_type) {
     return source;
 }
@@ -41,8 +41,8 @@ SFEM_INLINE const s_t *ageom_stream(
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT converted,
+        const g_t *const RSTR source,
+        s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
@@ -104,14 +104,14 @@ struct mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_d
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_element_soa(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const double *const SFEM_RESTRICT determinant,
-        const double *const SFEM_RESTRICT adjugate[4],
-        const double *const SFEM_RESTRICT current[6],
-        const double *const SFEM_RESTRICT previous[6],
+        const double *const RSTR determinant,
+        const double *const RSTR adjugate[4],
+        const double *const RSTR current[6],
+        const double *const RSTR previous[6],
         const double eta_b,
         const double eta_s,
         const double newmark_velocity_alpha,
-        double *const SFEM_RESTRICT output[6]
+        double *const RSTR output[6]
 ) {
     sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_residual_block<double, 1, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
     return SFEM_SUCCESS;
@@ -120,14 +120,14 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_element_
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_element_soa_float(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const float *const SFEM_RESTRICT determinant,
-        const float *const SFEM_RESTRICT adjugate[4],
-        const float *const SFEM_RESTRICT current[6],
-        const float *const SFEM_RESTRICT previous[6],
+        const float *const RSTR determinant,
+        const float *const RSTR adjugate[4],
+        const float *const RSTR current[6],
+        const float *const RSTR previous[6],
         const float eta_b,
         const float eta_s,
         const float newmark_velocity_alpha,
-        float *const SFEM_RESTRICT output[6]
+        float *const RSTR output[6]
 ) {
     sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_residual_block<float, 1, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
     return SFEM_SUCCESS;
@@ -140,24 +140,24 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t eta_b,
         const s_t eta_s,
         const s_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const s_t *const SFEM_RESTRICT u0,
-        const s_t *const SFEM_RESTRICT u1,
+        const s_t *const RSTR u0,
+        const s_t *const RSTR u1,
         const ptrdiff_t previous_stride,
-        const s_t *const SFEM_RESTRICT u0_old,
-        const s_t *const SFEM_RESTRICT u1_old,
+        const s_t *const RSTR u0_old,
+        const s_t *const RSTR u1_old,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT u0_out,
-        s_t *const SFEM_RESTRICT u1_out
+        s_t *const RSTR u0_out,
+        s_t *const RSTR u1_out
 ) {
     static constexpr int ND = 2;
     static constexpr int NQ = 1;
@@ -180,7 +180,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_
         const s_t *const previous_components[NC] = {u0_old, u1_old};
 
         for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const RSTR element_shape = elements[shape];
             for (int field = 0; field < NC; ++field) {
                 const int stream = shape * NC + field;
                 #pragma omp simd
@@ -215,10 +215,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_
 
         s_t *const output_components[NC] = {u0_out, u1_out};
         for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const RSTR element_shape = elements[shape];
             for (int field = 0; field < NC; ++field) {
                 const int stream = shape * NC + field;
-                s_t *const SFEM_RESTRICT out = output_components[field];
+                s_t *const RSTR out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
@@ -236,24 +236,24 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double eta_b,
         const double eta_s,
         const double newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u0,
-        const double *const SFEM_RESTRICT u1,
+        const double *const RSTR u0,
+        const double *const RSTR u1,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT u0_old,
-        const double *const SFEM_RESTRICT u1_old,
+        const double *const RSTR u0_old,
+        const double *const RSTR u1_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u0_out,
-        double *const SFEM_RESTRICT u1_out
+        double *const RSTR u0_out,
+        double *const RSTR u1_out
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
 }
@@ -261,24 +261,24 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_affine_m
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float eta_b,
         const float eta_s,
         const float newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u0,
-        const float *const SFEM_RESTRICT u1,
+        const float *const RSTR u0,
+        const float *const RSTR u1,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT u0_old,
-        const float *const SFEM_RESTRICT u1_old,
+        const float *const RSTR u0_old,
+        const float *const RSTR u1_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u0_out,
-        float *const SFEM_RESTRICT u1_out
+        float *const RSTR u0_out,
+        float *const RSTR u1_out
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
 }
@@ -286,15 +286,15 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_affine_m
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_element_soa(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const double *const SFEM_RESTRICT determinant,
-        const double *const SFEM_RESTRICT adjugate[4],
-        const double *const SFEM_RESTRICT current[6],
-        const double *const SFEM_RESTRICT previous[6],
-        const double *const SFEM_RESTRICT direction[6],
+        const double *const RSTR determinant,
+        const double *const RSTR adjugate[4],
+        const double *const RSTR current[6],
+        const double *const RSTR previous[6],
+        const double *const RSTR direction[6],
         const double eta_b,
         const double eta_s,
         const double newmark_velocity_alpha,
-        double *const SFEM_RESTRICT output[6]
+        double *const RSTR output[6]
 ) {
     sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block<double, 1, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
     return SFEM_SUCCESS;
@@ -303,15 +303,15 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_e
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_element_soa_float(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const float *const SFEM_RESTRICT determinant,
-        const float *const SFEM_RESTRICT adjugate[4],
-        const float *const SFEM_RESTRICT current[6],
-        const float *const SFEM_RESTRICT previous[6],
-        const float *const SFEM_RESTRICT direction[6],
+        const float *const RSTR determinant,
+        const float *const RSTR adjugate[4],
+        const float *const RSTR current[6],
+        const float *const RSTR previous[6],
+        const float *const RSTR direction[6],
         const float eta_b,
         const float eta_s,
         const float newmark_velocity_alpha,
-        float *const SFEM_RESTRICT output[6]
+        float *const RSTR output[6]
 ) {
     sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block<float, 1, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
     return SFEM_SUCCESS;
@@ -324,27 +324,27 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t eta_b,
         const s_t eta_s,
         const s_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const s_t *const SFEM_RESTRICT u0,
-        const s_t *const SFEM_RESTRICT u1,
+        const s_t *const RSTR u0,
+        const s_t *const RSTR u1,
         const ptrdiff_t previous_stride,
-        const s_t *const SFEM_RESTRICT u0_old,
-        const s_t *const SFEM_RESTRICT u1_old,
+        const s_t *const RSTR u0_old,
+        const s_t *const RSTR u1_old,
         const ptrdiff_t direction_stride,
-        const s_t *const SFEM_RESTRICT u0_direction,
-        const s_t *const SFEM_RESTRICT u1_direction,
+        const s_t *const RSTR u0_direction,
+        const s_t *const RSTR u1_direction,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT u0_out,
-        s_t *const SFEM_RESTRICT u1_out
+        s_t *const RSTR u0_out,
+        s_t *const RSTR u1_out
 ) {
     static constexpr int ND = 2;
     static constexpr int NQ = 1;
@@ -369,7 +369,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_
         const s_t *const direction_components[NC] = {u0_direction, u1_direction};
 
         for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const RSTR element_shape = elements[shape];
             for (int field = 0; field < NC; ++field) {
                 const int stream = shape * NC + field;
                 #pragma omp simd
@@ -405,10 +405,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_
 
         s_t *const output_components[NC] = {u0_out, u1_out};
         for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const RSTR element_shape = elements[shape];
             for (int field = 0; field < NC; ++field) {
                 const int stream = shape * NC + field;
-                s_t *const SFEM_RESTRICT out = output_components[field];
+                s_t *const RSTR out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
@@ -426,27 +426,27 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double eta_b,
         const double eta_s,
         const double newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u0,
-        const double *const SFEM_RESTRICT u1,
+        const double *const RSTR u0,
+        const double *const RSTR u1,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT u0_old,
-        const double *const SFEM_RESTRICT u1_old,
+        const double *const RSTR u0_old,
+        const double *const RSTR u1_old,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u0_direction,
-        const double *const SFEM_RESTRICT u1_direction,
+        const double *const RSTR u0_direction,
+        const double *const RSTR u1_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u0_out,
-        double *const SFEM_RESTRICT u1_out
+        double *const RSTR u0_out,
+        double *const RSTR u1_out
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
@@ -454,27 +454,27 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_a
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float eta_b,
         const float eta_s,
         const float newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u0,
-        const float *const SFEM_RESTRICT u1,
+        const float *const RSTR u0,
+        const float *const RSTR u1,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT u0_old,
-        const float *const SFEM_RESTRICT u1_old,
+        const float *const RSTR u0_old,
+        const float *const RSTR u1_old,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u0_direction,
-        const float *const SFEM_RESTRICT u1_direction,
+        const float *const RSTR u0_direction,
+        const float *const RSTR u1_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u0_out,
-        float *const SFEM_RESTRICT u1_out
+        float *const RSTR u0_out,
+        float *const RSTR u1_out
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }

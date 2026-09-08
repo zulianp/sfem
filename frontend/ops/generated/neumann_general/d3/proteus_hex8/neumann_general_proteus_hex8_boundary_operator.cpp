@@ -1,5 +1,11 @@
 #include "sfem_base.hpp"
 #include "sfem_macros.hpp"
+#ifndef SFEM_RESTRICT
+#define SFEM_RESTRICT __restrict__
+#endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 
 #include <math.h>
 #include "../../../kernel_math.hpp"
@@ -59,11 +65,11 @@ template <typename s_t>
 static SFEM_INLINE s_t neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_measure(
         const int qx,
         const int qy,
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points) {
-    const s_t *const SFEM_RESTRICT shape_1d = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_1d();
-    const s_t *const SFEM_RESTRICT grad_1d = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::grad_1d();
-    const int *const SFEM_RESTRICT shape_index = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_index();
+        const idx_t *const RSTR ev,
+        const geom_t *const *const RSTR points) {
+    const s_t *const RSTR shape_1d = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_1d();
+    const s_t *const RSTR grad_1d = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::grad_1d();
+    const int *const RSTR shape_index = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_index();
     constexpr int NS1 = 2;
     s_t dxdr0 = s_t(0);
     s_t dxdr1 = s_t(0);
@@ -131,9 +137,9 @@ static SFEM_INLINE const int *neumann_general_proteus_hex8_proteus_quadshell4_bo
 static SFEM_INLINE void neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_gather_sideset_element(
         const element_idx_t parent_element,
         const int side,
-        idx_t **const SFEM_RESTRICT elements,
-        idx_t *const SFEM_RESTRICT ev) {
-    const int *const SFEM_RESTRICT side_nodes = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_side_nodes();
+        idx_t **const RSTR elements,
+        idx_t *const RSTR ev) {
+    const int *const RSTR side_nodes = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_side_nodes();
     constexpr int n_shape = 4;
     for (int i = 0; i < n_shape; ++i) {
         ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
@@ -142,12 +148,12 @@ static SFEM_INLINE void neumann_general_proteus_hex8_proteus_quadshell4_boundary
 
 template <typename s_t>
 static SFEM_INLINE void neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_element(
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
+        const idx_t *const RSTR ev,
+        const geom_t *const *const RSTR points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
         s_t element_vector[3][4]) {
-    const s_t *const SFEM_RESTRICT shape_1d = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_1d();
-    const s_t *const SFEM_RESTRICT weight_1d = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::weight_1d();
-    const int *const SFEM_RESTRICT shape_index = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_index();
+    const s_t *const RSTR shape_1d = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_1d();
+    const s_t *const RSTR weight_1d = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::weight_1d();
+    const int *const RSTR shape_index = neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_reference_data<s_t>::shape_index();
     constexpr int NS1 = 2;
     constexpr int NQ1 = 2;
 
@@ -191,12 +197,12 @@ static SFEM_INLINE void neumann_general_proteus_hex8_proteus_quadshell4_boundary
 
 template <typename s_t>
 static SFEM_INLINE void neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_scatter_element(
-        const idx_t *const SFEM_RESTRICT ev,
+        const idx_t *const RSTR ev,
         const s_t element_vector[3][4],
         const int out_stride,
-        s_t *const SFEM_RESTRICT out0,
-        s_t *const SFEM_RESTRICT out1,
-        s_t *const SFEM_RESTRICT out2) {
+        s_t *const RSTR out0,
+        s_t *const RSTR out1,
+        s_t *const RSTR out2) {
     constexpr int n_shape = 4;
     for (int i = 0; i < n_shape; ++i) {
         const idx_t node = ev[i];
@@ -213,12 +219,12 @@ template <typename s_t>
 static SFEM_INLINE int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
         const int out_stride,
-        s_t *const SFEM_RESTRICT out0,
-        s_t *const SFEM_RESTRICT out1,
-        s_t *const SFEM_RESTRICT out2) {
+        s_t *const RSTR out0,
+        s_t *const RSTR out1,
+        s_t *const RSTR out2) {
 #pragma omp parallel for
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         idx_t ev[4];
@@ -242,14 +248,14 @@ template <typename s_t>
 static SFEM_INLINE int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const s_t t0, const s_t t0_001, const s_t t0_010, const s_t t0_100, const s_t t1, const s_t t1_001, const s_t t1_010, const s_t t1_100, const s_t t2, const s_t t2_001, const s_t t2_010, const s_t t2_100,
         const int out_stride,
-        s_t *const SFEM_RESTRICT out0,
-        s_t *const SFEM_RESTRICT out1,
-        s_t *const SFEM_RESTRICT out2) {
+        s_t *const RSTR out0,
+        s_t *const RSTR out1,
+        s_t *const RSTR out2) {
 #pragma omp parallel for
     for (ptrdiff_t s = 0; s < nsides; ++s) {
         idx_t ev[4];
@@ -273,12 +279,12 @@ static SFEM_INLINE int neumann_general_proteus_hex8_proteus_quadshell4_boundary_
 extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2) {
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2) {
     return sfem::codegen::neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_impl<real_t>(
             nelements, nnodes, elements, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, out_stride, out0, out1, out2);
 }
@@ -286,12 +292,12 @@ extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual
 extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2) {
+        float *const RSTR out0,
+        float *const RSTR out1,
+        float *const RSTR out2) {
     return sfem::codegen::neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_soa_impl<float>(
             nelements, nnodes, elements, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, out_stride, out0, out1, out2);
 }
@@ -299,14 +305,14 @@ extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual
 extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2) {
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2) {
     return sfem::codegen::neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa_impl<real_t>(
             nsides, nnodes, elements, parent, side_idx, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, out_stride, out0, out1, out2);
 }
@@ -314,14 +320,14 @@ extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual
 extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2) {
+        float *const RSTR out0,
+        float *const RSTR out1,
+        float *const RSTR out2) {
     return sfem::codegen::neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa_impl<float>(
             nsides, nnodes, elements, parent, side_idx, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, out_stride, out0, out1, out2);
 }

@@ -24,11 +24,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_2d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     switch ((int)element_type) {
         case 3:
@@ -46,11 +46,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_3d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     switch ((int)element_type) {
         case 4:
@@ -70,11 +70,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_2d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     switch ((int)element_type) {
         case 3:
@@ -92,11 +92,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_3d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     switch ((int)element_type) {
         case 4:
@@ -116,12 +116,12 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_2d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     switch ((int)element_type) {
         case 3:
@@ -139,12 +139,12 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_energy_3d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     switch ((int)element_type) {
         case 4:
@@ -164,11 +164,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_2d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     switch ((int)element_type) {
         case 3:
@@ -186,11 +186,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_3d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     switch ((int)element_type) {
         case 4:
@@ -210,11 +210,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_2d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     switch ((int)element_type) {
         case 3:
@@ -232,11 +232,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_3d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     switch ((int)element_type) {
         case 4:
@@ -256,12 +256,12 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_2d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     switch ((int)element_type) {
         case 3:
@@ -279,12 +279,12 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_gradient_3d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     switch ((int)element_type) {
         case 4:
@@ -304,10 +304,10 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_2d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     switch ((int)element_type) {
         case 3:
@@ -325,10 +325,10 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_3d_element_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     switch ((int)element_type) {
         case 4:
@@ -348,10 +348,10 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_2d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     switch ((int)element_type) {
         case 3:
@@ -369,10 +369,10 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_3d_element_coords_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     switch ((int)element_type) {
         case 4:
@@ -392,11 +392,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_2d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     switch ((int)element_type) {
         case 3:
@@ -414,11 +414,11 @@ template <typename s_t, int VS = 16, typename elem_type_t>
 static SFEM_INLINE int linear_elasticity_hessian_3d_element_geometry_soa(
         const elem_type_t element_type,
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     switch ((int)element_type) {
         case 4:

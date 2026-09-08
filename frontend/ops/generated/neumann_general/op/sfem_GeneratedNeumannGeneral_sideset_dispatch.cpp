@@ -14,161 +14,161 @@
 extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_010, const real_t t1_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_010, const real_t t1_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1);
+        real_t *const RSTR out0,
+        real_t *const RSTR out1);
 extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_010, const float t0_100, const float t1, const float t1_010, const float t1_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t0_010, const float t0_100, const float t1, const float t1_010, const float t1_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1);
+        float *const RSTR out0,
+        float *const RSTR out1);
 extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_010, const real_t t1_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_010, const real_t t1_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1);
+        real_t *const RSTR out0,
+        real_t *const RSTR out1);
 extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_010, const float t0_100, const float t1, const float t1_010, const float t1_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t0_010, const float t0_100, const float t1, const float t1_010, const float t1_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1);
+        float *const RSTR out0,
+        float *const RSTR out1);
 extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_010, const real_t t1_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_010, const real_t t1_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1);
+        real_t *const RSTR out0,
+        real_t *const RSTR out1);
 extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_010, const float t0_100, const float t1, const float t1_010, const float t1_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t0_010, const float t0_100, const float t1, const float t1_010, const float t1_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1);
+        float *const RSTR out0,
+        float *const RSTR out1);
 extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2);
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2);
 extern "C" int neumann_general_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2);
+        float *const RSTR out0,
+        float *const RSTR out1,
+        float *const RSTR out2);
 extern "C" int neumann_general_hex8_quadshell4_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2);
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2);
 extern "C" int neumann_general_hex8_quadshell4_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2);
+        float *const RSTR out0,
+        float *const RSTR out1,
+        float *const RSTR out2);
 extern "C" int neumann_general_tet4_trishell3_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2);
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2);
 extern "C" int neumann_general_tet4_trishell3_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2);
+        float *const RSTR out0,
+        float *const RSTR out1,
+        float *const RSTR out2);
 extern "C" int neumann_general_tet10_trishell6_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t0_001, const real_t t0_010, const real_t t0_100, const real_t t1, const real_t t1_001, const real_t t1_010, const real_t t1_100, const real_t t2, const real_t t2_001, const real_t t2_010, const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2);
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2);
 extern "C" int neumann_general_tet10_trishell6_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t0_001, const float t0_010, const float t0_100, const float t1, const float t1_001, const float t1_010, const float t1_100, const float t2, const float t2_001, const float t2_010, const float t2_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2);
+        float *const RSTR out0,
+        float *const RSTR out1,
+        float *const RSTR out2);
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_edgeshell2_boundary_residual_2d_sideset_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const real_t t0,
         const real_t t0_010,
         const real_t t0_100,
@@ -176,8 +176,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_edgeshell2_boundary_res
         const real_t t1_010,
         const real_t t1_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1
+        real_t *const RSTR out0,
+        real_t *const RSTR out1
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -232,10 +232,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_proteus_quadshell4_boun
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const real_t t0,
         const real_t t0_001,
         const real_t t0_010,
@@ -249,9 +249,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_proteus_quadshell4_boun
         const real_t t2_010,
         const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -284,10 +284,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_quadshell4_boundary_res
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const real_t t0,
         const real_t t0_001,
         const real_t t0_010,
@@ -301,9 +301,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_quadshell4_boundary_res
         const real_t t2_010,
         const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -336,10 +336,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_trishell3_boundary_resi
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const real_t t0,
         const real_t t0_001,
         const real_t t0_010,
@@ -353,9 +353,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_trishell3_boundary_resi
         const real_t t2_010,
         const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -388,10 +388,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_trishell6_boundary_resi
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const real_t t0,
         const real_t t0_001,
         const real_t t0_010,
@@ -405,9 +405,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_general_trishell6_boundary_resi
         const real_t t2_010,
         const real_t t2_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2
+        real_t *const RSTR out0,
+        real_t *const RSTR out1,
+        real_t *const RSTR out2
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)

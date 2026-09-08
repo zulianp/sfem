@@ -700,12 +700,12 @@ namespace sfem {
             const int dim = mesh->spatial_dimension();
             if (dim == 2) {
                 static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = state + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = state + 1;
-                    const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
-                    const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                    const real_t *const RSTR p_w_data = state + 0;
+                    const real_t *const RSTR p_c_data = state + 1;
+                    const real_t *const RSTR p_w_old_data = previous + 0;
+                    const real_t *const RSTR p_c_old_data = previous + 1;
+                    real_t *const RSTR p_w_out = out + 0;
+                    real_t *const RSTR p_c_out = out + 1;
                 if (impl_->residual_uses_affine) {
                     return two_phase_flow_residual_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
                 }
@@ -713,12 +713,12 @@ namespace sfem {
             }
             else if (dim == 3) {
                 static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = state + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = state + 1;
-                    const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
-                    const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                    const real_t *const RSTR p_w_data = state + 0;
+                    const real_t *const RSTR p_c_data = state + 1;
+                    const real_t *const RSTR p_w_old_data = previous + 0;
+                    const real_t *const RSTR p_c_old_data = previous + 1;
+                    real_t *const RSTR p_w_out = out + 0;
+                    real_t *const RSTR p_c_out = out + 1;
                 if (impl_->residual_uses_affine) {
                     return two_phase_flow_residual_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
                 }
@@ -788,12 +788,12 @@ namespace sfem {
             const int dim = mesh->spatial_dimension();
             if (dim == 2) {
                 static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
-                    const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
-                    const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                    const real_t *const RSTR p_w_data = current + 0;
+                    const real_t *const RSTR p_c_data = current + 1;
+                    const real_t *const RSTR p_w_direction_data = direction + 0;
+                    const real_t *const RSTR p_c_direction_data = direction + 1;
+                    real_t *const RSTR p_w_out = out + 0;
+                    real_t *const RSTR p_c_out = out + 1;
                 if (impl_->jacobian_action_uses_affine) {
                     return two_phase_flow_jacobian_action_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
                 }
@@ -801,12 +801,12 @@ namespace sfem {
             }
             else if (dim == 3) {
                 static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
-                    const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
-                    const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                    const real_t *const RSTR p_w_data = current + 0;
+                    const real_t *const RSTR p_c_data = current + 1;
+                    const real_t *const RSTR p_w_direction_data = direction + 0;
+                    const real_t *const RSTR p_c_direction_data = direction + 1;
+                    real_t *const RSTR p_w_out = out + 0;
+                    real_t *const RSTR p_c_out = out + 1;
                 if (impl_->jacobian_action_uses_affine) {
                     return two_phase_flow_jacobian_action_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
                 }

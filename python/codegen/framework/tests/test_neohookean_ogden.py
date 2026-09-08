@@ -895,9 +895,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("generated_quad4_tensor_product_quad4_q_weight[", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", local_source)
-        self.assertNotIn("const s_t *const SFEM_RESTRICT shape_1d", operator_source)
-        self.assertNotIn("const s_t *const SFEM_RESTRICT grad_1d", operator_source)
-        self.assertNotIn("const s_t *const SFEM_RESTRICT q_weight_1d", operator_source)
+        self.assertNotIn("const s_t *const RSTR shape_1d", operator_source)
+        self.assertNotIn("const s_t *const RSTR grad_1d", operator_source)
+        self.assertNotIn("const s_t *const RSTR q_weight_1d", operator_source)
         self.assertIn("const int qx = q % NQ1;", operator_source)
         self.assertIn("const int qy = q / NQ1;", operator_source)
         # No affine assertion for QUAD4: two dimensions publishes only the
@@ -909,8 +909,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         )
         self.assertNotIn("generated_quad4_tensor_product_quad4_objective_soa_impl", operator_source)
         self.assertNotIn('extern "C" int generated_quad4_tensor_product_quad4_objective_soa', operator_source)
-        self.assertIn("const s_t *const SFEM_RESTRICT shape_1d", local_source)
-        self.assertIn("const s_t *const SFEM_RESTRICT grad_1d", local_source)
+        self.assertIn("const s_t *const RSTR shape_1d", local_source)
+        self.assertIn("const s_t *const RSTR grad_1d", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn("static constexpr int NQ1 = 2;", local_source)
         self.assertIn(
@@ -1161,8 +1161,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         local_source = source_by_path["generated_quad4_weak_neohookean_local.hpp"]
         tensor_source = source_by_path["tensor_product_kernels.hpp"]
 
-        self.assertIn("const s_t *const SFEM_RESTRICT shape_1d", local_source)
-        self.assertIn("const s_t *const SFEM_RESTRICT grad_1d", local_source)
+        self.assertIn("const s_t *const RSTR shape_1d", local_source)
+        self.assertIn("const s_t *const RSTR grad_1d", local_source)
         self.assertIn("for (int q = 0; q < NQ; ++q)", local_source)
         self.assertIn('#include "tensor_product_kernels.hpp"', local_source)
         self.assertIn("s_t value_x[Q * S * VS]", tensor_source)
@@ -1516,7 +1516,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             'extern "C" int %s_hex8_gradient_isoparametric_soa' % prefix,
             operator_source,
         )
-        self.assertNotIn("const real_t *const SFEM_RESTRICT x0", operator_source)
+        self.assertNotIn("const real_t *const RSTR x0", operator_source)
         self.assertNotIn("bcoordinate_streams", operator_source)
         self.assertIn("bcoordinate_data[NS * ND]", operator_source)
         self.assertIn(
@@ -1536,8 +1536,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             'extern "C" int %s_hex8_gradient_isoparametric_mesh_soa' % prefix,
             operator_source,
         )
-        self.assertIn("idx_t **const SFEM_RESTRICT elements", operator_source)
-        self.assertIn("const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0", operator_source)
+        self.assertIn("idx_t **const RSTR elements", operator_source)
+        self.assertIn("const geom_t *const RSTR g_jacobian_adjugate0", operator_source)
         self.assertIn("std::is_same<g_t, s_t>()", operator_source)
         self.assertIn(
             "ageom_stream<s_t, g_t, VS>",
@@ -1554,11 +1554,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("s_t bjacobian_adjugate0_data[VS]", affine_mesh_source)
         self.assertNotIn("g_jacobian_adjugate[(evb + lane)", affine_mesh_source)
         self.assertIn(
-            "const g_t *const *const SFEM_RESTRICT points",
+            "const g_t *const *const RSTR points",
             operator_source,
         )
         self.assertIn(
-            "const geom_t *const *const SFEM_RESTRICT points",
+            "const geom_t *const *const RSTR points",
             operator_source,
         )
         self.assertIn(
@@ -2210,14 +2210,14 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("bjacobian_adjugate_streams[ND * ND]", operator_source)
         self.assertIn("geometry_jacobian_adjugate_and_determinant_2<s_t>", operator_source)
         self.assertNotIn("bjacobian_adjugate0[lane] = J11", operator_source)
-        self.assertNotIn("const real_t *const SFEM_RESTRICT ux0", operator_source)
+        self.assertNotIn("const real_t *const RSTR ux0", operator_source)
         self.assertIn("#pragma omp simd", local_source)
         self.assertIn("template <typename s_t, int NQ, int NS, int VS>", local_source)
         self.assertIn("generated_neohookean_ogden_apply_block", local_source)
         self.assertIn("const int q", local_source)
-        self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", local_source)
-        self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_y", local_source)
-        self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_data", local_source)
+        self.assertIn("const s_t *const RSTR grad_ref_x", local_source)
+        self.assertIn("const s_t *const RSTR grad_ref_y", local_source)
+        self.assertNotIn("const s_t *const RSTR grad_ref_data", local_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", local_source)
         self.assertIn("s_t grad_ref[NS * 2];", local_source)
         self.assertIn("s_t u[NS * 2];", local_source)

@@ -6,20 +6,20 @@ namespace codegen {
 template <typename s_t, typename g_t, typename tangent_t>
 static SFEM_INLINE int linear_elasticity_tri3_inexact_apply_tangent_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        tangent_t *const SFEM_RESTRICT tangent
+        tangent_t *const RSTR tangent
 ) {
     #pragma omp parallel for schedule(static)
     for (ptrdiff_t element = 0; element < nelements; ++element) {
@@ -70,16 +70,16 @@ static SFEM_INLINE int linear_elasticity_tri3_inexact_apply_tangent_affine_mesh_
 template <typename s_t, typename tangent_t>
 static SFEM_INLINE int linear_elasticity_tri3_inexact_apply_stored_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
+        idx_t **const RSTR elements,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        const tangent_t *const SFEM_RESTRICT tangent,
+        const tangent_t *const RSTR tangent,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy
+        s_t *const RSTR outx,
+        s_t *const RSTR outy
 ) {
     #pragma omp parallel for schedule(static)
     for (ptrdiff_t element = 0; element < nelements; ++element) {
@@ -146,17 +146,17 @@ static SFEM_INLINE int linear_elasticity_tri3_inexact_apply_stored_affine_mesh_s
 template <typename s_t, typename tangent_t, typename scale_t>
 static SFEM_INLINE int linear_elasticity_tri3_inexact_apply_compressed_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
+        idx_t **const RSTR elements,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        const tangent_t *const SFEM_RESTRICT tangent,
-        const scale_t *const SFEM_RESTRICT scaling,
+        const tangent_t *const RSTR tangent,
+        const scale_t *const RSTR scaling,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy
+        s_t *const RSTR outx,
+        s_t *const RSTR outy
 ) {
     #pragma omp parallel for schedule(static)
     for (ptrdiff_t element = 0; element < nelements; ++element) {

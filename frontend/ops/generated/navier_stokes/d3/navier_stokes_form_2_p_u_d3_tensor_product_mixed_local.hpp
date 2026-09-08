@@ -18,6 +18,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
@@ -33,10 +36,10 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_2_p_u_d3_tensor_product_mixed_residual_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT field_shape_1d[2],
-        const s_t *const SFEM_RESTRICT q_weight_1d,
-        s_t *const SFEM_RESTRICT output[89]
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR field_shape_1d[2],
+        const s_t *const RSTR q_weight_1d,
+        s_t *const RSTR output[89]
 ) {
     static constexpr int ND = 3;
     static constexpr int NC = 2;
@@ -57,9 +60,9 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_2_p_u_d3_tensor_product_mixed_residual_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT field_shape_1d[2],
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR field_shape_1d[2],
+        const s_t *const RSTR q_weight_1d,
         s_t output[89][VS]
 ) {
     static constexpr int ND = 3;
@@ -81,13 +84,13 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[9],
-        const s_t *const SFEM_RESTRICT field_shape_1d[2],
-        const s_t *const SFEM_RESTRICT field_grad_1d[2],
-        const s_t *const SFEM_RESTRICT q_weight_1d,
-        const s_t *const SFEM_RESTRICT direction[89],
-        s_t *const SFEM_RESTRICT output[89]
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[9],
+        const s_t *const RSTR field_shape_1d[2],
+        const s_t *const RSTR field_grad_1d[2],
+        const s_t *const RSTR q_weight_1d,
+        const s_t *const RSTR direction[89],
+        s_t *const RSTR output[89]
 ) {
     static constexpr int ND = 3;
     static constexpr int NC = 2;
@@ -193,11 +196,11 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[9],
-        const s_t *const SFEM_RESTRICT field_shape_1d[2],
-        const s_t *const SFEM_RESTRICT field_grad_1d[2],
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[9],
+        const s_t *const RSTR field_shape_1d[2],
+        const s_t *const RSTR field_grad_1d[2],
+        const s_t *const RSTR q_weight_1d,
         const s_t direction[89][VS],
         s_t output[89][VS]
 ) {

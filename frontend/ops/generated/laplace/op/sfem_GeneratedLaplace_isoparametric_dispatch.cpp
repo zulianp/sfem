@@ -14,642 +14,642 @@
 extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_hex8_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_proteus_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_proteus_hex8_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_tet10_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_tet10_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_proteus_hex8_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_proteus_hex8_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 );
 extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 );
 extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_tri3_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_tri3_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_tet4_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_tet4_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_tri3_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_tri3_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 );
 extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 );
 extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 );
 extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 );
 extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 );
 extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 );
 extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 );
 extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 );
 extern "C" int laplace_proteus_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 );
 extern "C" int laplace_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 );
 extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 );
 extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 );
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa(
@@ -657,13 +657,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
         const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx
+        void *const RSTR outx
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -707,13 +707,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_isoparametric_mesh_soa
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
         const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx
+        void *const RSTR outx
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -768,13 +768,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_isoparametric_mesh_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
         const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx
+        void *const RSTR outx
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -818,13 +818,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_isoparametric_mesh_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
         const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx
+        void *const RSTR outx
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -879,12 +879,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_isoparametric_me
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        void *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -939,12 +939,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_isoparametric_me
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        void *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -1010,12 +1010,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_isoparametric_me
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        void *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -1070,12 +1070,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_me
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        void *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -1141,16 +1141,16 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_isoparametri
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
         const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
+        const void *const RSTR ux,
         const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
+        const void *const RSTR hx,
         const int nsteps,
-        const void *const SFEM_RESTRICT steps,
-        void *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -1194,16 +1194,16 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_isoparametri
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t kappa,
         const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
+        const void *const RSTR ux,
         const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
+        const void *const RSTR hx,
         const int nsteps,
-        const void *const SFEM_RESTRICT steps,
-        void *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)

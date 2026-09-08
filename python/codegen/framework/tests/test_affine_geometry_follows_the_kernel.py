@@ -27,16 +27,16 @@ from codegen.framework.package.op_wrappers import (
 METRIC_KERNEL = '''
 extern "C" int demo_gradient_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
-        const geom_t *const SFEM_RESTRICT g_geom_metric0,
-        const geom_t *const SFEM_RESTRICT g_geom_metric5
+        const geom_t *const RSTR g_geom_metric0,
+        const geom_t *const RSTR g_geom_metric5
 );
 '''
 
 ADJUGATE_KERNEL = '''
 extern "C" int demo_apply_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_determinant0
 );
 '''
 
@@ -45,7 +45,7 @@ extern "C" int demo_apply_3d_affine_mesh_soa(
 ELEMENT_KERNEL = '''
 int demo_tet4_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
-        const geom_t *const SFEM_RESTRICT g_geom_metric0
+        const geom_t *const RSTR g_geom_metric0
 );
 '''
 
@@ -102,8 +102,8 @@ class AffineGeometryFollowsTheKernelTest(unittest.TestCase):
         )
 
     def test_colliding_dispatch_signatures_are_named_apart(self):
-        metric = ("const geom_t *const SFEM_RESTRICT g_geom_metric0",)
-        adjugate = ("const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0",)
+        metric = ("const geom_t *const RSTR g_geom_metric0",)
+        adjugate = ("const geom_t *const RSTR g_jacobian_adjugate0",)
         self.assertEqual(
             _geometry_qualified_dispatch_name("demo_gradient_3d_affine_mesh_soa", metric),
             "demo_gradient_3d_affine_metric_mesh_soa",

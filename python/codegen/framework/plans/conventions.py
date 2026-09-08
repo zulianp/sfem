@@ -81,6 +81,42 @@ STREAMS = {
 }
 
 
+#: Qualifiers the generator emits into every signature.
+#:
+#: `RSTR` is the generator's spelling of SFEM's `SFEM_RESTRICT`.  The macro is
+#: not ours -- `base/sfem_base.hpp` picks `__restrict__` or `__restrict` per
+#: compiler -- but its 13 characters appear 48,000 times, which is 4.3% of the
+#: generated tree, and the generated headers already emit a fallback definition
+#: of their own.  So the generator aliases a name it does not own, once, in the
+#: shared prelude, and uses the short form everywhere below.
+QUALIFIERS = {
+    "restrict": "RSTR",
+    "restrict_source": "SFEM_RESTRICT",
+}
+
+
+def restrict_prelude(definition="__restrict__", indent=""):
+    """The lines that make the short qualifier available in a generated file.
+
+    Emitted once per file, and the only place either spelling appears in
+    generated output.  It defers to SFEM's macro when the real header is
+    present, so the generator never second-guesses which of `__restrict__` and
+    `__restrict` this compiler wants, and falls back only when compiled
+    standalone.
+    """
+    short = QUALIFIERS["restrict"]
+    source = QUALIFIERS["restrict_source"]
+    define = ("%s#define %s %s" % (indent, source, definition)).rstrip()
+    return [
+        "%s#ifndef %s" % (indent, source),
+        define,
+        "%s#endif" % indent,
+        "%s#ifndef %s" % (indent, short),
+        "%s#define %s %s" % (indent, short, source),
+        "%s#endif" % indent,
+    ]
+
+
 #: The frozen C ABI spelling of each geometry stream.
 #:
 #: The local name and the ABI name used to be the same string with a `g_` in
@@ -171,6 +207,7 @@ def reserved():
     names |= set(CONSTANTS.values())
     names |= set(LITERALS.values())
     names |= set(INDICES.values())
+    names |= set(QUALIFIERS.values())
     return frozenset(names)
 
 

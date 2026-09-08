@@ -40,12 +40,12 @@ struct mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_ref
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_energy_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -97,11 +97,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_e
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_energy_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -151,11 +151,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_e
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_energy_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -206,12 +206,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_e
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -266,11 +266,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -323,11 +323,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -381,12 +381,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -455,11 +455,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_h
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -526,11 +526,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_h
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;

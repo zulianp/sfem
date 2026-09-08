@@ -26,8 +26,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT,
+        const g_t *const RSTR source,
+        s_t *const RSTR,
         std::true_type) {
     return source;
 }
@@ -35,8 +35,8 @@ SFEM_INLINE const s_t *ageom_stream(
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT converted,
+        const g_t *const RSTR source,
+        s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
@@ -239,25 +239,25 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int laplace_tet10_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_adjugate4,
+        const g_t *const RSTR g_jacobian_adjugate5,
+        const g_t *const RSTR g_jacobian_adjugate6,
+        const g_t *const RSTR g_jacobian_adjugate7,
+        const g_t *const RSTR g_jacobian_adjugate8,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t kappa,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
+        const s_t *const RSTR ux,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
+        const s_t *const RSTR hx,
         const int nsteps,
-        const s_t *const SFEM_RESTRICT steps,
-        s_t *const SFEM_RESTRICT value
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
 ) {
     static constexpr int NC = 1;
     static constexpr int NQ = 4;
@@ -279,7 +279,7 @@ static SFEM_INLINE int laplace_tet10_objective_steps_affine_mesh_soa_impl(
         s_t bvalue[VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -367,25 +367,25 @@ static SFEM_INLINE int laplace_tet10_objective_steps_affine_mesh_soa_impl(
 extern "C" int laplace_tet10_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     return sfem::codegen::laplace_tet10_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
 }
@@ -393,25 +393,25 @@ extern "C" int laplace_tet10_objective_steps_affine_mesh_soa(
 extern "C" int laplace_tet10_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     return sfem::codegen::laplace_tet10_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
 }
@@ -425,29 +425,29 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -464,8 +464,8 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -473,14 +473,14 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa(
             const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux};
             const s_t *const h_components[NC] = {hx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_u_base_component[k] = u_component[node * u_stride];
@@ -503,7 +503,7 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa(
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9]};
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -579,29 +579,29 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -618,8 +618,8 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa_float(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -627,14 +627,14 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa_float(
             const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux};
             const s_t *const h_components[NC] = {hx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_u_base_component[k] = u_component[node * u_stride];
@@ -657,7 +657,7 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa_float(
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9]};
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -738,16 +738,16 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int laplace_tet10_objective_steps_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t kappa,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
+        const s_t *const RSTR ux,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
+        const s_t *const RSTR hx,
         const int nsteps,
-        const s_t *const SFEM_RESTRICT steps,
-        s_t *const SFEM_RESTRICT value
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 3;
@@ -755,9 +755,9 @@ static SFEM_INLINE int laplace_tet10_objective_steps_isoparametric_mesh_soa_impl
     static constexpr int NS = 10;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
-    const g_t *const SFEM_RESTRICT z = points[2];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
+    const g_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -784,7 +784,7 @@ static SFEM_INLINE int laplace_tet10_objective_steps_isoparametric_mesh_soa_impl
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -957,16 +957,16 @@ static SFEM_INLINE int laplace_tet10_objective_steps_isoparametric_mesh_soa_impl
 extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     return sfem::codegen::laplace_tet10_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
 }
@@ -974,16 +974,16 @@ extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa(
 extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     return sfem::codegen::laplace_tet10_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
 }
@@ -997,20 +997,20 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -1021,9 +1021,9 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
     (void)nnodes;
     (void)n_shared_nodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -1031,9 +1031,9 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -1041,11 +1041,11 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
             const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             for (int d = 0; d < ND; ++d) {
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_coordinate[k] = s_t(coordinate_component[node]);
@@ -1058,10 +1058,10 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
             const s_t *const u_components[NC] = {ux};
             const s_t *const h_components[NC] = {hx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_u_base_component[k] = u_component[node * u_stride];
@@ -1096,7 +1096,7 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9]};
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -1254,20 +1254,20 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -1278,9 +1278,9 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
     (void)nnodes;
     (void)n_shared_nodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -1288,9 +1288,9 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -1298,11 +1298,11 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
             const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             for (int d = 0; d < ND; ++d) {
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_coordinate[k] = s_t(coordinate_component[node]);
@@ -1315,10 +1315,10 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
             const s_t *const u_components[NC] = {ux};
             const s_t *const h_components[NC] = {hx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_u_base_component[k] = u_component[node * u_stride];
@@ -1353,7 +1353,7 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9]};
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -1645,22 +1645,22 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int laplace_tet10_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_adjugate4,
+        const g_t *const RSTR g_jacobian_adjugate5,
+        const g_t *const RSTR g_jacobian_adjugate6,
+        const g_t *const RSTR g_jacobian_adjugate7,
+        const g_t *const RSTR g_jacobian_adjugate8,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t kappa,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
+        const s_t *const RSTR ux,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx
+        s_t *const RSTR outx
 ) {
     static constexpr int NC = 1;
     static constexpr int NQ = 4;
@@ -1680,7 +1680,7 @@ static SFEM_INLINE int laplace_tet10_gradient_affine_mesh_soa_impl(
         s_t bout_data[NS * NC][VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -1768,22 +1768,22 @@ static SFEM_INLINE int laplace_tet10_gradient_affine_mesh_soa_impl(
 extern "C" int laplace_tet10_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     return sfem::codegen::laplace_tet10_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, u_stride, ux, out_stride, outx);
 }
@@ -1791,22 +1791,22 @@ extern "C" int laplace_tet10_gradient_affine_mesh_soa(
 extern "C" int laplace_tet10_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     return sfem::codegen::laplace_tet10_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, u_stride, ux, out_stride, outx);
 }
@@ -1820,26 +1820,26 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -1855,8 +1855,8 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -1867,13 +1867,13 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -1901,7 +1901,7 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -1946,9 +1946,9 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
                 laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -1957,8 +1957,8 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -1985,26 +1985,26 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -2020,8 +2020,8 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2032,13 +2032,13 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2066,7 +2066,7 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2111,9 +2111,9 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
                 laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -2122,8 +2122,8 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -2150,32 +2150,32 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        double *const RSTR ghost_buf,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -2191,8 +2191,8 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2202,14 +2202,14 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const s_t *const u_components[NC] = {ux};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2237,7 +2237,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2282,9 +2282,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
                 laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -2293,9 +2293,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -2315,7 +2315,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -2332,32 +2332,32 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        float *const RSTR ghost_buf,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -2373,8 +2373,8 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2384,14 +2384,14 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const s_t *const u_components[NC] = {ux};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2419,7 +2419,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2464,9 +2464,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
                 laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -2475,9 +2475,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -2497,7 +2497,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -2519,13 +2519,13 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int laplace_tet10_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t kappa,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
+        const s_t *const RSTR ux,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx
+        s_t *const RSTR outx
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 3;
@@ -2533,9 +2533,9 @@ static SFEM_INLINE int laplace_tet10_gradient_isoparametric_mesh_soa_impl(
     static constexpr int NS = 10;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
-    const g_t *const SFEM_RESTRICT z = points[2];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
+    const g_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -2560,7 +2560,7 @@ static SFEM_INLINE int laplace_tet10_gradient_isoparametric_mesh_soa_impl(
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -2733,13 +2733,13 @@ static SFEM_INLINE int laplace_tet10_gradient_isoparametric_mesh_soa_impl(
 extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     return sfem::codegen::laplace_tet10_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, out_stride, outx);
 }
@@ -2747,13 +2747,13 @@ extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa(
 extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     return sfem::codegen::laplace_tet10_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, out_stride, outx);
 }
@@ -2767,17 +2767,17 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -2787,9 +2787,9 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -2797,9 +2797,9 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2810,16 +2810,16 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2861,7 +2861,7 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2988,9 +2988,9 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
                 laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -2999,8 +2999,8 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -3027,17 +3027,17 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -3047,9 +3047,9 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -3057,9 +3057,9 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -3070,16 +3070,16 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -3121,7 +3121,7 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -3248,9 +3248,9 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
                 laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -3259,8 +3259,8 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -3287,23 +3287,23 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        double *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
+        const double *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -3313,9 +3313,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -3323,9 +3323,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -3335,17 +3335,17 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -3387,7 +3387,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -3514,9 +3514,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
                 laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -3525,9 +3525,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -3547,7 +3547,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -3564,23 +3564,23 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        float *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
+        const float *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -3590,9 +3590,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -3600,9 +3600,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -3612,17 +3612,17 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -3664,7 +3664,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -3791,9 +3791,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
                 laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -3802,9 +3802,9 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -3824,7 +3824,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -3975,22 +3975,22 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int laplace_tet10_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_adjugate4,
+        const g_t *const RSTR g_jacobian_adjugate5,
+        const g_t *const RSTR g_jacobian_adjugate6,
+        const g_t *const RSTR g_jacobian_adjugate7,
+        const g_t *const RSTR g_jacobian_adjugate8,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t kappa,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
+        const s_t *const RSTR hx,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx
+        s_t *const RSTR outx
 ) {
     static constexpr int NC = 1;
     static constexpr int NQ = 4;
@@ -4010,7 +4010,7 @@ static SFEM_INLINE int laplace_tet10_apply_affine_mesh_soa_impl(
         s_t bout_data[NS * NC][VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -4098,22 +4098,22 @@ static SFEM_INLINE int laplace_tet10_apply_affine_mesh_soa_impl(
 extern "C" int laplace_tet10_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     return sfem::codegen::laplace_tet10_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, h_stride, hx, out_stride, outx);
 }
@@ -4121,22 +4121,22 @@ extern "C" int laplace_tet10_apply_affine_mesh_soa(
 extern "C" int laplace_tet10_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     return sfem::codegen::laplace_tet10_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, h_stride, hx, out_stride, outx);
 }
@@ -4150,26 +4150,26 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -4185,8 +4185,8 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4197,13 +4197,13 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const h_components[NC] = {hx};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -4231,7 +4231,7 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -4276,9 +4276,9 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
                 laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -4287,8 +4287,8 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -4315,26 +4315,26 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -4350,8 +4350,8 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4362,13 +4362,13 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const h_components[NC] = {hx};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -4396,7 +4396,7 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -4441,9 +4441,9 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
                 laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -4452,8 +4452,8 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -4480,32 +4480,32 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        double *const RSTR ghost_buf,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -4521,8 +4521,8 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4532,14 +4532,14 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const s_t *const h_components[NC] = {hx};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -4567,7 +4567,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -4612,9 +4612,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
                 laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -4623,9 +4623,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -4645,7 +4645,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -4662,32 +4662,32 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        float *const RSTR ghost_buf,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -4703,8 +4703,8 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4714,14 +4714,14 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const s_t *const h_components[NC] = {hx};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -4749,7 +4749,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -4794,9 +4794,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
                 laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -4805,9 +4805,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -4827,7 +4827,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -4849,13 +4849,13 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int laplace_tet10_apply_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t kappa,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
+        const s_t *const RSTR hx,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx
+        s_t *const RSTR outx
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 3;
@@ -4863,9 +4863,9 @@ static SFEM_INLINE int laplace_tet10_apply_isoparametric_mesh_soa_impl(
     static constexpr int NS = 10;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
-    const g_t *const SFEM_RESTRICT z = points[2];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
+    const g_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -4890,7 +4890,7 @@ static SFEM_INLINE int laplace_tet10_apply_isoparametric_mesh_soa_impl(
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -5063,13 +5063,13 @@ static SFEM_INLINE int laplace_tet10_apply_isoparametric_mesh_soa_impl(
 extern "C" int laplace_tet10_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     return sfem::codegen::laplace_tet10_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, h_stride, hx, out_stride, outx);
 }
@@ -5077,13 +5077,13 @@ extern "C" int laplace_tet10_apply_isoparametric_mesh_soa(
 extern "C" int laplace_tet10_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     return sfem::codegen::laplace_tet10_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, h_stride, hx, out_stride, outx);
 }
@@ -5097,17 +5097,17 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -5117,9 +5117,9 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -5127,9 +5127,9 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -5140,16 +5140,16 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const h_components[NC] = {hx};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -5191,7 +5191,7 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -5318,9 +5318,9 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
                 laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -5329,8 +5329,8 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -5357,17 +5357,17 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -5377,9 +5377,9 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -5387,9 +5387,9 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -5400,16 +5400,16 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const h_components[NC] = {hx};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -5451,7 +5451,7 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -5578,9 +5578,9 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
                 laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -5589,8 +5589,8 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -5617,23 +5617,23 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        double *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
         const double kappa,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
+        const double *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
+        double *const RSTR outx
 ) {
     using s_t = double;
     static constexpr int NC = 1;
@@ -5643,9 +5643,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -5653,9 +5653,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -5665,17 +5665,17 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const h_components[NC] = {hx};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -5717,7 +5717,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -5844,9 +5844,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
                 laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -5855,9 +5855,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -5877,7 +5877,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -5894,23 +5894,23 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        float *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
         const float kappa,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
+        const float *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
+        float *const RSTR outx
 ) {
     using s_t = float;
     static constexpr int NC = 1;
@@ -5920,9 +5920,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -5930,9 +5930,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -5942,17 +5942,17 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const h_components[NC] = {hx};
             s_t *const out_components[NC] = {outx};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -5994,7 +5994,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -6121,9 +6121,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
                 laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -6132,9 +6132,9 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -6154,7 +6154,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -6173,10 +6173,10 @@ namespace sfem {
 namespace codegen {
 
 static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_find_cols(
-        const idx_t *const SFEM_RESTRICT targets,
-        const idx_t *const SFEM_RESTRICT row,
+        const idx_t *const RSTR targets,
+        const idx_t *const RSTR row,
         const int lenrow,
-        idx_t *const SFEM_RESTRICT ks) {
+        idx_t *const RSTR ks) {
 #pragma unroll(10)
     for (int d = 0; d < 10; ++d) {
         ks[d] = 0;
@@ -6191,11 +6191,11 @@ static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_find_cols(
 
 template <typename s_t>
 static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(
-        const idx_t *const SFEM_RESTRICT ev,
-        const s_t *const SFEM_RESTRICT element_matrix,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        s_t *const SFEM_RESTRICT values) {
+        const idx_t *const RSTR ev,
+        const s_t *const RSTR element_matrix,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        s_t *const RSTR values) {
     static constexpr int NC = 1;
     static constexpr int NS = 10;
     count_t entries[NS * NS];
@@ -6204,7 +6204,7 @@ static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_scatter_bsr
         const idx_t dof_i = ev[i];
         const count_t row_begin = rowptr[dof_i];
         const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
-        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
+        const idx_t *const RSTR cols = &colidx[row_begin];
         laplace_tet10_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
         for (int j = 0; j < NS; ++j) {
             entries[i * NS + j] = row_begin + ks[j];
@@ -6227,11 +6227,11 @@ static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_scatter_bsr
 
 template <typename s_t>
 static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_scatter_crs(
-        const idx_t *const SFEM_RESTRICT ev,
-        const s_t *const SFEM_RESTRICT element_matrix,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        s_t *const SFEM_RESTRICT values) {
+        const idx_t *const RSTR ev,
+        const s_t *const RSTR element_matrix,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        s_t *const RSTR values) {
     static constexpr int NC = 1;
     static constexpr int NS = 10;
     count_t row_begin[NS];
@@ -6241,7 +6241,7 @@ static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_scatter_crs
     for (int i = 0; i < NS; ++i) {
         row_begin[i] = rowptr[ev[i]];
         lenrow[i] = (int)(rowptr[ev[i] + 1] - row_begin[i]);
-        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin[i]];
+        const idx_t *const RSTR cols = &colidx[row_begin[i]];
         laplace_tet10_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow[i], ks);
         for (int j = 0; j < NS; ++j) {
             local_col[i * NS + j] = (int)ks[j];
@@ -6269,19 +6269,19 @@ template <typename s_t, typename g_t, int FORMAT>
 static int laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        s_t *const SFEM_RESTRICT values,
-        const int *const SFEM_RESTRICT diag_offsets,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        s_t *const RSTR values,
+        const int *const RSTR diag_offsets,
         const ptrdiff_t ndiag,
         const ptrdiff_t coo_nnz,
-        const idx_t *const SFEM_RESTRICT coo_rows,
-        const idx_t *const SFEM_RESTRICT coo_cols,
-        idx_t *const SFEM_RESTRICT coo_triplet_rows,
-        idx_t *const SFEM_RESTRICT coo_triplet_cols) {
+        const idx_t *const RSTR coo_rows,
+        const idx_t *const RSTR coo_cols,
+        idx_t *const RSTR coo_triplet_rows,
+        idx_t *const RSTR coo_triplet_cols) {
     static constexpr int NC = 1;
     static constexpr int ND = 3;
     static constexpr int NQ = 11;
@@ -6289,9 +6289,9 @@ static int laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
     static constexpr int VS = 1;
     static constexpr int NDOFS = NC * NS;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
-    const g_t *const SFEM_RESTRICT z = points[2];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
+    const g_t *const RSTR z = points[2];
     const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
     const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
     const s_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
@@ -6460,12 +6460,12 @@ static int laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
 extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 ) {
     return sfem::codegen::laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
@@ -6473,12 +6473,12 @@ extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa(
 extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 ) {
     return sfem::codegen::laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
@@ -6486,12 +6486,12 @@ extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa_float(
 extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 ) {
     return sfem::codegen::laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
@@ -6499,12 +6499,12 @@ extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa(
 extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 ) {
     return sfem::codegen::laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }

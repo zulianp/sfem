@@ -18,6 +18,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
@@ -33,17 +36,17 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_residual_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[9],
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
-        const s_t *const SFEM_RESTRICT current[3 * NS],
-        const s_t *const SFEM_RESTRICT previous[3 * NS],
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[9],
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
+        const s_t *const RSTR current[3 * NS],
+        const s_t *const RSTR previous[3 * NS],
         const s_t eta_b,
         const s_t eta_s,
         const s_t newmark_velocity_alpha,
-        s_t *const SFEM_RESTRICT output[3 * NS]
+        s_t *const RSTR output[3 * NS]
 ) {
     static constexpr int ND = 3;
     static constexpr int NC = 3;
@@ -190,11 +193,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_residual_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[9],
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[9],
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
         const s_t current[3 * NS][VS],
         const s_t previous[3 * NS][VS],
         const s_t eta_b,
@@ -347,18 +350,18 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[9],
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
-        const s_t *const SFEM_RESTRICT current[3 * NS],
-        const s_t *const SFEM_RESTRICT previous[3 * NS],
-        const s_t *const SFEM_RESTRICT direction[3 * NS],
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[9],
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
+        const s_t *const RSTR current[3 * NS],
+        const s_t *const RSTR previous[3 * NS],
+        const s_t *const RSTR direction[3 * NS],
         const s_t eta_b,
         const s_t eta_s,
         const s_t newmark_velocity_alpha,
-        s_t *const SFEM_RESTRICT output[3 * NS]
+        s_t *const RSTR output[3 * NS]
 ) {
     static constexpr int ND = 3;
     static constexpr int NC = 3;
@@ -758,11 +761,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[9],
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[9],
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
         const s_t current[3 * NS][VS],
         const s_t previous[3 * NS][VS],
         const s_t direction[3 * NS][VS],

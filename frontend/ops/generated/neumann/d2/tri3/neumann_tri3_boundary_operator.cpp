@@ -1,5 +1,11 @@
 #include "sfem_base.hpp"
 #include "sfem_macros.hpp"
+#ifndef SFEM_RESTRICT
+#define SFEM_RESTRICT __restrict__
+#endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 
 #include <math.h>
 #include "../../../kernel_math.hpp"
@@ -46,8 +52,8 @@ struct neumann_tri3_edgeshell2_boundary_residual_soa_reference_data {
 template <typename s_t>
 static SFEM_INLINE s_t neumann_tri3_edgeshell2_boundary_residual_soa_measure(
         const int q,
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points) {
+        const idx_t *const RSTR ev,
+        const geom_t *const *const RSTR points) {
     const s_t *const grad = neumann_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::grad();
     const int n_shape = neumann_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
     s_t dx0 = s_t(0);
@@ -76,9 +82,9 @@ static SFEM_INLINE const int *neumann_tri3_edgeshell2_boundary_residual_soa_side
 static SFEM_INLINE void neumann_tri3_edgeshell2_boundary_residual_soa_gather_sideset_element(
         const element_idx_t parent_element,
         const int side,
-        idx_t **const SFEM_RESTRICT elements,
-        idx_t *const SFEM_RESTRICT ev) {
-    const int *const SFEM_RESTRICT side_nodes = neumann_tri3_edgeshell2_boundary_residual_soa_side_nodes();
+        idx_t **const RSTR elements,
+        idx_t *const RSTR ev) {
+    const int *const RSTR side_nodes = neumann_tri3_edgeshell2_boundary_residual_soa_side_nodes();
     constexpr int n_shape = 2;
     for (int i = 0; i < n_shape; ++i) {
         ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
@@ -87,8 +93,8 @@ static SFEM_INLINE void neumann_tri3_edgeshell2_boundary_residual_soa_gather_sid
 
 template <typename s_t>
 static SFEM_INLINE void neumann_tri3_edgeshell2_boundary_residual_soa_element(
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t1,
+        const idx_t *const RSTR ev,
+        const geom_t *const *const RSTR points, const s_t t0, const s_t t1,
         s_t element_vector[2][2]) {
     const s_t *const shape = neumann_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::shape();
     const s_t *const weight = neumann_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::weight();
@@ -113,11 +119,11 @@ static SFEM_INLINE void neumann_tri3_edgeshell2_boundary_residual_soa_element(
 
 template <typename s_t>
 static SFEM_INLINE void neumann_tri3_edgeshell2_boundary_residual_soa_scatter_element(
-        const idx_t *const SFEM_RESTRICT ev,
+        const idx_t *const RSTR ev,
         const s_t element_vector[2][2],
         const int out_stride,
-        s_t *const SFEM_RESTRICT out0,
-        s_t *const SFEM_RESTRICT out1) {
+        s_t *const RSTR out0,
+        s_t *const RSTR out1) {
     constexpr int n_shape = 2;
     for (int i = 0; i < n_shape; ++i) {
         const idx_t node = ev[i];
@@ -132,11 +138,11 @@ template <typename s_t>
 static SFEM_INLINE int neumann_tri3_edgeshell2_boundary_residual_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t1,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points, const s_t t0, const s_t t1,
         const int out_stride,
-        s_t *const SFEM_RESTRICT out0,
-        s_t *const SFEM_RESTRICT out1) {
+        s_t *const RSTR out0,
+        s_t *const RSTR out1) {
 #pragma omp parallel for
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         idx_t ev[2];
@@ -160,13 +166,13 @@ template <typename s_t>
 static SFEM_INLINE int neumann_tri3_edgeshell2_boundary_residual_sideset_soa_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const s_t t0, const s_t t1,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const s_t t0, const s_t t1,
         const int out_stride,
-        s_t *const SFEM_RESTRICT out0,
-        s_t *const SFEM_RESTRICT out1) {
+        s_t *const RSTR out0,
+        s_t *const RSTR out1) {
 #pragma omp parallel for
     for (ptrdiff_t s = 0; s < nsides; ++s) {
         idx_t ev[2];
@@ -190,11 +196,11 @@ static SFEM_INLINE int neumann_tri3_edgeshell2_boundary_residual_sideset_soa_imp
 extern "C" int neumann_tri3_edgeshell2_boundary_residual_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t1,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t1,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1) {
+        real_t *const RSTR out0,
+        real_t *const RSTR out1) {
     return sfem::codegen::neumann_tri3_edgeshell2_boundary_residual_soa_impl<real_t>(
             nelements, nnodes, elements, points, t0, t1, out_stride, out0, out1);
 }
@@ -202,11 +208,11 @@ extern "C" int neumann_tri3_edgeshell2_boundary_residual_soa(
 extern "C" int neumann_tri3_edgeshell2_boundary_residual_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t1,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points, const float t0, const float t1,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1) {
+        float *const RSTR out0,
+        float *const RSTR out1) {
     return sfem::codegen::neumann_tri3_edgeshell2_boundary_residual_soa_impl<float>(
             nelements, nnodes, elements, points, t0, t1, out_stride, out0, out1);
 }
@@ -214,13 +220,13 @@ extern "C" int neumann_tri3_edgeshell2_boundary_residual_soa_float(
 extern "C" int neumann_tri3_edgeshell2_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t1,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const real_t t0, const real_t t1,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1) {
+        real_t *const RSTR out0,
+        real_t *const RSTR out1) {
     return sfem::codegen::neumann_tri3_edgeshell2_boundary_residual_sideset_soa_impl<real_t>(
             nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
 }
@@ -228,13 +234,13 @@ extern "C" int neumann_tri3_edgeshell2_boundary_residual_sideset_soa(
 extern "C" int neumann_tri3_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const float t0, const float t1,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points, const float t0, const float t1,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1) {
+        float *const RSTR out0,
+        float *const RSTR out1) {
     return sfem::codegen::neumann_tri3_edgeshell2_boundary_residual_sideset_soa_impl<float>(
             nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
 }

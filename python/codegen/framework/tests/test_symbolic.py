@@ -173,7 +173,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(openmp.parallel_for_pragma(), "#pragma omp parallel for")
         self.assertEqual(openmp.parallel_for_pragma("static"), "#pragma omp parallel for schedule(static)")
         self.assertEqual(openmp.function_qualifier(), "static SFEM_INLINE")
-        self.assertEqual(openmp.restrict_qualifier(), "SFEM_RESTRICT")
+        self.assertEqual(openmp.restrict_qualifier(), "RSTR")
         self.assertEqual(openmp.vectorize_pragma(), "#pragma omp simd")
         self.assertEqual(openmp.atomic_update_pragma(), "#pragma omp atomic update")
         self.assertEqual(openmp.alignment_assumption("x"), "__builtin_assume_aligned(x, 64)")

@@ -1,3 +1,4 @@
+from codegen.framework.plans.conventions import restrict_prelude
 from codegen.framework.targets import current_target
 from codegen.framework.fem.tensor_product import (
     streams_in_shape_order,
@@ -35,8 +36,8 @@ def _work_item_loop_lines(indent, *, work_item_index=None, simd_lines=None, sing
 def _restrict_define_line(restrict_definition):
     restrict_definition = str(restrict_definition)
     if restrict_definition:
-        return "#define SFEM_RESTRICT %s" % restrict_definition
-    return "#define SFEM_RESTRICT"
+        return "#define RSTR %s" % restrict_definition
+    return "#define RSTR"
 
 
 def isoparametric_adjugate_lines(
@@ -114,9 +115,7 @@ def sfem_geometry_kernels_header_source(
             "#include <stddef.h>",
             "",
             *inline_block,
-            "#ifndef SFEM_RESTRICT",
-            _restrict_define_line(restrict_definition),
-            "#endif",
+            *restrict_prelude(restrict_definition or ""),
             "",
             "namespace sfem {",
             "namespace codegen {",
@@ -130,8 +129,8 @@ def sfem_geometry_kernels_header_source(
             "        const s_t J01,",
             "        const s_t J10,",
             "        const s_t J11,",
-            "        s_t *const *const SFEM_RESTRICT adjugate,",
-            "        s_t *const SFEM_RESTRICT determinant,",
+            "        s_t *const *const RSTR adjugate,",
+            "        s_t *const RSTR determinant,",
             "        const ptrdiff_t offset) {",
             "    adjugate[0][offset] = J11;",
             "    adjugate[1][offset] = -J01;",
@@ -151,8 +150,8 @@ def sfem_geometry_kernels_header_source(
             "        const s_t J20,",
             "        const s_t J21,",
             "        const s_t J22,",
-            "        s_t *const *const SFEM_RESTRICT adjugate,",
-            "        s_t *const SFEM_RESTRICT determinant,",
+            "        s_t *const *const RSTR adjugate,",
+            "        s_t *const RSTR determinant,",
             "        const ptrdiff_t offset) {",
             "    adjugate[0][offset] = J11 * J22 - J12 * J21;",
             "    adjugate[1][offset] = J02 * J21 - J01 * J22;",
@@ -172,9 +171,9 @@ def sfem_geometry_kernels_header_source(
             "struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ, VS> {",
             "    static %s void eval(" % inline_qualifier,
             "            const int nelems,",
-            "            const s_t *const SFEM_RESTRICT coordinate_grad_ref,",
-            "            s_t *const *const SFEM_RESTRICT adjugate,",
-            "            s_t *const SFEM_RESTRICT determinant) {",
+            "            const s_t *const RSTR coordinate_grad_ref,",
+            "            s_t *const *const RSTR adjugate,",
+            "            s_t *const RSTR determinant) {",
             "        for (int q = 0; q < NQ; ++q) {",
             *work_loop,
             "                const ptrdiff_t offset = q * VS + %s;" % work_item,
@@ -193,9 +192,9 @@ def sfem_geometry_kernels_header_source(
             "struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ, VS> {",
             "    static %s void eval(" % inline_qualifier,
             "            const int nelems,",
-            "            const s_t *const SFEM_RESTRICT coordinate_grad_ref,",
-            "            s_t *const *const SFEM_RESTRICT adjugate,",
-            "            s_t *const SFEM_RESTRICT determinant) {",
+            "            const s_t *const RSTR coordinate_grad_ref,",
+            "            s_t *const *const RSTR adjugate,",
+            "            s_t *const RSTR determinant) {",
             "        for (int q = 0; q < NQ; ++q) {",
             *work_loop,
             "                const ptrdiff_t offset = q * VS + %s;" % work_item,
@@ -219,9 +218,9 @@ def sfem_geometry_kernels_header_source(
             "template <typename s_t, int ND, int NQ, int VS>",
             "static %s void geometry_jacobian_adjugate_and_determinant(" % inline_qualifier,
             "        const int nelems,",
-            "        const s_t *const SFEM_RESTRICT coordinate_grad_ref,",
-            "        s_t *const *const SFEM_RESTRICT adjugate,",
-            "        s_t *const SFEM_RESTRICT determinant) {",
+            "        const s_t *const RSTR coordinate_grad_ref,",
+            "        s_t *const *const RSTR adjugate,",
+            "        s_t *const RSTR determinant) {",
             "    GeometryJacobianAdjugateDeterminant<s_t, ND, NQ, VS>::eval(",
             "            nelems, coordinate_grad_ref, adjugate, determinant);",
             "}",

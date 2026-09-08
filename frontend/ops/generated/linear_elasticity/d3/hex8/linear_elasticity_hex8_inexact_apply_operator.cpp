@@ -4,26 +4,26 @@
 
 extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        metric_tensor_t *const SFEM_RESTRICT tangent
+        metric_tensor_t *const RSTR tangent
 ) {
     return sfem::codegen::linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_impl<double, geom_t, metric_tensor_t>(
             nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0,
@@ -34,18 +34,18 @@ extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa(
 
 extern "C" int linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
+        idx_t **const RSTR elements,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const metric_tensor_t *const RSTR tangent,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     return sfem::codegen::linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa_impl<double, metric_tensor_t>(
             nelements, elements,
@@ -56,19 +56,19 @@ extern "C" int linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa(
 
 extern "C" int linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
+        idx_t **const RSTR elements,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        const compressed_t *const SFEM_RESTRICT tangent,
-        const scaling_t *const SFEM_RESTRICT scaling,
+        const compressed_t *const RSTR tangent,
+        const scaling_t *const RSTR scaling,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     return sfem::codegen::linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa_impl<double, compressed_t, scaling_t>(
             nelements, elements,
@@ -79,26 +79,26 @@ extern "C" int linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa(
 
 extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_float(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        metric_tensor_t *const SFEM_RESTRICT tangent
+        metric_tensor_t *const RSTR tangent
 ) {
     return sfem::codegen::linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_impl<float, geom_t, metric_tensor_t>(
             nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0,
@@ -109,18 +109,18 @@ extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_floa
 
 extern "C" int linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa_float(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
+        idx_t **const RSTR elements,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const metric_tensor_t *const RSTR tangent,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     return sfem::codegen::linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa_impl<float, metric_tensor_t>(
             nelements, elements,
@@ -131,19 +131,19 @@ extern "C" int linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa_float
 
 extern "C" int linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa_float(
         const ptrdiff_t nelements,
-        idx_t **const SFEM_RESTRICT elements,
+        idx_t **const RSTR elements,
         const ptrdiff_t tangent_element_stride,
         const ptrdiff_t tangent_component_stride,
-        const compressed_t *const SFEM_RESTRICT tangent,
-        const scaling_t *const SFEM_RESTRICT scaling,
+        const compressed_t *const RSTR tangent,
+        const scaling_t *const RSTR scaling,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     return sfem::codegen::linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa_impl<float, compressed_t, scaling_t>(
             nelements, elements,

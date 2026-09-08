@@ -6,6 +6,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline

@@ -18,6 +18,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
@@ -33,10 +36,10 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_residual_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT shape,
-        const s_t *const SFEM_RESTRICT q_weight,
-        s_t *const SFEM_RESTRICT output[2 * NS]
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR shape,
+        const s_t *const RSTR q_weight,
+        s_t *const RSTR output[2 * NS]
 ) {
     static constexpr int ND = 2;
     static constexpr int NC = 2;
@@ -61,9 +64,9 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_residual_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT shape,
-        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR shape,
+        const s_t *const RSTR q_weight,
         s_t output[2 * NS][VS]
 ) {
     static constexpr int ND = 2;
@@ -89,10 +92,10 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_tri3_residual_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT shape,
-        const s_t *const SFEM_RESTRICT q_weight,
-        s_t *const SFEM_RESTRICT output[2 * NS]
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR shape,
+        const s_t *const RSTR q_weight,
+        s_t *const RSTR output[2 * NS]
 ) {
     static constexpr int ND = 2;
     static constexpr int NC = 2;
@@ -117,9 +120,9 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_tri3_residual_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT shape,
-        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR shape,
+        const s_t *const RSTR q_weight,
         s_t output[2 * NS][VS]
 ) {
     static constexpr int ND = 2;
@@ -145,14 +148,14 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_jacobian_action_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[4],
-        const s_t *const SFEM_RESTRICT shape,
-        const s_t *const SFEM_RESTRICT grad_ref_x,
-        const s_t *const SFEM_RESTRICT grad_ref_y,
-        const s_t *const SFEM_RESTRICT q_weight,
-        const s_t *const SFEM_RESTRICT current[2 * NS],
-        const s_t *const SFEM_RESTRICT direction[2 * NS],
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[4],
+        const s_t *const RSTR shape,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t *const RSTR q_weight,
+        const s_t *const RSTR current[2 * NS],
+        const s_t *const RSTR direction[2 * NS],
         const s_t C_kw1,
         const s_t K_0,
         const s_t K_1,
@@ -167,7 +170,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_jacobian_action
         const s_t p_wr,
         const s_t porosity,
         const s_t rho_w0,
-        s_t *const SFEM_RESTRICT output[2 * NS]
+        s_t *const RSTR output[2 * NS]
 ) {
     static constexpr int ND = 2;
     static constexpr int NC = 2;
@@ -320,12 +323,12 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_jacobian_action_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[4],
-        const s_t *const SFEM_RESTRICT shape,
-        const s_t *const SFEM_RESTRICT grad_ref_x,
-        const s_t *const SFEM_RESTRICT grad_ref_y,
-        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[4],
+        const s_t *const RSTR shape,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t *const RSTR q_weight,
         const s_t current[2 * NS][VS],
         const s_t direction[2 * NS][VS],
         const s_t C_kw1,
@@ -495,14 +498,14 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_tri3_jacobian_action_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[4],
-        const s_t *const SFEM_RESTRICT shape,
-        const s_t *const SFEM_RESTRICT grad_ref_x,
-        const s_t *const SFEM_RESTRICT grad_ref_y,
-        const s_t *const SFEM_RESTRICT q_weight,
-        const s_t *const SFEM_RESTRICT current[2 * NS],
-        const s_t *const SFEM_RESTRICT direction[2 * NS],
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[4],
+        const s_t *const RSTR shape,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t *const RSTR q_weight,
+        const s_t *const RSTR current[2 * NS],
+        const s_t *const RSTR direction[2 * NS],
         const s_t C_kw1,
         const s_t K_0,
         const s_t K_1,
@@ -517,7 +520,7 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_tri3_jacobian_a
         const s_t p_wr,
         const s_t porosity,
         const s_t rho_w0,
-        s_t *const SFEM_RESTRICT output[2 * NS]
+        s_t *const RSTR output[2 * NS]
 ) {
     static constexpr int ND = 2;
     static constexpr int NC = 2;
@@ -670,12 +673,12 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_2_p_w_p_c_d2_simplex_tri3_jacobian_action_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[4],
-        const s_t *const SFEM_RESTRICT shape,
-        const s_t *const SFEM_RESTRICT grad_ref_x,
-        const s_t *const SFEM_RESTRICT grad_ref_y,
-        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[4],
+        const s_t *const RSTR shape,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t *const RSTR q_weight,
         const s_t current[2 * NS][VS],
         const s_t direction[2 * NS][VS],
         const s_t C_kw1,

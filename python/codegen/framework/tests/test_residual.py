@@ -508,7 +508,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn(
-                    "idx_t **const SFEM_RESTRICT elements",
+                    "idx_t **const RSTR elements",
                     operator_source,
                 )
                 self.assertIn(

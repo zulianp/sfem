@@ -3,10 +3,10 @@
 extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const real_t t0,
         const real_t t0_010,
         const real_t t0_100,
@@ -14,16 +14,16 @@ extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sidese
         const real_t t1_010,
         const real_t t1_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1
+        real_t *const RSTR out0,
+        real_t *const RSTR out1
 );
 extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const float t0,
         const float t0_010,
         const float t0_100,
@@ -31,17 +31,17 @@ extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sidese
         const float t1_010,
         const float t1_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1
+        float *const RSTR out0,
+        float *const RSTR out1
 );
 
 extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const real_t t0,
         const real_t t0_010,
         const real_t t0_100,
@@ -49,8 +49,8 @@ extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(
         const real_t t1_010,
         const real_t t1_100,
         const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1
+        real_t *const RSTR out0,
+        real_t *const RSTR out1
 ) {
     idx_t *proteus_elements[4] = {
         elements[0],
@@ -64,10 +64,10 @@ extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(
 extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points,
         const float t0,
         const float t0_010,
         const float t0_100,
@@ -75,8 +75,8 @@ extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa_fl
         const float t1_010,
         const float t1_100,
         const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1
+        float *const RSTR out0,
+        float *const RSTR out1
 ) {
     idx_t *proteus_elements[4] = {
         elements[0],

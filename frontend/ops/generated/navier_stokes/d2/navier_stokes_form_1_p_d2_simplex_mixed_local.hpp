@@ -18,6 +18,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
@@ -33,13 +36,13 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[4],
-        const s_t *const SFEM_RESTRICT field_shape[2],
-        const s_t *const SFEM_RESTRICT fgref[4],
-        const s_t *const SFEM_RESTRICT q_weight,
-        const s_t *const SFEM_RESTRICT current[15],
-        s_t *const SFEM_RESTRICT output[15]
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[4],
+        const s_t *const RSTR field_shape[2],
+        const s_t *const RSTR fgref[4],
+        const s_t *const RSTR q_weight,
+        const s_t *const RSTR current[15],
+        s_t *const RSTR output[15]
 ) {
     static constexpr int ND = 2;
     static constexpr int NC = 2;
@@ -129,11 +132,11 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[4],
-        const s_t *const SFEM_RESTRICT field_shape[2],
-        const s_t *const SFEM_RESTRICT fgref[4],
-        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[4],
+        const s_t *const RSTR field_shape[2],
+        const s_t *const RSTR fgref[4],
+        const s_t *const RSTR q_weight,
         const s_t current[15][VS],
         s_t output[15][VS]
 ) {
@@ -225,10 +228,10 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT field_shape[2],
-        const s_t *const SFEM_RESTRICT q_weight,
-        s_t *const SFEM_RESTRICT output[15]
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR field_shape[2],
+        const s_t *const RSTR q_weight,
+        s_t *const RSTR output[15]
 ) {
     static constexpr int ND = 2;
     static constexpr int NC = 2;
@@ -250,9 +253,9 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_jacobian_action_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT field_shape[2],
-        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR field_shape[2],
+        const s_t *const RSTR q_weight,
         s_t output[15][VS]
 ) {
     static constexpr int ND = 2;

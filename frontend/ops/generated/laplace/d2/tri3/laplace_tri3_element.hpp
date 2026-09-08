@@ -44,11 +44,11 @@ struct laplace_tri3_isoparametric_reference_data {
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_energy_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t kappa,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;
@@ -91,10 +91,10 @@ static SFEM_INLINE int laplace_tri3_energy_element_geometry_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_energy_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t kappa,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;
@@ -188,10 +188,10 @@ static SFEM_INLINE int laplace_tri3_energy_element_coords_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_energy_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t kappa,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;
@@ -286,11 +286,11 @@ static SFEM_INLINE int laplace_tri3_energy_element_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_gradient_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t kappa,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;
@@ -336,10 +336,10 @@ static SFEM_INLINE int laplace_tri3_gradient_element_geometry_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_gradient_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t kappa,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;
@@ -436,10 +436,10 @@ static SFEM_INLINE int laplace_tri3_gradient_element_coords_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_gradient_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t kappa,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;
@@ -537,10 +537,10 @@ static SFEM_INLINE int laplace_tri3_gradient_element_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_hessian_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t kappa,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;
@@ -598,9 +598,9 @@ static SFEM_INLINE int laplace_tri3_hessian_element_geometry_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_hessian_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t kappa,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;
@@ -709,9 +709,9 @@ static SFEM_INLINE int laplace_tri3_hessian_element_coords_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tri3_hessian_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t kappa,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 1;
     static constexpr int ND = 2;

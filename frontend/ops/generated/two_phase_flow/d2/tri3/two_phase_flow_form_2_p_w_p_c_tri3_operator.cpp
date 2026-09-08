@@ -32,8 +32,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT,
+        const g_t *const RSTR source,
+        s_t *const RSTR,
         std::true_type) {
     return source;
 }
@@ -41,8 +41,8 @@ SFEM_INLINE const s_t *ageom_stream(
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT converted,
+        const g_t *const RSTR source,
+        s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
@@ -708,8 +708,8 @@ extern "C" void two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_isoparametric
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_element_soa(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const double *const SFEM_RESTRICT determinant,
-        double *const SFEM_RESTRICT output[6]
+        const double *const RSTR determinant,
+        double *const RSTR output[6]
 ) {
     sfem::codegen::two_phase_flow_form_2_p_w_p_c_d2_simplex_residual_block<double, 6, 3, 16>(nelems, geometry_stride, determinant, sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<double>::shape(), sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<double>::q_weight(), output);
     return SFEM_SUCCESS;
@@ -718,8 +718,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_element_soa(
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_element_soa_float(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const float *const SFEM_RESTRICT determinant,
-        float *const SFEM_RESTRICT output[6]
+        const float *const RSTR determinant,
+        float *const RSTR output[6]
 ) {
     sfem::codegen::two_phase_flow_form_2_p_w_p_c_d2_simplex_residual_block<float, 6, 3, 16>(nelems, geometry_stride, determinant, sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<float>::shape(), sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<float>::q_weight(), output);
     return SFEM_SUCCESS;
@@ -732,11 +732,11 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT p_w_out,
-        s_t *const SFEM_RESTRICT p_c_out
+        s_t *const RSTR p_w_out,
+        s_t *const RSTR p_c_out
 ) {
     static constexpr int ND = 2;
     static constexpr int NQ = 6;
@@ -773,10 +773,10 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_s
 
         s_t *const output_components[NC] = {p_w_out, p_c_out};
         for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const RSTR element_shape = elements[shape];
             for (int field = 0; field < NC; ++field) {
                 const int stream = shape * NC + field;
-                s_t *const SFEM_RESTRICT out = output_components[field];
+                s_t *const RSTR out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
@@ -794,11 +794,11 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_s
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 ) {
     return sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
 }
@@ -806,11 +806,11 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_soa(
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 ) {
     return sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_determinant0, out_stride, p_w_out, p_c_out);
 }
@@ -818,10 +818,10 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_affine_mesh_soa_float
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const double *const SFEM_RESTRICT determinant,
-        const double *const SFEM_RESTRICT adjugate[4],
-        const double *const SFEM_RESTRICT current[6],
-        const double *const SFEM_RESTRICT direction[6],
+        const double *const RSTR determinant,
+        const double *const RSTR adjugate[4],
+        const double *const RSTR current[6],
+        const double *const RSTR direction[6],
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -836,7 +836,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa(
         const double p_wr,
         const double porosity,
         const double rho_w0,
-        double *const SFEM_RESTRICT output[6]
+        double *const RSTR output[6]
 ) {
     sfem::codegen::two_phase_flow_form_2_p_w_p_c_d2_simplex_jacobian_action_block<double, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<double>::shape(), sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<double>::q_weight(), current, direction, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
@@ -845,10 +845,10 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa(
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa_float(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const float *const SFEM_RESTRICT determinant,
-        const float *const SFEM_RESTRICT adjugate[4],
-        const float *const SFEM_RESTRICT current[6],
-        const float *const SFEM_RESTRICT direction[6],
+        const float *const RSTR determinant,
+        const float *const RSTR adjugate[4],
+        const float *const RSTR current[6],
+        const float *const RSTR direction[6],
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -863,7 +863,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_element_soa_fl
         const float p_wr,
         const float porosity,
         const float rho_w0,
-        float *const SFEM_RESTRICT output[6]
+        float *const RSTR output[6]
 ) {
     sfem::codegen::two_phase_flow_form_2_p_w_p_c_d2_simplex_jacobian_action_block<float, 6, 3, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<float>::shape(), sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data<float>::q_weight(), current, direction, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, output);
     return SFEM_SUCCESS;
@@ -876,12 +876,12 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t C_kw1,
         const s_t K_0,
         const s_t K_1,
@@ -897,14 +897,14 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine
         const s_t porosity,
         const s_t rho_w0,
         const ptrdiff_t current_stride,
-        const s_t *const SFEM_RESTRICT p_w,
-        const s_t *const SFEM_RESTRICT p_c,
+        const s_t *const RSTR p_w,
+        const s_t *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const s_t *const SFEM_RESTRICT p_w_direction,
-        const s_t *const SFEM_RESTRICT p_c_direction,
+        const s_t *const RSTR p_w_direction,
+        const s_t *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT p_w_out,
-        s_t *const SFEM_RESTRICT p_c_out
+        s_t *const RSTR p_w_out,
+        s_t *const RSTR p_c_out
 ) {
     static constexpr int ND = 2;
     static constexpr int NQ = 6;
@@ -927,7 +927,7 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine
         const s_t *const direction_components[NC] = {p_w_direction, p_c_direction};
 
         for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const RSTR element_shape = elements[shape];
             for (int field = 0; field < NC; ++field) {
                 const int stream = shape * NC + field;
                 #pragma omp simd
@@ -962,10 +962,10 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine
 
         s_t *const output_components[NC] = {p_w_out, p_c_out};
         for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const RSTR element_shape = elements[shape];
             for (int field = 0; field < NC; ++field) {
                 const int stream = shape * NC + field;
-                s_t *const SFEM_RESTRICT out = output_components[field];
+                s_t *const RSTR out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
                     out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
@@ -983,12 +983,12 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -1004,14 +1004,14 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_so
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 ) {
     return sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
@@ -1019,12 +1019,12 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_so
 extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -1040,14 +1040,14 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_so
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 ) {
     return sfem::codegen::two_phase_flow_form_2_p_w_p_c_tri3_jacobian_action_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }

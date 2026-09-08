@@ -1155,7 +1155,7 @@ class GenApiTest(unittest.TestCase):
                 declarations,
             )
             self.assertIn(
-                "const geom_t *const SFEM_RESTRICT g_jacobian_determinant0",
+                "const geom_t *const RSTR g_jacobian_determinant0",
                 declarations,
             )
             manifest = os.path.join(
@@ -1588,7 +1588,7 @@ int main() {
         tet4_apply = local[local.index("linear_elasticity_d3_simplex_tet4_apply_block") :]
 
         for block in (generic_objective, generic_gradient, generic_apply):
-            self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+            self.assertIn("const s_t *const RSTR grad_ref_x", block)
             self.assertIn("for (int shape = 0; shape < NS; ++shape)", block)
             self.assertIn("grad_ref_x[q * NS + shape]", block)
             self.assertIn("_ref0_values", block)
@@ -1610,9 +1610,9 @@ int main() {
             tet4_apply,
         )
         for block in (tet4_objective, tet4_gradient, tet4_apply):
-            self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
-            self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
-            self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
+            self.assertNotIn("const s_t *const RSTR grad_ref_x", block)
+            self.assertNotIn("const s_t *const RSTR grad_ref_y", block)
+            self.assertNotIn("const s_t *const RSTR grad_ref_z", block)
             self.assertNotIn("for (int shape = 0; shape < NS; ++shape)", block)
             self.assertNotIn("grad_ref_x[q * NS + shape]", block)
             self.assertNotIn("_ref0_values", block)
@@ -1843,7 +1843,7 @@ int main() {
                 declarations,
             )
             self.assertIn(
-                "const geom_t *const SFEM_RESTRICT g_jacobian_determinant0",
+                "const geom_t *const RSTR g_jacobian_determinant0",
                 declarations,
             )
             self.assertIn(
@@ -3694,7 +3694,7 @@ int main() {
                 "stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float_print_rate",
                 contents,
             )
-            self.assertIn("s_t *const SFEM_RESTRICT u_out[2]", contents)
+            self.assertIn("s_t *const RSTR u_out[2]", contents)
             self.assertNotIn("u0_out", contents)
             self.assertNotIn("u1_out", contents)
             self.assertIn("static constexpr int NC = 2;", contents)
@@ -3721,8 +3721,8 @@ int main() {
                 wrapper_contents.index("if (ret->initialize(block_names)"),
             )
             self.assertIn("static constexpr ptrdiff_t FIELD_STRIDE = 3;", wrapper_contents)
-            self.assertIn("const real_t *const SFEM_RESTRICT u_data[2]", wrapper_contents)
-            self.assertIn("real_t *const SFEM_RESTRICT u_out[2]", wrapper_contents)
+            self.assertIn("const real_t *const RSTR u_data[2]", wrapper_contents)
+            self.assertIn("real_t *const RSTR u_out[2]", wrapper_contents)
             c_abi = os.path.join(out_dir, "op", "sfem_GeneratedStokes_c_abi.hpp")
             with open(c_abi, encoding="utf-8") as input_file:
                 declarations = input_file.read()
@@ -3841,7 +3841,7 @@ int main() {
                 contents,
             )
             self.assertIn(
-                "const idx_t *const SFEM_RESTRICT field_0_elements[27] = {"
+                "const idx_t *const RSTR field_0_elements[27] = {"
                 "elements[0], elements[8], elements[1]",
                 contents,
             )
@@ -3853,7 +3853,7 @@ int main() {
             self.assertNotIn("bdirection_streams[89]", contents)
             self.assertNotIn("boutput_streams[89]", contents)
             self.assertIn("static constexpr int NC = 2;", contents)
-            self.assertIn("s_t *const SFEM_RESTRICT u_out[3]", contents)
+            self.assertIn("s_t *const RSTR u_out[3]", contents)
             self.assertNotIn("u0_out", contents)
             self.assertNotIn("u1_out", contents)
             self.assertNotIn("u2_out", contents)
@@ -3971,7 +3971,7 @@ int main() {
             )
             with open(source, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
-            self.assertIn("const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];", operator_source)
+            self.assertIn("const idx_t *const RSTR element_shape = elements[local_shape];", operator_source)
             self.assertIn("const idx_t node = element_shape[evb + lane];", operator_source)
             self.assertIn("out[element_shape[evb + scatter] * out_stride]", operator_source)
             self.assertNotIn("idx_t ev[VS * CELL_NS]", operator_source)
@@ -4107,24 +4107,24 @@ int main() {
             ]
 
             for block in (generic_residual, generic_action):
-                self.assertIn("const s_t *const SFEM_RESTRICT determinant", block)
-                self.assertIn("const s_t *const SFEM_RESTRICT adjugate[9]", block)
-                self.assertIn("const s_t *const SFEM_RESTRICT shape", block)
-                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertIn("const s_t *const RSTR determinant", block)
+                self.assertIn("const s_t *const RSTR adjugate[9]", block)
+                self.assertIn("const s_t *const RSTR shape", block)
+                self.assertIn("const s_t *const RSTR grad_ref_x", block)
                 self.assertIn("for (int trial = 0; trial < NS; ++trial)", block)
                 self.assertIn("grad_ref_x[q * NS + trial]", block)
                 self.assertIn("test_grad0", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT geom_metric[6]", block)
+                self.assertNotIn("const s_t *const RSTR geom_metric[6]", block)
 
             for block in (tet4_residual, tet4_action):
                 self.assertIn("geom_metric00", block)
                 self.assertIn("geom_metric01", block)
                 self.assertIn("geom_metric22", block)
-                self.assertIn("const s_t *const SFEM_RESTRICT geom_metric[6]", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT shape", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
+                self.assertIn("const s_t *const RSTR geom_metric[6]", block)
+                self.assertNotIn("const s_t *const RSTR shape", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_x", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_y", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_z", block)
                 self.assertIn("const s_t metric_factor = q_weight[q] * (kappa);", block)
                 self.assertIn("metric_factor * geom_metric[0][goff]", block)
                 self.assertNotIn("for (int trial = 0; trial < NS; ++trial)", block)
@@ -4144,7 +4144,7 @@ int main() {
             )
             with open(operator) as source:
                 operator_source = source.read()
-            self.assertIn("const idx_t *const SFEM_RESTRICT element_shape = elements[shape];", operator_source)
+            self.assertIn("const idx_t *const RSTR element_shape = elements[shape];", operator_source)
             self.assertIn("const idx_t node = element_shape[evb + lane];", operator_source)
             self.assertIn("out[element_shape[evb + scatter] * out_stride]", operator_source)
             self.assertNotIn("idx_t ev[VS * NS]", operator_source)
@@ -4270,18 +4270,18 @@ int main() {
                 "laplace_d2_simplex_tri3_jacobian_action_block",
             )
             for block in (generic_residual, generic_action):
-                self.assertIn("const s_t *const SFEM_RESTRICT determinant", block)
-                self.assertIn("const s_t *const SFEM_RESTRICT adjugate[4]", block)
-                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
+                self.assertIn("const s_t *const RSTR determinant", block)
+                self.assertIn("const s_t *const RSTR adjugate[4]", block)
+                self.assertIn("const s_t *const RSTR grad_ref_x", block)
                 self.assertIn("for (int trial = 0; trial < NS; ++trial)", block)
                 self.assertIn("grad_ref_x[q * NS + trial]", block)
             for block in (tri3_residual, tri3_action):
-                self.assertIn("const s_t *const SFEM_RESTRICT geom_metric[3]", block)
+                self.assertIn("const s_t *const RSTR geom_metric[3]", block)
                 self.assertIn("geom_metric00", block)
                 self.assertIn("geom_metric01", block)
                 self.assertIn("geom_metric11", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_x", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_y", block)
                 self.assertNotIn("for (int trial = 0; trial < NS; ++trial)", block)
                 self.assertNotIn("grad_ref_x[q * NS + trial]", block)
             self.assertIn(
@@ -4399,16 +4399,16 @@ int main() {
             )
 
             for block in (generic_objective, generic_gradient, generic_apply):
-                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
-                self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
+                self.assertIn("const s_t *const RSTR grad_ref_x", block)
+                self.assertIn("const s_t *const RSTR grad_ref_y", block)
+                self.assertIn("const s_t *const RSTR grad_ref_z", block)
                 self.assertIn("for (int shape = 0; shape < NS; ++shape)", block)
                 self.assertIn("grad_ref_x[q * NS + shape]", block)
 
             for block in (tet4_objective, tet4_gradient, tet4_apply):
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_x", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_y", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_z", block)
                 self.assertNotIn("for (int shape = 0; shape < NS; ++shape)", block)
                 self.assertNotIn("grad_ref_x[q * NS + shape]", block)
 
@@ -4553,11 +4553,11 @@ int main() {
                 "linear_elasticity_d2_simplex_tri3_apply_block",
             )
 
-            self.assertIn("const s_t *const SFEM_RESTRICT grad_ref_x", generic_apply)
+            self.assertIn("const s_t *const RSTR grad_ref_x", generic_apply)
             self.assertIn("for (int shape = 0; shape < NS; ++shape)", generic_apply)
             for block in (tri3_objective, tri3_gradient, tri3_apply):
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_x", block)
-                self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_x", block)
+                self.assertNotIn("const s_t *const RSTR grad_ref_y", block)
                 self.assertNotIn("for (int shape = 0; shape < NS; ++shape)", block)
                 self.assertNotIn("grad_ref_x[q * NS + shape]", block)
             self.assertIn(
@@ -4831,8 +4831,8 @@ int main() {
             self.assertIn('#include "../../kernel_math.hpp"', source)
             self.assertIn("for (int qy = 0; qy < NQ1; ++qy)", source)
             self.assertIn("for (int qx = 0; qx < NQ1; ++qx)", source)
-            self.assertIn("const element_idx_t *const SFEM_RESTRICT parent", source)
-            self.assertIn("const int16_t *const SFEM_RESTRICT side_idx", source)
+            self.assertIn("const element_idx_t *const RSTR parent", source)
+            self.assertIn("const int16_t *const RSTR side_idx", source)
             self.assertIn("elements[side_nodes[side * n_shape + i]][parent_element]", source)
             self.assertIn("const s_t coeff0 = -t0;", source)
             self.assertIn("const s_t coeff1 = -t1;", source)

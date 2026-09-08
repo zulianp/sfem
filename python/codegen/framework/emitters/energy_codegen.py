@@ -1,6 +1,6 @@
 import sympy as sp
 
-from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name
+from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name, restrict_prelude
 
 #: The staged-buffer and per-thread-scratch prefixes, from the one
 #: table that owns them.  Spelling either here again is what made the
@@ -125,9 +125,7 @@ def _sfem_packed_thread_scratch_header_source():
             "#include <cstddef>",
             "#include <cstdlib>",
             "",
-            "#ifndef SFEM_RESTRICT",
-            "#define SFEM_RESTRICT __restrict__",
-            "#endif",
+            *restrict_prelude(),
             "",
             "#ifndef SFEM_INLINE",
             "#define SFEM_INLINE inline",
@@ -268,8 +266,8 @@ def _affine_geometry_stream_helper_lines(source_builder):
         "template <typename s_t, typename g_t, int VS>",
         "%s const s_t *ageom_stream(" % inline_qualifier,
         "        const int,",
-        "        const g_t *const SFEM_RESTRICT source,",
-        "        s_t *const SFEM_RESTRICT,",
+        "        const g_t *const RSTR source,",
+        "        s_t *const RSTR,",
         "        std::true_type) {",
         "    return source;",
         "}",
@@ -277,8 +275,8 @@ def _affine_geometry_stream_helper_lines(source_builder):
         "template <typename s_t, typename g_t, int VS>",
         "%s const s_t *ageom_stream(" % inline_qualifier,
         "        const int nelems,",
-        "        const g_t *const SFEM_RESTRICT source,",
-        "        s_t *const SFEM_RESTRICT converted,",
+        "        const g_t *const RSTR source,",
+        "        s_t *const RSTR converted,",
         "        std::false_type) {",
     ]
     if _emits_vector_lane_loop(source_builder):
@@ -989,31 +987,31 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     n_field_components = form_n_field_components(form, dim)
     params = [
         *(
-            "const s_t *const SFEM_RESTRICT badj%d" % component
+            "const s_t *const RSTR badj%d" % component
             for component in range(dim * dim)
         ),
-        "const s_t *const SFEM_RESTRICT bdet0",
+        "const s_t *const RSTR bdet0",
     ]
     if use_tensor_product_reference:
         params.extend(
             (
-                "const s_t *const SFEM_RESTRICT shape_1d",
-                "const s_t *const SFEM_RESTRICT grad_1d",
-                "const s_t *const SFEM_RESTRICT q_weight_1d",
+                "const s_t *const RSTR shape_1d",
+                "const s_t *const RSTR grad_1d",
+                "const s_t *const RSTR q_weight_1d",
             )
         )
     elif use_reference_gradient_vectors:
         params.extend(_sfem_reference_gradient_vector_params(dim))
-        params.append("const s_t *const SFEM_RESTRICT q_weight")
+        params.append("const s_t *const RSTR q_weight")
     else:
         params.extend(
-            "const %s *const SFEM_RESTRICT %s"
+            "const %s *const RSTR %s"
             % (array_input.scalar_type, _sfem_soa_reference_param_name(array_input))
             for array_input in reference_inputs
         )
-        params.append("const s_t *const SFEM_RESTRICT q_weight")
+        params.append("const s_t *const RSTR q_weight")
     params.extend(_form_material_parameter_declarations(form))
-    params.append("s_t *const SFEM_RESTRICT element_matrix")
+    params.append("s_t *const RSTR element_matrix")
 
     lines = [
         "template <typename s_t, int NQ, int NS, int VS>",
@@ -1129,7 +1127,7 @@ def _sfem_soa_block_signature_lines(name, params, source_builder):
 def _sfem_soa_element_stream_params(shared):
     """One parameter per stream of every element input."""
     return [
-        "const %s *const SFEM_RESTRICT %s" % (array_input.scalar_type, stream)
+        "const %s *const RSTR %s" % (array_input.scalar_type, stream)
         for array_input in shared.element_inputs
         for stream in _soa_array_stream_names(array_input)
     ]
@@ -1141,13 +1139,13 @@ def _sfem_soa_reference_basis_params(dim, shared, omit_reference_basis_inputs):
         return []
     if shared.use_tensor_product_reference:
         return [
-            "const s_t *const SFEM_RESTRICT shape_1d",
-            "const s_t *const SFEM_RESTRICT grad_1d",
+            "const s_t *const RSTR shape_1d",
+            "const s_t *const RSTR grad_1d",
         ]
     if shared.use_reference_gradient_vectors:
         return list(_sfem_reference_gradient_vector_params(dim))
     return [
-        "const %s *const SFEM_RESTRICT %s"
+        "const %s *const RSTR %s"
         % (array_input.scalar_type, _sfem_soa_reference_param_name(array_input))
         for array_input in shared.reference_inputs
     ]
@@ -1253,38 +1251,38 @@ def _sfem_soa_weak_form_block_function(
         _sfem_soa_reference_basis_params(dim, shared, omit_reference_basis_inputs)
     )
     if shared.use_tensor_product_reference:
-        params.append("const s_t *const SFEM_RESTRICT q_weight_1d")
+        params.append("const s_t *const RSTR q_weight_1d")
     else:
-        params.append("const s_t *const SFEM_RESTRICT q_weight")
+        params.append("const s_t *const RSTR q_weight")
     params.extend(_form_material_parameter_declarations(form))
     if use_stream_arrays:
         if shared.uses_current:
             params.append(
-                "const s_t *const SFEM_RESTRICT u_streams[NS * %d]" % n_field_components
+                "const s_t *const RSTR u_streams[NS * %d]" % n_field_components
             )
         if shared.uses_direction:
             params.append(
-                "const s_t *const SFEM_RESTRICT h_streams[NS * %d]" % n_field_components
+                "const s_t *const RSTR h_streams[NS * %d]" % n_field_components
             )
         if not writes_per_shape(form):
-            params.append("s_t *const SFEM_RESTRICT value")
+            params.append("s_t *const RSTR value")
         else:
             params.append(
-                "s_t *const SFEM_RESTRICT out_streams[NS * %d]" % n_field_components
+                "s_t *const RSTR out_streams[NS * %d]" % n_field_components
             )
     else:
         if shared.uses_current:
             params.extend(
-                "const s_t *const SFEM_RESTRICT %s" % name
+                "const s_t *const RSTR %s" % name
                 for name in _field_stream_names("u", n_field_components, n_nodes)
             )
         if shared.uses_direction:
             params.extend(
-                "const s_t *const SFEM_RESTRICT %s" % name
+                "const s_t *const RSTR %s" % name
                 for name in _field_stream_names("h", n_field_components, n_nodes)
             )
         params.extend(
-            "s_t *const SFEM_RESTRICT %s" % name
+            "s_t *const RSTR %s" % name
             for name in _output_stream_names(form, n_field_components, n_nodes)
         )
 
@@ -1438,16 +1436,16 @@ def _sfem_soa_pointwise_block_function(
     params.extend(_form_material_parameter_declarations(form))
     if shared.uses_current:
         params.extend(
-            "const s_t *const SFEM_RESTRICT %s" % name
+            "const s_t *const RSTR %s" % name
             for name in _field_stream_names("u", n_field_components, n_nodes)
         )
     if shared.uses_direction:
         params.extend(
-            "const s_t *const SFEM_RESTRICT %s" % name
+            "const s_t *const RSTR %s" % name
             for name in _field_stream_names("h", n_field_components, n_nodes)
         )
     params.extend(
-        "s_t *const SFEM_RESTRICT %s" % name
+        "s_t *const RSTR %s" % name
         for name in _output_stream_names(form, n_field_components, n_nodes)
     )
 
@@ -2680,7 +2678,7 @@ def _sfem_reference_gradient_vector_name(component):
 
 def _sfem_reference_gradient_vector_params(dim):
     return tuple(
-        "const s_t *const SFEM_RESTRICT %s"
+        "const s_t *const RSTR %s"
         % _sfem_reference_gradient_vector_name(component)
         for component in range(dim)
     )
@@ -3230,19 +3228,19 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
     impl_params = (
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
-        "const g_t *const SFEM_RESTRICT g_jacobian_adjugate_aos",
-        "const g_t *const SFEM_RESTRICT g_jacobian_determinant0",
+        "idx_t **const RSTR elements",
+        "const g_t *const RSTR g_jacobian_adjugate_aos",
+        "const g_t *const RSTR g_jacobian_determinant0",
         "const s_t mu",
         "const s_t lmbda",
         "const ptrdiff_t %s" % stride_name,
-        "const s_t *const SFEM_RESTRICT %s" % input_components[0],
-        "const s_t *const SFEM_RESTRICT %s" % input_components[1],
-        "const s_t *const SFEM_RESTRICT %s" % input_components[2],
+        "const s_t *const RSTR %s" % input_components[0],
+        "const s_t *const RSTR %s" % input_components[1],
+        "const s_t *const RSTR %s" % input_components[2],
         "const ptrdiff_t out_stride",
-        "s_t *const SFEM_RESTRICT outx",
-        "s_t *const SFEM_RESTRICT outy",
-        "s_t *const SFEM_RESTRICT outz",
+        "s_t *const RSTR outx",
+        "s_t *const RSTR outy",
+        "s_t *const RSTR outz",
     )
     wrapper_params = tuple(
         param.replace("g_t", "geom_t") for param in impl_params
@@ -3282,7 +3280,7 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
             "        const s_t uz2 = %s[ev2 * %s];" % (vz, stride_name),
             "        const s_t uz3 = %s[ev3 * %s];" % (vz, stride_name),
             "",
-            "        const g_t *const SFEM_RESTRICT adjugate = g_jacobian_adjugate_aos + element * 9;",
+            "        const g_t *const RSTR adjugate = g_jacobian_adjugate_aos + element * 9;",
         ]
     )
     for component in range(9):
@@ -3502,21 +3500,21 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "        const ptrdiff_t nelements,",
                 "        const ptrdiff_t nnodes,",
                 "        const ptrdiff_t max_nodes_per_pack,",
-                "        uint16_t **const SFEM_RESTRICT elements,",
-                "        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,",
-                "        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,",
-                "        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,",
-                "        const idx_t *const SFEM_RESTRICT ghost_idx,",
+                "        uint16_t **const RSTR elements,",
+                "        const ptrdiff_t *const RSTR owned_nodes_ptr,",
+                "        const ptrdiff_t *const RSTR n_shared_nodes,",
+                "        const ptrdiff_t *const RSTR ghost_ptr,",
+                "        const idx_t *const RSTR ghost_idx,",
             ]
         )
         if is_affine:
             for array_input in _packed_affine_geometry_inputs(dim, metric):
                 for stream in _soa_array_stream_names(array_input):
                     lines.append(
-                        "        const geom_t *const SFEM_RESTRICT %s," % abi_geometry_name(stream)
+                        "        const geom_t *const RSTR %s," % abi_geometry_name(stream)
                     )
         else:
-            lines.append("        const geom_t *const *const SFEM_RESTRICT points,")
+            lines.append("        const geom_t *const *const RSTR points,")
         lines.extend(
             "        const %s %s," % (scalar_type, parameter)
             for parameter in material_parameter_names
@@ -3524,20 +3522,20 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         lines.append("        const ptrdiff_t u_stride,")
         for d in range(n_field_components):
             lines.append(
-                "        const %s *const SFEM_RESTRICT u%s,"
+                "        const %s *const RSTR u%s,"
                 % (scalar_type, _component_name(d))
             )
         lines.append("        const ptrdiff_t h_stride,")
         for d in range(n_field_components):
             lines.append(
-                "        const %s *const SFEM_RESTRICT h%s,"
+                "        const %s *const RSTR h%s,"
                 % (scalar_type, _component_name(d))
             )
         lines.extend(
             [
                 "        const int nsteps,",
-                "        const %s *const SFEM_RESTRICT steps," % scalar_type,
-                "        %s *const SFEM_RESTRICT value" % scalar_type,
+                "        const %s *const RSTR steps," % scalar_type,
+                "        %s *const RSTR value" % scalar_type,
                 ") {",
                 "    using s_t = %s;" % scalar_type,
                 "    static constexpr int NC = %d;" % n_field_components,
@@ -3553,7 +3551,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         if not is_affine:
             for d in range(dim):
                 lines.append(
-                    "    const geom_t *const SFEM_RESTRICT %s = points[%d];"
+                    "    const geom_t *const RSTR %s = points[%d];"
                     % (_component_name(d), d)
                 )
             lines.extend(
@@ -3594,12 +3592,12 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         )
         if not is_affine:
             lines.append(
-                "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
+                "        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
             )
         lines.extend(
             [
-                "        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);",
-                "        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);",
+                "        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);",
+                "        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);",
                 "",
                 "#pragma omp for schedule(static)",
                 "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
@@ -3607,7 +3605,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
                 "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
                 "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-                "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+                "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
             ]
         )
         if not is_affine:
@@ -3623,8 +3621,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             lines.extend(
                 [
                     "            for (int d = 0; d < ND; ++d) {",
-                    "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
-                    "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
+                    "                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
+                    "                const geom_t *const RSTR coordinate_component = coordinate_components[d];",
                     "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                     "                    const idx_t node = owned_nodes_ptr[pack] + k;",
                     "                    pk_coordinate[k] = s_t(coordinate_component[node]);",
@@ -3643,10 +3641,10 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "            const s_t *const h_components[NC] = {%s};"
                 % ", ".join("h%s" % _component_name(d) for d in range(n_field_components)),
                 "            for (int d = 0; d < NC; ++d) {",
-                "                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;",
-                "                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;",
-                "                const s_t *const SFEM_RESTRICT u_component = u_components[d];",
-                "                const s_t *const SFEM_RESTRICT h_component = h_components[d];",
+                "                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;",
+                "                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;",
+                "                const s_t *const RSTR u_component = u_components[d];",
+                "                const s_t *const RSTR h_component = h_components[d];",
                 "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                    const idx_t node = owned_nodes_ptr[pack] + k;",
                 "                    pk_u_base_component[k] = u_component[node * u_stride];",
@@ -3697,8 +3695,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 ),
                 "",
                 "                for (int shape = 0; shape < NS; ++shape) {",
-                "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
-                *([] if is_affine or identity_stream_shape_order else ["                    const uint16_t *const SFEM_RESTRICT coordinate_shape = coordinate_elements[shape];"]),
+                "                    const uint16_t *const RSTR element_shape = elements[shape];",
+                *([] if is_affine or identity_stream_shape_order else ["                    const uint16_t *const RSTR coordinate_shape = coordinate_elements[shape];"]),
             ]
         )
                 # The coordinates carry one component per spatial direction and
@@ -3894,36 +3892,36 @@ def _mesh_operator_parameters(
     base_params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
+        "idx_t **const RSTR elements",
     ]
     if geometry_mode == "affine":
         base_params.extend(
-            "const g_t *const SFEM_RESTRICT %s" % abi_geometry_name(stream)
+            "const g_t *const RSTR %s" % abi_geometry_name(stream)
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
     else:
-        base_params.append("const g_t *const *const SFEM_RESTRICT points")
+        base_params.append("const g_t *const *const RSTR points")
 
     material_params = _form_material_parameter_declarations(form)
     field_params = []
     if uses_current:
         field_params.append("const ptrdiff_t u_stride")
         field_params.extend(
-            "const s_t *const SFEM_RESTRICT u%s" % _component_name(d)
+            "const s_t *const RSTR u%s" % _component_name(d)
             for d in range(n_field_components)
         )
     if uses_direction:
         field_params.append("const ptrdiff_t h_stride")
         field_params.extend(
-            "const s_t *const SFEM_RESTRICT h%s" % _component_name(d)
+            "const s_t *const RSTR h%s" % _component_name(d)
             for d in range(n_field_components)
         )
     if not writes_per_shape(form):
-        output_params = ("s_t *const SFEM_RESTRICT value",)
+        output_params = ("s_t *const RSTR value",)
     else:
         output_params = tuple(["const ptrdiff_t out_stride"]) + tuple(
-            "s_t *const SFEM_RESTRICT out%s" % _component_name(d)
+            "s_t *const RSTR out%s" % _component_name(d)
             for d in range(n_field_components)
         )
 
@@ -4361,7 +4359,7 @@ def _append_mesh_operator_isoparametric_jacobian(
                 [
                     "",
                     "        for (int shape = 0; shape < NS; ++shape) {",
-                    *([] if identity_stream_shape_order else ["            const idx_t *const SFEM_RESTRICT coordinate_element_shape = coordinate_elements[shape];"]),
+                    *([] if identity_stream_shape_order else ["            const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
                     "            for (int d = 0; d < ND; ++d) {",
                     *_work_item_loop_lines(source_builder, "                "),
                     "                    bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
@@ -4690,7 +4688,7 @@ def _sfem_soa_mesh_operator_function(
     if geometry_mode == "isoparametric":
         for d in range(dim):
             lines.append(
-                "    const g_t *const SFEM_RESTRICT %s = points[%d];"
+                "    const g_t *const RSTR %s = points[%d];"
                 % (_component_name(d), d)
             )
         if compact_coordinate_buffers:
@@ -4763,7 +4761,7 @@ def _sfem_soa_mesh_operator_function(
         [
             "",
             "        for (int element_node = 0; element_node < NS; ++element_node) {",
-            "            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];",
+            "            const idx_t *const RSTR element_shape = elements[element_node];",
             *_work_item_loop_lines(source_builder, "            "),
             "                ev[element_node * VS + %s] = element_shape[evb + %s];" % (work_item, work_item),
             "            }",
@@ -5149,11 +5147,11 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "        const ptrdiff_t nelements,",
                     "        const ptrdiff_t nnodes,",
                     "        const ptrdiff_t max_nodes_per_pack,",
-                    "        uint16_t **const SFEM_RESTRICT elements,",
-                    "        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,",
-                    "        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,",
-                    "        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,",
-                    "        const idx_t *const SFEM_RESTRICT ghost_idx,",
+                    "        uint16_t **const RSTR elements,",
+                    "        const ptrdiff_t *const RSTR owned_nodes_ptr,",
+                    "        const ptrdiff_t *const RSTR n_shared_nodes,",
+                    "        const ptrdiff_t *const RSTR ghost_ptr,",
+                    "        const idx_t *const RSTR ghost_idx,",
                 ]
             )
             if two_pass:
@@ -5161,20 +5159,20 @@ def _sfem_soa_packed_apply_public_wrappers(
                     [
                         "        const ptrdiff_t n_ghost_entries,",
                         "        const ptrdiff_t n_ghost_reduce_rows,",
-                        "        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,",
-                        "        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,",
-                        "        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,",
-                        "        %s *const SFEM_RESTRICT ghost_buf," % scalar_type,
+                        "        const ptrdiff_t *const RSTR ghost_reduce_ptr,",
+                        "        const ptrdiff_t *const RSTR ghost_reduce_idx,",
+                        "        const idx_t *const RSTR ghost_reduce_dest,",
+                        "        %s *const RSTR ghost_buf," % scalar_type,
                     ]
                 )
             if is_affine:
                 for array_input in _packed_affine_geometry_inputs(dim, metric):
                     for stream in _soa_array_stream_names(array_input):
                         lines.append(
-                            "        const geom_t *const SFEM_RESTRICT %s," % abi_geometry_name(stream)
+                            "        const geom_t *const RSTR %s," % abi_geometry_name(stream)
                         )
             else:
-                lines.append("        const geom_t *const *const SFEM_RESTRICT points,")
+                lines.append("        const geom_t *const *const RSTR points,")
             lines.extend(
                 "        const %s %s," % (scalar_type, parameter)
                 for parameter in material_parameter_names
@@ -5183,21 +5181,21 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.append("        const ptrdiff_t u_stride,")
                 for d in range(n_field_components):
                     lines.append(
-                        "        const %s *const SFEM_RESTRICT u%s,"
+                        "        const %s *const RSTR u%s,"
                         % (scalar_type, _component_name(d))
                     )
             if uses_direction:
                 lines.append("        const ptrdiff_t h_stride,")
                 for d in range(n_field_components):
                     lines.append(
-                        "        const %s *const SFEM_RESTRICT h%s,"
+                        "        const %s *const RSTR h%s,"
                         % (scalar_type, _component_name(d))
                     )
             lines.append("        const ptrdiff_t out_stride,")
             for d in range(n_field_components):
                 comma = "," if d + 1 < n_field_components else ""
                 lines.append(
-                    "        %s *const SFEM_RESTRICT out%s%s"
+                    "        %s *const RSTR out%s%s"
                     % (scalar_type, _component_name(d), comma)
                 )
             lines.extend(
@@ -5216,7 +5214,7 @@ def _sfem_soa_packed_apply_public_wrappers(
             if not is_affine:
                 for d in range(dim):
                     lines.append(
-                        "    const geom_t *const SFEM_RESTRICT %s = points[%d];"
+                        "    const geom_t *const RSTR %s = points[%d];"
                         % (_component_name(d), d)
                     )
                 lines.extend(
@@ -5257,19 +5255,19 @@ def _sfem_soa_packed_apply_public_wrappers(
             )
             if not is_affine:
                 lines.append(
-                    "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
+                    "        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
                 )
             if uses_current:
                 lines.append(
-                    "        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
+                    "        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
                 )
             if uses_direction:
                 lines.append(
-                    "        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);"
+                    "        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);"
                 )
             lines.extend(
                 [
-                    "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);",
+                    "        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);",
                     "",
                     "#pragma omp for schedule(static)",
                     "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
@@ -5284,7 +5282,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "            (void)n_shared_nodes;",
                         "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
                         "            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
-                        "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+                        "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
                         "            const ptrdiff_t ghost_off = ghost_ptr[pack];",
                     ]
                 )
@@ -5295,7 +5293,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
                         "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
                         "            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
-                        "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+                        "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
                     ]
                 )
             if not is_affine:
@@ -5318,31 +5316,31 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "            s_t *const out_components[NC] = {%s};"
                     % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)),
                     "            for (int d = 0; d < NC; ++d) {",
-                    "                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;",
+                    "                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
                 ]
             )
             if not is_affine:
                 lines.append(
-                    "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;"
+                    "                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;"
                 )
             if uses_current:
                 lines.append(
-                    "                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;"
+                    "                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;"
                 )
             if uses_direction:
                 lines.append(
-                    "                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;"
+                    "                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;"
                 )
             if not is_affine:
                 lines.append(
-                    "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];"
+                    "                const geom_t *const RSTR coordinate_component = coordinate_components[d];"
                 )
             if uses_current:
                 lines.append(
-                    "                const s_t *const SFEM_RESTRICT u_component = u_components[d];"
+                    "                const s_t *const RSTR u_component = u_components[d];"
                 )
             if uses_direction:
-                lines.append("                const s_t *const SFEM_RESTRICT h_component = h_components[d];")
+                lines.append("                const s_t *const RSTR h_component = h_components[d];")
             lines.extend(
                 [
                     "                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {",
@@ -5445,8 +5443,8 @@ def _sfem_soa_packed_apply_public_wrappers(
                     ),
                     "",
                     "                for (int shape = 0; shape < NS; ++shape) {",
-                    "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
-                    *([] if identity_stream_shape_order else ["                    const uint16_t *const SFEM_RESTRICT coordinate_shape = coordinate_elements[shape];"]),
+                    "                    const uint16_t *const RSTR element_shape = elements[shape];",
+                    *([] if identity_stream_shape_order else ["                    const uint16_t *const RSTR coordinate_shape = coordinate_elements[shape];"]),
                 ]
             )
             # Two loops, for the reason spelled at the other packed gather: the
@@ -5592,9 +5590,9 @@ def _sfem_soa_packed_apply_public_wrappers(
                     % (block_name, ", ".join(call_args)),
                     "",
                     "                for (int shape = 0; shape < NS; ++shape) {",
-                    "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
+                    "                    const uint16_t *const RSTR element_shape = elements[shape];",
                     "                    for (int d = 0; d < NC; ++d) {",
-                    "                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;",
+                    "                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
                     "                        for (int lane = 0; lane < nelems; ++lane) {",
                     "                            pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];",
                     "                        }",
@@ -5617,9 +5615,9 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend(
                     [
                         "            for (int d = 0; d < NC; ++d) {",
-                        "                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;",
-                        "                s_t *const SFEM_RESTRICT global_out = out_components[d];",
-                        "                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;",
+                        "                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+                        "                s_t *const RSTR global_out = out_components[d];",
+                        "                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;",
                         "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                         "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
                         "                    pk_component_out[k] = s_t(0);",
@@ -5636,8 +5634,8 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend(
                     [
                         "            for (int d = 0; d < NC; ++d) {",
-                        "                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;",
-                        "                s_t *const SFEM_RESTRICT global_out = out_components[d];",
+                        "                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+                        "                s_t *const RSTR global_out = out_components[d];",
                         "                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
                         "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
                         "                    pk_component_out[k] = s_t(0);",
@@ -5669,7 +5667,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "        const ptrdiff_t begin = ghost_reduce_ptr[row];",
                         "        const ptrdiff_t end = ghost_reduce_ptr[row + 1];",
                         "        for (int d = 0; d < NC; ++d) {",
-                        "            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;",
+                        "            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;",
                         "            s_t sum = s_t(0);",
                         "            for (ptrdiff_t j = begin; j < end; ++j) {",
                         "                sum += ghost_component[ghost_reduce_idx[j]];",
@@ -5883,33 +5881,33 @@ def _sfem_soa_mesh_objective_steps_function(
     base_params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
+        "idx_t **const RSTR elements",
     ]
     if geometry_mode == "affine":
         base_params.extend(
-            "const g_t *const SFEM_RESTRICT %s" % abi_geometry_name(stream)
+            "const g_t *const RSTR %s" % abi_geometry_name(stream)
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
     else:
-        base_params.append("const g_t *const *const SFEM_RESTRICT points")
+        base_params.append("const g_t *const *const RSTR points")
 
     material_params = _form_material_parameter_declarations(form)
     field_params = ["const ptrdiff_t u_stride"]
     field_params.extend(
-        "const s_t *const SFEM_RESTRICT u%s" % _component_name(d)
+        "const s_t *const RSTR u%s" % _component_name(d)
         for d in range(n_field_components)
     )
     field_params.append("const ptrdiff_t h_stride")
     field_params.extend(
-        "const s_t *const SFEM_RESTRICT h%s" % _component_name(d)
+        "const s_t *const RSTR h%s" % _component_name(d)
         for d in range(n_field_components)
     )
     step_params = (
         "const int nsteps",
-        "const s_t *const SFEM_RESTRICT steps",
+        "const s_t *const RSTR steps",
     )
-    output_params = ("s_t *const SFEM_RESTRICT value",)
+    output_params = ("s_t *const RSTR value",)
 
     impl_params = (
         tuple(base_params)
@@ -5952,7 +5950,7 @@ def _sfem_soa_mesh_objective_steps_function(
     if geometry_mode == "isoparametric":
         for d in range(dim):
             lines.append(
-                "    const g_t *const SFEM_RESTRICT %s = points[%d];"
+                "    const g_t *const RSTR %s = points[%d];"
                 % (_component_name(d), d)
             )
         if compact_coordinate_buffers:
@@ -6027,7 +6025,7 @@ def _sfem_soa_mesh_objective_steps_function(
         [
             "",
             "        for (int element_node = 0; element_node < NS; ++element_node) {",
-            "            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];",
+            "            const idx_t *const RSTR element_shape = elements[element_node];",
             *_work_item_loop_lines(source_builder, "            "),
             "                ev[element_node * VS + %s] = element_shape[evb + %s];"
             % (work_item, work_item),
@@ -6043,7 +6041,7 @@ def _sfem_soa_mesh_objective_steps_function(
                 [
                     "",
                     "        for (int shape = 0; shape < NS; ++shape) {",
-                    *([] if identity_stream_shape_order else ["            const idx_t *const SFEM_RESTRICT coordinate_element_shape = coordinate_elements[shape];"]),
+                    *([] if identity_stream_shape_order else ["            const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
                     "            for (int d = 0; d < ND; ++d) {",
                     *_work_item_loop_lines(source_builder, "                "),
                     "                    bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
@@ -6644,14 +6642,14 @@ def _sfem_soa_hessian_packed_crs_passes(
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
             "const ptrdiff_t max_nodes_per_pack",
-            "uint16_t **const SFEM_RESTRICT elements",
-            "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
-            "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
-            "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
-            "const idx_t *const SFEM_RESTRICT ghost_idx",
+            "uint16_t **const RSTR elements",
+            "const ptrdiff_t *const RSTR owned_nodes_ptr",
+            "const ptrdiff_t *const RSTR n_shared_nodes",
+            "const ptrdiff_t *const RSTR ghost_ptr",
+            "const idx_t *const RSTR ghost_idx",
         ]
         packed_state_params = [
-            "const g_t *const *const SFEM_RESTRICT points",
+            "const g_t *const *const RSTR points",
         ]
         packed_state_params.extend(
             "const s_t %s" % parameter
@@ -6660,23 +6658,23 @@ def _sfem_soa_hessian_packed_crs_passes(
         if uses_current:
             packed_state_params.append("const ptrdiff_t u_stride")
             packed_state_params.extend(
-                "const s_t *const SFEM_RESTRICT u%s" % _component_name(d)
+                "const s_t *const RSTR u%s" % _component_name(d)
                 for d in range(n_field_components)
             )
         packed_fill_params = tuple(
             packed_common_params
             + packed_state_params
             + [
-                "const count_t *const SFEM_RESTRICT packed_element_entries",
-                "s_t *const SFEM_RESTRICT values",
+                "const count_t *const RSTR packed_element_entries",
+                "s_t *const RSTR values",
             ]
         )
         packed_discover_params = tuple(
             packed_common_params
             + [
-                "const count_t *const SFEM_RESTRICT %s" % row_pointer,
-                "const idx_t *const SFEM_RESTRICT %s" % column_index,
-                "count_t *const SFEM_RESTRICT packed_element_entries",
+                "const count_t *const RSTR %s" % row_pointer,
+                "const idx_t *const RSTR %s" % column_index,
+                "count_t *const RSTR packed_element_entries",
             ]
         )
         lines.extend(
@@ -6732,7 +6730,7 @@ def _sfem_soa_hessian_packed_crs_passes(
         )
         for d in range(dim):
             lines.append(
-                "    const g_t *const SFEM_RESTRICT %s = points[%d];"
+                "    const g_t *const RSTR %s = points[%d];"
                 % (_component_name(d), d)
             )
         lines.extend(
@@ -6760,12 +6758,12 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "",
                 "#pragma omp parallel",
                 "    {",
-                "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
+                "        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
             ]
         )
         if uses_current:
             lines.append(
-                "        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
+                "        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
             )
         lines.extend(
             [
@@ -6776,7 +6774,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
                 "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
                 "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-                "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+                "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
                 "            const g_t *const coordinate_components[ND] = {%s};"
                 % ", ".join(_component_name(d) for d in range(dim)),
             ]
@@ -6789,15 +6787,15 @@ def _sfem_soa_hessian_packed_crs_passes(
         lines.extend(
             [
                 "            for (int d = 0; d < ND; ++d) {",
-                "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
-                "                const g_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
+                "                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
+                "                const g_t *const RSTR coordinate_component = coordinate_components[d];",
             ]
         )
         if uses_current:
             lines.extend(
                 [
-                    "                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;",
-                    "                const s_t *const SFEM_RESTRICT u_component = u_components[d];",
+                    "                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;",
+                    "                const s_t *const RSTR u_component = u_components[d];",
                 ]
             )
         lines.extend(
@@ -7178,8 +7176,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "static int %s(" % implementation_name,
             "        const ptrdiff_t nelements,",
             "        const ptrdiff_t nnodes,",
-            "        idx_t **const SFEM_RESTRICT elements,",
-            "        const g_t *const *const SFEM_RESTRICT points,",
+            "        idx_t **const RSTR elements,",
+            "        const g_t *const *const RSTR points,",
         ]
     )
     lines.extend(
@@ -7191,21 +7189,21 @@ def _sfem_soa_hessian_matrix_assembly_function(
         for d in range(dim):
             comma = "," if d + 1 < dim else ","
             lines.append(
-                "        const s_t *const SFEM_RESTRICT u%s%s"
+                "        const s_t *const RSTR u%s%s"
                 % (_component_name(d), comma)
             )
     lines.extend(
         [
-            "        const count_t *const SFEM_RESTRICT rowptr,",
-            "        const idx_t *const SFEM_RESTRICT colidx,",
-            "        s_t *const SFEM_RESTRICT values,",
-            "        const int *const SFEM_RESTRICT diag_offsets,",
+            "        const count_t *const RSTR rowptr,",
+            "        const idx_t *const RSTR colidx,",
+            "        s_t *const RSTR values,",
+            "        const int *const RSTR diag_offsets,",
             "        const ptrdiff_t ndiag,",
             "        const ptrdiff_t coo_nnz,",
-            "        const idx_t *const SFEM_RESTRICT coo_rows,",
-            "        const idx_t *const SFEM_RESTRICT coo_cols,",
-            "        idx_t *const SFEM_RESTRICT coo_triplet_rows,",
-            "        idx_t *const SFEM_RESTRICT coo_triplet_cols) {",
+            "        const idx_t *const RSTR coo_rows,",
+            "        const idx_t *const RSTR coo_cols,",
+            "        idx_t *const RSTR coo_triplet_rows,",
+            "        idx_t *const RSTR coo_triplet_cols) {",
             "    static constexpr int NC = %d;" % n_field_components,
                 "    static constexpr int ND = %d;" % dim,
             "    static constexpr int NQ = %d;" % n_qp,
@@ -7222,7 +7220,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         )
     for d in range(dim):
         lines.append(
-            "    const g_t *const SFEM_RESTRICT %s = points[%d];"
+            "    const g_t *const RSTR %s = points[%d];"
             % (_component_name(d), d)
         )
     lines.extend(
@@ -7575,7 +7573,7 @@ def _ordered_element_pointer_array_lines(pointer_type, array_name, source_name, 
     if tuple(stream_shape_order) == tuple(range(len(stream_shape_order))):
         return []
     return [
-        "%sconst %s *const SFEM_RESTRICT %s[NS] = {%s};"
+        "%sconst %s *const RSTR %s[NS] = {%s};"
         % (
             indent,
             pointer_type,
@@ -7624,10 +7622,10 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_fiel
     if "bsr" in formats or "crs" in formats or "patch" in formats:
         find_cols_lines = [
             "static SFEM_INLINE void %s_find_cols(" % function_base,
-            "        const idx_t *const SFEM_RESTRICT targets,",
-            "        const idx_t *const SFEM_RESTRICT row,",
+            "        const idx_t *const RSTR targets,",
+            "        const idx_t *const RSTR row,",
             "        const int lenrow,",
-            "        idx_t *const SFEM_RESTRICT ks) {",
+            "        idx_t *const RSTR ks) {",
         ]
         if n_nodes <= 10:
             find_cols_lines.append("#pragma unroll(%d)" % n_nodes)
@@ -7802,7 +7800,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                     expr_ref("(int)(%s[dof_i + 1] - row_begin)" % row_pointer),
                 ),
                 BufferDeclNode(
-                    "const idx_t *const SFEM_RESTRICT",
+                    "const idx_t *const RSTR",
                     "cols",
                     (),
                     expr_ref("&%s[row_begin]" % column_index),
@@ -7849,11 +7847,11 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
         FunctionDefNode(
             "%s_scatter_bsr" % function_base,
             params=(
-                "const idx_t *const SFEM_RESTRICT ev",
-                "const s_t *const SFEM_RESTRICT element_matrix",
-                "const count_t *const SFEM_RESTRICT rowptr",
-                "const idx_t *const SFEM_RESTRICT colidx",
-                "s_t *const SFEM_RESTRICT values",
+                "const idx_t *const RSTR ev",
+                "const s_t *const RSTR element_matrix",
+                "const count_t *const RSTR rowptr",
+                "const idx_t *const RSTR colidx",
+                "s_t *const RSTR values",
             ),
             body=tuple(body),
             qualifier="static SFEM_INLINE",
@@ -7867,11 +7865,11 @@ def _sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes, n_field_com
     return [
         "template <typename s_t>",
         "static SFEM_INLINE void %s_scatter_crs(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const s_t *const SFEM_RESTRICT element_matrix,",
-        "        const count_t *const SFEM_RESTRICT rowptr,",
-        "        const idx_t *const SFEM_RESTRICT colidx,",
-        "        s_t *const SFEM_RESTRICT values) {",
+        "        const idx_t *const RSTR ev,",
+        "        const s_t *const RSTR element_matrix,",
+        "        const count_t *const RSTR rowptr,",
+        "        const idx_t *const RSTR colidx,",
+        "        s_t *const RSTR values) {",
         "    static constexpr int NC = %d;" % n_field_components,
                 "    static constexpr int ND = %d;" % dim,
         "    static constexpr int NS = %d;" % n_nodes,
@@ -7882,7 +7880,7 @@ def _sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes, n_field_com
         "    for (int i = 0; i < NS; ++i) {",
         "        row_begin[i] = rowptr[ev[i]];",
         "        lenrow[i] = (int)(rowptr[ev[i] + 1] - row_begin[i]);",
-        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin[i]];",
+        "        const idx_t *const RSTR cols = &colidx[row_begin[i]];",
         "        %s_find_cols(ev, cols, lenrow[i], ks);" % function_base,
         "        for (int j = 0; j < NS; ++j) {",
         "            local_col[i * NS + j] = (int)ks[j];",
@@ -7915,19 +7913,19 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes, n_fie
         "static SFEM_INLINE idx_t %s_packed_global_node(" % function_base,
         "        const uint16_t packed_node,",
         "        const ptrdiff_t pack,",
-        "        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,",
-        "        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,",
-        "        const idx_t *const SFEM_RESTRICT ghost_idx) {",
+        "        const ptrdiff_t *const RSTR owned_nodes_ptr,",
+        "        const ptrdiff_t *const RSTR ghost_ptr,",
+        "        const idx_t *const RSTR ghost_idx) {",
         "    const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
         "    return packed_node < n_contiguous ? idx_t(owned_nodes_ptr[pack] + packed_node) : ghost_idx[ghost_ptr[pack] + packed_node - n_contiguous];",
         "}",
         "",
         "template <typename s_t>",
         "static SFEM_INLINE void %s_discover_packed_crs_entries(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const count_t *const SFEM_RESTRICT rowptr,",
-        "        const idx_t *const SFEM_RESTRICT colidx,",
-        "        count_t *const SFEM_RESTRICT entries) {",
+        "        const idx_t *const RSTR ev,",
+        "        const count_t *const RSTR rowptr,",
+        "        const idx_t *const RSTR colidx,",
+        "        count_t *const RSTR entries) {",
         "    static constexpr int NC = %d;" % n_field_components,
                 "    static constexpr int ND = %d;" % dim,
         "    static constexpr int NS = %d;" % n_nodes,
@@ -7936,7 +7934,7 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes, n_fie
         "    for (int i = 0; i < NS; ++i) {",
         "        const count_t row_begin = rowptr[ev[i]];",
         "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
-        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
+        "        const idx_t *const RSTR cols = &colidx[row_begin];",
         "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
         "        for (int j = 0; j < NS; ++j) {",
         "            const int local_col = (int)ks[j];",
@@ -7954,9 +7952,9 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes, n_fie
         "",
         "template <typename s_t>",
         "static SFEM_INLINE void %s_scatter_packed_crs_entries(" % function_base,
-        "        const s_t *const SFEM_RESTRICT element_matrix,",
-        "        const count_t *const SFEM_RESTRICT entries,",
-        "        s_t *const SFEM_RESTRICT values) {",
+        "        const s_t *const RSTR element_matrix,",
+        "        const count_t *const RSTR entries,",
+        "        s_t *const RSTR values) {",
         "    static constexpr int NC = %d;" % n_field_components,
                 "    static constexpr int ND = %d;" % dim,
         "    static constexpr int NS = %d;" % n_nodes,
@@ -8038,9 +8036,9 @@ def _sfem_soa_hessian_scatter_block_diag_sym_lines(
         FunctionDefNode(
             "%s_scatter_block_diag_sym" % function_base,
             params=(
-                "const idx_t *const SFEM_RESTRICT ev",
-                "const s_t *const SFEM_RESTRICT element_matrix",
-                "s_t *const SFEM_RESTRICT %s" % value_stream,
+                "const idx_t *const RSTR ev",
+                "const s_t *const RSTR element_matrix",
+                "s_t *const RSTR %s" % value_stream,
             ),
             body=tuple(body),
             qualifier="static SFEM_INLINE",
@@ -8227,8 +8225,8 @@ def _hessian_matrix_public_params(
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
-        "const geom_t *const *const SFEM_RESTRICT points",
+        "idx_t **const RSTR elements",
+        "const geom_t *const *const RSTR points",
     ]
     params.extend(
         "const %s %s" % (scalar_type, parameter)
@@ -8237,52 +8235,52 @@ def _hessian_matrix_public_params(
     if uses_current:
         params.append("const ptrdiff_t u_stride")
         params.extend(
-            "const %s *const SFEM_RESTRICT u%s" % (scalar_type, _component_name(d))
+            "const %s *const RSTR u%s" % (scalar_type, _component_name(d))
             for d in range(dim)
         )
     if matrix_format in ("crs", "bsr"):
         params.extend(
             [
-                "const count_t *const SFEM_RESTRICT rowptr",
-                "const idx_t *const SFEM_RESTRICT colidx",
-                "%s *const SFEM_RESTRICT values" % scalar_type,
+                "const count_t *const RSTR rowptr",
+                "const idx_t *const RSTR colidx",
+                "%s *const RSTR values" % scalar_type,
             ]
         )
     elif matrix_format == "dia":
         params.extend(
             [
-                "const int *const SFEM_RESTRICT diag_offsets",
+                "const int *const RSTR diag_offsets",
                 "const ptrdiff_t ndiag",
-                "%s *const SFEM_RESTRICT values" % scalar_type,
+                "%s *const RSTR values" % scalar_type,
             ]
         )
     elif matrix_format == "coo":
         params.extend(
             [
                 "const ptrdiff_t nnz",
-                "const idx_t *const SFEM_RESTRICT rows",
-                "const idx_t *const SFEM_RESTRICT cols",
-                "%s *const SFEM_RESTRICT values" % scalar_type,
+                "const idx_t *const RSTR rows",
+                "const idx_t *const RSTR cols",
+                "%s *const RSTR values" % scalar_type,
             ]
         )
     elif matrix_format == "coo_triplet":
         params.extend(
             [
-                "idx_t *const SFEM_RESTRICT rows",
-                "idx_t *const SFEM_RESTRICT cols",
-                "%s *const SFEM_RESTRICT values" % scalar_type,
+                "idx_t *const RSTR rows",
+                "idx_t *const RSTR cols",
+                "%s *const RSTR values" % scalar_type,
             ]
         )
     elif matrix_format == "patch":
         params.extend(
             [
-                "const count_t *const SFEM_RESTRICT rowptr",
-                "const idx_t *const SFEM_RESTRICT colidx",
-                "%s *const SFEM_RESTRICT values" % scalar_type,
+                "const count_t *const RSTR rowptr",
+                "const idx_t *const RSTR colidx",
+                "%s *const RSTR values" % scalar_type,
             ]
         )
     elif matrix_format == "block_diag_sym":
-        params.append("%s *const SFEM_RESTRICT values" % scalar_type)
+        params.append("%s *const RSTR values" % scalar_type)
     else:
         raise ValueError("unsupported matrix format '%s'" % matrix_format)
     return params
@@ -8301,12 +8299,12 @@ def _hessian_packed_crs_public_params(
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
         "const ptrdiff_t max_nodes_per_pack",
-        "uint16_t **const SFEM_RESTRICT elements",
-        "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
-        "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
-        "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
-        "const idx_t *const SFEM_RESTRICT ghost_idx",
-        "const geom_t *const *const SFEM_RESTRICT points",
+        "uint16_t **const RSTR elements",
+        "const ptrdiff_t *const RSTR owned_nodes_ptr",
+        "const ptrdiff_t *const RSTR n_shared_nodes",
+        "const ptrdiff_t *const RSTR ghost_ptr",
+        "const idx_t *const RSTR ghost_idx",
+        "const geom_t *const *const RSTR points",
     ]
     params.extend(
         "const %s %s" % (scalar_type, parameter)
@@ -8315,20 +8313,20 @@ def _hessian_packed_crs_public_params(
     if uses_current:
         params.append("const ptrdiff_t u_stride")
         params.extend(
-            "const %s *const SFEM_RESTRICT u%s" % (scalar_type, _component_name(d))
+            "const %s *const RSTR u%s" % (scalar_type, _component_name(d))
             for d in range(dim)
         )
     if two_pass:
         params.extend(
             [
-                "const count_t *const SFEM_RESTRICT rowptr",
-                "const idx_t *const SFEM_RESTRICT colidx",
-                "count_t *const SFEM_RESTRICT packed_element_entries",
+                "const count_t *const RSTR rowptr",
+                "const idx_t *const RSTR colidx",
+                "count_t *const RSTR packed_element_entries",
             ]
         )
     else:
-        params.append("const count_t *const SFEM_RESTRICT packed_element_entries")
-    params.append("%s *const SFEM_RESTRICT values" % scalar_type)
+        params.append("const count_t *const RSTR packed_element_entries")
+    params.append("%s *const RSTR values" % scalar_type)
     return params
 
 
@@ -9317,7 +9315,7 @@ def _sfem_soa_element_api_alias_header(
         if form is None or form.weak_form is None:
             continue
         public = "energy" if operation == "objective" else "gradient"
-        output_param = "s_t *const SFEM_RESTRICT values" if public == "energy" else "s_t *const *const SFEM_RESTRICT out_streams"
+        output_param = "s_t *const RSTR values" if public == "energy" else "s_t *const *const RSTR out_streams"
         for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
             name = "%s_%s_element_%ssoa" % (prefix, public, ("%s_" % suffix) if suffix else "")
             target_name = "%s_%s_element_%ssoa" % (
@@ -9347,7 +9345,7 @@ def _sfem_soa_element_api_alias_header(
             name = "%s_hessian_element_%ssoa" % (prefix, ("%s_" % suffix) if suffix else "")
             target_name = "%s_hessian_element_%ssoa" % (alias["target_prefix"], ("%s_" % suffix) if suffix else "")
             params = _sfem_soa_element_api_common_params(apply_form, dim, include_coords)
-            params.append("s_t *const *const SFEM_RESTRICT matrix_streams")
+            params.append("s_t *const *const RSTR matrix_streams")
             lines.extend(
                 _sfem_soa_element_api_alias_function_lines(
                     name,
@@ -9460,13 +9458,13 @@ def _sfem_soa_element_api_alias_stream_lines(source_name, ordered_name, pointer_
 def _sfem_soa_element_api_common_params(form, dim, include_coords):
     params = ["const ptrdiff_t nelements"]
     if include_coords:
-        params.append("const s_t *const *const SFEM_RESTRICT coords")
+        params.append("const s_t *const *const RSTR coords")
     else:
-        params.append("const s_t *const *const SFEM_RESTRICT adj")
-        params.append("const s_t *const SFEM_RESTRICT det")
+        params.append("const s_t *const *const RSTR adj")
+        params.append("const s_t *const RSTR det")
     params.extend(_form_material_parameter_declarations(form))
     if _form_uses_current(form, default=True):
-        params.append("const s_t *const *const SFEM_RESTRICT u_streams")
+        params.append("const s_t *const *const RSTR u_streams")
     return params
 
 
@@ -9688,7 +9686,7 @@ def _sfem_soa_element_api_operation_lines(
 ):
     n_field_components = form_n_field_components(form, dim)
     output_kind = "value" if public == "energy" else "vector"
-    output_param = "s_t *const SFEM_RESTRICT values" if public == "energy" else "s_t *const *const SFEM_RESTRICT out_streams"
+    output_param = "s_t *const RSTR values" if public == "energy" else "s_t *const *const RSTR out_streams"
     lines = []
     for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
         name = "%s_%s_element_%ssoa" % (prefix, public, ("%s_" % suffix) if suffix else "")
@@ -9768,7 +9766,7 @@ def _sfem_soa_element_api_hessian_lines(
     for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
         name = "%s_hessian_element_%ssoa" % (prefix, ("%s_" % suffix) if suffix else "")
         params = _sfem_soa_element_api_common_params(form, dim, include_coords)
-        params.append("s_t *const *const SFEM_RESTRICT matrix_streams")
+        params.append("s_t *const *const RSTR matrix_streams")
         lines.extend(
             [
                 "template <typename s_t, int VS = %d>" % vector_size,

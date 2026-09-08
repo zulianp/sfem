@@ -25,8 +25,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT,
+        const g_t *const RSTR source,
+        s_t *const RSTR,
         std::true_type) {
     return source;
 }
@@ -34,8 +34,8 @@ SFEM_INLINE const s_t *ageom_stream(
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT converted,
+        const g_t *const RSTR source,
+        s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
@@ -230,23 +230,23 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
         const int nsteps,
-        const s_t *const SFEM_RESTRICT steps,
-        s_t *const SFEM_RESTRICT value
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
 ) {
     static constexpr int NC = 2;
     static constexpr int NQ = 1;
@@ -265,7 +265,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
         s_t bvalue[VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -338,23 +338,23 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
@@ -362,23 +362,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
@@ -520,20 +520,20 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy
+        s_t *const RSTR outx,
+        s_t *const RSTR outy
 ) {
     static constexpr int NC = 2;
     static constexpr int NQ = 1;
@@ -550,7 +550,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
         s_t bout_data[NS * NC][VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -623,20 +623,20 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        double *const RSTR outx,
+        double *const RSTR outy
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
@@ -644,20 +644,20 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_m
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        float *const RSTR outx,
+        float *const RSTR outy
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
@@ -799,23 +799,23 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy
+        s_t *const RSTR outx,
+        s_t *const RSTR outy
 ) {
     static constexpr int NC = 2;
     static constexpr int NQ = 1;
@@ -833,7 +833,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_aff
         s_t bout_data[NS * NC][VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -912,23 +912,23 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_aff
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        double *const RSTR outx,
+        double *const RSTR outy
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
@@ -936,23 +936,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        float *const RSTR outx,
+        float *const RSTR outy
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }

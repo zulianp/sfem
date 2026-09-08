@@ -16,6 +16,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
@@ -28,16 +31,16 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d2_simplex_direct_hessian_reference_element_matrix(
-        const s_t *const SFEM_RESTRICT badj0,
-        const s_t *const SFEM_RESTRICT badj1,
-        const s_t *const SFEM_RESTRICT badj2,
-        const s_t *const SFEM_RESTRICT badj3,
-        const s_t *const SFEM_RESTRICT bdet0,
-        const s_t *const SFEM_RESTRICT grad_ref_x,
-        const s_t *const SFEM_RESTRICT grad_ref_y,
-        const s_t *const SFEM_RESTRICT q_weight,
+        const s_t *const RSTR badj0,
+        const s_t *const RSTR badj1,
+        const s_t *const RSTR badj2,
+        const s_t *const RSTR badj3,
+        const s_t *const RSTR bdet0,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t *const RSTR q_weight,
         const s_t kappa,
-        s_t *const SFEM_RESTRICT element_matrix
+        s_t *const RSTR element_matrix
 ) {
     static_assert(NQ > 0, "NQ must be positive");
     static_assert(NS > 0, "NS must be positive");

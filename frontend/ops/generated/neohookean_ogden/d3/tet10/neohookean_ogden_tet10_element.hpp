@@ -48,12 +48,12 @@ struct neohookean_ogden_tet10_isoparametric_reference_data {
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_energy_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -105,11 +105,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_energy_element_geometry_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_energy_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -260,11 +260,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_energy_element_coords_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_energy_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -416,12 +416,12 @@ static SFEM_INLINE int neohookean_ogden_tet10_energy_element_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_gradient_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -476,11 +476,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_element_geometry_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_gradient_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -634,11 +634,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_element_coords_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_gradient_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -793,12 +793,12 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_element_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_hessian_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -867,11 +867,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_hessian_element_geometry_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_hessian_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -1039,11 +1039,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_hessian_element_coords_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tet10_hessian_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;

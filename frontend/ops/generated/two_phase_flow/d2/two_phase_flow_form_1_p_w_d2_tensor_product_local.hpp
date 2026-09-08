@@ -18,6 +18,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
@@ -33,13 +36,13 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[4],
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
-        const s_t *const SFEM_RESTRICT current[2 * NS],
-        const s_t *const SFEM_RESTRICT previous[2 * NS],
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[4],
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
+        const s_t *const RSTR current[2 * NS],
+        const s_t *const RSTR previous[2 * NS],
         const s_t C_kw1,
         const s_t K_0,
         const s_t K_1,
@@ -54,7 +57,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
         const s_t p_wr,
         const s_t porosity,
         const s_t rho_w0,
-        s_t *const SFEM_RESTRICT output[2 * NS]
+        s_t *const RSTR output[2 * NS]
 ) {
     static constexpr int ND = 2;
     static constexpr int NC = 2;
@@ -120,11 +123,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT adjugate[4],
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT grad_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR adjugate[4],
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
         const s_t current[2 * NS][VS],
         const s_t previous[2 * NS][VS],
         const s_t C_kw1,
@@ -207,10 +210,10 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_jacobian_action_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
-        s_t *const SFEM_RESTRICT output[2 * NS]
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR q_weight_1d,
+        s_t *const RSTR output[2 * NS]
 ) {
     static constexpr int ND = 2;
     static constexpr int NC = 2;
@@ -220,9 +223,9 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_jacobian_action_block_contiguous(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT determinant,
-        const s_t *const SFEM_RESTRICT shape_1d,
-        const s_t *const SFEM_RESTRICT q_weight_1d,
+        const s_t *const RSTR determinant,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR q_weight_1d,
         s_t output[2 * NS][VS]
 ) {
     static constexpr int ND = 2;

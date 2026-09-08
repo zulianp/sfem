@@ -13,6 +13,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
@@ -33,8 +36,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT,
+        const g_t *const RSTR source,
+        s_t *const RSTR,
         std::true_type) {
     return source;
 }
@@ -42,8 +45,8 @@ SFEM_INLINE const s_t *ageom_stream(
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT converted,
+        const g_t *const RSTR source,
+        s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
@@ -409,17 +412,17 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mixed_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_adjugate4,
+        const g_t *const RSTR g_jacobian_adjugate5,
+        const g_t *const RSTR g_jacobian_adjugate6,
+        const g_t *const RSTR g_jacobian_adjugate7,
+        const g_t *const RSTR g_jacobian_adjugate8,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t convection_scale,
         const s_t dt,
         const s_t f0,
@@ -428,14 +431,14 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
         const s_t nu,
         const s_t rho,
         const ptrdiff_t current_stride,
-        const s_t *const SFEM_RESTRICT u_data[3],
-        const s_t *const SFEM_RESTRICT p_data,
+        const s_t *const RSTR u_data[3],
+        const s_t *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const s_t *const SFEM_RESTRICT u_old_data[3],
-        const s_t *const SFEM_RESTRICT p_old_data,
+        const s_t *const RSTR u_old_data[3],
+        const s_t *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT u_out[3],
-        s_t *const SFEM_RESTRICT p_out
+        s_t *const RSTR u_out[3],
+        s_t *const RSTR p_out
 ) {
     static constexpr int ND = 3;
     static constexpr int NQ = 11;
@@ -456,7 +459,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
         s_t boutput[N_FIELD_STREAMS][VS];
 
         for (int local_shape = 0; local_shape < 10; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 0 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -466,7 +469,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
             }
         }
         for (int local_shape = 0; local_shape < 10; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 10 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -476,7 +479,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
             }
         }
         for (int local_shape = 0; local_shape < 10; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 20 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -486,7 +489,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
             }
         }
         for (int local_shape = 0; local_shape < 4; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 30 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -517,9 +520,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
         navier_stokes_form_1_u_d3_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(nelems, 0, bageom_streams[9], badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_1_u_affine_reference_data<s_t>::q_weight(), bcurrent, bprevious, convection_scale, dt, f0, f1, f2, nu, rho, boutput);
 
         {
-            s_t *const SFEM_RESTRICT out = u_out[0];
+            s_t *const RSTR out = u_out[0];
             for (int local_shape = 0; local_shape < 10; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 0 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -528,9 +531,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
             }
         }
         {
-            s_t *const SFEM_RESTRICT out = u_out[1];
+            s_t *const RSTR out = u_out[1];
             for (int local_shape = 0; local_shape < 10; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 10 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -539,9 +542,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
             }
         }
         {
-            s_t *const SFEM_RESTRICT out = u_out[2];
+            s_t *const RSTR out = u_out[2];
             for (int local_shape = 0; local_shape < 10; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 20 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -550,9 +553,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
             }
         }
         {
-            s_t *const SFEM_RESTRICT out = p_out;
+            s_t *const RSTR out = p_out;
             for (int local_shape = 0; local_shape < 4; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 30 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -570,17 +573,17 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
 extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double convection_scale,
         const double dt,
         const double f0,
@@ -589,14 +592,14 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa(
         const double nu,
         const double rho,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u_data[3],
-        const double *const SFEM_RESTRICT p_data,
+        const double *const RSTR u_data[3],
+        const double *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT u_old_data[3],
-        const double *const SFEM_RESTRICT p_old_data,
+        const double *const RSTR u_old_data[3],
+        const double *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out[3],
-        double *const SFEM_RESTRICT p_out
+        double *const RSTR u_out[3],
+        double *const RSTR p_out
 ) {
     return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
 }
@@ -604,17 +607,17 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa(
 extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float convection_scale,
         const float dt,
         const float f0,
@@ -623,14 +626,14 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa_float(
         const float nu,
         const float rho,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u_data[3],
-        const float *const SFEM_RESTRICT p_data,
+        const float *const RSTR u_data[3],
+        const float *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT u_old_data[3],
-        const float *const SFEM_RESTRICT p_old_data,
+        const float *const RSTR u_old_data[3],
+        const float *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out[3],
-        float *const SFEM_RESTRICT p_out
+        float *const RSTR u_out[3],
+        float *const RSTR p_out
 ) {
     return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
 }
@@ -642,8 +645,8 @@ template <typename s_t>
 static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_mixed_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const s_t convection_scale,
         const s_t dt,
         const s_t f0,
@@ -652,14 +655,14 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
         const s_t nu,
         const s_t rho,
         const ptrdiff_t current_stride,
-        const s_t *const SFEM_RESTRICT u_data[3],
-        const s_t *const SFEM_RESTRICT p_data,
+        const s_t *const RSTR u_data[3],
+        const s_t *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const s_t *const SFEM_RESTRICT u_old_data[3],
-        const s_t *const SFEM_RESTRICT p_old_data,
+        const s_t *const RSTR u_old_data[3],
+        const s_t *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT u_out[3],
-        s_t *const SFEM_RESTRICT p_out
+        s_t *const RSTR u_out[3],
+        s_t *const RSTR p_out
 ) {
     static constexpr int ND = 3;
     static constexpr int NQ = 11;
@@ -684,7 +687,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
 
         const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
         for (int shape = 0; shape < NS; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
+            const idx_t *const RSTR element_shape = elements[shape];
             for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
@@ -695,7 +698,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
         }
 
         for (int local_shape = 0; local_shape < 10; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 0 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -705,7 +708,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
             }
         }
         for (int local_shape = 0; local_shape < 10; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 10 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -715,7 +718,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
             }
         }
         for (int local_shape = 0; local_shape < 10; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 20 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -725,7 +728,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
             }
         }
         for (int local_shape = 0; local_shape < 4; ++local_shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+            const idx_t *const RSTR element_shape = elements[local_shape];
             const int stream = 30 + local_shape;
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -768,9 +771,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
         navier_stokes_form_1_u_d3_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(nelems, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_1_u_isoparametric_reference_data<s_t>::q_weight(), bcurrent, bprevious, convection_scale, dt, f0, f1, f2, nu, rho, boutput);
 
         {
-            s_t *const SFEM_RESTRICT out = u_out[0];
+            s_t *const RSTR out = u_out[0];
             for (int local_shape = 0; local_shape < 10; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 0 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -779,9 +782,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
             }
         }
         {
-            s_t *const SFEM_RESTRICT out = u_out[1];
+            s_t *const RSTR out = u_out[1];
             for (int local_shape = 0; local_shape < 10; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 10 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -790,9 +793,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
             }
         }
         {
-            s_t *const SFEM_RESTRICT out = u_out[2];
+            s_t *const RSTR out = u_out[2];
             for (int local_shape = 0; local_shape < 10; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 20 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -801,9 +804,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
             }
         }
         {
-            s_t *const SFEM_RESTRICT out = p_out;
+            s_t *const RSTR out = p_out;
             for (int local_shape = 0; local_shape < 4; ++local_shape) {
-                const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];
+                const idx_t *const RSTR element_shape = elements[local_shape];
                 const int stream = 30 + local_shape;
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
@@ -821,8 +824,8 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
 extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double convection_scale,
         const double dt,
         const double f0,
@@ -831,14 +834,14 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa
         const double nu,
         const double rho,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u_data[3],
-        const double *const SFEM_RESTRICT p_data,
+        const double *const RSTR u_data[3],
+        const double *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT u_old_data[3],
-        const double *const SFEM_RESTRICT p_old_data,
+        const double *const RSTR u_old_data[3],
+        const double *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out[3],
-        double *const SFEM_RESTRICT p_out
+        double *const RSTR u_out[3],
+        double *const RSTR p_out
 ) {
     return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
 }
@@ -846,8 +849,8 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa
 extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float convection_scale,
         const float dt,
         const float f0,
@@ -856,14 +859,14 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_soa
         const float nu,
         const float rho,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u_data[3],
-        const float *const SFEM_RESTRICT p_data,
+        const float *const RSTR u_data[3],
+        const float *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT u_old_data[3],
-        const float *const SFEM_RESTRICT p_old_data,
+        const float *const RSTR u_old_data[3],
+        const float *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out[3],
-        float *const SFEM_RESTRICT p_out
+        float *const RSTR u_out[3],
+        float *const RSTR p_out
 ) {
     return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
 }
@@ -875,11 +878,11 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_jacobian_action_affine_mesh_mixed_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT u_out[3],
-        s_t *const SFEM_RESTRICT p_out
+        s_t *const RSTR u_out[3],
+        s_t *const RSTR p_out
 ) {
     static constexpr int ND = 3;
     static constexpr int NQ = 11;
@@ -902,11 +905,11 @@ template <typename s_t>
 static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT u_out[3],
-        s_t *const SFEM_RESTRICT p_out
+        s_t *const RSTR u_out[3],
+        s_t *const RSTR p_out
 ) {
     static constexpr int ND = 3;
     static constexpr int NQ = 11;

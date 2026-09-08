@@ -84,7 +84,7 @@ class InexactApplyGenerationTest(unittest.TestCase):
             "g_jacobian_determinant0",
             "const s_t mu",
             "const s_t lmbda",
-            "tangent_t *const SFEM_RESTRICT tangent",
+            "tangent_t *const RSTR tangent",
         ):
             with self.subTest(assembly=expected):
                 self.assertIn(expected, body)
@@ -101,9 +101,9 @@ class InexactApplyGenerationTest(unittest.TestCase):
             with self.subTest(absent_from_apply=absent):
                 self.assertNotIn(absent, body)
         for expected in (
-            "const tangent_t *const SFEM_RESTRICT tangent",
+            "const tangent_t *const RSTR tangent",
             "const ptrdiff_t h_stride",
-            "s_t *const SFEM_RESTRICT outz",
+            "s_t *const RSTR outz",
         ):
             with self.subTest(apply=expected):
                 self.assertIn(expected, body)
@@ -168,9 +168,9 @@ class InexactApplyAbiTest(InexactApplyGenerationTest):
     def test_the_store_uses_sfem_types(self):
         """`metric_tensor_t` and `compressed_t` are what the library stores."""
         source = self._operator_source()
-        self.assertIn("metric_tensor_t *const SFEM_RESTRICT tangent", source)
-        self.assertIn("const compressed_t *const SFEM_RESTRICT tangent", source)
-        self.assertIn("const scaling_t *const SFEM_RESTRICT scaling", source)
+        self.assertIn("metric_tensor_t *const RSTR tangent", source)
+        self.assertIn("const compressed_t *const RSTR tangent", source)
+        self.assertIn("const scaling_t *const RSTR scaling", source)
 
     def test_the_apply_still_takes_no_geometry_or_state(self):
         """The ABI must not reintroduce what the split exists to remove."""

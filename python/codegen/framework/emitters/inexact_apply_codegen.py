@@ -262,17 +262,17 @@ def _geometry_lines(dim, indent="        "):
 
 def _geometry_arguments(dim):
     lines = [
-        "        const g_t *const SFEM_RESTRICT g_jacobian_adjugate%d," % index
+        "        const g_t *const RSTR g_jacobian_adjugate%d," % index
         for index in range(dim * dim)
     ]
-    lines.append("        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,")
+    lines.append("        const g_t *const RSTR g_jacobian_determinant0,")
     return lines
 
 
 def _stream_arguments(role, component):
     lines = ["        const ptrdiff_t %s_stride," % role]
     lines.extend(
-        "        const s_t *const SFEM_RESTRICT %s%s," % (role, name)
+        "        const s_t *const RSTR %s%s," % (role, name)
         for name in component
     )
     return lines
@@ -281,7 +281,7 @@ def _stream_arguments(role, component):
 def _output_arguments(component):
     lines = ["        const ptrdiff_t out_stride,"]
     lines.extend(
-        "        s_t *const SFEM_RESTRICT out%s%s"
+        "        s_t *const RSTR out%s%s"
         % (name, "," if index + 1 < len(component) else "")
         for index, name in enumerate(component)
     )
@@ -324,7 +324,7 @@ def _tangent_lines(
         for slot in range(plan.tangent_components)
     )
 
-    signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
+    signature = ["        const ptrdiff_t nelements,", "        idx_t **const RSTR elements,"]
     signature.extend(_geometry_arguments(dim))
     signature.extend("        const s_t %s," % name for name in parameters)
     signature.extend(_stream_arguments("u", component))
@@ -333,7 +333,7 @@ def _tangent_lines(
         [
             "        const ptrdiff_t tangent_element_stride,",
             "        const ptrdiff_t tangent_component_stride,",
-            "        tangent_t *const SFEM_RESTRICT tangent",
+            "        tangent_t *const RSTR tangent",
         ]
     )
     return _function_lines(
@@ -356,12 +356,12 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     body.extend(action_body)
     body.extend(_scatter_body(component, n_nodes))
 
-    signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
+    signature = ["        const ptrdiff_t nelements,", "        idx_t **const RSTR elements,"]
     signature.extend(
         [
             "        const ptrdiff_t tangent_element_stride,",
             "        const ptrdiff_t tangent_component_stride,",
-            "        const tangent_t *const SFEM_RESTRICT tangent,",
+            "        const tangent_t *const RSTR tangent,",
         ]
     )
     signature.extend(_stream_arguments("h", component))
@@ -392,13 +392,13 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     body.extend(action_body)
     body.extend(_scatter_body(component, n_nodes, scale="scale * "))
 
-    signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
+    signature = ["        const ptrdiff_t nelements,", "        idx_t **const RSTR elements,"]
     signature.extend(
         [
             "        const ptrdiff_t tangent_element_stride,",
             "        const ptrdiff_t tangent_component_stride,",
-            "        const tangent_t *const SFEM_RESTRICT tangent,",
-            "        const scale_t *const SFEM_RESTRICT scaling,",
+            "        const tangent_t *const RSTR tangent,",
+            "        const scale_t *const RSTR scaling,",
         ]
     )
     signature.extend(_stream_arguments("h", component))
@@ -452,7 +452,7 @@ _ABI_SCALARS = (("", "double"), ("_float", "float"))
 def _abi_stream(scalar, role, component, const="const "):
     lines = ["        const ptrdiff_t %s_stride," % role]
     lines.extend(
-        "        %s%s *const SFEM_RESTRICT %s%s," % (const, scalar, role, name)
+        "        %s%s *const RSTR %s%s," % (const, scalar, role, name)
         for name in component
     )
     return lines
@@ -460,10 +460,10 @@ def _abi_stream(scalar, role, component, const="const "):
 
 def _abi_geometry(dim):
     lines = [
-        "        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate%d," % index
+        "        const geom_t *const RSTR g_jacobian_adjugate%d," % index
         for index in range(dim * dim)
     ]
-    lines.append("        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,")
+    lines.append("        const geom_t *const RSTR g_jacobian_determinant0,")
     return lines
 
 
@@ -495,7 +495,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         name = "%s_inexact_apply_tangent_affine_mesh_soa%s" % (prefix, suffix)
         lines.append('extern "C" int %s(' % name)
         lines.append("        const ptrdiff_t nelements,")
-        lines.append("        idx_t **const SFEM_RESTRICT elements,")
+        lines.append("        idx_t **const RSTR elements,")
         lines.extend(_abi_geometry(dim))
         lines.extend("        const %s %s," % (scalar, p) for p in parameters)
         lines.extend(_abi_stream(scalar, "u", component))
@@ -504,7 +504,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
             [
                 "        const ptrdiff_t tangent_element_stride,",
                 "        const ptrdiff_t tangent_component_stride,",
-                "        metric_tensor_t *const SFEM_RESTRICT tangent",
+                "        metric_tensor_t *const RSTR tangent",
                 ") {",
                 "    return sfem::codegen::%s_inexact_apply_tangent_affine_mesh_soa_impl<"
                 "%s, geom_t, metric_tensor_t>(" % (prefix, scalar),
@@ -524,10 +524,10 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         lines.extend(
             [
                 "        const ptrdiff_t nelements,",
-                "        idx_t **const SFEM_RESTRICT elements,",
+                "        idx_t **const RSTR elements,",
                 "        const ptrdiff_t tangent_element_stride,",
                 "        const ptrdiff_t tangent_component_stride,",
-                "        const metric_tensor_t *const SFEM_RESTRICT tangent,",
+                "        const metric_tensor_t *const RSTR tangent,",
             ]
         )
         lines.extend(_abi_stream(scalar, "h", component))
@@ -553,11 +553,11 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         lines.extend(
             [
                 "        const ptrdiff_t nelements,",
-                "        idx_t **const SFEM_RESTRICT elements,",
+                "        idx_t **const RSTR elements,",
                 "        const ptrdiff_t tangent_element_stride,",
                 "        const ptrdiff_t tangent_component_stride,",
-                "        const compressed_t *const SFEM_RESTRICT tangent,",
-                "        const scaling_t *const SFEM_RESTRICT scaling,",
+                "        const compressed_t *const RSTR tangent,",
+                "        const scaling_t *const RSTR scaling,",
             ]
         )
         lines.extend(_abi_stream(scalar, "h", component))

@@ -25,8 +25,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT,
+        const g_t *const RSTR source,
+        s_t *const RSTR,
         std::true_type) {
     return source;
 }
@@ -34,8 +34,8 @@ SFEM_INLINE const s_t *ageom_stream(
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT converted,
+        const g_t *const RSTR source,
+        s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
@@ -222,19 +222,19 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int neohookean_ogden_proteus_quad4_objective_steps_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
         const int nsteps,
-        const s_t *const SFEM_RESTRICT steps,
-        s_t *const SFEM_RESTRICT value
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -242,8 +242,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_objective_steps_isoparamet
     static constexpr int NS = 4;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
     const s_t *const isoparametric_shape_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -266,7 +266,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_objective_steps_isoparamet
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -346,19 +346,19 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_objective_steps_isoparamet
 extern "C" int neohookean_ogden_proteus_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     return sfem::codegen::neohookean_ogden_proteus_quad4_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
@@ -366,19 +366,19 @@ extern "C" int neohookean_ogden_proteus_quad4_objective_steps_isoparametric_mesh
 extern "C" int neohookean_ogden_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     return sfem::codegen::neohookean_ogden_proteus_quad4_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
@@ -520,16 +520,16 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy
+        s_t *const RSTR outx,
+        s_t *const RSTR outy
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -537,8 +537,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_gradient_isoparametric_mes
     static constexpr int NS = 4;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
     const s_t *const isoparametric_shape_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -559,7 +559,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_gradient_isoparametric_mes
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -639,16 +639,16 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_gradient_isoparametric_mes
 extern "C" int neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        double *const RSTR outx,
+        double *const RSTR outy
 ) {
     return sfem::codegen::neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
@@ -656,16 +656,16 @@ extern "C" int neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa(
 extern "C" int neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        float *const RSTR outx,
+        float *const RSTR outy
 ) {
     return sfem::codegen::neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
@@ -807,19 +807,19 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy
+        s_t *const RSTR outx,
+        s_t *const RSTR outy
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -827,8 +827,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_s
     static constexpr int NS = 4;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
     const s_t *const isoparametric_shape_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -850,7 +850,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_s
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -936,19 +936,19 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_s
 extern "C" int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        double *const RSTR outx,
+        double *const RSTR outy
 ) {
     return sfem::codegen::neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
@@ -956,19 +956,19 @@ extern "C" int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa(
 extern "C" int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        float *const RSTR outx,
+        float *const RSTR outy
 ) {
     return sfem::codegen::neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
@@ -978,10 +978,10 @@ namespace sfem {
 namespace codegen {
 
 static SFEM_INLINE void neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_find_cols(
-        const idx_t *const SFEM_RESTRICT targets,
-        const idx_t *const SFEM_RESTRICT row,
+        const idx_t *const RSTR targets,
+        const idx_t *const RSTR row,
         const int lenrow,
-        idx_t *const SFEM_RESTRICT ks) {
+        idx_t *const RSTR ks) {
 #pragma unroll(4)
     for (int d = 0; d < 4; ++d) {
         ks[d] = 0;
@@ -996,11 +996,11 @@ static SFEM_INLINE void neohookean_ogden_proteus_quad4_hessian_isoparametric_mes
 
 template <typename s_t>
 static SFEM_INLINE void neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_scatter_bsr(
-        const idx_t *const SFEM_RESTRICT ev,
-        const s_t *const SFEM_RESTRICT element_matrix,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        s_t *const SFEM_RESTRICT values) {
+        const idx_t *const RSTR ev,
+        const s_t *const RSTR element_matrix,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        s_t *const RSTR values) {
     static constexpr int NC = 2;
     static constexpr int NS = 4;
     count_t entries[NS * NS];
@@ -1009,7 +1009,7 @@ static SFEM_INLINE void neohookean_ogden_proteus_quad4_hessian_isoparametric_mes
         const idx_t dof_i = ev[i];
         const count_t row_begin = rowptr[dof_i];
         const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
-        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
+        const idx_t *const RSTR cols = &colidx[row_begin];
         neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
         for (int j = 0; j < NS; ++j) {
             entries[i * NS + j] = row_begin + ks[j];
@@ -1034,23 +1034,23 @@ template <typename s_t, typename g_t, int FORMAT>
 static int neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_assemble_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        s_t *const SFEM_RESTRICT values,
-        const int *const SFEM_RESTRICT diag_offsets,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        s_t *const RSTR values,
+        const int *const RSTR diag_offsets,
         const ptrdiff_t ndiag,
         const ptrdiff_t coo_nnz,
-        const idx_t *const SFEM_RESTRICT coo_rows,
-        const idx_t *const SFEM_RESTRICT coo_cols,
-        idx_t *const SFEM_RESTRICT coo_triplet_rows,
-        idx_t *const SFEM_RESTRICT coo_triplet_cols) {
+        const idx_t *const RSTR coo_rows,
+        const idx_t *const RSTR coo_cols,
+        idx_t *const RSTR coo_triplet_rows,
+        idx_t *const RSTR coo_triplet_cols) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
     static constexpr int NQ = 4;
@@ -1059,8 +1059,8 @@ static int neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_assembl
     static constexpr int NDOFS = NC * NS;
     (void)nnodes;
     const s_t *const u_components[NC] = {ux, uy};
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
     const s_t *const isoparametric_shape_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::neohookean_ogden_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -1153,16 +1153,16 @@ static int neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_assembl
 extern "C" int neohookean_ogden_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        double *const RSTR values
 ) {
     return sfem::codegen::neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
@@ -1170,16 +1170,16 @@ extern "C" int neohookean_ogden_proteus_quad4_hessian_bsr_isoparametric_mesh_soa
 extern "C" int neohookean_ogden_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        float *const RSTR values
 ) {
     return sfem::codegen::neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }

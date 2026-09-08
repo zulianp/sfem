@@ -10,6 +10,9 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 
 namespace sfem {
 namespace codegen {
@@ -23,8 +26,8 @@ static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_2(
         const s_t J01,
         const s_t J10,
         const s_t J11,
-        s_t *const *const SFEM_RESTRICT adjugate,
-        s_t *const SFEM_RESTRICT determinant,
+        s_t *const *const RSTR adjugate,
+        s_t *const RSTR determinant,
         const ptrdiff_t offset) {
     adjugate[0][offset] = J11;
     adjugate[1][offset] = -J01;
@@ -44,8 +47,8 @@ static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_3(
         const s_t J20,
         const s_t J21,
         const s_t J22,
-        s_t *const *const SFEM_RESTRICT adjugate,
-        s_t *const SFEM_RESTRICT determinant,
+        s_t *const *const RSTR adjugate,
+        s_t *const RSTR determinant,
         const ptrdiff_t offset) {
     adjugate[0][offset] = J11 * J22 - J12 * J21;
     adjugate[1][offset] = J02 * J21 - J01 * J22;
@@ -65,9 +68,9 @@ template <typename s_t, int NQ, int VS>
 struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ, VS> {
     static SFEM_INLINE void eval(
             const int nelems,
-            const s_t *const SFEM_RESTRICT coordinate_grad_ref,
-            s_t *const *const SFEM_RESTRICT adjugate,
-            s_t *const SFEM_RESTRICT determinant) {
+            const s_t *const RSTR coordinate_grad_ref,
+            s_t *const *const RSTR adjugate,
+            s_t *const RSTR determinant) {
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -87,9 +90,9 @@ template <typename s_t, int NQ, int VS>
 struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ, VS> {
     static SFEM_INLINE void eval(
             const int nelems,
-            const s_t *const SFEM_RESTRICT coordinate_grad_ref,
-            s_t *const *const SFEM_RESTRICT adjugate,
-            s_t *const SFEM_RESTRICT determinant) {
+            const s_t *const RSTR coordinate_grad_ref,
+            s_t *const *const RSTR adjugate,
+            s_t *const RSTR determinant) {
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -114,9 +117,9 @@ struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ, VS> {
 template <typename s_t, int ND, int NQ, int VS>
 static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant(
         const int nelems,
-        const s_t *const SFEM_RESTRICT coordinate_grad_ref,
-        s_t *const *const SFEM_RESTRICT adjugate,
-        s_t *const SFEM_RESTRICT determinant) {
+        const s_t *const RSTR coordinate_grad_ref,
+        s_t *const *const RSTR adjugate,
+        s_t *const RSTR determinant) {
     GeometryJacobianAdjugateDeterminant<s_t, ND, NQ, VS>::eval(
             nelems, coordinate_grad_ref, adjugate, determinant);
 }

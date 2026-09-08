@@ -9,12 +9,12 @@ namespace codegen {
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_energy_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -35,11 +35,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_energy_e
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_energy_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -67,11 +67,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_energy_e
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_energy_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const SFEM_RESTRICT values
+        const s_t *const *const RSTR u_streams,
+        s_t *const RSTR values
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -99,12 +99,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_energy_e
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -132,11 +132,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -171,11 +171,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT out_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR out_streams
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -210,12 +210,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_hessian_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT adj,
-        const s_t *const SFEM_RESTRICT det,
+        const s_t *const *const RSTR adj,
+        const s_t *const RSTR det,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -252,11 +252,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_hessian_
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_hessian_element_coords_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;
@@ -300,11 +300,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_hessian_
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_hessian_element_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT coords,
+        const s_t *const *const RSTR coords,
         const s_t lmbda,
         const s_t mu,
-        const s_t *const *const SFEM_RESTRICT u_streams,
-        s_t *const *const SFEM_RESTRICT matrix_streams
+        const s_t *const *const RSTR u_streams,
+        s_t *const *const RSTR matrix_streams
 ) {
     static constexpr int NC = 2;
     static constexpr int ND = 2;

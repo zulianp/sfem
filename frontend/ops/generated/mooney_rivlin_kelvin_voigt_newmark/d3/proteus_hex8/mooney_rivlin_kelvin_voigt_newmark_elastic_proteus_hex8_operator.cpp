@@ -25,8 +25,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT,
+        const g_t *const RSTR source,
+        s_t *const RSTR,
         std::true_type) {
     return source;
 }
@@ -34,8 +34,8 @@ SFEM_INLINE const s_t *ageom_stream(
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
-        const g_t *const SFEM_RESTRICT source,
-        s_t *const SFEM_RESTRICT converted,
+        const g_t *const RSTR source,
+        s_t *const RSTR converted,
         std::false_type) {
     #pragma omp simd
     for (int lane = 0; lane < nelems; ++lane) {
@@ -222,30 +222,30 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_adjugate4,
+        const g_t *const RSTR g_jacobian_adjugate5,
+        const g_t *const RSTR g_jacobian_adjugate6,
+        const g_t *const RSTR g_jacobian_adjugate7,
+        const g_t *const RSTR g_jacobian_adjugate8,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
-        const s_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
-        const s_t *const SFEM_RESTRICT hz,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
         const int nsteps,
-        const s_t *const SFEM_RESTRICT steps,
-        s_t *const SFEM_RESTRICT value
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
 ) {
     static constexpr int NC = 3;
     static constexpr int NQ = 8;
@@ -268,7 +268,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
         s_t bvalue[VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -356,30 +356,30 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
@@ -387,30 +387,30 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
@@ -424,34 +424,34 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -469,8 +469,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -478,14 +478,14 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
             const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_u_base_component[k] = u_component[node * u_stride];
@@ -508,7 +508,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23]};
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -584,34 +584,34 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -629,8 +629,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -638,14 +638,14 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
             const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_u_base_component[k] = u_component[node * u_stride];
@@ -668,7 +668,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23]};
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -749,21 +749,21 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
-        const s_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
-        const s_t *const SFEM_RESTRICT hz,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
         const int nsteps,
-        const s_t *const SFEM_RESTRICT steps,
-        s_t *const SFEM_RESTRICT value
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -771,9 +771,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
     static constexpr int NS = 8;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
-    const g_t *const SFEM_RESTRICT z = points[2];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
+    const g_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -801,7 +801,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -884,21 +884,21 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
@@ -906,21 +906,21 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
@@ -934,25 +934,25 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const double *const RSTR steps,
+        double *const RSTR value
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -963,9 +963,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
     (void)nnodes;
     (void)n_shared_nodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -974,9 +974,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -984,11 +984,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
             const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             for (int d = 0; d < ND; ++d) {
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_coordinate[k] = s_t(coordinate_component[node]);
@@ -1001,10 +1001,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_u_base_component[k] = u_component[node * u_stride];
@@ -1039,7 +1039,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23]};
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -1106,25 +1106,25 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const float *const RSTR steps,
+        float *const RSTR value
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -1135,9 +1135,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
     (void)nnodes;
     (void)n_shared_nodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -1146,9 +1146,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -1156,11 +1156,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
             const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             for (int d = 0; d < ND; ++d) {
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_coordinate[k] = s_t(coordinate_component[node]);
@@ -1173,10 +1173,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     const idx_t node = owned_nodes_ptr[pack] + k;
                     pk_u_base_component[k] = u_component[node * u_stride];
@@ -1211,7 +1211,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23]};
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -1412,27 +1412,27 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_adjugate4,
+        const g_t *const RSTR g_jacobian_adjugate5,
+        const g_t *const RSTR g_jacobian_adjugate6,
+        const g_t *const RSTR g_jacobian_adjugate7,
+        const g_t *const RSTR g_jacobian_adjugate8,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
-        const s_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy,
-        s_t *const SFEM_RESTRICT outz
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
 ) {
     static constexpr int NC = 3;
     static constexpr int NQ = 8;
@@ -1453,7 +1453,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
         s_t bout_data[NS * NC][VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -1541,27 +1541,27 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
@@ -1569,27 +1569,27 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
@@ -1603,31 +1603,31 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -1644,8 +1644,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -1656,13 +1656,13 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux, uy, uz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -1690,7 +1690,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -1735,9 +1735,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -1746,8 +1746,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -1774,31 +1774,31 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -1815,8 +1815,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -1827,13 +1827,13 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux, uy, uz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -1861,7 +1861,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -1906,9 +1906,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -1917,8 +1917,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -1945,37 +1945,37 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        double *const RSTR ghost_buf,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -1992,8 +1992,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2003,14 +2003,14 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const s_t *const u_components[NC] = {ux, uy, uz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2038,7 +2038,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2083,9 +2083,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -2094,9 +2094,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -2116,7 +2116,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -2133,37 +2133,37 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        float *const RSTR ghost_buf,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -2180,8 +2180,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2191,14 +2191,14 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const s_t *const u_components[NC] = {ux, uy, uz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2226,7 +2226,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2271,9 +2271,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -2282,9 +2282,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -2304,7 +2304,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -2326,18 +2326,18 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
-        const s_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy,
-        s_t *const SFEM_RESTRICT outz
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -2345,9 +2345,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
     static constexpr int NS = 8;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
-    const g_t *const SFEM_RESTRICT z = points[2];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
+    const g_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -2373,7 +2373,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -2456,18 +2456,18 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
@@ -2475,18 +2475,18 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
@@ -2500,22 +2500,22 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -2525,9 +2525,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -2536,9 +2536,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2549,16 +2549,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux, uy, uz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2600,7 +2600,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2636,9 +2636,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -2647,8 +2647,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -2675,22 +2675,22 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -2700,9 +2700,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -2711,9 +2711,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2724,16 +2724,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux, uy, uz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2775,7 +2775,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2811,9 +2811,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -2822,8 +2822,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -2850,28 +2850,28 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        double *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -2881,9 +2881,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -2892,9 +2892,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -2904,17 +2904,17 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux, uy, uz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -2956,7 +2956,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -2992,9 +2992,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -3003,9 +3003,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -3025,7 +3025,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -3042,28 +3042,28 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        float *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -3073,9 +3073,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -3084,9 +3084,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -3096,17 +3096,17 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux, uy, uz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -3148,7 +3148,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -3184,9 +3184,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -3195,9 +3195,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -3217,7 +3217,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -3368,31 +3368,31 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const g_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const g_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_jacobian_adjugate0,
+        const g_t *const RSTR g_jacobian_adjugate1,
+        const g_t *const RSTR g_jacobian_adjugate2,
+        const g_t *const RSTR g_jacobian_adjugate3,
+        const g_t *const RSTR g_jacobian_adjugate4,
+        const g_t *const RSTR g_jacobian_adjugate5,
+        const g_t *const RSTR g_jacobian_adjugate6,
+        const g_t *const RSTR g_jacobian_adjugate7,
+        const g_t *const RSTR g_jacobian_adjugate8,
+        const g_t *const RSTR g_jacobian_determinant0,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
-        const s_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
-        const s_t *const SFEM_RESTRICT hz,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy,
-        s_t *const SFEM_RESTRICT outz
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
 ) {
     static constexpr int NC = 3;
     static constexpr int NQ = 8;
@@ -3414,7 +3414,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
         s_t bout_data[NS * NC][VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -3508,31 +3508,31 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
@@ -3540,31 +3540,31 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_aff
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
@@ -3578,35 +3578,35 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -3623,9 +3623,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -3636,16 +3636,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -3680,7 +3680,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -3726,9 +3726,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -3737,8 +3737,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -3765,35 +3765,35 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -3810,9 +3810,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -3823,16 +3823,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -3867,7 +3867,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -3913,9 +3913,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -3924,8 +3924,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -3952,41 +3952,41 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        double *const RSTR ghost_buf,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -4003,9 +4003,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4015,17 +4015,17 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -4060,7 +4060,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -4106,9 +4106,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -4117,9 +4117,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -4139,7 +4139,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -4156,41 +4156,41 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        float *const RSTR ghost_buf,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -4207,9 +4207,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4219,17 +4219,17 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -4264,7 +4264,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -4310,9 +4310,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -4321,9 +4321,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -4343,7 +4343,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -4365,22 +4365,22 @@ template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const g_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
         const s_t lmbda,
         const s_t mu,
         const ptrdiff_t u_stride,
-        const s_t *const SFEM_RESTRICT ux,
-        const s_t *const SFEM_RESTRICT uy,
-        const s_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t h_stride,
-        const s_t *const SFEM_RESTRICT hx,
-        const s_t *const SFEM_RESTRICT hy,
-        const s_t *const SFEM_RESTRICT hz,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
         const ptrdiff_t out_stride,
-        s_t *const SFEM_RESTRICT outx,
-        s_t *const SFEM_RESTRICT outy,
-        s_t *const SFEM_RESTRICT outz
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
 ) {
     static constexpr int NC = 3;
     static constexpr int ND = 3;
@@ -4388,9 +4388,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
     static constexpr int NS = 8;
     static constexpr int VS = 16;
     (void)nnodes;
-    const g_t *const SFEM_RESTRICT x = points[0];
-    const g_t *const SFEM_RESTRICT y = points[1];
-    const g_t *const SFEM_RESTRICT z = points[2];
+    const g_t *const RSTR x = points[0];
+    const g_t *const RSTR y = points[1];
+    const g_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -4417,7 +4417,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
         s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+            const idx_t *const RSTR element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 ev[element_node * VS + lane] = element_shape[evb + lane];
@@ -4506,22 +4506,22 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
@@ -4529,22 +4529,22 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_iso
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
@@ -4558,26 +4558,26 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -4587,9 +4587,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -4598,10 +4598,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4612,19 +4612,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -4673,7 +4673,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -4710,9 +4710,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -4721,8 +4721,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -4749,26 +4749,26 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -4778,9 +4778,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -4789,10 +4789,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4803,19 +4803,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             const ptrdiff_t n_not_shared = n_contiguous - n_shared;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -4864,7 +4864,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -4901,9 +4901,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -4912,8 +4912,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -4940,32 +4940,32 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        double *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
         const double lmbda,
         const double mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const double *const RSTR ux,
+        const double *const RSTR uy,
+        const double *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const double *const RSTR hx,
+        const double *const RSTR hy,
+        const double *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        double *const RSTR outx,
+        double *const RSTR outy,
+        double *const RSTR outz
 ) {
     using s_t = double;
     static constexpr int NC = 3;
@@ -4975,9 +4975,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -4986,10 +4986,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -4999,20 +4999,20 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -5061,7 +5061,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -5098,9 +5098,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -5109,9 +5109,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -5131,7 +5131,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];
@@ -5148,32 +5148,32 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        float *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
         const float lmbda,
         const float mu,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
+        const float *const RSTR ux,
+        const float *const RSTR uy,
+        const float *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
+        const float *const RSTR hx,
+        const float *const RSTR hy,
+        const float *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+        float *const RSTR outx,
+        float *const RSTR outy,
+        float *const RSTR outz
 ) {
     using s_t = float;
     static constexpr int NC = 3;
@@ -5183,9 +5183,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
     static constexpr int VS = 16;
     (void)nnodes;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
+    const geom_t *const RSTR x = points[0];
+    const geom_t *const RSTR y = points[1];
+    const geom_t *const RSTR z = points[2];
     const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
     const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
@@ -5194,10 +5194,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 #pragma omp parallel
     {
-        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
-        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
@@ -5207,20 +5207,20 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             (void)n_shared_nodes;
             const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t ghost_off = ghost_ptr[pack];
             const geom_t *const coordinate_components[ND] = {x, y, z};
             const s_t *const u_components[NC] = {ux, uy, uz};
             const s_t *const h_components[NC] = {hx, hy, hz};
             s_t *const out_components[NC] = {outx, outy, outz};
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const s_t *const SFEM_RESTRICT u_component = u_components[d];
-                const s_t *const SFEM_RESTRICT h_component = h_components[d];
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+                s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+                s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+                const geom_t *const RSTR coordinate_component = coordinate_components[d];
+                const s_t *const RSTR u_component = u_components[d];
+                const s_t *const RSTR h_component = h_components[d];
                 for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
                     pk_component_out[k] = s_t(0);
                 }
@@ -5269,7 +5269,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 }
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
@@ -5306,9 +5306,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
                 mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
+                    const uint16_t *const RSTR element_shape = elements[shape];
                     for (int d = 0; d < NC; ++d) {
-                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
+                        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
                             pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
                         }
@@ -5317,9 +5317,9 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
             }
 
             for (int d = 0; d < NC; ++d) {
-                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;
-                s_t *const SFEM_RESTRICT global_out = out_components[d];
-                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+                s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+                s_t *const RSTR global_out = out_components[d];
+                s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
                 for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                     global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
                     pk_component_out[k] = s_t(0);
@@ -5339,7 +5339,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t begin = ghost_reduce_ptr[row];
         const ptrdiff_t end = ghost_reduce_ptr[row + 1];
         for (int d = 0; d < NC; ++d) {
-            const s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
+            const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
             s_t sum = s_t(0);
             for (ptrdiff_t j = begin; j < end; ++j) {
                 sum += ghost_component[ghost_reduce_idx[j]];

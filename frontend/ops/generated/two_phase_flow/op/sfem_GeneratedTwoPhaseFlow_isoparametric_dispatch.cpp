@@ -14,184 +14,184 @@
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -209,20 +209,20 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_isoparametric_me
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -240,20 +240,20 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_isoparametric_me
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -271,20 +271,20 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_residual_isoparametric_mesh_soa(
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -302,60 +302,60 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_residual_isoparametric_mesh_soa_f
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_c_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -378,20 +378,20 @@ extern "C" int two_phase_flow_form_1_p_c_hex8_residual_isoparametric_mesh_soa(
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -414,20 +414,20 @@ extern "C" int two_phase_flow_form_1_p_c_hex8_residual_isoparametric_mesh_soa_fl
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -450,20 +450,20 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_isoparametric_mes
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -486,196 +486,196 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_isoparametric_mes
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -691,20 +691,20 @@ extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_residual_isoparametric_me
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -720,20 +720,20 @@ extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_residual_isoparametric_me
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -749,20 +749,20 @@ extern "C" int two_phase_flow_form_1_p_w_quad4_residual_isoparametric_mesh_soa(
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -778,60 +778,60 @@ extern "C" int two_phase_flow_form_1_p_w_quad4_residual_isoparametric_mesh_soa_f
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -852,20 +852,20 @@ extern "C" int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mesh_soa(
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -886,20 +886,20 @@ extern "C" int two_phase_flow_form_1_p_w_hex8_residual_isoparametric_mesh_soa_fl
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -920,20 +920,20 @@ extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_residual_isoparametric_mes
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -954,60 +954,60 @@ extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_residual_isoparametric_mes
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1025,20 +1025,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_isopa
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1056,20 +1056,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_isopa
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1087,20 +1087,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_isoparametric
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1118,60 +1118,60 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_isoparametric
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1194,20 +1194,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_isoparametric_
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1230,20 +1230,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_isoparametric_
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1266,20 +1266,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_isopar
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1302,196 +1302,196 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_isopar
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1509,20 +1509,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_isopa
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1540,20 +1540,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_isopa
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1571,20 +1571,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_isoparametric
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1602,60 +1602,60 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_isoparametric
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1678,20 +1678,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_isoparametric_
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1714,20 +1714,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_isoparametric_
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double K_0,
@@ -1750,20 +1750,20 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_isopar
         const double mu_c,
         const double porosity,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float K_0,
@@ -1786,196 +1786,196 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_isopar
         const float mu_c,
         const float porosity,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -1991,20 +1991,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_isopa
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -2020,20 +2020,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_isopa
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -2049,20 +2049,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_isoparametric
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -2078,60 +2078,60 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_isoparametric
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -2152,20 +2152,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_isoparametric_
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -2186,20 +2186,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_isoparametric_
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -2220,20 +2220,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_isopar
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -2254,196 +2254,196 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_isopar
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -2459,20 +2459,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_isopa
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -2488,20 +2488,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_isopa
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -2517,20 +2517,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isoparametric
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -2546,60 +2546,60 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_isoparametric
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -2620,20 +2620,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_isoparametric_
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -2654,20 +2654,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_isoparametric_
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_kw1,
         const double K_0,
         const double K_1,
@@ -2688,20 +2688,20 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_isopar
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_kw1,
         const float K_0,
         const float K_1,
@@ -2722,196 +2722,196 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_isopar
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_quad4_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_quad4_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -2934,20 +2934,20 @@ extern "C" int two_phase_flow_proteus_quad4_jacobian_action_isoparametric_mesh_s
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -2970,20 +2970,20 @@ extern "C" int two_phase_flow_proteus_quad4_jacobian_action_isoparametric_mesh_s
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_quad4_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3006,20 +3006,20 @@ extern "C" int two_phase_flow_quad4_jacobian_action_isoparametric_mesh_soa(
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_quad4_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3042,60 +3042,60 @@ extern "C" int two_phase_flow_quad4_jacobian_action_isoparametric_mesh_soa_float
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR direction,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR direction,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3123,20 +3123,20 @@ extern "C" int two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa(
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3164,20 +3164,20 @@ extern "C" int two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3205,20 +3205,20 @@ extern "C" int two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_so
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT p_w_direction,
-        const double *const SFEM_RESTRICT p_c_direction,
+        const double *const RSTR p_w_direction,
+        const double *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3246,60 +3246,60 @@ extern "C" int two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_so
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT p_w_direction,
-        const float *const SFEM_RESTRICT p_c_direction,
+        const float *const RSTR p_w_direction,
+        const float *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_proteus_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_proteus_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_quad4_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_quad4_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_proteus_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3322,20 +3322,20 @@ extern "C" int two_phase_flow_proteus_quad4_residual_isoparametric_mesh_soa(
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_proteus_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3358,20 +3358,20 @@ extern "C" int two_phase_flow_proteus_quad4_residual_isoparametric_mesh_soa_floa
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_quad4_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3394,20 +3394,20 @@ extern "C" int two_phase_flow_quad4_residual_isoparametric_mesh_soa(
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_quad4_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3430,60 +3430,60 @@ extern "C" int two_phase_flow_quad4_residual_isoparametric_mesh_soa_float(
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_proteus_hex8_residual_isoparametric_mesh_aos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        const double *const SFEM_RESTRICT previous,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const double *const RSTR parameters,
+        const double *const RSTR current,
+        const double *const RSTR previous,
+        double *const RSTR output
 );
 extern "C" int two_phase_flow_proteus_hex8_residual_isoparametric_mesh_aos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        const float *const SFEM_RESTRICT previous,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const float *const RSTR parameters,
+        const float *const RSTR current,
+        const float *const RSTR previous,
+        float *const RSTR output
 );
 extern "C" int two_phase_flow_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3511,20 +3511,20 @@ extern "C" int two_phase_flow_hex8_residual_isoparametric_mesh_soa(
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3552,20 +3552,20 @@ extern "C" int two_phase_flow_hex8_residual_isoparametric_mesh_soa_float(
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const double C_ka1,
         const double C_ka2,
         const double C_kw1,
@@ -3593,20 +3593,20 @@ extern "C" int two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa(
         const double porosity,
         const double rho_w0,
         const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
+        const double *const RSTR p_w,
+        const double *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const double *const SFEM_RESTRICT p_w_old,
-        const double *const SFEM_RESTRICT p_c_old,
+        const double *const RSTR p_w_old,
+        const double *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT p_w_out,
-        double *const SFEM_RESTRICT p_c_out
+        double *const RSTR p_w_out,
+        double *const RSTR p_c_out
 );
 extern "C" int two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const float C_ka1,
         const float C_ka2,
         const float C_kw1,
@@ -3634,14 +3634,14 @@ extern "C" int two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa_float
         const float porosity,
         const float rho_w0,
         const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
+        const float *const RSTR p_w,
+        const float *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const float *const SFEM_RESTRICT p_w_old,
-        const float *const SFEM_RESTRICT p_c_old,
+        const float *const RSTR p_w_old,
+        const float *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT p_w_out,
-        float *const SFEM_RESTRICT p_c_out
+        float *const RSTR p_w_out,
+        float *const RSTR p_c_out
 );
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_jacobian_action_2d_isoparametric_mesh_aos(
@@ -3649,10 +3649,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_jacobian_acti
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -3696,11 +3696,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_jacobian_acti
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -3744,10 +3744,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_jacobian_acti
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -3791,11 +3791,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_jacobian_acti
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -3839,12 +3839,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_residual_2d_i
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT previous,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -3888,8 +3888,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_residual_2d_i
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t K_0,
@@ -3907,14 +3907,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_residual_2d_i
         const real_t mu_c,
         const real_t porosity,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT p_w_old,
-        const void *const SFEM_RESTRICT p_c_old,
+        const void *const RSTR p_w_old,
+        const void *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -3958,12 +3958,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_residual_3d_i
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT previous,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4007,8 +4007,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_residual_3d_i
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t K_0,
@@ -4031,14 +4031,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_residual_3d_i
         const real_t mu_c,
         const real_t porosity,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT p_w_old,
-        const void *const SFEM_RESTRICT p_c_old,
+        const void *const RSTR p_w_old,
+        const void *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4082,10 +4082,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_jacobian_acti
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4129,11 +4129,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_jacobian_acti
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4177,10 +4177,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_jacobian_acti
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4224,11 +4224,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_jacobian_acti
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4272,12 +4272,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_residual_2d_i
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT previous,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4321,8 +4321,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_residual_2d_i
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_kw1,
         const real_t K_0,
         const real_t K_1,
@@ -4338,14 +4338,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_residual_2d_i
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT p_w_old,
-        const void *const SFEM_RESTRICT p_c_old,
+        const void *const RSTR p_w_old,
+        const void *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4389,12 +4389,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_residual_3d_i
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT previous,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4438,8 +4438,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_residual_3d_i
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_kw1,
         const real_t K_0,
         const real_t K_1,
@@ -4460,14 +4460,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_residual_3d_i
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT p_w_old,
-        const void *const SFEM_RESTRICT p_c_old,
+        const void *const RSTR p_w_old,
+        const void *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4511,12 +4511,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4560,8 +4560,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t K_0,
@@ -4579,14 +4579,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
         const real_t mu_c,
         const real_t porosity,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4630,12 +4630,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4679,8 +4679,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t K_0,
@@ -4703,14 +4703,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
         const real_t mu_c,
         const real_t porosity,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4754,10 +4754,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4801,11 +4801,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4849,10 +4849,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4896,11 +4896,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4944,12 +4944,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -4993,8 +4993,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t K_0,
@@ -5012,14 +5012,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
         const real_t mu_c,
         const real_t porosity,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5063,12 +5063,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5112,8 +5112,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t K_0,
@@ -5136,14 +5136,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
         const real_t mu_c,
         const real_t porosity,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5187,10 +5187,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5234,11 +5234,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5282,10 +5282,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5329,11 +5329,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5377,12 +5377,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5426,8 +5426,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_kw1,
         const real_t K_0,
         const real_t K_1,
@@ -5443,14 +5443,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5494,12 +5494,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5543,8 +5543,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_kw1,
         const real_t K_0,
         const real_t K_1,
@@ -5565,14 +5565,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5616,10 +5616,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5663,11 +5663,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5711,10 +5711,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5758,11 +5758,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5806,12 +5806,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5855,8 +5855,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_kw1,
         const real_t K_0,
         const real_t K_1,
@@ -5872,14 +5872,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5923,12 +5923,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -5972,8 +5972,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_kw1,
         const real_t K_0,
         const real_t K_1,
@@ -5994,14 +5994,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6045,10 +6045,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6092,11 +6092,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6140,10 +6140,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6187,11 +6187,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_residual_
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6235,12 +6235,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_2d_isopa
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6284,8 +6284,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_2d_isopa
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t C_kw1,
@@ -6308,14 +6308,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_2d_isopa
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6359,12 +6359,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_3d_isopa
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT direction,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6408,8 +6408,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_3d_isopa
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t C_kw1,
@@ -6437,14 +6437,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_3d_isopa
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT p_w_direction,
-        const void *const SFEM_RESTRICT p_c_direction,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6488,12 +6488,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_residual_2d_isoparametri
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT previous,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6537,8 +6537,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_residual_2d_isoparametri
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t C_kw1,
@@ -6561,14 +6561,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_residual_2d_isoparametri
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT p_w_old,
-        const void *const SFEM_RESTRICT p_c_old,
+        const void *const RSTR p_w_old,
+        const void *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6612,12 +6612,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_residual_3d_isoparametri
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const void *const SFEM_RESTRICT parameters,
-        const void *const SFEM_RESTRICT current,
-        const void *const SFEM_RESTRICT previous,
-        void *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        void *const RSTR output
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)
@@ -6661,8 +6661,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_residual_3d_isoparametri
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t C_ka1,
         const real_t C_ka2,
         const real_t C_kw1,
@@ -6690,14 +6690,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_residual_3d_isoparametri
         const real_t porosity,
         const real_t rho_w0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT p_w,
-        const void *const SFEM_RESTRICT p_c,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT p_w_old,
-        const void *const SFEM_RESTRICT p_c_old,
+        const void *const RSTR p_w_old,
+        const void *const RSTR p_c_old,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT p_w_out,
-        void *const SFEM_RESTRICT p_c_out
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out
 ) {
     const enum smesh::PrimitiveType resolved_real_type =
             (real_type == smesh::SMESH_DEFAULT)

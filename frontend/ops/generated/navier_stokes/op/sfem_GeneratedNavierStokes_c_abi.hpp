@@ -21,6 +21,9 @@ typedef double geom_t;
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 
 #include "../../kernel_diagnostics.hpp"
 
@@ -41,18 +44,18 @@ extern "C" int navier_stokes_form_1_p_residual_2d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[2],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[2],
+        const void *const RSTR p_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_1_p_residual_2d_isoparametric_mesh_soa(
@@ -60,14 +63,14 @@ extern "C" int navier_stokes_form_1_p_residual_2d_isoparametric_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[2],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[2],
+        const void *const RSTR p_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_1_p_residual_3d_affine_mesh_soa(
@@ -75,23 +78,23 @@ extern "C" int navier_stokes_form_1_p_residual_3d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[3],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[3],
+        const void *const RSTR p_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_1_p_residual_3d_isoparametric_mesh_soa(
@@ -99,14 +102,14 @@ extern "C" int navier_stokes_form_1_p_residual_3d_isoparametric_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[3],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[3],
+        const void *const RSTR p_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_p_residual_element_2d_soa_diagnostics(
@@ -126,12 +129,12 @@ extern "C" int navier_stokes_form_1_u_residual_2d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const real_t convection_scale,
         const real_t dt,
         const real_t f0,
@@ -139,14 +142,14 @@ extern "C" int navier_stokes_form_1_u_residual_2d_affine_mesh_soa(
         const real_t nu,
         const real_t rho,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[2],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[2],
+        const void *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[2],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[2],
+        const void *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_1_u_residual_2d_isoparametric_mesh_soa(
@@ -154,8 +157,8 @@ extern "C" int navier_stokes_form_1_u_residual_2d_isoparametric_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t convection_scale,
         const real_t dt,
         const real_t f0,
@@ -163,14 +166,14 @@ extern "C" int navier_stokes_form_1_u_residual_2d_isoparametric_mesh_soa(
         const real_t nu,
         const real_t rho,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[2],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[2],
+        const void *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[2],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[2],
+        const void *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_1_u_residual_3d_affine_mesh_soa(
@@ -178,17 +181,17 @@ extern "C" int navier_stokes_form_1_u_residual_3d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const real_t convection_scale,
         const real_t dt,
         const real_t f0,
@@ -197,14 +200,14 @@ extern "C" int navier_stokes_form_1_u_residual_3d_affine_mesh_soa(
         const real_t nu,
         const real_t rho,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[3],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[3],
+        const void *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[3],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[3],
+        const void *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_1_u_residual_3d_isoparametric_mesh_soa(
@@ -212,8 +215,8 @@ extern "C" int navier_stokes_form_1_u_residual_3d_isoparametric_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t convection_scale,
         const real_t dt,
         const real_t f0,
@@ -222,14 +225,14 @@ extern "C" int navier_stokes_form_1_u_residual_3d_isoparametric_mesh_soa(
         const real_t nu,
         const real_t rho,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[3],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[3],
+        const void *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[3],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[3],
+        const void *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_residual_element_2d_soa_diagnostics(
@@ -243,18 +246,18 @@ extern "C" int navier_stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[2],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_2_p_u_jacobian_action_2d_isoparametric_mesh_soa(
@@ -262,14 +265,14 @@ extern "C" int navier_stokes_form_2_p_u_jacobian_action_2d_isoparametric_mesh_so
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[2],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_affine_mesh_soa(
@@ -277,23 +280,23 @@ extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[3],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa(
@@ -301,14 +304,14 @@ extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_so
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[3],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_jacobian_action_element_2d_soa_diagnostics(
@@ -328,18 +331,18 @@ extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[2],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa(
@@ -347,14 +350,14 @@ extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_so
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[2],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_affine_mesh_soa(
@@ -362,23 +365,23 @@ extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[3],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa(
@@ -386,14 +389,14 @@ extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_so
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[3],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_jacobian_action_element_2d_soa_diagnostics(
@@ -413,22 +416,22 @@ extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const real_t convection_scale,
         const real_t dt,
         const real_t nu,
         const real_t rho,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[2],
+        const void *const RSTR u_old_data[2],
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[2],
+        const void *const RSTR u_direction_data[2],
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2]
+        void *const RSTR u_out[2]
 );
 
 extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_isoparametric_mesh_soa(
@@ -436,18 +439,18 @@ extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_isoparametric_mesh_so
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t convection_scale,
         const real_t dt,
         const real_t nu,
         const real_t rho,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[2],
+        const void *const RSTR u_old_data[2],
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[2],
+        const void *const RSTR u_direction_data[2],
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2]
+        void *const RSTR u_out[2]
 );
 
 extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_affine_mesh_soa(
@@ -455,27 +458,27 @@ extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const real_t convection_scale,
         const real_t dt,
         const real_t nu,
         const real_t rho,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[3],
+        const void *const RSTR u_old_data[3],
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[3],
+        const void *const RSTR u_direction_data[3],
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3]
+        void *const RSTR u_out[3]
 );
 
 extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa(
@@ -483,18 +486,18 @@ extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_so
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t convection_scale,
         const real_t dt,
         const real_t nu,
         const real_t rho,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[3],
+        const void *const RSTR u_old_data[3],
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[3],
+        const void *const RSTR u_direction_data[3],
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3]
+        void *const RSTR u_out[3]
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_jacobian_action_element_2d_soa_diagnostics(
@@ -514,25 +517,25 @@ extern "C" int navier_stokes_jacobian_action_2d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const real_t convection_scale,
         const real_t dt,
         const real_t nu,
         const real_t rho,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[2],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[2],
+        const void *const RSTR p_old_data,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[2],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_jacobian_action_2d_isoparametric_mesh_soa(
@@ -540,21 +543,21 @@ extern "C" int navier_stokes_jacobian_action_2d_isoparametric_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t convection_scale,
         const real_t dt,
         const real_t nu,
         const real_t rho,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[2],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[2],
+        const void *const RSTR p_old_data,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[2],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_jacobian_action_3d_affine_mesh_soa(
@@ -562,30 +565,30 @@ extern "C" int navier_stokes_jacobian_action_3d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const real_t convection_scale,
         const real_t dt,
         const real_t nu,
         const real_t rho,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[3],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[3],
+        const void *const RSTR p_old_data,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[3],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_jacobian_action_3d_isoparametric_mesh_soa(
@@ -593,21 +596,21 @@ extern "C" int navier_stokes_jacobian_action_3d_isoparametric_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t convection_scale,
         const real_t dt,
         const real_t nu,
         const real_t rho,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[3],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[3],
+        const void *const RSTR p_old_data,
         const ptrdiff_t direction_stride,
-        const void *const SFEM_RESTRICT u_direction_data[3],
-        const void *const SFEM_RESTRICT p_direction_data,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_jacobian_action_element_2d_soa_diagnostics(
@@ -621,12 +624,12 @@ extern "C" int navier_stokes_residual_2d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const real_t convection_scale,
         const real_t dt,
         const real_t f0,
@@ -634,14 +637,14 @@ extern "C" int navier_stokes_residual_2d_affine_mesh_soa(
         const real_t nu,
         const real_t rho,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[2],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[2],
+        const void *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[2],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[2],
+        const void *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_residual_2d_isoparametric_mesh_soa(
@@ -649,8 +652,8 @@ extern "C" int navier_stokes_residual_2d_isoparametric_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t convection_scale,
         const real_t dt,
         const real_t f0,
@@ -658,14 +661,14 @@ extern "C" int navier_stokes_residual_2d_isoparametric_mesh_soa(
         const real_t nu,
         const real_t rho,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[2],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[2],
+        const void *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[2],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[2],
+        const void *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[2],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_residual_3d_affine_mesh_soa(
@@ -673,17 +676,17 @@ extern "C" int navier_stokes_residual_3d_affine_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_jacobian_adjugate0,
+        const geom_t *const RSTR g_jacobian_adjugate1,
+        const geom_t *const RSTR g_jacobian_adjugate2,
+        const geom_t *const RSTR g_jacobian_adjugate3,
+        const geom_t *const RSTR g_jacobian_adjugate4,
+        const geom_t *const RSTR g_jacobian_adjugate5,
+        const geom_t *const RSTR g_jacobian_adjugate6,
+        const geom_t *const RSTR g_jacobian_adjugate7,
+        const geom_t *const RSTR g_jacobian_adjugate8,
+        const geom_t *const RSTR g_jacobian_determinant0,
         const real_t convection_scale,
         const real_t dt,
         const real_t f0,
@@ -692,14 +695,14 @@ extern "C" int navier_stokes_residual_3d_affine_mesh_soa(
         const real_t nu,
         const real_t rho,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[3],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[3],
+        const void *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[3],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[3],
+        const void *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" int navier_stokes_residual_3d_isoparametric_mesh_soa(
@@ -707,8 +710,8 @@ extern "C" int navier_stokes_residual_3d_isoparametric_mesh_soa(
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
         const real_t convection_scale,
         const real_t dt,
         const real_t f0,
@@ -717,14 +720,14 @@ extern "C" int navier_stokes_residual_3d_isoparametric_mesh_soa(
         const real_t nu,
         const real_t rho,
         const ptrdiff_t current_stride,
-        const void *const SFEM_RESTRICT u_data[3],
-        const void *const SFEM_RESTRICT p_data,
+        const void *const RSTR u_data[3],
+        const void *const RSTR p_data,
         const ptrdiff_t previous_stride,
-        const void *const SFEM_RESTRICT u_old_data[3],
-        const void *const SFEM_RESTRICT p_old_data,
+        const void *const RSTR u_old_data[3],
+        const void *const RSTR p_old_data,
         const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT u_out[3],
-        void *const SFEM_RESTRICT p_out
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
 );
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_residual_element_2d_soa_diagnostics(
