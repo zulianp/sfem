@@ -7,6 +7,24 @@ generated tree's 15.9 MB is identifier bytes.
 The architecture this serves is in `PRESCRIBED_ARCHITECTURE.md`; where it stands is in
 `ARCHITECTURE.html`. This document is the vocabulary those two assume.
 
+**Every table below is code.** `plans/conventions.py` holds them in editable form, and it is the
+only place a spelling should be changed — this file is its prose. It also draws the distinction
+that matters most in practice:
+
+- a **literal** is spelled once in one emitter (`idet`, `goff`) and can be renamed directly;
+- a **composed** name is built at run time from a prefix and a stream name (`"block_%s" % stream`),
+  so it has *two* owners, and renaming either half alone makes the declaration and the use
+  disagree. Use `conventions.compose(prefix, stream)`.
+
+That is not a theoretical hazard. Shortening the temporaries by editing literals broke the build
+four times, each on a different family, each caught by the C++ compiler — `badj0` used where
+`block_adj0` was declared, `pack_u` used where `pk_cur` was declared, and twice more. The
+provenance is not visible in the emitter text, which is why it belongs in a table.
+
+`conventions.check_material()` runs at generation and refuses a material that declares a reserved
+name; `conventions.check_tables()` refuses two concepts sharing one spelling.
+`tests/test_conventions.py` holds both to it.
+
 ## The rule
 
 > **A name is short because its scope is small.** The generator spells a concept at full length
