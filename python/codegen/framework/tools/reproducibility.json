@@ -1851,34 +1851,9 @@
       "l2": 0.05942431530075,
       "material": "laplace"
     },
-    "laplace_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 0.845862826105,
-      "l2": 0.1324118684832,
-      "material": "laplace"
-    },
-    "laplace_jacobian_action_3d_isoparametric_mesh_aos": {
-      "l1": 0.02436154361113,
-      "l2": 0.003683035010468,
-      "material": "laplace"
-    },
-    "laplace_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 0.8458628114777,
-      "l2": 0.1324118656447,
-      "material": "laplace"
-    },
-    "laplace_jacobian_action_packed_3d_affine_mesh_soa": {
-      "l1": 0.845862826105,
-      "l2": 0.1324118684832,
-      "material": "laplace"
-    },
-    "laplace_jacobian_action_packed_3d_isoparametric_mesh_soa": {
-      "l1": 0.8458628114777,
-      "l2": 0.1324118656447,
-      "material": "laplace"
-    },
-    "laplace_jacobian_action_packed_two_pass_3d_isoparametric_mesh_soa": {
-      "l1": 0.8458628114777,
-      "l2": 0.1324118656447,
+    "laplace_hessian_bsr_3d_isoparametric_mesh_soa": {
+      "l1": 42.72000169754,
+      "l2": 3.251324716254,
       "material": "laplace"
     },
     "laplace_objective_steps_3d_affine_mesh_soa": {
@@ -1899,21 +1874,6 @@
     "laplace_objective_steps_packed_3d_isoparametric_mesh_soa": {
       "l1": 0.01237805458029,
       "l2": 0.0016099557489,
-      "material": "laplace"
-    },
-    "laplace_residual_3d_affine_mesh_soa": {
-      "l1": 0.6372615832171,
-      "l2": 0.09798883654039,
-      "material": "laplace"
-    },
-    "laplace_residual_3d_isoparametric_mesh_aos": {
-      "l1": 0.01707041495957,
-      "l2": 0.00257287805261,
-      "material": "laplace"
-    },
-    "laplace_residual_3d_isoparametric_mesh_soa": {
-      "l1": 0.6372615789034,
-      "l2": 0.09798883561011,
       "material": "laplace"
     },
     "linear_elasticity_apply_3d_affine_mesh_soa": {
@@ -1979,16 +1939,6 @@
     "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa": {
       "l1": 466.056,
       "l2": 11.21792480995,
-      "material": "linear_elasticity"
-    },
-    "linear_elasticity_objective_3d_affine_mesh_soa": {
-      "l1": 31.10145785235,
-      "l2": 7.008716663298,
-      "material": "linear_elasticity"
-    },
-    "linear_elasticity_objective_3d_isoparametric_mesh_soa": {
-      "l1": 31.10145752793,
-      "l2": 7.008716590433,
       "material": "linear_elasticity"
     },
     "linear_elasticity_objective_steps_3d_affine_mesh_soa": {

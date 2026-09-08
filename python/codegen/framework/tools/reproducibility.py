@@ -75,6 +75,15 @@ BASELINE_PATH = os.path.join(
 #: compiler and libm differences across machines, not genuine drift.
 TOLERANCE = 1e-9
 
+#: How many entry points each material is allowed to leave undriven, by the
+#: reason `_bind` gives.  A kernel it cannot bind is skipped and its digest is
+#: never checked, so an unbounded skipped list is a hole in the gate that grows
+#: quietly: a renamed parameter, a new type spelling, a signature the binder
+#: stops recognising, and the kernel simply leaves the run.  Shrink-only, in the
+#: shape of the framework's other ratchets -- lower an entry when a kernel
+#: becomes bindable, and never raise one to make a change fit.
+SKIPPED_BUDGET = {}
+
 #: The materials the snapshot maintains.  Kept as a list rather than discovered
 #: so that a material silently failing to generate is a visible absence.
 MATERIALS = (
@@ -1215,6 +1224,24 @@ def _call_block(name, args, inputs, outputs, repeats=0, packed=False, scratch=()
         "        );",
     ]
     lines.extend(call)
+
+    # Digest the *first* call's output, before any timing repeats.  These
+    # kernels accumulate -- `out[i] += ...` -- into a buffer nothing re-zeroes
+    # between calls, so digesting after the repeat loop made l1 and l2 scale by
+    # exactly `repeats + 1`.  A baseline recorded during a throughput run was
+    # therefore incomparable with one recorded plainly, silently and by a clean
+    # integer factor: the refine=6 bucket carries linear_elasticity digests
+    # exactly 20x the plain values, from a `--repeats 19` run.  A digest that
+    # depends on how many times you asked for the timing is not a digest.
+    lines.append("        Digest d;")
+    for buffer, _scalar, _param, _components, extent, _length in outputs:
+        if extent:
+            for slot in range(extent):
+                lines.append("        accumulate(d, %s_%d);" % (buffer, slot))
+        else:
+            lines.append("        accumulate(d, %s);" % buffer)
+    lines.append('        report("%s", d);' % name)
+
     if repeats:
         lines.append("        {")
         lines.append("            double best = 1e30;")
@@ -1229,14 +1256,6 @@ def _call_block(name, args, inputs, outputs, repeats=0, packed=False, scratch=()
         lines.append("            }")
         lines.append('            report_rate("%s", best, mesh.nnodes);' % name)
         lines.append("        }")
-    lines.append("        Digest d;")
-    for buffer, _scalar, _param, _components, extent, _length in outputs:
-        if extent:
-            for slot in range(extent):
-                lines.append("        accumulate(d, %s_%d);" % (buffer, slot))
-        else:
-            lines.append("        accumulate(d, %s);" % buffer)
-    lines.append('        report("%s", d);' % name)
     lines.append("    }")
     return "\n".join(lines)
 
@@ -1599,6 +1618,15 @@ def main(argv=None):
              "checked and timed",
     )
     parser.add_argument("--record", action="store_true", help="rewrite the baseline")
+    parser.add_argument(
+        "--rename-map",
+        default=None,
+        help=(
+            "JSON file mapping old kernel name -> new kernel name.  Rewrites the "
+            "baseline keys through it and requires every digest to be unchanged, "
+            "which is how a rename is proved rather than re-recorded."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument(
         "--repeats",
@@ -1691,12 +1719,31 @@ def main(argv=None):
                 "    %d kernels driven, %d skipped" % (len(digests), len(skipped))
             )
 
+    over_budget = []
     for material, skipped in sorted(skipped_all.items()):
         reasons = {}
         for _name, reason in skipped:
             reasons[reason] = reasons.get(reason, 0) + 1
         for reason, count in sorted(reasons.items(), key=lambda kv: -kv[1])[:4]:
             print("    %s skipped %d for: %s" % (material, count, reason))
+        allowed = SKIPPED_BUDGET.get(material)
+        if allowed is not None and len(skipped) > allowed:
+            over_budget.append((material, len(skipped), allowed))
+    if over_budget:
+        sys.stderr.write(
+            "kernels left the run that the budget does not allow; each one is a "
+            "digest that is no longer checked:\n"
+        )
+        for material, count, allowed in over_budget:
+            sys.stderr.write(
+                "    %s skipped %d, budget %d\n" % (material, count, allowed)
+            )
+        sys.stderr.write(
+            "\nIf a kernel legitimately stopped binding, lower nothing -- work out "
+            "why the binder no longer recognises it.  SKIPPED_BUDGET only ever "
+            "shrinks.\n"
+        )
+        return 1
 
     if failures:
         for failure in failures:
@@ -1769,15 +1816,29 @@ def main(argv=None):
     if packed_pairs:
         print("packed/unpacked parity holds for %d pairs" % packed_pairs)
 
+    if args.record and args.rename_map:
+        sys.stderr.write(
+            "--record and --rename-map are different claims and cannot be combined.\n"
+            "--record asserts the new digests are correct; --rename-map proves the\n"
+            "old ones survived the rename, and rewrites the baseline keys itself.\n"
+        )
+        return 1
+
     if args.record:
         merged = dict(recorded)
         # Drop this run's materials wholesale before re-adding what was
-        # measured, so a kernel that no longer exists leaves the baseline.  An
-        # entry is this run's if it was measured now, or if it was recorded
-        # under a kernel prefix one of these materials owns.
-        prefixes = {name.rsplit("_", 1)[0] for name in measured} or set()
+        # measured, so a kernel that no longer exists leaves the baseline.
+        #
+        # `key_scope` is the right set and is already computed above: it is
+        # every entry this run's materials own, whether or not anything measured
+        # it.  The previous rule matched on kernel-name *prefixes* seen in this
+        # run, which cannot see a verb change -- when laplace was rewritten as an
+        # energy its `laplace_residual_*` and `laplace_jacobian_action_*` entries
+        # matched no surviving prefix, so eleven dead entries stayed in the
+        # baseline through every subsequent --record.  They were invisible
+        # because the comparison forgave `missing`; both halves are fixed here.
         for name in list(merged):
-            if name in measured or any(name.startswith(p) for p in prefixes):
+            if name in key_scope or name in measured:
                 del merged[name]
         merged.update(
             {
@@ -1794,19 +1855,51 @@ def main(argv=None):
         print("recorded %d kernel digests for %s" % (len(measured), bucket))
         return 0
 
+    if args.rename_map:
+        # Carry each recorded digest to the kernel's new name and compare as
+        # normal.  The point is that nothing else changes: if the rename was
+        # only a rename, every digest matches under the new key and `appeared`
+        # and `missing` are both empty.  Re-recording would assert the same
+        # thing by fiat; this proves it.
+        with open(args.rename_map, encoding="utf-8") as handle:
+            renames = json.load(handle)
+        unknown = sorted(set(renames) - set(recorded))
+        if unknown:
+            sys.stderr.write(
+                "%d names in the rename map are not in the baseline:\n" % len(unknown)
+            )
+            for name in unknown[:20]:
+                sys.stderr.write("    %s\n" % name)
+            return 1
+        collisions = sorted(set(renames.values()) & (set(recorded) - set(renames)))
+        if collisions:
+            sys.stderr.write(
+                "%d renamed kernels collide with a baseline name that is not "
+                "being renamed:\n" % len(collisions)
+            )
+            for name in collisions[:20]:
+                sys.stderr.write("    %s\n" % name)
+            return 1
+        recorded = {renames.get(name, name): digest for name, digest in recorded.items()}
+        key_scope = {renames.get(name, name) for name in key_scope}
+        print("rename map applied to %d baseline entries" % len(renames))
+
     scoped = {
         name: digest for name, digest in recorded.items() if name in key_scope
     }
     moved, appeared, missing = _compare(scoped, measured)
 
-    if appeared:
-        print("new kernels, not yet in the baseline: %d" % len(appeared))
-        for name in appeared[:10]:
-            print("    %s" % name)
-    if missing:
-        print("kernels in the baseline that no longer generate: %d" % len(missing))
-        for name in missing[:10]:
-            print("    %s" % name)
+    # A kernel that appears or vanishes is a change to *what is checked*, and
+    # until now it was reported and then forgiven: only `moved` returned
+    # non-zero, so a run in which every recorded kernel went missing and an
+    # equal number of new ones appeared printed "all N kernel answers match"
+    # and exited 0.  That is precisely the shape of a rename, which is the one
+    # change this gate most needs to survive -- and `key_scope` above was
+    # already built to make a vanished kernel visible, so the scoping half of
+    # the fix was done and the exit code was not.
+    # Report a moved answer before a changed population: a digest that moved is
+    # the stronger signal and must not be hidden behind a rename that happened
+    # in the same run.
     if moved:
         sys.stderr.write("%d kernel answers moved:\n" % len(moved))
         for name, worst, expected, digest in moved[:20]:
@@ -1818,6 +1911,28 @@ def main(argv=None):
             "\nIf the change was intended, re-record with --record and review the "
             "baseline diff: it is the statement of which kernels moved.\n"
         )
+
+    if appeared or missing:
+        if appeared:
+            sys.stderr.write(
+                "%d kernels are not in the baseline:\n" % len(appeared)
+            )
+            for name in appeared[:20]:
+                sys.stderr.write("    %s\n" % name)
+        if missing:
+            sys.stderr.write(
+                "%d kernels in the baseline no longer generate:\n" % len(missing)
+            )
+            for name in missing[:20]:
+                sys.stderr.write("    %s\n" % name)
+        sys.stderr.write(
+            "\nThe set of kernels changed, so the digests below cover a different\n"
+            "population than the baseline records.  If a kernel was renamed, use\n"
+            "--rename-map to carry its digest across and prove the answer did not\n"
+            "move.  If it was genuinely added or removed, re-record with --record.\n"
+        )
+        return 1
+    if moved:
         return 1
 
     if not scoped:
@@ -1826,6 +1941,15 @@ def main(argv=None):
             % bucket
         )
         return 0
+    if args.rename_map:
+        baseline[bucket] = recorded
+        with open(BASELINE_PATH, "w", encoding="utf-8") as handle:
+            json.dump(baseline, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        print(
+            "renamed %d baseline keys at %s; every digest survived unchanged"
+            % (len(json.load(open(args.rename_map, encoding="utf-8"))), bucket)
+        )
     print(
         "all %d kernel answers match the recorded baseline at %s"
         % (len(measured), bucket)

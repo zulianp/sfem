@@ -6126,7 +6126,36 @@ def _c_abi_function_name(declaration):
 
 
 def _c_abi_function_exists(kernel_sources, function_name, public_only=False):
+    """Whether the generator emitted this entry point.
+
+    Callers use this to choose between code paths that are genuinely optional --
+    a material that did not ask for BSR assembly has no BSR entry point, and the
+    wrapper must simply not offer the method.  For a name that is *not* optional,
+    use `_c_abi_function_required` instead: absence there is a generator bug, and
+    answering False sends the wrapper quietly down a different path.
+    """
     return function_name in _c_abi_signatures(kernel_sources, public_only=public_only)
+
+
+def _c_abi_function_required(kernel_sources, function_name, public_only=False):
+    """The same lookup, for a name whose absence is a defect rather than a choice.
+
+    The wrapper reconstructs entry-point names by format string while the
+    emitters build them from the kernel plan, so the two agree by convention and
+    not by construction.  When they stop agreeing, `_c_abi_function_exists`
+    reports False and the wrapper emits a *different* operator -- it compiles, it
+    links, it runs, and it has quietly lost the path the name selected.  This
+    raises instead, so a naming change that reaches only one side fails at
+    generation with the name that went missing.
+    """
+    if not _c_abi_function_exists(
+        kernel_sources, function_name, public_only=public_only
+    ):
+        raise ValueError(
+            "the generated C ABI has no entry point named %r; the wrapper and the "
+            "kernel plan disagree about how it is spelled" % function_name
+        )
+    return True
 
 
 def _c_abi_public_dispatch_case_elements(kernel_sources, function_name):
