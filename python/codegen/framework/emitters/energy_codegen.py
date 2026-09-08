@@ -1,6 +1,6 @@
 import sympy as sp
 
-from codegen.framework.plans.conventions import PREFIXES
+from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name
 
 #: The staged-buffer and per-thread-scratch prefixes, from the one
 #: table that owns them.  Spelling either here again is what made the
@@ -252,8 +252,8 @@ def _sfem_soa_affine_geometry_stream_lines(
                     "%ss_t b%s_data[VS];" % (indent, stream),
                     "%sconst s_t *const b%s = ageom_stream<s_t, %s, VS>("
                     % (indent, stream, geometry_scalar_type),
-                    "%s        nelems, g_%s + evb, b%s_data, std::is_same<%s, s_t>());"
-                    % (indent, stream, stream, geometry_scalar_type),
+                    "%s        nelems, %s + evb, b%s_data, std::is_same<%s, s_t>());"
+                    % (indent, abi_geometry_name(stream), stream, geometry_scalar_type),
                 ]
             )
     return lines
@@ -989,10 +989,10 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     n_field_components = form_n_field_components(form, dim)
     params = [
         *(
-            "const s_t *const SFEM_RESTRICT bjacobian_adjugate%d" % component
+            "const s_t *const SFEM_RESTRICT badj%d" % component
             for component in range(dim * dim)
         ),
-        "const s_t *const SFEM_RESTRICT bjacobian_determinant0",
+        "const s_t *const SFEM_RESTRICT bdet0",
     ]
     if use_tensor_product_reference:
         params.extend(
@@ -1682,12 +1682,12 @@ def _append_sfem_soa_tensor_weak_form_lines(
     )
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = jacobian_adjugate%d[goff];"
-            % (_work_item_name(source_builder, "jacobian_adjugate", component), component)
+            "            const s_t %s = adj%d[goff];"
+            % (_work_item_name(source_builder, "adj", component), component)
         )
     lines.append(
-        "            const s_t %s = jacobian_determinant0[goff];"
-        % _work_item_name(source_builder, "jacobian_determinant", 0)
+        "            const s_t %s = det0[goff];"
+        % _work_item_name(source_builder, "det", 0)
     )
     if uses_current:
         lines.append("            s_t gu_ref[%d];" % (n_field_components * dim))
@@ -1722,7 +1722,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
 
     lines.append(
         "            const s_t idet = s_t(1) / %s;"
-        % geometry_value("jacobian_determinant", 0)
+        % geometry_value("det", 0)
     )
     for row in range(weak_form.n_field_components):
         for col in range(dim):
@@ -1731,7 +1731,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     "gu_ref[%d] * %s"
                     % (
                         row * dim + k,
-                        geometry_value("jacobian_adjugate", k * dim + col),
+                        geometry_value("adj", k * dim + col),
                     )
                     for k in range(dim)
                 ]
@@ -1744,7 +1744,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     "grad_h_ref[%d] * %s"
                     % (
                         row * dim + k,
-                        geometry_value("jacobian_adjugate", k * dim + col),
+                        geometry_value("adj", k * dim + col),
                     )
                     for k in range(dim)
                 ]
@@ -1992,12 +1992,12 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     lines.append("            const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = jacobian_adjugate%d[goff];"
-            % (geometry_value("jacobian_adjugate", component), component)
+            "            const s_t %s = adj%d[goff];"
+            % (geometry_value("adj", component), component)
         )
     lines.append(
-        "            const s_t %s = jacobian_determinant0[goff];"
-        % geometry_value("jacobian_determinant", 0)
+        "            const s_t %s = det0[goff];"
+        % geometry_value("det", 0)
     )
     for row in range(n_field_components):
         for col in range(dim):
@@ -2030,7 +2030,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                 )
     lines.append(
         "            const s_t idet = s_t(1) / %s;"
-        % geometry_value("jacobian_determinant", 0)
+        % geometry_value("det", 0)
     )
     for row in range(weak_form.n_field_components):
         for col in range(dim):
@@ -2039,7 +2039,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     "gu_ref%d * %s"
                     % (
                         row * dim + k,
-                        geometry_value("jacobian_adjugate", k * dim + col),
+                        geometry_value("adj", k * dim + col),
                     )
                     for k in range(dim)
                 ]
@@ -2052,7 +2052,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     "grad_h_ref%d * %s"
                     % (
                         row * dim + k,
-                        geometry_value("jacobian_adjugate", k * dim + col),
+                        geometry_value("adj", k * dim + col),
                     )
                     for k in range(dim)
                 ]
@@ -2238,12 +2238,12 @@ def _append_sfem_soa_weak_form_lines(
     lines.append("            const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = jacobian_adjugate%d[goff];"
-            % (geometry_value("jacobian_adjugate", component), component)
+            "            const s_t %s = adj%d[goff];"
+            % (geometry_value("adj", component), component)
         )
     lines.append(
-        "            const s_t %s = jacobian_determinant0[goff];"
-        % geometry_value("jacobian_determinant", 0)
+        "            const s_t %s = det0[goff];"
+        % geometry_value("det", 0)
     )
     for row in range(n_field_components):
         for col in range(dim):
@@ -2254,7 +2254,7 @@ def _append_sfem_soa_weak_form_lines(
                 lines.append("            const s_t grad_h_ref%d = grad_h_ref%d_values[%s];" % (idx, idx, work_item))
     lines.append(
         "        const s_t idet = s_t(1) / %s;"
-        % geometry_value("jacobian_determinant", 0)
+        % geometry_value("det", 0)
     )
     for row in range(weak_form.n_field_components):
         for col in range(dim):
@@ -2263,7 +2263,7 @@ def _append_sfem_soa_weak_form_lines(
                     "gu_ref%d * %s"
                     % (
                         row * dim + k,
-                        geometry_value("jacobian_adjugate", k * dim + col),
+                        geometry_value("adj", k * dim + col),
                     )
                     for k in range(dim)
                 ]
@@ -2276,7 +2276,7 @@ def _append_sfem_soa_weak_form_lines(
                     "grad_h_ref%d * %s"
                     % (
                         row * dim + k,
-                        geometry_value("jacobian_adjugate", k * dim + col),
+                        geometry_value("adj", k * dim + col),
                     )
                     for k in range(dim)
                 ]
@@ -2365,7 +2365,7 @@ def _append_transformed_loperand_lines(
                     "material%d" % (row * dim + k)
                     if scalar_temporaries
                     else "material[%d]" % (row * dim + k),
-                    geometry_value("jacobian_adjugate", col * dim + k),
+                    geometry_value("adj", col * dim + k),
                 )
                 for k in range(dim)
             ]
@@ -2481,7 +2481,7 @@ def _append_weak_objective_accumulation(
             % (work_item, "+=" if form.output_mode == "accumulate" else "=")
         ],
         "weak_obj_tmp",
-        scale="qw * %s" % geometry_value("jacobian_determinant", 0),
+        scale="qw * %s" % geometry_value("det", 0),
     )
     lines.extend(closing)
 
@@ -2826,14 +2826,14 @@ def _sfem_soa_isoparametric_geometry_lines(
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
-    stream_array_name = "bjacobian_adjugate_streams"
+    stream_array_name = "badj_streams"
     lines = isoparametric_adjugate_stream_array_lines(
         dim_name="ND",
         dim=dim,
         indent="            ",
         stream_array_name=stream_array_name,
         adjugate_streams=tuple(
-            "bjacobian_adjugate%d" % component
+            "badj%d" % component
             for component in range(dim * dim)
         ),
     )
@@ -2892,7 +2892,7 @@ def _sfem_soa_isoparametric_geometry_lines(
             indent="                ",
             index=output_index,
             stream_array_name=stream_array_name,
-            determinant_stream="bjacobian_determinant0",
+            determinant_stream="bdet0",
         )
     )
     lines.append("            }")
@@ -3513,7 +3513,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             for array_input in _packed_affine_geometry_inputs(dim, metric):
                 for stream in _soa_array_stream_names(array_input):
                     lines.append(
-                        "        const geom_t *const SFEM_RESTRICT g_%s," % stream
+                        "        const geom_t *const SFEM_RESTRICT %s," % abi_geometry_name(stream)
                     )
         else:
             lines.append("        const geom_t *const *const SFEM_RESTRICT points,")
@@ -3678,9 +3678,9 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 lines.append("                s_t b%s[NQ * VS];" % stream)
             lines.extend(
                 [
-                    "                s_t bjacobian_determinant0[NQ * VS];",
-                    "                s_t *bjacobian_adjugate_streams[ND * ND] = {%s};"
-                    % ", ".join("bjacobian_adjugate%d" % i for i in range(dim * dim)),
+                    "                s_t bdet0[NQ * VS];",
+                    "                s_t *badj_streams[ND * ND] = {%s};"
+                    % ", ".join("badj%d" % i for i in range(dim * dim)),
                 ]
             )
         lines.extend(
@@ -3762,10 +3762,10 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                     local_prefix=local_prefix,
                     coordinate_streams="bcoordinate_data",
                     contiguous_coordinate_streams=True,
-                    adjugate_target=lambda component, index: "bjacobian_adjugate%d[%s]" % (component, index),
-                    determinant_target=lambda index: "bjacobian_determinant0[%s]" % index,
-                    adjugate_streams=tuple("bjacobian_adjugate%d" % component for component in range(dim * dim)),
-                    determinant_stream="bjacobian_determinant0",
+                    adjugate_target=lambda component, index: "badj%d[%s]" % (component, index),
+                    determinant_target=lambda index: "bdet0[%s]" % index,
+                    adjugate_streams=tuple("badj%d" % component for component in range(dim * dim)),
+                    determinant_stream="bdet0",
                     shape_name=tensor_shape_name,
                     grad_name=tensor_grad_name,
                 )
@@ -3795,8 +3795,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             )
         else:
             call_args.extend(
-                ["bjacobian_adjugate%d" % i for i in range(dim * dim)]
-                + ["bjacobian_determinant0"]
+                ["badj%d" % i for i in range(dim * dim)]
+                + ["bdet0"]
             )
         if omit_reference_basis_inputs:
             pass
@@ -3898,7 +3898,7 @@ def _mesh_operator_parameters(
     ]
     if geometry_mode == "affine":
         base_params.extend(
-            "const g_t *const SFEM_RESTRICT g_%s" % stream
+            "const g_t *const SFEM_RESTRICT %s" % abi_geometry_name(stream)
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
@@ -4180,16 +4180,16 @@ def _append_mesh_operator_isoparametric_flux(
                 coordinate_streams="bcoordinate_data",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "bjacobian_adjugate%d[%s]" % (component, index)
+                    "badj%d[%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "bjacobian_determinant0[%s]" % index
+                    "bdet0[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "bjacobian_adjugate%d" % component
+                    "badj%d" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="bjacobian_determinant0",
+                determinant_stream="bdet0",
                 shape_name=tensor_shape_name,
                 grad_name=tensor_grad_name,
             )
@@ -5084,7 +5084,7 @@ def _packed_affine_geometry_inputs(dim, metric):
         return _metric_array_inputs((), dim)
     return (
         _adjugate_input(dim),
-        sfem_soa_reference_input("jacobian_determinant", 1, 1, 1),
+        sfem_soa_reference_input("det", 1, 1, 1),
     )
 
 
@@ -5171,7 +5171,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 for array_input in _packed_affine_geometry_inputs(dim, metric):
                     for stream in _soa_array_stream_names(array_input):
                         lines.append(
-                            "        const geom_t *const SFEM_RESTRICT g_%s," % stream
+                            "        const geom_t *const SFEM_RESTRICT %s," % abi_geometry_name(stream)
                         )
             else:
                 lines.append("        const geom_t *const *const SFEM_RESTRICT points,")
@@ -5406,9 +5406,9 @@ def _sfem_soa_packed_apply_public_wrappers(
                     lines.append("                s_t b%s[NQ * VS];" % stream)
                 lines.extend(
                     [
-                        "                s_t bjacobian_determinant0[NQ * VS];",
-                        "                s_t *bjacobian_adjugate_streams[ND * ND] = {%s};"
-                        % ", ".join("bjacobian_adjugate%d" % i for i in range(dim * dim)),
+                        "                s_t bdet0[NQ * VS];",
+                        "                s_t *badj_streams[ND * ND] = {%s};"
+                        % ", ".join("badj%d" % i for i in range(dim * dim)),
                     ]
                 )
             if uses_current:
@@ -5521,16 +5521,16 @@ def _sfem_soa_packed_apply_public_wrappers(
                         coordinate_streams="bcoordinate_data",
                         contiguous_coordinate_streams=True,
                         adjugate_target=lambda component, index: (
-                            "bjacobian_adjugate%d[%s]" % (component, index)
+                            "badj%d[%s]" % (component, index)
                         ),
                         determinant_target=lambda index: (
-                            "bjacobian_determinant0[%s]" % index
+                            "bdet0[%s]" % index
                         ),
                         adjugate_streams=tuple(
-                            "bjacobian_adjugate%d" % component
+                            "badj%d" % component
                             for component in range(dim * dim)
                         ),
-                        determinant_stream="bjacobian_determinant0",
+                        determinant_stream="bdet0",
                         shape_name=tensor_shape_name,
                         grad_name=tensor_grad_name,
                     )
@@ -5561,8 +5561,8 @@ def _sfem_soa_packed_apply_public_wrappers(
                 )
             else:
                 call_args.extend(
-                    ["bjacobian_adjugate%d" % i for i in range(dim * dim)]
-                    + ["bjacobian_determinant0"]
+                    ["badj%d" % i for i in range(dim * dim)]
+                    + ["bdet0"]
                 )
             if omit_reference_basis_inputs:
                 pass
@@ -5887,7 +5887,7 @@ def _sfem_soa_mesh_objective_steps_function(
     ]
     if geometry_mode == "affine":
         base_params.extend(
-            "const g_t *const SFEM_RESTRICT g_%s" % stream
+            "const g_t *const SFEM_RESTRICT %s" % abi_geometry_name(stream)
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
@@ -6140,16 +6140,16 @@ def _sfem_soa_mesh_objective_steps_function(
                 coordinate_streams="bcoordinate_data",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "bjacobian_adjugate%d[%s]" % (component, index)
+                    "badj%d[%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "bjacobian_determinant0[%s]" % index
+                    "bdet0[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "bjacobian_adjugate%d" % component
+                    "badj%d" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="bjacobian_determinant0",
+                determinant_stream="bdet0",
                 shape_name=tensor_shape_name,
                 grad_name=tensor_grad_name,
             )
@@ -6410,14 +6410,14 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     )
     for component in range(dim * dim):
         lines.append(
-            "%s    const s_t jacobian_adjugate_lane%d = bjacobian_adjugate%d[goff];"
+            "%s    const s_t adj_lane%d = badj%d[goff];"
             % (indent, component, component)
         )
     lines.extend(
         [
-            "%s    const s_t jacobian_determinant_lane0 = bjacobian_determinant0[goff];"
+            "%s    const s_t det_lane0 = bdet0[goff];"
             % indent,
-            "%s    const s_t idet = s_t(1) / jacobian_determinant_lane0;"
+            "%s    const s_t idet = s_t(1) / det_lane0;"
             % indent,
             "%s    for (int trial_component = 0; trial_component < NC; ++trial_component) {"
             % indent,
@@ -6469,7 +6469,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     )
     for phys_component in range(dim):
         terms = [
-            "trial_grad_ref%d * jacobian_adjugate_lane%d"
+            "trial_grad_ref%d * adj_lane%d"
             % (ref_component, ref_component * dim + phys_component)
             for ref_component in range(dim)
         ]
@@ -6524,7 +6524,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     lines.append("%s                    s_t entry = s_t(0);" % indent)
     for ref_component in range(dim):
         terms = [
-            "material[test_component * ND + %d] * jacobian_adjugate_lane%d"
+            "material[test_component * ND + %d] * adj_lane%d"
             % (k, ref_component * dim + k)
             for k in range(dim)
         ]
@@ -6564,8 +6564,8 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
     indent,
 ):
     args = [
-        *("bjacobian_adjugate%d" % i for i in range(dim * dim)),
-        "bjacobian_determinant0",
+        *("badj%d" % i for i in range(dim * dim)),
+        "bdet0",
     ]
     if use_tensor_product_reference:
         args.extend((tensor_shape_name, tensor_grad_name, tensor_weight_name))
@@ -6836,10 +6836,10 @@ def _sfem_soa_hessian_packed_crs_passes(
             lines.append("                s_t bu_data[NS * NC][VS];")
         for stream in _soa_array_stream_names(_adjugate_input(dim)):
             lines.append("                s_t b%s[NQ * VS];" % stream)
-        lines.append("                s_t bjacobian_determinant0[NQ * VS];")
+        lines.append("                s_t bdet0[NQ * VS];")
         lines.append(
-            "                s_t *bjacobian_adjugate_streams[ND * ND] = {%s};"
-            % ", ".join("bjacobian_adjugate%d" % i for i in range(dim * dim))
+            "                s_t *badj_streams[ND * ND] = {%s};"
+            % ", ".join("badj%d" % i for i in range(dim * dim))
         )
         if uses_current:
             lines.extend(
@@ -6898,16 +6898,16 @@ def _sfem_soa_hessian_packed_crs_passes(
                     coordinate_streams="bcoordinate_data",
                     contiguous_coordinate_streams=True,
                     adjugate_target=lambda component, index: (
-                        "bjacobian_adjugate%d[%s]" % (component, index)
+                        "badj%d[%s]" % (component, index)
                     ),
                     determinant_target=lambda index: (
-                        "bjacobian_determinant0[%s]" % index
+                        "bdet0[%s]" % index
                     ),
                     adjugate_streams=tuple(
-                        "bjacobian_adjugate%d" % component
+                        "badj%d" % component
                         for component in range(dim * dim)
                     ),
-                    determinant_stream="bjacobian_determinant0",
+                    determinant_stream="bdet0",
                     shape_name=tensor_shape_name,
                     grad_name=tensor_grad_name,
                 )
@@ -6931,8 +6931,8 @@ def _sfem_soa_hessian_packed_crs_passes(
         packed_call_args = [
             "1",
             "1",
-            *("bjacobian_adjugate%d" % i for i in range(dim * dim)),
-            "bjacobian_determinant0",
+            *("badj%d" % i for i in range(dim * dim)),
+            "bdet0",
         ]
         if omit_reference_basis_inputs:
             pass
@@ -7263,10 +7263,10 @@ def _sfem_soa_hessian_matrix_assembly_function(
         lines.append("        s_t bu_data[NS * NC][VS];")
     for stream in _soa_array_stream_names(_adjugate_input(dim)):
         lines.append("        s_t b%s[NQ * VS];" % stream)
-    lines.append("        s_t bjacobian_determinant0[NQ * VS];")
+    lines.append("        s_t bdet0[NQ * VS];")
     lines.append(
-            "        s_t *bjacobian_adjugate_streams[ND * ND] = {%s};"
-            % ", ".join("bjacobian_adjugate%d" % i for i in range(dim * dim))
+            "        s_t *badj_streams[ND * ND] = {%s};"
+            % ", ".join("badj%d" % i for i in range(dim * dim))
         )
     if uses_current:
         lines.extend(
@@ -7326,16 +7326,16 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 coordinate_streams="bcoordinate_data",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "bjacobian_adjugate%d[%s]" % (component, index)
+                    "badj%d[%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "bjacobian_determinant0[%s]" % index
+                    "bdet0[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "bjacobian_adjugate%d" % component
+                    "badj%d" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="bjacobian_determinant0",
+                determinant_stream="bdet0",
                 shape_name=tensor_shape_name,
                 grad_name=tensor_grad_name,
             )
@@ -7361,8 +7361,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
     call_args = [
         "1",
         "1",
-        *("bjacobian_adjugate%d" % i for i in range(dim * dim)),
-        "bjacobian_determinant0",
+        *("badj%d" % i for i in range(dim * dim)),
+        "bdet0",
     ]
     if omit_reference_basis_inputs:
         pass
@@ -7615,7 +7615,7 @@ def _ordered_stream_pointer_array_lines(pointer_type, array_name, storage_name, 
 
 
 def _adjugate_input(dim):
-    return sfem_soa_reference_input("jacobian_adjugate", 1, 1, dim * dim)
+    return sfem_soa_reference_input("adj", 1, 1, dim * dim)
 
 
 def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_field_components=None):
@@ -8480,8 +8480,8 @@ def _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     names_and_sizes = {(array_input.name, array_input.size) for array_input in element_inputs}
     return (
-        ("jacobian_adjugate", dim * dim) in names_and_sizes
-        and ("jacobian_determinant", 1) in names_and_sizes
+        ("adj", dim * dim) in names_and_sizes
+        and ("det", 1) in names_and_sizes
     )
 
 
@@ -9462,8 +9462,8 @@ def _sfem_soa_element_api_common_params(form, dim, include_coords):
     if include_coords:
         params.append("const s_t *const *const SFEM_RESTRICT coords")
     else:
-        params.append("const s_t *const *const SFEM_RESTRICT jacobian_adjugate")
-        params.append("const s_t *const SFEM_RESTRICT jacobian_determinant")
+        params.append("const s_t *const *const SFEM_RESTRICT adj")
+        params.append("const s_t *const SFEM_RESTRICT det")
     params.extend(_form_material_parameter_declarations(form))
     if _form_uses_current(form, default=True):
         params.append("const s_t *const *const SFEM_RESTRICT u_streams")
@@ -9493,8 +9493,8 @@ def _sfem_soa_element_api_reference_args(prefix, quadrature_rule, use_tensor_pro
 
 
 def _sfem_soa_element_api_geometry_args(dim):
-    return tuple("bjacobian_adjugate%d" % component for component in range(dim * dim)) + (
-        "bjacobian_determinant0",
+    return tuple("badj%d" % component for component in range(dim * dim)) + (
+        "bdet0",
     )
 
 
@@ -9564,8 +9564,8 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
 def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
     lines = []
     for component in range(dim * dim):
-        lines.append("        s_t bjacobian_adjugate%d[NQ * VS];" % component)
-    lines.append("        s_t bjacobian_determinant0[NQ * VS];")
+        lines.append("        s_t badj%d[NQ * VS];" % component)
+    lines.append("        s_t bdet0[NQ * VS];")
     # The element API tiles are per element, so the scope the
     # element calls for can be printed here without the shared
     # local header disagreeing with itself about it.
@@ -9576,10 +9576,10 @@ def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
     lines.append("            for (int lane = 0; lane < nelems; ++lane) {")
     for component in range(dim * dim):
         lines.append(
-            "                bjacobian_adjugate%d[q * VS + lane] = jacobian_adjugate[%d][q * nelements + evb + lane];"
+            "                badj%d[q * VS + lane] = adj[%d][q * nelements + evb + lane];"
             % (component, component)
         )
-    lines.append("                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];")
+    lines.append("                bdet0[q * VS + lane] = det[q * nelements + evb + lane];")
     lines.append("            }")
     lines.append("        }")
     return lines
@@ -9605,8 +9605,8 @@ def _sfem_soa_element_api_coords_tile_lines(
         "        }",
     ]
     for component in range(dim * dim):
-        lines.append("        s_t bjacobian_adjugate%d[NQ * VS];" % component)
-    lines.append("        s_t bjacobian_determinant0[NQ * VS];")
+        lines.append("        s_t badj%d[NQ * VS];" % component)
+    lines.append("        s_t bdet0[NQ * VS];")
     if use_tensor_product_reference:
         lines.extend(
             [
@@ -9626,10 +9626,10 @@ def _sfem_soa_element_api_coords_tile_lines(
             )
         lines.append(
             "        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {%s};"
-            % ", ".join("bjacobian_adjugate%d" % component for component in range(dim * dim))
+            % ", ".join("badj%d" % component for component in range(dim * dim))
         )
         lines.append(
-            "        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);"
+            "        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
         )
         return lines
     if use_reference_gradient_vectors:
