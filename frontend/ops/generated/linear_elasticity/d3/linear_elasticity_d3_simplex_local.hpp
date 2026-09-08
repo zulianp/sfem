@@ -53,122 +53,122 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_objective_block(
     static_assert(VS > 0, "VS must be positive");
         for (int q = 0; q < NQ; ++q) {
             const s_t qw = q_weight[q];
-            s_t grad_u_ref0_values[VS];
-            s_t grad_u_ref1_values[VS];
-            s_t grad_u_ref2_values[VS];
-            s_t grad_u_ref3_values[VS];
-            s_t grad_u_ref4_values[VS];
-            s_t grad_u_ref5_values[VS];
-            s_t grad_u_ref6_values[VS];
-            s_t grad_u_ref7_values[VS];
-            s_t grad_u_ref8_values[VS];
+            s_t gu_ref0_values[VS];
+            s_t gu_ref1_values[VS];
+            s_t gu_ref2_values[VS];
+            s_t gu_ref3_values[VS];
+            s_t gu_ref4_values[VS];
+            s_t gu_ref5_values[VS];
+            s_t gu_ref6_values[VS];
+            s_t gu_ref7_values[VS];
+            s_t gu_ref8_values[VS];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref0_values[lane] = s_t(0);
+                gu_ref0_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref1_values[lane] = s_t(0);
+                gu_ref1_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref2_values[lane] = s_t(0);
+                gu_ref2_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref3_values[lane] = s_t(0);
+                gu_ref3_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref4_values[lane] = s_t(0);
+                gu_ref4_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref5_values[lane] = s_t(0);
+                gu_ref5_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref6_values[lane] = s_t(0);
+                gu_ref6_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref7_values[lane] = s_t(0);
+                gu_ref7_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref8_values[lane] = s_t(0);
+                gu_ref8_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * NS + shape];
+                    gu_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * NS + shape];
+                    gu_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * NS + shape];
+                    gu_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * NS + shape];
+                    gu_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * NS + shape];
+                    gu_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * NS + shape];
+                    gu_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * NS + shape];
+                    gu_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * NS + shape];
+                    gu_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * NS + shape];
+                    gu_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * NS + shape];
                 }
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[geometry_offset];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[geometry_offset];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[geometry_offset];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const s_t grad_u_ref0 = grad_u_ref0_values[lane];
-            const s_t grad_u_ref1 = grad_u_ref1_values[lane];
-            const s_t grad_u_ref2 = grad_u_ref2_values[lane];
-            const s_t grad_u_ref3 = grad_u_ref3_values[lane];
-            const s_t grad_u_ref4 = grad_u_ref4_values[lane];
-            const s_t grad_u_ref5 = grad_u_ref5_values[lane];
-            const s_t grad_u_ref6 = grad_u_ref6_values[lane];
-            const s_t grad_u_ref7 = grad_u_ref7_values[lane];
-            const s_t grad_u_ref8 = grad_u_ref8_values[lane];
-        const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
-        const s_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane3 + grad_u_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t grad_u1 = (grad_u_ref0 * jacobian_adjugate_lane1 + grad_u_ref1 * jacobian_adjugate_lane4 + grad_u_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t grad_u2 = (grad_u_ref0 * jacobian_adjugate_lane2 + grad_u_ref1 * jacobian_adjugate_lane5 + grad_u_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const s_t grad_u3 = (grad_u_ref3 * jacobian_adjugate_lane0 + grad_u_ref4 * jacobian_adjugate_lane3 + grad_u_ref5 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t grad_u4 = (grad_u_ref3 * jacobian_adjugate_lane1 + grad_u_ref4 * jacobian_adjugate_lane4 + grad_u_ref5 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t grad_u5 = (grad_u_ref3 * jacobian_adjugate_lane2 + grad_u_ref4 * jacobian_adjugate_lane5 + grad_u_ref5 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const s_t grad_u6 = (grad_u_ref6 * jacobian_adjugate_lane0 + grad_u_ref7 * jacobian_adjugate_lane3 + grad_u_ref8 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t grad_u7 = (grad_u_ref6 * jacobian_adjugate_lane1 + grad_u_ref7 * jacobian_adjugate_lane4 + grad_u_ref8 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t grad_u8 = (grad_u_ref6 * jacobian_adjugate_lane2 + grad_u_ref7 * jacobian_adjugate_lane5 + grad_u_ref8 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        value[lane] += qw * jacobian_determinant_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(grad_u0 + grad_u4 + grad_u8) + mu*(pow_2(grad_u0) + pow_2(grad_u4) + pow_2(grad_u8) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*grad_u1 + ((s_t(1) / s_t(2)))*grad_u3) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*grad_u2 + ((s_t(1) / s_t(2)))*grad_u6) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*grad_u5 + ((s_t(1) / s_t(2)))*grad_u7)));
+            const ptrdiff_t goff = q * geometry_stride + lane;
+            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
+            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
+            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
+            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
+            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
+            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
+            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
+            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
+            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
+            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t gu_ref0 = gu_ref0_values[lane];
+            const s_t gu_ref1 = gu_ref1_values[lane];
+            const s_t gu_ref2 = gu_ref2_values[lane];
+            const s_t gu_ref3 = gu_ref3_values[lane];
+            const s_t gu_ref4 = gu_ref4_values[lane];
+            const s_t gu_ref5 = gu_ref5_values[lane];
+            const s_t gu_ref6 = gu_ref6_values[lane];
+            const s_t gu_ref7 = gu_ref7_values[lane];
+            const s_t gu_ref8 = gu_ref8_values[lane];
+        const s_t idet = s_t(1) / jacobian_determinant_lane0;
+        const s_t gu0 = (gu_ref0 * jacobian_adjugate_lane0 + gu_ref1 * jacobian_adjugate_lane3 + gu_ref2 * jacobian_adjugate_lane6) * idet;
+        const s_t gu1 = (gu_ref0 * jacobian_adjugate_lane1 + gu_ref1 * jacobian_adjugate_lane4 + gu_ref2 * jacobian_adjugate_lane7) * idet;
+        const s_t gu2 = (gu_ref0 * jacobian_adjugate_lane2 + gu_ref1 * jacobian_adjugate_lane5 + gu_ref2 * jacobian_adjugate_lane8) * idet;
+        const s_t gu3 = (gu_ref3 * jacobian_adjugate_lane0 + gu_ref4 * jacobian_adjugate_lane3 + gu_ref5 * jacobian_adjugate_lane6) * idet;
+        const s_t gu4 = (gu_ref3 * jacobian_adjugate_lane1 + gu_ref4 * jacobian_adjugate_lane4 + gu_ref5 * jacobian_adjugate_lane7) * idet;
+        const s_t gu5 = (gu_ref3 * jacobian_adjugate_lane2 + gu_ref4 * jacobian_adjugate_lane5 + gu_ref5 * jacobian_adjugate_lane8) * idet;
+        const s_t gu6 = (gu_ref6 * jacobian_adjugate_lane0 + gu_ref7 * jacobian_adjugate_lane3 + gu_ref8 * jacobian_adjugate_lane6) * idet;
+        const s_t gu7 = (gu_ref6 * jacobian_adjugate_lane1 + gu_ref7 * jacobian_adjugate_lane4 + gu_ref8 * jacobian_adjugate_lane7) * idet;
+        const s_t gu8 = (gu_ref6 * jacobian_adjugate_lane2 + gu_ref7 * jacobian_adjugate_lane5 + gu_ref8 * jacobian_adjugate_lane8) * idet;
+        value[lane] += qw * jacobian_determinant_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu0 + gu4 + gu8) + mu*(pow_2(gu0) + pow_2(gu4) + pow_2(gu8) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu1 + ((s_t(1) / s_t(2)))*gu3) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu2 + ((s_t(1) / s_t(2)))*gu6) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu5 + ((s_t(1) / s_t(2)))*gu7)));
             }
         }
 }
@@ -199,37 +199,37 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_objective_block(
             const s_t qw = q_weight[q];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[geometry_offset];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[geometry_offset];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[geometry_offset];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const s_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];
-            const s_t grad_u_ref1 = -(u_streams[0 * 3 + 0][lane]) + u_streams[2 * 3 + 0][lane];
-            const s_t grad_u_ref2 = -(u_streams[0 * 3 + 0][lane]) + u_streams[3 * 3 + 0][lane];
-            const s_t grad_u_ref3 = -(u_streams[0 * 3 + 1][lane]) + u_streams[1 * 3 + 1][lane];
-            const s_t grad_u_ref4 = -(u_streams[0 * 3 + 1][lane]) + u_streams[2 * 3 + 1][lane];
-            const s_t grad_u_ref5 = -(u_streams[0 * 3 + 1][lane]) + u_streams[3 * 3 + 1][lane];
-            const s_t grad_u_ref6 = -(u_streams[0 * 3 + 2][lane]) + u_streams[1 * 3 + 2][lane];
-            const s_t grad_u_ref7 = -(u_streams[0 * 3 + 2][lane]) + u_streams[2 * 3 + 2][lane];
-            const s_t grad_u_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];
-            const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
-            const s_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane3 + grad_u_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t grad_u1 = (grad_u_ref0 * jacobian_adjugate_lane1 + grad_u_ref1 * jacobian_adjugate_lane4 + grad_u_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t grad_u2 = (grad_u_ref0 * jacobian_adjugate_lane2 + grad_u_ref1 * jacobian_adjugate_lane5 + grad_u_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-            const s_t grad_u3 = (grad_u_ref3 * jacobian_adjugate_lane0 + grad_u_ref4 * jacobian_adjugate_lane3 + grad_u_ref5 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t grad_u4 = (grad_u_ref3 * jacobian_adjugate_lane1 + grad_u_ref4 * jacobian_adjugate_lane4 + grad_u_ref5 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t grad_u5 = (grad_u_ref3 * jacobian_adjugate_lane2 + grad_u_ref4 * jacobian_adjugate_lane5 + grad_u_ref5 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-            const s_t grad_u6 = (grad_u_ref6 * jacobian_adjugate_lane0 + grad_u_ref7 * jacobian_adjugate_lane3 + grad_u_ref8 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t grad_u7 = (grad_u_ref6 * jacobian_adjugate_lane1 + grad_u_ref7 * jacobian_adjugate_lane4 + grad_u_ref8 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t grad_u8 = (grad_u_ref6 * jacobian_adjugate_lane2 + grad_u_ref7 * jacobian_adjugate_lane5 + grad_u_ref8 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        value[lane] += qw * jacobian_determinant_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(grad_u0 + grad_u4 + grad_u8) + mu*(pow_2(grad_u0) + pow_2(grad_u4) + pow_2(grad_u8) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*grad_u1 + ((s_t(1) / s_t(2)))*grad_u3) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*grad_u2 + ((s_t(1) / s_t(2)))*grad_u6) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*grad_u5 + ((s_t(1) / s_t(2)))*grad_u7)));
+            const ptrdiff_t goff = q * geometry_stride + lane;
+            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
+            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
+            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
+            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
+            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
+            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
+            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
+            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
+            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
+            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t gu_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];
+            const s_t gu_ref1 = -(u_streams[0 * 3 + 0][lane]) + u_streams[2 * 3 + 0][lane];
+            const s_t gu_ref2 = -(u_streams[0 * 3 + 0][lane]) + u_streams[3 * 3 + 0][lane];
+            const s_t gu_ref3 = -(u_streams[0 * 3 + 1][lane]) + u_streams[1 * 3 + 1][lane];
+            const s_t gu_ref4 = -(u_streams[0 * 3 + 1][lane]) + u_streams[2 * 3 + 1][lane];
+            const s_t gu_ref5 = -(u_streams[0 * 3 + 1][lane]) + u_streams[3 * 3 + 1][lane];
+            const s_t gu_ref6 = -(u_streams[0 * 3 + 2][lane]) + u_streams[1 * 3 + 2][lane];
+            const s_t gu_ref7 = -(u_streams[0 * 3 + 2][lane]) + u_streams[2 * 3 + 2][lane];
+            const s_t gu_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];
+            const s_t idet = s_t(1) / jacobian_determinant_lane0;
+            const s_t gu0 = (gu_ref0 * jacobian_adjugate_lane0 + gu_ref1 * jacobian_adjugate_lane3 + gu_ref2 * jacobian_adjugate_lane6) * idet;
+            const s_t gu1 = (gu_ref0 * jacobian_adjugate_lane1 + gu_ref1 * jacobian_adjugate_lane4 + gu_ref2 * jacobian_adjugate_lane7) * idet;
+            const s_t gu2 = (gu_ref0 * jacobian_adjugate_lane2 + gu_ref1 * jacobian_adjugate_lane5 + gu_ref2 * jacobian_adjugate_lane8) * idet;
+            const s_t gu3 = (gu_ref3 * jacobian_adjugate_lane0 + gu_ref4 * jacobian_adjugate_lane3 + gu_ref5 * jacobian_adjugate_lane6) * idet;
+            const s_t gu4 = (gu_ref3 * jacobian_adjugate_lane1 + gu_ref4 * jacobian_adjugate_lane4 + gu_ref5 * jacobian_adjugate_lane7) * idet;
+            const s_t gu5 = (gu_ref3 * jacobian_adjugate_lane2 + gu_ref4 * jacobian_adjugate_lane5 + gu_ref5 * jacobian_adjugate_lane8) * idet;
+            const s_t gu6 = (gu_ref6 * jacobian_adjugate_lane0 + gu_ref7 * jacobian_adjugate_lane3 + gu_ref8 * jacobian_adjugate_lane6) * idet;
+            const s_t gu7 = (gu_ref6 * jacobian_adjugate_lane1 + gu_ref7 * jacobian_adjugate_lane4 + gu_ref8 * jacobian_adjugate_lane7) * idet;
+            const s_t gu8 = (gu_ref6 * jacobian_adjugate_lane2 + gu_ref7 * jacobian_adjugate_lane5 + gu_ref8 * jacobian_adjugate_lane8) * idet;
+        value[lane] += qw * jacobian_determinant_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu0 + gu4 + gu8) + mu*(pow_2(gu0) + pow_2(gu4) + pow_2(gu8) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu1 + ((s_t(1) / s_t(2)))*gu3) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu2 + ((s_t(1) / s_t(2)))*gu6) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu5 + ((s_t(1) / s_t(2)))*gu7)));
             }
         }
 }
@@ -261,15 +261,15 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_gradient_block(
     static_assert(VS > 0, "VS must be positive");
         for (int q = 0; q < NQ; ++q) {
             const s_t qw = q_weight[q];
-            s_t grad_u_ref0_values[VS];
-            s_t grad_u_ref1_values[VS];
-            s_t grad_u_ref2_values[VS];
-            s_t grad_u_ref3_values[VS];
-            s_t grad_u_ref4_values[VS];
-            s_t grad_u_ref5_values[VS];
-            s_t grad_u_ref6_values[VS];
-            s_t grad_u_ref7_values[VS];
-            s_t grad_u_ref8_values[VS];
+            s_t gu_ref0_values[VS];
+            s_t gu_ref1_values[VS];
+            s_t gu_ref2_values[VS];
+            s_t gu_ref3_values[VS];
+            s_t gu_ref4_values[VS];
+            s_t gu_ref5_values[VS];
+            s_t gu_ref6_values[VS];
+            s_t gu_ref7_values[VS];
+            s_t gu_ref8_values[VS];
             s_t loperand0_values[VS];
             s_t loperand1_values[VS];
             s_t loperand2_values[VS];
@@ -281,117 +281,117 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_gradient_block(
             s_t loperand8_values[VS];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref0_values[lane] = s_t(0);
+                gu_ref0_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref1_values[lane] = s_t(0);
+                gu_ref1_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref2_values[lane] = s_t(0);
+                gu_ref2_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref3_values[lane] = s_t(0);
+                gu_ref3_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref4_values[lane] = s_t(0);
+                gu_ref4_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref5_values[lane] = s_t(0);
+                gu_ref5_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref6_values[lane] = s_t(0);
+                gu_ref6_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref7_values[lane] = s_t(0);
+                gu_ref7_values[lane] = s_t(0);
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                grad_u_ref8_values[lane] = s_t(0);
+                gu_ref8_values[lane] = s_t(0);
             }
             for (int shape = 0; shape < NS; ++shape) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * NS + shape];
+                    gu_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * NS + shape];
+                    gu_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * NS + shape];
+                    gu_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * NS + shape];
+                    gu_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * NS + shape];
+                    gu_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * NS + shape];
+                    gu_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * NS + shape];
+                    gu_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * NS + shape];
+                    gu_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * NS + shape];
                 }
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    grad_u_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * NS + shape];
+                    gu_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * NS + shape];
                 }
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[geometry_offset];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[geometry_offset];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[geometry_offset];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const s_t grad_u_ref0 = grad_u_ref0_values[lane];
-            const s_t grad_u_ref1 = grad_u_ref1_values[lane];
-            const s_t grad_u_ref2 = grad_u_ref2_values[lane];
-            const s_t grad_u_ref3 = grad_u_ref3_values[lane];
-            const s_t grad_u_ref4 = grad_u_ref4_values[lane];
-            const s_t grad_u_ref5 = grad_u_ref5_values[lane];
-            const s_t grad_u_ref6 = grad_u_ref6_values[lane];
-            const s_t grad_u_ref7 = grad_u_ref7_values[lane];
-            const s_t grad_u_ref8 = grad_u_ref8_values[lane];
-        const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
-        const s_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane3 + grad_u_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t grad_u1 = (grad_u_ref0 * jacobian_adjugate_lane1 + grad_u_ref1 * jacobian_adjugate_lane4 + grad_u_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t grad_u2 = (grad_u_ref0 * jacobian_adjugate_lane2 + grad_u_ref1 * jacobian_adjugate_lane5 + grad_u_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const s_t grad_u3 = (grad_u_ref3 * jacobian_adjugate_lane0 + grad_u_ref4 * jacobian_adjugate_lane3 + grad_u_ref5 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t grad_u4 = (grad_u_ref3 * jacobian_adjugate_lane1 + grad_u_ref4 * jacobian_adjugate_lane4 + grad_u_ref5 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t grad_u5 = (grad_u_ref3 * jacobian_adjugate_lane2 + grad_u_ref4 * jacobian_adjugate_lane5 + grad_u_ref5 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const s_t grad_u6 = (grad_u_ref6 * jacobian_adjugate_lane0 + grad_u_ref7 * jacobian_adjugate_lane3 + grad_u_ref8 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t grad_u7 = (grad_u_ref6 * jacobian_adjugate_lane1 + grad_u_ref7 * jacobian_adjugate_lane4 + grad_u_ref8 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t grad_u8 = (grad_u_ref6 * jacobian_adjugate_lane2 + grad_u_ref7 * jacobian_adjugate_lane5 + grad_u_ref8 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const s_t weak_mat_tmp0 = s_t(2)*grad_u0;
-        const s_t weak_mat_tmp1 = s_t(2)*grad_u4;
-        const s_t weak_mat_tmp2 = s_t(2)*grad_u8;
+            const ptrdiff_t goff = q * geometry_stride + lane;
+            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
+            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
+            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
+            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
+            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
+            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
+            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
+            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
+            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
+            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t gu_ref0 = gu_ref0_values[lane];
+            const s_t gu_ref1 = gu_ref1_values[lane];
+            const s_t gu_ref2 = gu_ref2_values[lane];
+            const s_t gu_ref3 = gu_ref3_values[lane];
+            const s_t gu_ref4 = gu_ref4_values[lane];
+            const s_t gu_ref5 = gu_ref5_values[lane];
+            const s_t gu_ref6 = gu_ref6_values[lane];
+            const s_t gu_ref7 = gu_ref7_values[lane];
+            const s_t gu_ref8 = gu_ref8_values[lane];
+        const s_t idet = s_t(1) / jacobian_determinant_lane0;
+        const s_t gu0 = (gu_ref0 * jacobian_adjugate_lane0 + gu_ref1 * jacobian_adjugate_lane3 + gu_ref2 * jacobian_adjugate_lane6) * idet;
+        const s_t gu1 = (gu_ref0 * jacobian_adjugate_lane1 + gu_ref1 * jacobian_adjugate_lane4 + gu_ref2 * jacobian_adjugate_lane7) * idet;
+        const s_t gu2 = (gu_ref0 * jacobian_adjugate_lane2 + gu_ref1 * jacobian_adjugate_lane5 + gu_ref2 * jacobian_adjugate_lane8) * idet;
+        const s_t gu3 = (gu_ref3 * jacobian_adjugate_lane0 + gu_ref4 * jacobian_adjugate_lane3 + gu_ref5 * jacobian_adjugate_lane6) * idet;
+        const s_t gu4 = (gu_ref3 * jacobian_adjugate_lane1 + gu_ref4 * jacobian_adjugate_lane4 + gu_ref5 * jacobian_adjugate_lane7) * idet;
+        const s_t gu5 = (gu_ref3 * jacobian_adjugate_lane2 + gu_ref4 * jacobian_adjugate_lane5 + gu_ref5 * jacobian_adjugate_lane8) * idet;
+        const s_t gu6 = (gu_ref6 * jacobian_adjugate_lane0 + gu_ref7 * jacobian_adjugate_lane3 + gu_ref8 * jacobian_adjugate_lane6) * idet;
+        const s_t gu7 = (gu_ref6 * jacobian_adjugate_lane1 + gu_ref7 * jacobian_adjugate_lane4 + gu_ref8 * jacobian_adjugate_lane7) * idet;
+        const s_t gu8 = (gu_ref6 * jacobian_adjugate_lane2 + gu_ref7 * jacobian_adjugate_lane5 + gu_ref8 * jacobian_adjugate_lane8) * idet;
+        const s_t weak_mat_tmp0 = s_t(2)*gu0;
+        const s_t weak_mat_tmp1 = s_t(2)*gu4;
+        const s_t weak_mat_tmp2 = s_t(2)*gu8;
         const s_t weak_mat_tmp3 = ((s_t(1) / s_t(2)))*lmbda*(weak_mat_tmp0 + weak_mat_tmp1 + weak_mat_tmp2);
-        const s_t weak_mat_tmp4 = mu*(grad_u1 + grad_u3);
-        const s_t weak_mat_tmp5 = mu*(grad_u2 + grad_u6);
-        const s_t weak_mat_tmp6 = mu*(grad_u5 + grad_u7);
+        const s_t weak_mat_tmp4 = mu*(gu1 + gu3);
+        const s_t weak_mat_tmp5 = mu*(gu2 + gu6);
+        const s_t weak_mat_tmp6 = mu*(gu5 + gu7);
         const s_t material0 = mu*weak_mat_tmp0 + weak_mat_tmp3;
         const s_t material1 = weak_mat_tmp4;
         const s_t material2 = weak_mat_tmp5;
@@ -463,43 +463,43 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_gradient_block(
             const s_t qw = q_weight[q];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[geometry_offset];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[geometry_offset];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[geometry_offset];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
-            const s_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];
-            const s_t grad_u_ref1 = -(u_streams[0 * 3 + 0][lane]) + u_streams[2 * 3 + 0][lane];
-            const s_t grad_u_ref2 = -(u_streams[0 * 3 + 0][lane]) + u_streams[3 * 3 + 0][lane];
-            const s_t grad_u_ref3 = -(u_streams[0 * 3 + 1][lane]) + u_streams[1 * 3 + 1][lane];
-            const s_t grad_u_ref4 = -(u_streams[0 * 3 + 1][lane]) + u_streams[2 * 3 + 1][lane];
-            const s_t grad_u_ref5 = -(u_streams[0 * 3 + 1][lane]) + u_streams[3 * 3 + 1][lane];
-            const s_t grad_u_ref6 = -(u_streams[0 * 3 + 2][lane]) + u_streams[1 * 3 + 2][lane];
-            const s_t grad_u_ref7 = -(u_streams[0 * 3 + 2][lane]) + u_streams[2 * 3 + 2][lane];
-            const s_t grad_u_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];
-            const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
-            const s_t grad_u0 = (grad_u_ref0 * jacobian_adjugate_lane0 + grad_u_ref1 * jacobian_adjugate_lane3 + grad_u_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t grad_u1 = (grad_u_ref0 * jacobian_adjugate_lane1 + grad_u_ref1 * jacobian_adjugate_lane4 + grad_u_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t grad_u2 = (grad_u_ref0 * jacobian_adjugate_lane2 + grad_u_ref1 * jacobian_adjugate_lane5 + grad_u_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-            const s_t grad_u3 = (grad_u_ref3 * jacobian_adjugate_lane0 + grad_u_ref4 * jacobian_adjugate_lane3 + grad_u_ref5 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t grad_u4 = (grad_u_ref3 * jacobian_adjugate_lane1 + grad_u_ref4 * jacobian_adjugate_lane4 + grad_u_ref5 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t grad_u5 = (grad_u_ref3 * jacobian_adjugate_lane2 + grad_u_ref4 * jacobian_adjugate_lane5 + grad_u_ref5 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-            const s_t grad_u6 = (grad_u_ref6 * jacobian_adjugate_lane0 + grad_u_ref7 * jacobian_adjugate_lane3 + grad_u_ref8 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t grad_u7 = (grad_u_ref6 * jacobian_adjugate_lane1 + grad_u_ref7 * jacobian_adjugate_lane4 + grad_u_ref8 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t grad_u8 = (grad_u_ref6 * jacobian_adjugate_lane2 + grad_u_ref7 * jacobian_adjugate_lane5 + grad_u_ref8 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const s_t weak_mat_tmp0 = s_t(2)*grad_u0;
-        const s_t weak_mat_tmp1 = s_t(2)*grad_u4;
-        const s_t weak_mat_tmp2 = s_t(2)*grad_u8;
+            const ptrdiff_t goff = q * geometry_stride + lane;
+            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
+            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
+            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
+            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
+            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
+            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
+            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
+            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
+            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
+            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t gu_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];
+            const s_t gu_ref1 = -(u_streams[0 * 3 + 0][lane]) + u_streams[2 * 3 + 0][lane];
+            const s_t gu_ref2 = -(u_streams[0 * 3 + 0][lane]) + u_streams[3 * 3 + 0][lane];
+            const s_t gu_ref3 = -(u_streams[0 * 3 + 1][lane]) + u_streams[1 * 3 + 1][lane];
+            const s_t gu_ref4 = -(u_streams[0 * 3 + 1][lane]) + u_streams[2 * 3 + 1][lane];
+            const s_t gu_ref5 = -(u_streams[0 * 3 + 1][lane]) + u_streams[3 * 3 + 1][lane];
+            const s_t gu_ref6 = -(u_streams[0 * 3 + 2][lane]) + u_streams[1 * 3 + 2][lane];
+            const s_t gu_ref7 = -(u_streams[0 * 3 + 2][lane]) + u_streams[2 * 3 + 2][lane];
+            const s_t gu_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];
+            const s_t idet = s_t(1) / jacobian_determinant_lane0;
+            const s_t gu0 = (gu_ref0 * jacobian_adjugate_lane0 + gu_ref1 * jacobian_adjugate_lane3 + gu_ref2 * jacobian_adjugate_lane6) * idet;
+            const s_t gu1 = (gu_ref0 * jacobian_adjugate_lane1 + gu_ref1 * jacobian_adjugate_lane4 + gu_ref2 * jacobian_adjugate_lane7) * idet;
+            const s_t gu2 = (gu_ref0 * jacobian_adjugate_lane2 + gu_ref1 * jacobian_adjugate_lane5 + gu_ref2 * jacobian_adjugate_lane8) * idet;
+            const s_t gu3 = (gu_ref3 * jacobian_adjugate_lane0 + gu_ref4 * jacobian_adjugate_lane3 + gu_ref5 * jacobian_adjugate_lane6) * idet;
+            const s_t gu4 = (gu_ref3 * jacobian_adjugate_lane1 + gu_ref4 * jacobian_adjugate_lane4 + gu_ref5 * jacobian_adjugate_lane7) * idet;
+            const s_t gu5 = (gu_ref3 * jacobian_adjugate_lane2 + gu_ref4 * jacobian_adjugate_lane5 + gu_ref5 * jacobian_adjugate_lane8) * idet;
+            const s_t gu6 = (gu_ref6 * jacobian_adjugate_lane0 + gu_ref7 * jacobian_adjugate_lane3 + gu_ref8 * jacobian_adjugate_lane6) * idet;
+            const s_t gu7 = (gu_ref6 * jacobian_adjugate_lane1 + gu_ref7 * jacobian_adjugate_lane4 + gu_ref8 * jacobian_adjugate_lane7) * idet;
+            const s_t gu8 = (gu_ref6 * jacobian_adjugate_lane2 + gu_ref7 * jacobian_adjugate_lane5 + gu_ref8 * jacobian_adjugate_lane8) * idet;
+        const s_t weak_mat_tmp0 = s_t(2)*gu0;
+        const s_t weak_mat_tmp1 = s_t(2)*gu4;
+        const s_t weak_mat_tmp2 = s_t(2)*gu8;
         const s_t weak_mat_tmp3 = ((s_t(1) / s_t(2)))*lmbda*(weak_mat_tmp0 + weak_mat_tmp1 + weak_mat_tmp2);
-        const s_t weak_mat_tmp4 = mu*(grad_u1 + grad_u3);
-        const s_t weak_mat_tmp5 = mu*(grad_u2 + grad_u6);
-        const s_t weak_mat_tmp6 = mu*(grad_u5 + grad_u7);
+        const s_t weak_mat_tmp4 = mu*(gu1 + gu3);
+        const s_t weak_mat_tmp5 = mu*(gu2 + gu6);
+        const s_t weak_mat_tmp6 = mu*(gu5 + gu7);
         const s_t material0 = mu*weak_mat_tmp0 + weak_mat_tmp3;
         const s_t material1 = weak_mat_tmp4;
         const s_t material2 = weak_mat_tmp5;
@@ -655,17 +655,17 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_apply_block(
             }
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[geometry_offset];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[geometry_offset];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[geometry_offset];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
+            const ptrdiff_t goff = q * geometry_stride + lane;
+            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
+            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
+            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
+            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
+            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
+            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
+            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
+            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
+            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
+            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
             const s_t grad_h_ref0 = grad_h_ref0_values[lane];
             const s_t grad_h_ref1 = grad_h_ref1_values[lane];
             const s_t grad_h_ref2 = grad_h_ref2_values[lane];
@@ -675,16 +675,16 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_apply_block(
             const s_t grad_h_ref6 = grad_h_ref6_values[lane];
             const s_t grad_h_ref7 = grad_h_ref7_values[lane];
             const s_t grad_h_ref8 = grad_h_ref8_values[lane];
-        const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
-        const s_t trial_grad0 = (grad_h_ref0 * jacobian_adjugate_lane0 + grad_h_ref1 * jacobian_adjugate_lane3 + grad_h_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t trial_grad1 = (grad_h_ref0 * jacobian_adjugate_lane1 + grad_h_ref1 * jacobian_adjugate_lane4 + grad_h_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t trial_grad2 = (grad_h_ref0 * jacobian_adjugate_lane2 + grad_h_ref1 * jacobian_adjugate_lane5 + grad_h_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const s_t trial_grad3 = (grad_h_ref3 * jacobian_adjugate_lane0 + grad_h_ref4 * jacobian_adjugate_lane3 + grad_h_ref5 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t trial_grad4 = (grad_h_ref3 * jacobian_adjugate_lane1 + grad_h_ref4 * jacobian_adjugate_lane4 + grad_h_ref5 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t trial_grad5 = (grad_h_ref3 * jacobian_adjugate_lane2 + grad_h_ref4 * jacobian_adjugate_lane5 + grad_h_ref5 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-        const s_t trial_grad6 = (grad_h_ref6 * jacobian_adjugate_lane0 + grad_h_ref7 * jacobian_adjugate_lane3 + grad_h_ref8 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-        const s_t trial_grad7 = (grad_h_ref6 * jacobian_adjugate_lane1 + grad_h_ref7 * jacobian_adjugate_lane4 + grad_h_ref8 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-        const s_t trial_grad8 = (grad_h_ref6 * jacobian_adjugate_lane2 + grad_h_ref7 * jacobian_adjugate_lane5 + grad_h_ref8 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
+        const s_t idet = s_t(1) / jacobian_determinant_lane0;
+        const s_t trial_grad0 = (grad_h_ref0 * jacobian_adjugate_lane0 + grad_h_ref1 * jacobian_adjugate_lane3 + grad_h_ref2 * jacobian_adjugate_lane6) * idet;
+        const s_t trial_grad1 = (grad_h_ref0 * jacobian_adjugate_lane1 + grad_h_ref1 * jacobian_adjugate_lane4 + grad_h_ref2 * jacobian_adjugate_lane7) * idet;
+        const s_t trial_grad2 = (grad_h_ref0 * jacobian_adjugate_lane2 + grad_h_ref1 * jacobian_adjugate_lane5 + grad_h_ref2 * jacobian_adjugate_lane8) * idet;
+        const s_t trial_grad3 = (grad_h_ref3 * jacobian_adjugate_lane0 + grad_h_ref4 * jacobian_adjugate_lane3 + grad_h_ref5 * jacobian_adjugate_lane6) * idet;
+        const s_t trial_grad4 = (grad_h_ref3 * jacobian_adjugate_lane1 + grad_h_ref4 * jacobian_adjugate_lane4 + grad_h_ref5 * jacobian_adjugate_lane7) * idet;
+        const s_t trial_grad5 = (grad_h_ref3 * jacobian_adjugate_lane2 + grad_h_ref4 * jacobian_adjugate_lane5 + grad_h_ref5 * jacobian_adjugate_lane8) * idet;
+        const s_t trial_grad6 = (grad_h_ref6 * jacobian_adjugate_lane0 + grad_h_ref7 * jacobian_adjugate_lane3 + grad_h_ref8 * jacobian_adjugate_lane6) * idet;
+        const s_t trial_grad7 = (grad_h_ref6 * jacobian_adjugate_lane1 + grad_h_ref7 * jacobian_adjugate_lane4 + grad_h_ref8 * jacobian_adjugate_lane7) * idet;
+        const s_t trial_grad8 = (grad_h_ref6 * jacobian_adjugate_lane2 + grad_h_ref7 * jacobian_adjugate_lane5 + grad_h_ref8 * jacobian_adjugate_lane8) * idet;
         const s_t weak_mat_tmp0 = s_t(2)*trial_grad0;
         const s_t weak_mat_tmp1 = s_t(2)*trial_grad4;
         const s_t weak_mat_tmp2 = s_t(2)*trial_grad8;
@@ -763,17 +763,17 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_apply_block(
             const s_t qw = q_weight[q];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[geometry_offset];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[geometry_offset];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[geometry_offset];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[geometry_offset];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[geometry_offset];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[geometry_offset];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[geometry_offset];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[geometry_offset];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[geometry_offset];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[geometry_offset];
+            const ptrdiff_t goff = q * geometry_stride + lane;
+            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
+            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
+            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
+            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
+            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
+            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
+            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
+            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
+            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
+            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
             const s_t grad_h_ref0 = -(h_streams[0 * 3 + 0][lane]) + h_streams[1 * 3 + 0][lane];
             const s_t grad_h_ref1 = -(h_streams[0 * 3 + 0][lane]) + h_streams[2 * 3 + 0][lane];
             const s_t grad_h_ref2 = -(h_streams[0 * 3 + 0][lane]) + h_streams[3 * 3 + 0][lane];
@@ -783,16 +783,16 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_apply_block(
             const s_t grad_h_ref6 = -(h_streams[0 * 3 + 2][lane]) + h_streams[1 * 3 + 2][lane];
             const s_t grad_h_ref7 = -(h_streams[0 * 3 + 2][lane]) + h_streams[2 * 3 + 2][lane];
             const s_t grad_h_ref8 = -(h_streams[0 * 3 + 2][lane]) + h_streams[3 * 3 + 2][lane];
-            const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
-            const s_t trial_grad0 = (grad_h_ref0 * jacobian_adjugate_lane0 + grad_h_ref1 * jacobian_adjugate_lane3 + grad_h_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t trial_grad1 = (grad_h_ref0 * jacobian_adjugate_lane1 + grad_h_ref1 * jacobian_adjugate_lane4 + grad_h_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t trial_grad2 = (grad_h_ref0 * jacobian_adjugate_lane2 + grad_h_ref1 * jacobian_adjugate_lane5 + grad_h_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-            const s_t trial_grad3 = (grad_h_ref3 * jacobian_adjugate_lane0 + grad_h_ref4 * jacobian_adjugate_lane3 + grad_h_ref5 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t trial_grad4 = (grad_h_ref3 * jacobian_adjugate_lane1 + grad_h_ref4 * jacobian_adjugate_lane4 + grad_h_ref5 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t trial_grad5 = (grad_h_ref3 * jacobian_adjugate_lane2 + grad_h_ref4 * jacobian_adjugate_lane5 + grad_h_ref5 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-            const s_t trial_grad6 = (grad_h_ref6 * jacobian_adjugate_lane0 + grad_h_ref7 * jacobian_adjugate_lane3 + grad_h_ref8 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-            const s_t trial_grad7 = (grad_h_ref6 * jacobian_adjugate_lane1 + grad_h_ref7 * jacobian_adjugate_lane4 + grad_h_ref8 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-            const s_t trial_grad8 = (grad_h_ref6 * jacobian_adjugate_lane2 + grad_h_ref7 * jacobian_adjugate_lane5 + grad_h_ref8 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
+            const s_t idet = s_t(1) / jacobian_determinant_lane0;
+            const s_t trial_grad0 = (grad_h_ref0 * jacobian_adjugate_lane0 + grad_h_ref1 * jacobian_adjugate_lane3 + grad_h_ref2 * jacobian_adjugate_lane6) * idet;
+            const s_t trial_grad1 = (grad_h_ref0 * jacobian_adjugate_lane1 + grad_h_ref1 * jacobian_adjugate_lane4 + grad_h_ref2 * jacobian_adjugate_lane7) * idet;
+            const s_t trial_grad2 = (grad_h_ref0 * jacobian_adjugate_lane2 + grad_h_ref1 * jacobian_adjugate_lane5 + grad_h_ref2 * jacobian_adjugate_lane8) * idet;
+            const s_t trial_grad3 = (grad_h_ref3 * jacobian_adjugate_lane0 + grad_h_ref4 * jacobian_adjugate_lane3 + grad_h_ref5 * jacobian_adjugate_lane6) * idet;
+            const s_t trial_grad4 = (grad_h_ref3 * jacobian_adjugate_lane1 + grad_h_ref4 * jacobian_adjugate_lane4 + grad_h_ref5 * jacobian_adjugate_lane7) * idet;
+            const s_t trial_grad5 = (grad_h_ref3 * jacobian_adjugate_lane2 + grad_h_ref4 * jacobian_adjugate_lane5 + grad_h_ref5 * jacobian_adjugate_lane8) * idet;
+            const s_t trial_grad6 = (grad_h_ref6 * jacobian_adjugate_lane0 + grad_h_ref7 * jacobian_adjugate_lane3 + grad_h_ref8 * jacobian_adjugate_lane6) * idet;
+            const s_t trial_grad7 = (grad_h_ref6 * jacobian_adjugate_lane1 + grad_h_ref7 * jacobian_adjugate_lane4 + grad_h_ref8 * jacobian_adjugate_lane7) * idet;
+            const s_t trial_grad8 = (grad_h_ref6 * jacobian_adjugate_lane2 + grad_h_ref7 * jacobian_adjugate_lane5 + grad_h_ref8 * jacobian_adjugate_lane8) * idet;
         const s_t weak_mat_tmp0 = s_t(2)*trial_grad0;
         const s_t weak_mat_tmp1 = s_t(2)*trial_grad4;
         const s_t weak_mat_tmp2 = s_t(2)*trial_grad8;

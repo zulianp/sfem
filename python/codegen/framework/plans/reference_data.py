@@ -456,6 +456,6 @@ def mixed_reference_streams(dependencies, tensor_product, n_fields, dim):
         return tuple(streams)
     streams = [MixedReferenceStream("field_shape", n_fields)]
     if dependencies.uses_reference_gradients:
-        streams.append(MixedReferenceStream("field_grad_ref", n_fields * dim))
+        streams.append(MixedReferenceStream("fgref", n_fields * dim))
     streams.append(MixedReferenceStream("q_weight", from_reference_data=True))
     return tuple(streams)

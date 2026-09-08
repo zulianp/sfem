@@ -23,7 +23,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
-SFEM_INLINE const s_t *affine_geometry_stream(
+SFEM_INLINE const s_t *ageom_stream(
         const int,
         const g_t *const SFEM_RESTRICT source,
         s_t *const SFEM_RESTRICT,
@@ -32,7 +32,7 @@ SFEM_INLINE const s_t *affine_geometry_stream(
 }
 
 template <typename s_t, typename g_t, int VS>
-SFEM_INLINE const s_t *affine_geometry_stream(
+SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
         const g_t *const SFEM_RESTRICT source,
         s_t *const SFEM_RESTRICT converted,
@@ -251,8 +251,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_u_base_data[NS * NC][VS];
@@ -269,7 +269,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
         const g_t *const coordinate_components[ND] = {x, y};
@@ -332,7 +332,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];
             }
         }
     }
@@ -546,8 +546,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_out_data[NS * NC][VS];
@@ -562,7 +562,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
         const g_t *const coordinate_components[ND] = {x, y};
@@ -836,8 +836,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_h_data[NS * NC][VS];
@@ -853,7 +853,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
         const g_t *const coordinate_components[ND] = {x, y};

@@ -23,7 +23,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
-SFEM_INLINE const s_t *affine_geometry_stream(
+SFEM_INLINE const s_t *ageom_stream(
         const int,
         const g_t *const SFEM_RESTRICT source,
         s_t *const SFEM_RESTRICT,
@@ -32,7 +32,7 @@ SFEM_INLINE const s_t *affine_geometry_stream(
 }
 
 template <typename s_t, typename g_t, int VS>
-SFEM_INLINE const s_t *affine_geometry_stream(
+SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
         const g_t *const SFEM_RESTRICT source,
         s_t *const SFEM_RESTRICT converted,
@@ -274,8 +274,8 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_affine_mesh_soa_im
     const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_u_base_data[NS * NC][VS];
@@ -286,7 +286,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_affine_mesh_soa_im
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
 
@@ -308,35 +308,35 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_affine_mesh_soa_im
             }
         }
         s_t block_jacobian_adjugate0_data[VS];
-        const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate1_data[VS];
-        const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate2_data[VS];
-        const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate3_data[VS];
-        const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate4_data[VS];
-        const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate5_data[VS];
-        const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate6_data[VS];
-        const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate7_data[VS];
-        const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate8_data[VS];
-        const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_determinant0_data[VS];
-        const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
@@ -357,7 +357,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_affine_mesh_soa_im
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];
             }
         }
     }
@@ -512,8 +512,8 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_u_base_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
@@ -526,7 +526,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_base_data[shape * NC + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                         }
@@ -534,35 +534,35 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa(
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 for (int step = 0; step < nsteps; ++step) {
                     const s_t alpha = steps[step];
@@ -583,7 +583,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa(
 
 #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
-                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                        value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];
                     }
                 }
             }
@@ -671,8 +671,8 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa_flo
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_u_base_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
@@ -685,7 +685,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa_flo
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_base_data[shape * NC + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                         }
@@ -693,35 +693,35 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa_flo
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 for (int step = 0; step < nsteps; ++step) {
                     const s_t alpha = steps[step];
@@ -742,7 +742,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa_flo
 
 #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
-                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                        value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];
                     }
                 }
             }
@@ -793,8 +793,8 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_isoparametric_mesh
     const s_t *const isoparametric_q_weight = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_u_base_data[NS * NC][VS];
@@ -816,7 +816,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_isoparametric_mesh
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
         const g_t *const coordinate_components[ND] = {x, y, z};
@@ -972,7 +972,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_isoparametric_mesh
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];
             }
         }
     }
@@ -1118,8 +1118,8 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_u_base_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
@@ -1144,14 +1144,14 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_base_data[shape * NC + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                         }
@@ -1283,7 +1283,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
 
 #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
-                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                        value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];
                     }
                 }
             }
@@ -1380,8 +1380,8 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_u_base_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
@@ -1406,14 +1406,14 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_base_data[shape * NC + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                         }
@@ -1545,7 +1545,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
 
 #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
-                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
+                        value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];
                     }
                 }
             }
@@ -1727,8 +1727,8 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_affine_mesh_soa_impl(
     const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_out_data[NS * NC][VS];
@@ -1737,7 +1737,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_affine_mesh_soa_impl(
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
         const s_t *const u_components[NC] = {ux, uy, uz};
@@ -1767,35 +1767,35 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_affine_mesh_soa_impl(
             block_out_streams[stream] = block_out_data[stream];
         }
         s_t block_jacobian_adjugate0_data[VS];
-        const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate1_data[VS];
-        const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate2_data[VS];
-        const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate3_data[VS];
-        const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate4_data[VS];
-        const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate5_data[VS];
-        const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate6_data[VS];
-        const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate7_data[VS];
-        const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate8_data[VS];
-        const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_determinant0_data[VS];
-        const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
 
         neohookean_ogden_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_out_streams);
 
@@ -1956,8 +1956,8 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
                 const s_t *block_u_streams[NS * NC];
@@ -1974,7 +1974,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
                         }
@@ -1982,35 +1982,35 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa(
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 neohookean_ogden_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_out_streams);
 
@@ -2019,7 +2019,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -2126,8 +2126,8 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa_float(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
                 const s_t *block_u_streams[NS * NC];
@@ -2144,7 +2144,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa_float(
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
                         }
@@ -2152,35 +2152,35 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa_float(
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 neohookean_ogden_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_out_streams);
 
@@ -2189,7 +2189,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa_float(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -2302,8 +2302,8 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
                 const s_t *block_u_streams[NS * NC];
@@ -2320,7 +2320,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
                         }
@@ -2328,35 +2328,35 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa(
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 neohookean_ogden_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_out_streams);
 
@@ -2365,7 +2365,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -2489,8 +2489,8 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa_f
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
                 const s_t *block_u_streams[NS * NC];
@@ -2507,7 +2507,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa_f
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
                         }
@@ -2515,35 +2515,35 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa_f
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 neohookean_ogden_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_out_streams);
 
@@ -2552,7 +2552,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa_f
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -2631,8 +2631,8 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_im
     const s_t *const isoparametric_q_weight = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_out_data[NS * NC][VS];
@@ -2652,7 +2652,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_im
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
         const g_t *const coordinate_components[ND] = {x, y, z};
@@ -2939,8 +2939,8 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
                 s_t block_coordinate_data[NS * ND][VS];
@@ -2969,14 +2969,14 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa(
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
                         }
@@ -3096,7 +3096,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -3204,8 +3204,8 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa_flo
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
                 s_t block_coordinate_data[NS * ND][VS];
@@ -3234,14 +3234,14 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa_flo
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
                         }
@@ -3361,7 +3361,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa_flo
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -3475,8 +3475,8 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
                 s_t block_coordinate_data[NS * ND][VS];
@@ -3505,14 +3505,14 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
                         }
@@ -3632,7 +3632,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -3757,8 +3757,8 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
                 s_t block_coordinate_data[NS * ND][VS];
@@ -3787,14 +3787,14 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
                         }
@@ -3914,7 +3914,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -4131,8 +4131,8 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_affine_mesh_soa_impl(
     const s_t *const affine_q_weight = sfem::codegen::neohookean_ogden_tet10_affine_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_h_data[NS * NC][VS];
@@ -4142,7 +4142,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_affine_mesh_soa_impl(
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
         const s_t *const u_components[NC] = {ux, uy, uz};
@@ -4178,35 +4178,35 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_affine_mesh_soa_impl(
             block_out_streams[stream] = block_out_data[stream];
         }
         s_t block_jacobian_adjugate0_data[VS];
-        const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate1_data[VS];
-        const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate2_data[VS];
-        const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate3_data[VS];
-        const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate4_data[VS];
-        const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate5_data[VS];
-        const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate6_data[VS];
-        const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate7_data[VS];
-        const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_adjugate8_data[VS];
-        const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<g_t, s_t>());
         s_t block_jacobian_determinant0_data[VS];
-        const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
+        const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<g_t, s_t>());
 
         neohookean_ogden_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
 
@@ -4385,8 +4385,8 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
@@ -4408,7 +4408,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
@@ -4417,35 +4417,35 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa(
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 neohookean_ogden_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
 
@@ -4454,7 +4454,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -4571,8 +4571,8 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa_float(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
@@ -4594,7 +4594,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa_float(
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
@@ -4603,35 +4603,35 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa_float(
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 neohookean_ogden_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
 
@@ -4640,7 +4640,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa_float(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -4763,8 +4763,8 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
@@ -4786,7 +4786,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
@@ -4795,35 +4795,35 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa(
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 neohookean_ogden_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
 
@@ -4832,7 +4832,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -4966,8 +4966,8 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa_floa
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
@@ -4989,7 +4989,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa_floa
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
@@ -4998,35 +4998,35 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa_floa
                 }
 
                 s_t block_jacobian_adjugate0_data[VS];
-                const s_t *const block_jacobian_adjugate0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, block_jacobian_adjugate0_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate1_data[VS];
-                const s_t *const block_jacobian_adjugate1 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, block_jacobian_adjugate1_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate2_data[VS];
-                const s_t *const block_jacobian_adjugate2 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, block_jacobian_adjugate2_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate3_data[VS];
-                const s_t *const block_jacobian_adjugate3 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, block_jacobian_adjugate3_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate4_data[VS];
-                const s_t *const block_jacobian_adjugate4 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, block_jacobian_adjugate4_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate5_data[VS];
-                const s_t *const block_jacobian_adjugate5 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, block_jacobian_adjugate5_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate6_data[VS];
-                const s_t *const block_jacobian_adjugate6 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, block_jacobian_adjugate6_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate7_data[VS];
-                const s_t *const block_jacobian_adjugate7 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, block_jacobian_adjugate7_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_adjugate8_data[VS];
-                const s_t *const block_jacobian_adjugate8 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, block_jacobian_adjugate8_data, std::is_same<geom_t, s_t>());
                 s_t block_jacobian_determinant0_data[VS];
-                const s_t *const block_jacobian_determinant0 = affine_geometry_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                const s_t *const block_jacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, block_jacobian_determinant0_data, std::is_same<geom_t, s_t>());
 
                 neohookean_ogden_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
 
@@ -5035,7 +5035,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa_floa
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -5118,8 +5118,8 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_isoparametric_mesh_soa_impl(
     const s_t *const isoparametric_q_weight = sfem::codegen::neohookean_ogden_tet10_isoparametric_reference_data<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         idx_t ev[VS * NS];
         s_t block_u_data[NS * NC][VS];
         s_t block_h_data[NS * NC][VS];
@@ -5140,7 +5140,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_isoparametric_mesh_soa_impl(
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VS + lane] = element_shape[evbegin + lane];
+                ev[element_node * VS + lane] = element_shape[evb + lane];
             }
         }
         const g_t *const coordinate_components[ND] = {x, y, z};
@@ -5451,8 +5451,8 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
@@ -5486,14 +5486,14 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa(
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
@@ -5614,7 +5614,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -5732,8 +5732,8 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float(
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
@@ -5767,14 +5767,14 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float(
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
@@ -5895,7 +5895,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float(
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -6019,8 +6019,8 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
@@ -6054,14 +6054,14 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
@@ -6182,7 +6182,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }
@@ -6317,8 +6317,8 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
                 }
             }
 
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {
-                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);
+            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);
                 s_t block_u_data[NS * NC][VS];
                 s_t block_h_data[NS * NC][VS];
                 s_t block_out_data[NS * NC][VS];
@@ -6352,14 +6352,14 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
                     for (int d = 0; d < ND; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
                         }
                     }
                     for (int d = 0; d < NC; ++d) {
 #pragma omp simd
                         for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
+                            const uint16_t packed_node = element_shape[evb + lane];
                             block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
                             block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
                             block_out_data[shape * NC + d][lane] = s_t(0);
@@ -6480,7 +6480,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
                     for (int d = 0; d < NC; ++d) {
                         s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
                         for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];
+                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];
                         }
                     }
                 }

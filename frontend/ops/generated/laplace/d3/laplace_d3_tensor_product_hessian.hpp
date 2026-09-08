@@ -63,18 +63,18 @@ static SFEM_INLINE void laplace_d3_tensor_product_direct_hessian_tensor_product_
         const int qz = q / (NQ1 * NQ1);
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
         const int lane = 0;
-        const ptrdiff_t geometry_offset = q * VS + lane;
-        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[geometry_offset];
-        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[geometry_offset];
-        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[geometry_offset];
-        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[geometry_offset];
-        const s_t jacobian_adjugate_lane4 = block_jacobian_adjugate4[geometry_offset];
-        const s_t jacobian_adjugate_lane5 = block_jacobian_adjugate5[geometry_offset];
-        const s_t jacobian_adjugate_lane6 = block_jacobian_adjugate6[geometry_offset];
-        const s_t jacobian_adjugate_lane7 = block_jacobian_adjugate7[geometry_offset];
-        const s_t jacobian_adjugate_lane8 = block_jacobian_adjugate8[geometry_offset];
-        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[geometry_offset];
-        const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
+        const ptrdiff_t goff = q * VS + lane;
+        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[goff];
+        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[goff];
+        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[goff];
+        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[goff];
+        const s_t jacobian_adjugate_lane4 = block_jacobian_adjugate4[goff];
+        const s_t jacobian_adjugate_lane5 = block_jacobian_adjugate5[goff];
+        const s_t jacobian_adjugate_lane6 = block_jacobian_adjugate6[goff];
+        const s_t jacobian_adjugate_lane7 = block_jacobian_adjugate7[goff];
+        const s_t jacobian_adjugate_lane8 = block_jacobian_adjugate8[goff];
+        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[goff];
+        const s_t idet = s_t(1) / jacobian_determinant_lane0;
         for (int trial_component = 0; trial_component < NC; ++trial_component) {
             for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
                 const int trial_sx = trial_shape % NS1;
@@ -87,9 +87,9 @@ static SFEM_INLINE void laplace_d3_tensor_product_direct_hessian_tensor_product_
                 for (int i = 0; i < NC * ND; ++i) {
                     trial_grad[i] = s_t(0);
                 }
-                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane3 + trial_grad_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane4 + trial_grad_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-                trial_grad[trial_component * ND + 2] = (trial_grad_ref0 * jacobian_adjugate_lane2 + trial_grad_ref1 * jacobian_adjugate_lane5 + trial_grad_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
+                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane3 + trial_grad_ref2 * jacobian_adjugate_lane6) * idet;
+                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane4 + trial_grad_ref2 * jacobian_adjugate_lane7) * idet;
+                trial_grad[trial_component * ND + 2] = (trial_grad_ref0 * jacobian_adjugate_lane2 + trial_grad_ref1 * jacobian_adjugate_lane5 + trial_grad_ref2 * jacobian_adjugate_lane8) * idet;
                 s_t material[NC * ND];
                 material[0] = kappa*trial_grad[0];
                 material[1] = kappa*trial_grad[1];

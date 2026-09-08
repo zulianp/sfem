@@ -1081,7 +1081,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("generated_weak_neohookean_isoparametric_reference_data<s_t>::grad_ref_x()", operator_source)
         self.assertIn("generated_weak_neohookean_isoparametric_reference_data<s_t>::grad_ref_y()", operator_source)
         self.assertIn(
-            "grad_u_ref0_values[lane] += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * NS + shape];",
+            "gu_ref0_values[lane] += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * NS + shape];",
             local_source,
         )
         self.assertIn(
@@ -1092,7 +1092,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("const s_t material0", local_source)
         self.assertIn("const s_t loperand0", local_source)
         self.assertNotIn("s_t F[4];", local_source)
-        self.assertNotIn("F[0] = 1.0 + grad_u[0];", local_source)
+        self.assertNotIn("F[0] = 1.0 + gu[0];", local_source)
         self.assertNotIn("s_t u[NS", local_source)
         self.assertNotIn("s_t du[NS", local_source)
         self.assertNotIn("s_t element_vector[NS", local_source)
@@ -1540,7 +1540,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0", operator_source)
         self.assertIn("std::is_same<g_t, s_t>()", operator_source)
         self.assertIn(
-            "affine_geometry_stream<s_t, g_t, VS>",
+            "ageom_stream<s_t, g_t, VS>",
             operator_source,
         )
         affine_mesh_source = operator_source.split(
@@ -1552,7 +1552,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             1,
         )[0]
         self.assertIn("s_t block_jacobian_adjugate0_data[VS]", affine_mesh_source)
-        self.assertNotIn("g_jacobian_adjugate[(evbegin + lane)", affine_mesh_source)
+        self.assertNotIn("g_jacobian_adjugate[(evb + lane)", affine_mesh_source)
         self.assertIn(
             "const g_t *const *const SFEM_RESTRICT points",
             operator_source,

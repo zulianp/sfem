@@ -242,9 +242,9 @@ def _sfem_soa_affine_geometry_stream_lines(
             lines.extend(
                 [
                     "%ss_t block_%s_data[VS];" % (indent, stream),
-                    "%sconst s_t *const block_%s = affine_geometry_stream<s_t, %s, VS>("
+                    "%sconst s_t *const block_%s = ageom_stream<s_t, %s, VS>("
                     % (indent, stream, geometry_scalar_type),
-                    "%s        nelems, g_%s + evbegin, block_%s_data, std::is_same<%s, s_t>());"
+                    "%s        nelems, g_%s + evb, block_%s_data, std::is_same<%s, s_t>());"
                     % (indent, stream, stream, geometry_scalar_type),
                 ]
             )
@@ -258,7 +258,7 @@ def _affine_geometry_stream_helper_lines(source_builder):
         "namespace codegen {",
         "",
         "template <typename s_t, typename g_t, int VS>",
-        "%s const s_t *affine_geometry_stream(" % inline_qualifier,
+        "%s const s_t *ageom_stream(" % inline_qualifier,
         "        const int,",
         "        const g_t *const SFEM_RESTRICT source,",
         "        s_t *const SFEM_RESTRICT,",
@@ -267,7 +267,7 @@ def _affine_geometry_stream_helper_lines(source_builder):
         "}",
         "",
         "template <typename s_t, typename g_t, int VS>",
-        "%s const s_t *affine_geometry_stream(" % inline_qualifier,
+        "%s const s_t *ageom_stream(" % inline_qualifier,
         "        const int nelems,",
         "        const g_t *const SFEM_RESTRICT source,",
         "        s_t *const SFEM_RESTRICT converted,",
@@ -1641,7 +1641,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
     block_extent = "NQ * %d * VS" % (dim * dim)
 
     if uses_current:
-        lines.append("    s_t grad_u_ref_q[%s];" % block_extent)
+        lines.append("    s_t gu_ref_q[%s];" % block_extent)
     if uses_direction:
         lines.append("    s_t grad_h_ref_q[%s];" % block_extent)
     if writes_per_shape(form):
@@ -1651,7 +1651,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
         output_offset = "%d * NQ * %d * VS" % (row, dim)
         if uses_current:
             lines.append(
-                "    tensor_gradient<s_t, NQ, NS, VS, %d, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_u_ref_q[%s]);"
+                "    tensor_gradient<s_t, NQ, NS, VS, %d, %d>(nelems, shape_1d, grad_1d, %s, %d, &gu_ref_q[%s]);"
                 % (dim, n_field_components, u_streams, row, output_offset)
             )
         if uses_direction:
@@ -1669,25 +1669,25 @@ def _append_sfem_soa_tensor_weak_form_lines(
     lines.extend(_work_item_loop_lines(source_builder, "        "))
     lines.extend(
         [
-            "            const ptrdiff_t geometry_offset = q * geometry_stride + %s;" % work_item,
+            "            const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
         ]
     )
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = jacobian_adjugate%d[geometry_offset];"
+            "            const s_t %s = jacobian_adjugate%d[goff];"
             % (_work_item_name(source_builder, "jacobian_adjugate", component), component)
         )
     lines.append(
-        "            const s_t %s = jacobian_determinant0[geometry_offset];"
+        "            const s_t %s = jacobian_determinant0[goff];"
         % _work_item_name(source_builder, "jacobian_determinant", 0)
     )
     if uses_current:
-        lines.append("            s_t grad_u_ref[%d];" % (n_field_components * dim))
+        lines.append("            s_t gu_ref[%d];" % (n_field_components * dim))
         for row in range(n_field_components):
             for col in range(dim):
                 component = row * dim + col
                 lines.append(
-                    "            grad_u_ref[%d] = grad_u_ref_q[((%d * NQ + q) * %d + %d) * VS + %s];"
+                    "            gu_ref[%d] = gu_ref_q[((%d * NQ + q) * %d + %d) * VS + %s];"
                     % (component, row, dim, col, work_item)
                 )
     if uses_direction:
@@ -1705,7 +1705,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
 
     if uses_current:
         lines.append(
-            "            s_t grad_u[%d];" % (weak_form.n_field_components * dim)
+            "            s_t gu[%d];" % (weak_form.n_field_components * dim)
         )
     if uses_direction:
         lines.append(
@@ -1713,14 +1713,14 @@ def _append_sfem_soa_tensor_weak_form_lines(
         )
 
     lines.append(
-        "            const s_t inv_jacobian_determinant = s_t(1) / %s;"
+        "            const s_t idet = s_t(1) / %s;"
         % geometry_value("jacobian_determinant", 0)
     )
     for row in range(weak_form.n_field_components):
         for col in range(dim):
             if uses_current:
                 terms = [
-                    "grad_u_ref[%d] * %s"
+                    "gu_ref[%d] * %s"
                     % (
                         row * dim + k,
                         geometry_value("jacobian_adjugate", k * dim + col),
@@ -1728,7 +1728,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "            grad_u[%d] = (%s) * inv_jacobian_determinant;"
+                    "            gu[%d] = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
             if uses_direction:
@@ -1741,13 +1741,13 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "            trial_grad[%d] = (%s) * inv_jacobian_determinant;"
+                    "            trial_grad[%d] = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
 
     deformation_gradient_substitutions = _weak_form_deformation_gradient_substitutions(
         weak_form,
-        "grad_u",
+        "gu",
     )
     if not writes_per_shape(form):
         _append_weak_objective_accumulation(
@@ -1918,11 +1918,11 @@ def _append_constant_p1_metric_weak_form_lines(
     # A constant-P1 simplex has one quadrature point, so the offset is just the
     # work item: `q` is zero and the stride term vanishes.
     lines.append(
-        "            const ptrdiff_t geometry_offset = %s;" % work_item
+        "            const ptrdiff_t goff = %s;" % work_item
     )
     for index in range(metric.metric_components):
         lines.append(
-            "            const s_t %s = geom_metric%d[geometry_offset];"
+            "            const s_t %s = geom_metric%d[goff];"
             % (_work_item_name(source_builder, "geom_metric", index), index)
         )
     for symbol, expression in plan.temporaries:
@@ -1969,7 +1969,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
 
     deformation_gradient_substitutions = _weak_form_deformation_gradient_substitutions(
         weak_form,
-        "grad_u",
+        "gu",
         scalar_temporaries=True,
     )
 
@@ -1981,14 +1981,14 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     lines.append("        { const int q = 0;  // constant-P1 simplex")
     lines.append("            const s_t qw = q_weight[q];")
     lines.extend(_work_item_loop_lines(source_builder, "            "))
-    lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + %s;" % work_item)
+    lines.append("            const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = jacobian_adjugate%d[geometry_offset];"
+            "            const s_t %s = jacobian_adjugate%d[goff];"
             % (geometry_value("jacobian_adjugate", component), component)
         )
     lines.append(
-        "            const s_t %s = jacobian_determinant0[geometry_offset];"
+        "            const s_t %s = jacobian_determinant0[goff];"
         % geometry_value("jacobian_determinant", 0)
     )
     for row in range(n_field_components):
@@ -1996,7 +1996,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
             idx = row * dim + col
             if uses_current:
                 lines.append(
-                    "            const s_t grad_u_ref%d = %s;"
+                    "            const s_t gu_ref%d = %s;"
                     % (
                         idx,
                         _constant_p1_field_gradient_expr(
@@ -2021,14 +2021,14 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     )
                 )
     lines.append(
-        "            const s_t inv_jacobian_determinant = s_t(1) / %s;"
+        "            const s_t idet = s_t(1) / %s;"
         % geometry_value("jacobian_determinant", 0)
     )
     for row in range(weak_form.n_field_components):
         for col in range(dim):
             if uses_current:
                 terms = [
-                    "grad_u_ref%d * %s"
+                    "gu_ref%d * %s"
                     % (
                         row * dim + k,
                         geometry_value("jacobian_adjugate", k * dim + col),
@@ -2036,7 +2036,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "            const s_t grad_u%d = (%s) * inv_jacobian_determinant;"
+                    "            const s_t gu%d = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
             if uses_direction:
@@ -2049,7 +2049,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "            const s_t trial_grad%d = (%s) * inv_jacobian_determinant;"
+                    "            const s_t trial_grad%d = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
 
@@ -2184,7 +2184,7 @@ def _append_sfem_soa_weak_form_lines(
 
     deformation_gradient_substitutions = _weak_form_deformation_gradient_substitutions(
         weak_form,
-        "grad_u",
+        "gu",
         scalar_temporaries=True,
     )
 
@@ -2194,7 +2194,7 @@ def _append_sfem_soa_weak_form_lines(
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
-                lines.append("            s_t grad_u_ref%d_values[VS];" % idx)
+                lines.append("            s_t gu_ref%d_values[VS];" % idx)
             if uses_direction:
                 lines.append("            s_t grad_h_ref%d_values[VS];" % idx)
     if writes_per_shape(form):
@@ -2205,7 +2205,7 @@ def _append_sfem_soa_weak_form_lines(
             idx = row * dim + col
             lines.extend(_work_item_loop_lines(source_builder, "            "))
             if uses_current:
-                lines.append("                grad_u_ref%d_values[%s] = s_t(0);" % (idx, work_item))
+                lines.append("                gu_ref%d_values[%s] = s_t(0);" % (idx, work_item))
             if uses_direction:
                 lines.append("                grad_h_ref%d_values[%s] = s_t(0);" % (idx, work_item))
             lines.append("            }")
@@ -2216,7 +2216,7 @@ def _append_sfem_soa_weak_form_lines(
             lines.extend(_work_item_loop_lines(source_builder, "                "))
             if uses_current:
                 lines.append(
-                    "                    grad_u_ref%d_values[%s] += %s * %s;"
+                    "                    gu_ref%d_values[%s] += %s * %s;"
                     % (idx, work_item, field_value("u", row), reference_gradient(col))
                 )
             if uses_direction:
@@ -2227,32 +2227,32 @@ def _append_sfem_soa_weak_form_lines(
             lines.append("                }")
     lines.append("            }")
     lines.extend(_work_item_loop_lines(source_builder, "            "))
-    lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + %s;" % work_item)
+    lines.append("            const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
         lines.append(
-            "            const s_t %s = jacobian_adjugate%d[geometry_offset];"
+            "            const s_t %s = jacobian_adjugate%d[goff];"
             % (geometry_value("jacobian_adjugate", component), component)
         )
     lines.append(
-        "            const s_t %s = jacobian_determinant0[geometry_offset];"
+        "            const s_t %s = jacobian_determinant0[goff];"
         % geometry_value("jacobian_determinant", 0)
     )
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
-                lines.append("            const s_t grad_u_ref%d = grad_u_ref%d_values[%s];" % (idx, idx, work_item))
+                lines.append("            const s_t gu_ref%d = gu_ref%d_values[%s];" % (idx, idx, work_item))
             if uses_direction:
                 lines.append("            const s_t grad_h_ref%d = grad_h_ref%d_values[%s];" % (idx, idx, work_item))
     lines.append(
-        "        const s_t inv_jacobian_determinant = s_t(1) / %s;"
+        "        const s_t idet = s_t(1) / %s;"
         % geometry_value("jacobian_determinant", 0)
     )
     for row in range(weak_form.n_field_components):
         for col in range(dim):
             if uses_current:
                 terms = [
-                    "grad_u_ref%d * %s"
+                    "gu_ref%d * %s"
                     % (
                         row * dim + k,
                         geometry_value("jacobian_adjugate", k * dim + col),
@@ -2260,7 +2260,7 @@ def _append_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "        const s_t grad_u%d = (%s) * inv_jacobian_determinant;"
+                    "        const s_t gu%d = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
             if uses_direction:
@@ -2273,7 +2273,7 @@ def _append_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "        const s_t trial_grad%d = (%s) * inv_jacobian_determinant;"
+                    "        const s_t trial_grad%d = (%s) * idet;"
                     % (row * dim + col, " + ".join(terms))
                 )
 
@@ -3656,8 +3656,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         element_loop_start = len(lines)
         lines.extend(
             [
-                "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {",
-                "                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);",
+                "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
+                "                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);",
                 "                s_t block_u_data[NS * NC][VS];",
                 "                s_t block_u_base_data[NS * NC][VS];",
                 "                s_t block_h_data[NS * NC][VS];",
@@ -3710,7 +3710,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                     "                    for (int d = 0; d < ND; ++d) {",
                     *source_builder.simd_lines(),
                     "                        for (int lane = 0; lane < nelems; ++lane) {",
-                    "                            const uint16_t %s = %s[evbegin + lane];"
+                    "                            const uint16_t %s = %s[evb + lane];"
                     % (
                         coordinate_node,
                         "element_shape" if identity_stream_shape_order else "coordinate_shape",
@@ -3726,7 +3726,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "                    for (int d = 0; d < NC; ++d) {",
                 *source_builder.simd_lines(),
                 "                        for (int lane = 0; lane < nelems; ++lane) {",
-                "                            const uint16_t packed_node = element_shape[evbegin + lane];",
+                "                            const uint16_t packed_node = element_shape[evb + lane];",
                 "                            block_u_base_data[shape * NC + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];",
                 "                            block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];",
                 "                        }",
@@ -3830,7 +3830,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "",
                 *source_builder.simd_lines(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];",
+                "                        value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];",
                 "                    }",
                 "                }",
                 "            }",
@@ -4054,7 +4054,7 @@ def _append_mesh_operator_scalar_output(
     n_field_components = form_n_field_components(form, dim)
     if not writes_per_shape(form):
         lines.extend(_work_item_loop_lines(source_builder, "        "))
-        lines.append("            value[evbegin + %s] += block_value[%s];" % (work_item, work_item))
+        lines.append("            value[evb + %s] += block_value[%s];" % (work_item, work_item))
         lines.append("        }")
     else:
         if compact_stream_buffers:
@@ -4361,7 +4361,7 @@ def _append_mesh_operator_isoparametric_jacobian(
                         work_item,
                         "ev[shape * VS + %s]" % work_item
                         if identity_stream_shape_order
-                        else "coordinate_element_shape[evbegin + %s]" % work_item,
+                        else "coordinate_element_shape[evb + %s]" % work_item,
                     ),
                     "                }",
                     "            }",
@@ -4757,7 +4757,7 @@ def _sfem_soa_mesh_operator_function(
             "        for (int element_node = 0; element_node < NS; ++element_node) {",
             "            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];",
             *_work_item_loop_lines(source_builder, "            "),
-            "                ev[element_node * VS + %s] = element_shape[evbegin + %s];" % (work_item, work_item),
+            "                ev[element_node * VS + %s] = element_shape[evb + %s];" % (work_item, work_item),
             "            }",
             "        }",
         ]
@@ -5379,8 +5379,8 @@ def _sfem_soa_packed_apply_public_wrappers(
             element_loop_start = len(lines)
             lines.extend(
                 [
-                    "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VS) {",
-                    "                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evbegin);",
+                    "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
+                    "                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);",
                 ]
             )
             if uses_current:
@@ -5455,7 +5455,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "                    for (int d = 0; d < ND; ++d) {",
                         *source_builder.simd_lines(),
                         "                        for (int lane = 0; lane < nelems; ++lane) {",
-                        "                            const uint16_t %s = %s[evbegin + lane];"
+                        "                            const uint16_t %s = %s[evb + lane];"
                         % (
                             coordinate_node,
                             "element_shape"
@@ -5473,7 +5473,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "                    for (int d = 0; d < NC; ++d) {",
                     *source_builder.simd_lines(),
                     "                        for (int lane = 0; lane < nelems; ++lane) {",
-                    "                            const uint16_t packed_node = element_shape[evbegin + lane];",
+                    "                            const uint16_t packed_node = element_shape[evb + lane];",
                 ]
             )
             if uses_current:
@@ -5588,7 +5588,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "                    for (int d = 0; d < NC; ++d) {",
                     "                        s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
                     "                        for (int lane = 0; lane < nelems; ++lane) {",
-                    "                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * NC + d][lane];",
+                    "                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];",
                     "                        }",
                     "                    }",
                     "                }",
@@ -6021,7 +6021,7 @@ def _sfem_soa_mesh_objective_steps_function(
             "        for (int element_node = 0; element_node < NS; ++element_node) {",
             "            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];",
             *_work_item_loop_lines(source_builder, "            "),
-            "                ev[element_node * VS + %s] = element_shape[evbegin + %s];"
+            "                ev[element_node * VS + %s] = element_shape[evb + %s];"
             % (work_item, work_item),
             "            }",
             "        }",
@@ -6043,7 +6043,7 @@ def _sfem_soa_mesh_objective_steps_function(
                         work_item,
                         "ev[shape * VS + %s]" % work_item
                         if identity_stream_shape_order
-                        else "coordinate_element_shape[evbegin + %s]" % work_item,
+                        else "coordinate_element_shape[evb + %s]" % work_item,
                     ),
                     "                }",
                     "            }",
@@ -6257,7 +6257,7 @@ def _sfem_soa_mesh_objective_steps_function(
             % (block_name, ", ".join(call_args)),
             "",
             *_work_item_loop_lines(source_builder, "            "),
-            "                value[(ptrdiff_t)step * nelements + evbegin + %s] = block_value[%s];"
+            "                value[(ptrdiff_t)step * nelements + evb + %s] = block_value[%s];"
             % (work_item, work_item),
             "            }",
             "        }",
@@ -6365,7 +6365,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     material = _weak_form_material_expression(
         weak_form,
         form.name,
-        _weak_form_deformation_gradient_substitutions(weak_form, "grad_u"),
+        _weak_form_deformation_gradient_substitutions(weak_form, "gu"),
         tuple(
             sp.symbols("trial_grad[%d]" % i)
             for i in range(weak_form.n_field_components * dim)
@@ -6397,19 +6397,19 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     lines.extend(
         [
             "%s    const int lane = 0;" % indent,
-            "%s    const ptrdiff_t geometry_offset = q * VS + lane;" % indent,
+            "%s    const ptrdiff_t goff = q * VS + lane;" % indent,
         ]
     )
     for component in range(dim * dim):
         lines.append(
-            "%s    const s_t jacobian_adjugate_lane%d = block_jacobian_adjugate%d[geometry_offset];"
+            "%s    const s_t jacobian_adjugate_lane%d = block_jacobian_adjugate%d[goff];"
             % (indent, component, component)
         )
     lines.extend(
         [
-            "%s    const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[geometry_offset];"
+            "%s    const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[goff];"
             % indent,
-            "%s    const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;"
+            "%s    const s_t idet = s_t(1) / jacobian_determinant_lane0;"
             % indent,
             "%s    for (int trial_component = 0; trial_component < NC; ++trial_component) {"
             % indent,
@@ -6466,7 +6466,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
             for ref_component in range(dim)
         ]
         lines.append(
-            "%s            trial_grad[trial_component * ND + %d] = (%s) * inv_jacobian_determinant;"
+            "%s            trial_grad[trial_component * ND + %d] = (%s) * idet;"
             % (indent, phys_component, " + ".join(terms))
         )
     lines.append("%s            s_t material[NC * ND];" % indent)
@@ -9528,15 +9528,15 @@ def _sfem_soa_element_api_block_call(
 
 def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
     lines = [
-        "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);",
+        "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
     ]
     if _form_uses_current(form, default=True):
         lines.append("        const s_t *block_u_streams[NDOFS];")
         lines.append("        for (int stream = 0; stream < NDOFS; ++stream) {")
-        lines.append("            block_u_streams[stream] = u_streams[stream] + evbegin;")
+        lines.append("            block_u_streams[stream] = u_streams[stream] + evb;")
         lines.append("        }")
     if output_kind == "value":
-        lines.append("        s_t *const block_value = values + evbegin;")
+        lines.append("        s_t *const block_value = values + evb;")
         lines.append("        #pragma omp simd")
         lines.append("        for (int lane = 0; lane < nelems; ++lane) {")
         lines.append("            block_value[lane] = s_t(0);")
@@ -9544,7 +9544,7 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
     elif output_kind == "vector":
         lines.append("        s_t *block_out_streams[NDOFS];")
         lines.append("        for (int stream = 0; stream < NDOFS; ++stream) {")
-        lines.append("            block_out_streams[stream] = out_streams[stream] + evbegin;")
+        lines.append("            block_out_streams[stream] = out_streams[stream] + evb;")
         lines.append("            #pragma omp simd")
         lines.append("            for (int lane = 0; lane < nelems; ++lane) {")
         lines.append("                block_out_streams[stream][lane] = s_t(0);")
@@ -9568,10 +9568,10 @@ def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
     lines.append("            for (int lane = 0; lane < nelems; ++lane) {")
     for component in range(dim * dim):
         lines.append(
-            "                block_jacobian_adjugate%d[q * VS + lane] = jacobian_adjugate[%d][q * nelements + evbegin + lane];"
+            "                block_jacobian_adjugate%d[q * VS + lane] = jacobian_adjugate[%d][q * nelements + evb + lane];"
             % (component, component)
         )
-    lines.append("                block_jacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evbegin + lane];")
+    lines.append("                block_jacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];")
     lines.append("            }")
     lines.append("        }")
     return lines
@@ -9592,7 +9592,7 @@ def _sfem_soa_element_api_coords_tile_lines(
         "        for (int stream = 0; stream < NDOFS; ++stream) {",
         "            #pragma omp simd",
         "            for (int lane = 0; lane < nelems; ++lane) {",
-        "                block_coordinate_data[stream][lane] = coords[stream][evbegin + lane];",
+        "                block_coordinate_data[stream][lane] = coords[stream][evb + lane];",
         "            }",
         "        }",
     ]
@@ -9702,7 +9702,7 @@ def _sfem_soa_element_api_operation_lines(
                 "    static constexpr int NQ = %d;" % n_qp,
                 "    static constexpr int NDOFS = NC * NS;",
                 "    if (nelements <= 0) return SFEM_SUCCESS;",
-                "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {",
+                "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
             ]
         )
         lines.extend(_sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind))
@@ -9777,13 +9777,13 @@ def _sfem_soa_element_api_hessian_lines(
                 "    static constexpr int NQ = %d;" % n_qp,
                 "    static constexpr int NDOFS = NC * NS;",
                 "    if (nelements <= 0) return SFEM_SUCCESS;",
-                "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {",
-                "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);",
+                "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
+                "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
             ]
         )
         if _form_uses_current(form, default=True):
             lines.append("        const s_t *block_u_streams[NDOFS];")
-            lines.append("        for (int stream = 0; stream < NDOFS; ++stream) block_u_streams[stream] = u_streams[stream] + evbegin;")
+            lines.append("        for (int stream = 0; stream < NDOFS; ++stream) block_u_streams[stream] = u_streams[stream] + evb;")
         if include_coords:
             lines.extend(
                 _sfem_soa_element_api_coords_tile_lines(
@@ -9830,7 +9830,7 @@ def _sfem_soa_element_api_hessian_lines(
                     use_shared_weak_local,
                 ),
                 "            for (int row = 0; row < NDOFS; ++row) {",
-                "                s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evbegin;",
+                "                s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;",
                 "                #pragma omp simd",
                 "                for (int lane = 0; lane < nelems; ++lane) {",
                 "                    matrix_stream[lane] = block_out_data[row][lane];",

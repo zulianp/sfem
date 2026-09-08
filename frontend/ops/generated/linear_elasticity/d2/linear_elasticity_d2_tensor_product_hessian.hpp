@@ -58,13 +58,13 @@ static SFEM_INLINE void linear_elasticity_d2_tensor_product_direct_hessian_tenso
         const int qy = q / NQ1;
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         const int lane = 0;
-        const ptrdiff_t geometry_offset = q * VS + lane;
-        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[geometry_offset];
-        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[geometry_offset];
-        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[geometry_offset];
-        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[geometry_offset];
-        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[geometry_offset];
-        const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
+        const ptrdiff_t goff = q * VS + lane;
+        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[goff];
+        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[goff];
+        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[goff];
+        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[goff];
+        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[goff];
+        const s_t idet = s_t(1) / jacobian_determinant_lane0;
         for (int trial_component = 0; trial_component < NC; ++trial_component) {
             for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
                 const int trial_sx = trial_shape % NS1;
@@ -75,8 +75,8 @@ static SFEM_INLINE void linear_elasticity_d2_tensor_product_direct_hessian_tenso
                 for (int i = 0; i < NC * ND; ++i) {
                     trial_grad[i] = s_t(0);
                 }
-                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane2) * inv_jacobian_determinant;
-                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane3) * inv_jacobian_determinant;
+                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane2) * idet;
+                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane3) * idet;
                 s_t material[NC * ND];
                 const s_t weak_hess_tmp0 = s_t(2)*trial_grad[0];
                 const s_t weak_hess_tmp1 = s_t(2)*trial_grad[3];

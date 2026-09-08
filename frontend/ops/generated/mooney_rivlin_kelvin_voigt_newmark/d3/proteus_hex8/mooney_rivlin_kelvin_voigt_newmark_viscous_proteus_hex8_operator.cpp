@@ -30,7 +30,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
-SFEM_INLINE const s_t *affine_geometry_stream(
+SFEM_INLINE const s_t *ageom_stream(
         const int,
         const g_t *const SFEM_RESTRICT source,
         s_t *const SFEM_RESTRICT,
@@ -39,7 +39,7 @@ SFEM_INLINE const s_t *affine_geometry_stream(
 }
 
 template <typename s_t, typename g_t, int VS>
-SFEM_INLINE const s_t *affine_geometry_stream(
+SFEM_INLINE const s_t *ageom_stream(
         const int nelems,
         const g_t *const SFEM_RESTRICT source,
         s_t *const SFEM_RESTRICT converted,
@@ -170,8 +170,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
     const s_t *const affine_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t block_current[NC * NS][VS];
         s_t block_previous[NC * NS][VS];
         s_t block_output[NC * NS][VS];
@@ -184,7 +184,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
                 const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
+                    const idx_t node = element_shape[evb + lane];
                     block_current[stream][lane] = current_components[field][node * current_stride];
                     block_previous[stream][lane] = previous_components[field][node * previous_stride];
                 }
@@ -198,19 +198,19 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
             }
         }
 
-        const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_adjugate4 + evb, g_jacobian_adjugate5 + evb, g_jacobian_adjugate6 + evb, g_jacobian_adjugate7 + evb, g_jacobian_adjugate8 + evb, g_jacobian_determinant0 + evb};
         s_t block_affine_geometry_data[10][VS];
-        const s_t *block_affine_geometry_streams[10];
+        const s_t *bageom_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<s_t, g_t, VS>(
+            bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
                     nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
         const s_t *block_adjugate[9];
         for (int component = 0; component < 9; ++component) {
-            block_adjugate[component] = block_affine_geometry_streams[component];
+            block_adjugate[component] = bageom_streams[component];
         }
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current, block_previous, eta_b, eta_s, newmark_velocity_alpha, block_output);
 
         s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -220,7 +220,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
                 }
             }
         }
@@ -334,8 +334,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t block_coordinates[3 * NS][VS];
         s_t block_adjugate_data[9][NQ * VS];
         s_t block_determinant[NQ * VS];
@@ -349,7 +349,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
             for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
+                    const idx_t node = element_shape[evb + lane];
                     block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
@@ -363,7 +363,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
                 const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
+                    const idx_t node = element_shape[evb + lane];
                     block_current[stream][lane] = current_components[field][node * current_stride];
                     block_previous[stream][lane] = previous_components[field][node * previous_stride];
                 }
@@ -404,7 +404,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
                 }
             }
         }
@@ -573,8 +573,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
     const s_t *const affine_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t block_current[NC * NS][VS];
         s_t block_previous[NC * NS][VS];
         s_t block_direction[NC * NS][VS];
@@ -589,7 +589,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
                 const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
+                    const idx_t node = element_shape[evb + lane];
                     block_current[stream][lane] = current_components[field][node * current_stride];
                     block_previous[stream][lane] = previous_components[field][node * previous_stride];
                     block_direction[stream][lane] = direction_components[field][node * direction_stride];
@@ -604,19 +604,19 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
             }
         }
 
-        const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        const g_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evb, g_jacobian_adjugate1 + evb, g_jacobian_adjugate2 + evb, g_jacobian_adjugate3 + evb, g_jacobian_adjugate4 + evb, g_jacobian_adjugate5 + evb, g_jacobian_adjugate6 + evb, g_jacobian_adjugate7 + evb, g_jacobian_adjugate8 + evb, g_jacobian_determinant0 + evb};
         s_t block_affine_geometry_data[10][VS];
-        const s_t *block_affine_geometry_streams[10];
+        const s_t *bageom_streams[10];
         for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<s_t, g_t, VS>(
+            bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
                     nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
         }
         const s_t *block_adjugate[9];
         for (int component = 0; component < 9; ++component) {
-            block_adjugate[component] = block_affine_geometry_streams[component];
+            block_adjugate[component] = bageom_streams[component];
         }
 
-        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
+        mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(nelems, 0, bageom_streams[9], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current, block_previous, block_direction, eta_b, eta_s, newmark_velocity_alpha, block_output);
 
         s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
         for (int shape = 0; shape < NS; ++shape) {
@@ -626,7 +626,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
                 }
             }
         }
@@ -752,8 +752,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
     const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {
-        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);
+    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         s_t block_coordinates[3 * NS][VS];
         s_t block_adjugate_data[9][NQ * VS];
         s_t block_determinant[NQ * VS];
@@ -768,7 +768,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
             for (int d = 0; d < ND; ++d) {
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
+                    const idx_t node = element_shape[evb + lane];
                     block_coordinates[shape * ND + d][lane] = coordinate_components[d][node];
                 }
             }
@@ -783,7 +783,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
                 const int stream = shape * NC + field;
                 #pragma omp simd
                 for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
+                    const idx_t node = element_shape[evb + lane];
                     block_current[stream][lane] = current_components[field][node * current_stride];
                     block_previous[stream][lane] = previous_components[field][node * previous_stride];
                     block_direction[stream][lane] = direction_components[field][node * direction_stride];
@@ -825,7 +825,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
                 s_t *const SFEM_RESTRICT out = output_components[field];
                 for (int scatter = 0; scatter < nelems; ++scatter) {
                     #pragma omp atomic update
-                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
+                    out[element_shape[evb + scatter] * out_stride] += block_output[stream][scatter];
                 }
             }
         }

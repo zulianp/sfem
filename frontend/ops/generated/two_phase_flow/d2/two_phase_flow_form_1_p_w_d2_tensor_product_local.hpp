@@ -74,12 +74,12 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const s_t det = determinant[geometry_offset];
-            const s_t adj0 = adjugate[0][geometry_offset];
-            const s_t adj1 = adjugate[1][geometry_offset];
-            const s_t adj2 = adjugate[2][geometry_offset];
-            const s_t adj3 = adjugate[3][geometry_offset];
+            const ptrdiff_t goff = q * geometry_stride + lane;
+            const s_t det = determinant[goff];
+            const s_t adj0 = adjugate[0][goff];
+            const s_t adj1 = adjugate[1][goff];
+            const s_t adj2 = adjugate[2][goff];
+            const s_t adj3 = adjugate[3][goff];
             const s_t p_w = current_value[(0 * NQ + q) * VS + lane];
             const s_t p_w_grad_0_ref = current_grad_ref[((0 * NQ + q) * ND + 0) * VS + lane];
             const s_t p_w_grad_1_ref = current_grad_ref[((0 * NQ + q) * ND + 1) * VS + lane];
@@ -161,12 +161,12 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const s_t det = determinant[geometry_offset];
-            const s_t adj0 = adjugate[0][geometry_offset];
-            const s_t adj1 = adjugate[1][geometry_offset];
-            const s_t adj2 = adjugate[2][geometry_offset];
-            const s_t adj3 = adjugate[3][geometry_offset];
+            const ptrdiff_t goff = q * geometry_stride + lane;
+            const s_t det = determinant[goff];
+            const s_t adj0 = adjugate[0][goff];
+            const s_t adj1 = adjugate[1][goff];
+            const s_t adj2 = adjugate[2][goff];
+            const s_t adj3 = adjugate[3][goff];
             const s_t p_w = current_value[(0 * NQ + q) * VS + lane];
             const s_t p_w_grad_0_ref = current_grad_ref[((0 * NQ + q) * ND + 0) * VS + lane];
             const s_t p_w_grad_1_ref = current_grad_ref[((0 * NQ + q) * ND + 1) * VS + lane];

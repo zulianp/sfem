@@ -51,13 +51,13 @@ static SFEM_INLINE void laplace_d2_simplex_direct_hessian_reference_element_matr
     for (int q = 0; q < NQ; ++q) {
         const s_t qw = q_weight[q];
         const int lane = 0;
-        const ptrdiff_t geometry_offset = q * VS + lane;
-        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[geometry_offset];
-        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[geometry_offset];
-        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[geometry_offset];
-        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[geometry_offset];
-        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[geometry_offset];
-        const s_t inv_jacobian_determinant = s_t(1) / jacobian_determinant_lane0;
+        const ptrdiff_t goff = q * VS + lane;
+        const s_t jacobian_adjugate_lane0 = block_jacobian_adjugate0[goff];
+        const s_t jacobian_adjugate_lane1 = block_jacobian_adjugate1[goff];
+        const s_t jacobian_adjugate_lane2 = block_jacobian_adjugate2[goff];
+        const s_t jacobian_adjugate_lane3 = block_jacobian_adjugate3[goff];
+        const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[goff];
+        const s_t idet = s_t(1) / jacobian_determinant_lane0;
         for (int trial_component = 0; trial_component < NC; ++trial_component) {
             for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
                 const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial_shape];
@@ -66,8 +66,8 @@ static SFEM_INLINE void laplace_d2_simplex_direct_hessian_reference_element_matr
                 for (int i = 0; i < NC * ND; ++i) {
                     trial_grad[i] = s_t(0);
                 }
-                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane2) * inv_jacobian_determinant;
-                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane3) * inv_jacobian_determinant;
+                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane2) * idet;
+                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane3) * idet;
                 s_t material[NC * ND];
                 material[0] = kappa*trial_grad[0];
                 material[1] = kappa*trial_grad[1];

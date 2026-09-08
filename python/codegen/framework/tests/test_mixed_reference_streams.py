@@ -29,7 +29,7 @@ class MixedReferenceStreamsTest(unittest.TestCase):
     def test_gradients_appear_only_when_the_form_reads_them(self):
         for tensor_product, gradient_name in (
             (True, "field_grad_1d"),
-            (False, "field_grad_ref"),
+            (False, "fgref"),
         ):
             with self.subTest(tensor_product=tensor_product):
                 with_gradients = mixed_reference_streams(
@@ -58,7 +58,7 @@ class MixedReferenceStreamsTest(unittest.TestCase):
         streams = mixed_reference_streams(
             Dependencies(True), False, n_fields=2, dim=3
         )
-        gradients = [s for s in streams if s.name == "field_grad_ref"][0]
+        gradients = [s for s in streams if s.name == "fgref"][0]
         self.assertEqual(gradients.extent, 6)
 
     def test_the_signature_and_the_call_are_the_same_sequence(self):
