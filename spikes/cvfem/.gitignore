@@ -15,3 +15,7 @@ __pycache__/
 *.py[cod]
 .DS_Store
 *.trace.csv
+
+# Verification run directories: logs and solution fields, regenerable from a job id.
+# The report built from one is committed under docs/; the raw runs are not.
+verification_runs/

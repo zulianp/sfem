@@ -5,6 +5,47 @@ Kernel synthesis, and the analysis scripts around the benchmark.
 Everything here runs against the repository venv (`../../../venv/bin/python`), which is
 where SymPy, NumPy and matplotlib live.
 
+## Verification report
+
+`cvfem_verify_report.py` turns a directory of verification runs into a Markdown report with
+plots, and an HTML rendering of it. Two steps, deliberately separate, so a report can be
+rebuilt or its thresholds changed without paying for the runs again:
+
+```sh
+scripts/verify_report.sh                                        # run the matrix
+python3 python/cvfem_verify_report.py <rundir> \
+    -o docs/CVFEM_Verification_Report.md --html                 # judge it and write the page
+```
+
+On Grace, `sbatch jobs/verify_report.sbatch` does both on the debug partition.
+
+What it checks, and against what -- every one is an identity or a fitted rate against a
+threshold, never an eyeballed plot:
+
+| section | claim | oracle |
+|---|---|---|
+| Spatial order | u is second order, p about 1.4 | log-log fit over the MMS ladder |
+| Boundary | a zero traction IS the do-nothing outflow | exact equality of the two runs |
+| Boundary | a port shifts the level by `p_bar - p_exact` | closed form, swept over `p_bar` |
+| Conservation | the continuity residual sums to zero | the exact inflow, 1/9 for the step |
+| Unit tests | the kernel-level checks pass | `ctest` |
+
+A run that did not converge is reported and never scored: the residual sum of an
+unconverged iterate says where the solver stopped, not whether the scheme is right.
+
+**Unlike everything else in this directory it is standard-library only, and that is a
+requirement.** `numpy`, `matplotlib` and `markdown` are all absent from the Alps uenv's
+`python3` and from the default `python3` here, so the convergence fit is a hand-rolled
+log-log least squares -- the same estimator as
+`verification_and_validation/common/convergence.py`, which needs NumPy -- and the figures
+are hand-emitted inline SVG, following `report_cvfem_bench.py`. `--html` shells out to
+`markdown_py`; a missing one is a skipped step and never a failure, because the Markdown is
+the artifact.
+
+`python3 python/cvfem_verify_report.py --selftest` checks the fitter, the log parser and the
+plotter, and runs as the `cvfem_verify_report_selftest` ctest. A report generator that
+quietly fits the wrong slope is worse than no report.
+
 ## Code generators
 
 | script | writes | consumed by |
