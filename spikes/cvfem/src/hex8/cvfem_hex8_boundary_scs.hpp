@@ -12,6 +12,36 @@
 
 #include "cvfem_portability.hpp"
 
+// Prescribed boundary data, carried alongside the face masks.
+//
+// A default-constructed instance means "nothing prescribed", which reproduces the existing
+// behaviour on every face exactly -- so this is a trailing default argument on the routines
+// below and no call site had to change. That is the shape Hex8RhieChowT already uses to
+// make the Rhie-Chow term optional, and it is preferred here over widening the face masks
+// to two bits per face: the values a boundary condition needs are per-sideset constants,
+// not per-face bits, and re-encoding the masks would have touched all three signatures and
+// about a dozen call sites for no gain.
+//
+// Two conditions, each reducing to something already supported:
+//
+//   traction   (pI - tau).n = t on the faces nmask selects. t = 0 is the do-nothing
+//              outflow, bit for bit -- the term added vanishes and its square root is not
+//              even evaluated.
+//   pressure   p = p_bar on the faces pmask selects, with the viscous traction still taken
+//              from the interior state. This is the closed-face flux with the nodal
+//              pressure replaced by a prescribed one, which is what a port held at a
+//              pressure is.
+//
+// nmask wins where both select the same face: a face cannot be both traction-free and
+// pressure-prescribed, and silently applying both would be worse than picking one and
+// saying so.
+template <typename scalar_t>
+struct Hex8BoundaryDataT {
+    scalar_t tx{0}, ty{0}, tz{0};  // prescribed traction on nmask faces
+    int      pmask{0};             // faces carrying a prescribed pressure
+    scalar_t p_bar{0};             // and its value
+};
+
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE bool on_plane(const scalar_t c, const scalar_t value, const scalar_t L) {
     const scalar_t tol = scalar_t(1e-8) * std::max(L, scalar_t(1));
@@ -132,8 +162,12 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
                                                   const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
                                                   const scalar_t *const SFEM_RESTRICT p, scalar_t *const SFEM_RESTRICT r,
                                                   const int fmask = -1,
-                                                  const int nmask = 0) {
+                                                  const int nmask = 0,
+                                                  const Hex8BoundaryDataT<scalar_t> &bd = {}) {
     scalar_t grad_el[9];
+    // Hoisted: the area magnitude a prescribed traction needs costs a square root per node
+    // per face, and t = 0 is the overwhelmingly common case.
+    const int have_traction = bd.tx != scalar_t(0) || bd.ty != scalar_t(0) || bd.tz != scalar_t(0);
     scalar_t A[3][3];
     if (!isoparam) {
         if (std::fabs(det) < scalar_t(1e-30)) return;
@@ -177,7 +211,15 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
             cvfem_hex8_traction(mu, grad[0], grad[1], grad[2], grad[3], grad[4], grad[5], grad[6], grad[7], grad[8], ax, ay, az,
                                 tau_x, tau_y, tau_z);
             const scalar_t mdot = rho * (ux[i] * ax + uy[i] * ay + uz[i] * az);
-            if ((nmask >> f) & 1) {
+            if (((bd.pmask >> f) & 1) && !((nmask >> f) & 1)) {
+                // Prescribed pressure: the closed-face flux with p_bar in place of the
+                // nodal pressure. The viscous traction still comes from the interior state,
+                // so this prescribes the pressure and not the whole normal traction.
+                r[i * 4 + 0] += mdot * ux[i] + bd.p_bar * ax - tau_x;
+                r[i * 4 + 1] += mdot * uy[i] + bd.p_bar * ay - tau_y;
+                r[i * 4 + 2] += mdot * uz[i] + bd.p_bar * az - tau_z;
+                r[i * 4 + 3] += mdot;
+            } else if ((nmask >> f) & 1) {
                 // Do-nothing (natural) outflow: (p I - tau) . n = 0, so the pressure and
                 // viscous traction are prescribed rather than evaluated. Dropping them is
                 // what makes this a genuine outflow condition and what removes the constant-
@@ -191,9 +233,11 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
                 // domain -- the classic finite-volume backflow instability, and a
                 // recirculating outlet is where it bites.
                 const scalar_t mup = mdot > scalar_t(0) ? mdot : scalar_t(0);
-                r[i * 4 + 0] += mup * ux[i];
-                r[i * 4 + 1] += mup * uy[i];
-                r[i * 4 + 2] += mup * uz[i];
+                scalar_t dS = scalar_t(0);
+                if (have_traction) dS = std::sqrt(ax * ax + ay * ay + az * az);
+                r[i * 4 + 0] += mup * ux[i] + bd.tx * dS;
+                r[i * 4 + 1] += mup * uy[i] + bd.ty * dS;
+                r[i * 4 + 2] += mup * uz[i] + bd.tz * dS;
                 // Continuity carries the true flux, not the guarded one: clipping it would
                 // destroy global mass conservation, which is the property being verified.
                 r[i * 4 + 3] += mdot;
@@ -215,7 +259,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
                                                  const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
                                                  const smesh::count_t *const SFEM_RESTRICT slots, scalar_t *const SFEM_RESTRICT values,
                                                   const int fmask = -1,
-                                                  const int nmask = 0) {
+                                                  const int nmask = 0,
+                                                  const Hex8BoundaryDataT<scalar_t> &bd = {}) {
     scalar_t A[3][3];
     scalar_t w_el[CVFEM_HEX8_N_NODES][3];
     if (!isoparam) {
@@ -282,6 +327,25 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
             // matrix feeds the coarse-grid operators, the Vanka patch solves and the
             // block-diagonal preconditioner, so the inconsistency reached the multigrid
             // for every case with an open outlet.
+            if (((bd.pmask >> f) & 1) && !((nmask >> f) & 1)) {
+                // Prescribed pressure: the closed-face block without its pressure column.
+                // p_bar is data, not an unknown, so d(residual)/dp is zero on this face;
+                // the viscous row stays because tau still depends on the velocity.
+                hex8_visc_jac_row<Atomic>(mu, ax, ay, az, w, i, slots, values);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 0, rho * ax * ux[i] + mdot);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 1, rho * ay * ux[i]);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 2, rho * az * ux[i]);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 0, rho * ax * uy[i]);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 1, rho * ay * uy[i] + mdot);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 2, rho * az * uy[i]);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 0, rho * ax * uz[i]);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 1, rho * ay * uz[i]);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 2, rho * az * uz[i] + mdot);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 0, rho * ax);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 1, rho * ay);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 2, rho * az);
+                continue;
+            }
             if ((nmask >> f) & 1) {
                 // d/du of max(mdot, 0) * u_i: the same velocity block as the closed face
                 // where mdot > 0, and nothing where it is not. No pressure column, because
@@ -335,7 +399,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
                                                          const scalar_t *const SFEM_RESTRICT vy, const scalar_t *const SFEM_RESTRICT vz,
                                                          const scalar_t *const SFEM_RESTRICT q, scalar_t *const SFEM_RESTRICT r,
                                                   const int fmask = -1,
-                                                  const int nmask = 0) {
+                                                  const int nmask = 0,
+                                                  const Hex8BoundaryDataT<scalar_t> &bd = {}) {
     scalar_t dgrad_el[9];
     scalar_t A[3][3];
     if (!isoparam) {
@@ -381,7 +446,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
                                 ay, az, dtx, dty, dtz);
             const scalar_t mdot  = rho * (ux[i] * ax + uy[i] * ay + uz[i] * az);
             const scalar_t dmdot = rho * (vx[i] * ax + vy[i] * ay + vz[i] * az);
-            if ((nmask >> f) & 1) {
+            if (((bd.pmask >> f) & 1) && !((nmask >> f) & 1)) {
+                // Prescribed pressure: as the closed face but without the q[i] * a term,
+                // since the pressure on this face is data and the direction cannot move it.
+                r[i * 4 + 0] += dmdot * ux[i] + mdot * vx[i] - dtx;
+                r[i * 4 + 1] += dmdot * uy[i] + mdot * vy[i] - dty;
+                r[i * 4 + 2] += dmdot * uz[i] + mdot * vz[i] - dtz;
+                r[i * 4 + 3] += dmdot;
+            } else if ((nmask >> f) & 1) {
                 // Exact derivative of the natural-outflow residual above. The max(mdot, 0)
                 // guard is piecewise linear, so its derivative is dmdot*u_i + mdot*v_i where
                 // mdot > 0 and zero where it is not. The kink at mdot == 0 is the same class
