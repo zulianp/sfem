@@ -579,7 +579,22 @@ def _op_counts(expression):
         if isinstance(node, sp.Add):
             adds += max(0, len(node.args) - 1)
         elif isinstance(node, sp.Mul):
-            muls += max(0, len(node.args) - 1)
+            # `-x` is `Mul(-1, x)` and `x / y` is `Mul(x, Pow(y, -1))`, and
+            # neither costs a multiply in the emitted C: the first is a sign
+            # the consuming instruction absorbs, the second is the division
+            # already charged by the `Pow` branch below.  Counting the sympy
+            # arguments straight charged both, which put the model six
+            # operations above the thirty a TET4 Laplacian element actually
+            # emits -- three negated differences and one negated sum.
+            factors = len(node.args)
+            if node.args and node.args[0] is sp.Integer(-1):
+                factors -= 1
+            factors -= sum(
+                1
+                for argument in node.args
+                if isinstance(argument, sp.Pow) and argument.exp == -1
+            )
+            muls += max(0, factors - 1)
         elif isinstance(node, sp.Pow):
             if node.exp == -1:
                 divs += 1

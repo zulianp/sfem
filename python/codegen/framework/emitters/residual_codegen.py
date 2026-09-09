@@ -11,6 +11,7 @@ _BLOCK = PREFIXES["block"]
 _BLOCK_FMT = _BLOCK + "%s"
 _PACK_FMT = PREFIXES["pack"] + "%s"
 
+from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
     assembled_matrix_dependencies,
@@ -5061,6 +5062,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
             "%s_residual_esoa" % prefix,
             residual_diagnostic_cost(system),
             system.residual_dependencies(),
+            "residual",
         )
     ]
     block_expressions = system.jacobian_blocks()
@@ -5072,6 +5074,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
                 "%s_%s" % (prefix, block_plan.name),
                 jacobian_block_diagnostic_cost(system, block),
                 system.dependencies_for_expressions((block.expression,)),
+                block_plan.name,
             )
         )
     diagnostics.append(
@@ -5079,10 +5082,11 @@ def _residual_diagnostics_lines(system, prefix, specialization):
             "%s_jacobian_action_esoa" % prefix,
             jacobian_action_diagnostic_cost(system),
             system.jacobian_action_dependencies(),
+            "jacobian_action",
         )
     )
     lines = []
-    for public_name, cost, dependencies in diagnostics:
+    for public_name, cost, dependencies, form_name in diagnostics:
         if lines:
             lines.append("")
         lines.extend(
@@ -5092,6 +5096,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
                 cost,
                 specialization,
                 dependencies,
+                form_name=form_name,
             )
         )
     return lines
@@ -5116,6 +5121,7 @@ def _mixed_residual_diagnostics_lines(
                 residual_coeffs,
                 system.residual_dependencies(),
             ),
+            "residual",
         ),
         (
             "%s_%s_jacobian_action_esoa" % (prefix, element),
@@ -5125,10 +5131,11 @@ def _mixed_residual_diagnostics_lines(
                 action_coeffs,
                 system.jacobian_action_dependencies(),
             ),
+            "jacobian_action",
         ),
     )
     lines = []
-    for public_name, cost, dependencies in diagnostics:
+    for public_name, cost, dependencies, form_name in diagnostics:
         if lines:
             lines.append("")
         lines.extend(
@@ -5140,6 +5147,7 @@ def _mixed_residual_diagnostics_lines(
                 field_element_types,
                 dependencies,
                 basis_family,
+                form_name=form_name,
             )
         )
     return lines
@@ -5153,6 +5161,7 @@ def _mixed_kernel_diagnostics_lines(
     field_element_types,
     dependencies,
     basis_family,
+    form_name="",
 ):
     rule = specialization.quadrature_rule
     layout = MixedFieldLayout.create(system, rule, field_element_types)
@@ -5164,6 +5173,7 @@ def _mixed_kernel_diagnostics_lines(
         dependencies,
         field_streams=layout.total_streams,
         reference_data=_mixed_reference_data(rule, system, field_element_types, basis_family),
+        form_name=form_name,
     )
 
 
@@ -5176,6 +5186,7 @@ def _kernel_diagnostics_lines(
     *,
     field_streams=None,
     reference_data=None,
+    form_name="",
 ):
     rule = specialization.quadrature_rule
     n_fields = len(system.fields)
@@ -5195,6 +5206,19 @@ def _kernel_diagnostics_lines(
         if reference.name.startswith("q_weight")
     )
     variable_name = "%s_diagnostics_data" % public_name
+    # What the element costs beyond its material evaluation.  These two were
+    # literal zeros here, which made `total_flops` report the constitutive cost
+    # alone for every kernel this emitter prints.
+    flops = element_flops_plan(
+        form_name,
+        rule.element_type,
+        system.dim,
+        rule.n_qp,
+        rule.n_shape,
+        n_fields,
+        rule,
+        cost.flops,
+    )
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -5218,8 +5242,8 @@ def _kernel_diagnostics_lines(
         "  %d," % cost.loads,
         "  %d," % cost.stores,
         "  %d," % cost.flops,
-        "  0,",
-        "  0,",
+        "  %d," % flops.affine_mesh_flops_per_element,
+        "  %d," % flops.isoparametric_mesh_flops_per_element,
         "  %d," % cost.temporaries,
         "  %d," % cost.estimated_registers,
         "  %d," % geometry_streams,
