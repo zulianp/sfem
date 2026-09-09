@@ -1,4 +1,11 @@
-from codegen.framework.plans.conventions import restrict_prelude
+from codegen.framework.plans.conventions import (
+    ABI_DIAGNOSTICS_TAIL,
+    ABI_GEOMETRY_TOKENS,
+    ABI_TRAVERSAL_TOKENS,
+    classify_abi_name,
+    dimension_markers,
+    restrict_prelude,
+)
 import collections
 import json
 import os
@@ -5226,31 +5233,50 @@ _DISPATCH_SOURCE_KIND_ORDER = (
 
 
 def _dispatch_source_kind(function_name):
-    packed = "_packed_" in function_name
-    affine = "_affine_" in function_name
-    isoparametric = "_isoparametric_" in function_name
-    if packed and isoparametric:
-        return "packed_isoparametric"
-    if packed and affine:
-        return "packed_affine"
-    if isoparametric:
-        return "isoparametric"
-    if affine:
-        return "affine"
-    if "_sideset_" in function_name:
-        return "sideset"
+    """Which dispatch translation unit `function_name` belongs in.
+
+    The tokens are the same ones `dimension_markers` is built from, so a rename
+    that moves the vocabulary moves the file split with it rather than dropping
+    every dispatch into `_other`.
+    """
+    present = {
+        token: "_%s_" % token in function_name
+        for token in ABI_TRAVERSAL_TOKENS + ABI_GEOMETRY_TOKENS
+    }
+    for traversal in ABI_TRAVERSAL_TOKENS:
+        if not present[traversal]:
+            continue
+        for geometry in ("isoparametric", "affine"):
+            if present.get(geometry):
+                return "%s_%s" % (traversal, geometry)
+    for geometry in ("isoparametric", "affine", "sideset"):
+        if present.get(geometry):
+            return geometry
     return "other"
 
 
 def _dispatch_groups(material, elements, declarations):
     element_names = _dispatch_element_names(elements)
     groups = {}
+    undispatched = []
+    off_mesh = []
     for declaration in declarations:
         name = _c_abi_function_name(declaration)
         if not name or not declaration.startswith('extern "C" int '):
             continue
         mapped = _dispatch_mapping(material.name, name, element_names)
-        if mapped is None:
+        if not isinstance(mapped, tuple):
+            # Declining a name has to be a decision, not an accident.  A local
+            # kernel, a diagnostics accessor or a scalar query genuinely has no
+            # dimension-generic entry point; a mesh kernel always does, and one
+            # that reaches here is a name this layer no longer recognises --
+            # which is what a half-finished rename looks like from the inside.
+            kind = classify_abi_name(name)
+            if kind is None or kind[0] == "mesh":
+                if mapped is _DISPATCH_NO_ELEMENT:
+                    off_mesh.append(name)
+                else:
+                    undispatched.append(name)
             continue
         dispatch_name, mesh_element, dim = mapped
         params = _c_abi_parameters(declaration)
@@ -5271,6 +5297,23 @@ def _dispatch_groups(material, elements, declarations):
                 "function": name,
                 "declaration": declaration,
             }
+        )
+
+    if undispatched:
+        raise ValueError(
+            "%s publishes %d mesh kernel(s) whose name this layer no longer "
+            "parses: %s"
+            % (material.name, len(undispatched), ", ".join(sorted(undispatched)[:8]))
+        )
+    if off_mesh and not groups:
+        # Every mesh kernel was declined for want of a matching element.  One
+        # sub-block naming a sub-space element is a known limit; all of them
+        # means the element table itself has gone stale, which is the same
+        # silent degradation wearing the other reason as a disguise.
+        raise ValueError(
+            "%s publishes %d mesh kernel(s) and none names an element this op "
+            "meshes: %s"
+            % (material.name, len(off_mesh), ", ".join(sorted(off_mesh)[:8]))
         )
 
     ordered = []
@@ -5337,19 +5380,50 @@ def _dispatch_mapping(material_name, function_name, element_names):
             op_suffix = op_suffix[len(repeated_prefix) :]
         dispatch_suffix = _insert_dispatch_dimension(op_suffix, dim)
         if dispatch_suffix is None:
-            return None
+            return _DISPATCH_NO_MARKER
         if dispatch_prefix:
             dispatch_suffix = "%s_%s" % (dispatch_prefix, dispatch_suffix)
         return "%s_%s" % (material_name, dispatch_suffix), mesh_element, dim
-    return None
+    return _DISPATCH_NO_ELEMENT
+
+
+#: Why `_dispatch_mapping` declined, because the two reasons are not the same
+#: kind of thing.
+#:
+#: `_DISPATCH_NO_ELEMENT` -- none of the op's mesh elements appears in the name.
+#: A mixed-order material names its sub-block kernels after the *sub-space*
+#: element (Taylor-Hood publishes a pressure-pressure block on `tet4` while the
+#: op meshes `tet10_tet4`), and a kernel named after a space the op does not mesh
+#: cannot be keyed by `smesh::ElemType` at all.  That is a structural limit of
+#: dispatching on element type, not a parse that has gone wrong.
+#:
+#: `_DISPATCH_NO_MARKER` -- the element was found, so the name parsed, but it
+#: carries no geometry token to splice a dimension in front of.  Every mesh
+#: kernel has one by construction, so this is the grammar having moved
+#: underneath this layer, and it is never survivable.
+_DISPATCH_NO_ELEMENT = "no-element"
+_DISPATCH_NO_MARKER = "no-marker"
 
 
 def _insert_dispatch_dimension(op_suffix, dim):
-    for marker in ("_affine_", "_isoparametric_", "_sideset_"):
+    """`op_suffix` with `_<dim>d` spliced in front of its geometry token.
+
+    The markers come from `plans/conventions.py` rather than being spelled here.
+    They used to be three literals, and they were the half of the name grammar
+    that did not move during a rename -- after which this returned `None` for
+    every kernel, `_dispatch_groups` skipped them all, and the wrapper published
+    its fallback paths without a word.
+    """
+    found = None
+    for marker in dimension_markers():
         index = op_suffix.find(marker)
-        if index >= 0:
-            return "%s_%dd%s" % (op_suffix[:index], dim, op_suffix[index:])
-    return None
+        if index < 0:
+            continue
+        if found is None or index < found[0]:
+            found = (index, marker)
+    if found is None:
+        return None
+    return "%s_%dd%s" % (op_suffix[: found[0]], dim, op_suffix[found[0] :])
 
 
 def _c_abi_parameters(declaration):
@@ -5651,16 +5725,24 @@ def _c_parameter_name(param):
 def _diagnostic_dispatch_groups(material, elements, declarations):
     element_names = _dispatch_element_names(elements)
     groups = {}
+    unmapped = []
+    off_mesh = []
     for declaration in declarations:
         name = _c_abi_function_name(declaration)
         if (
             not name
-            or not name.endswith("_soa_diagnostics")
+            or not name.endswith(ABI_DIAGNOSTICS_TAIL)
             or "KernelDiagnostics *" not in declaration
         ):
             continue
         mapped = _diagnostic_dispatch_mapping(material.name, name, element_names)
-        if mapped is None:
+        if not isinstance(mapped, tuple):
+            # Everything past the guard above is a per-element diagnostics
+            # accessor, so it either belongs to an element this op does not mesh
+            # -- a mixed-order sub-block, the same structural limit the kernel
+            # dispatch has -- or it is a parse that has fallen behind the
+            # grammar, which is never survivable.
+            (off_mesh if mapped is _DISPATCH_NO_ELEMENT else unmapped).append(name)
             continue
         dispatch_name, mesh_element, dim = mapped
         groups.setdefault(
@@ -5678,6 +5760,19 @@ def _diagnostic_dispatch_groups(material, elements, declarations):
             }
         )
 
+    if unmapped:
+        raise ValueError(
+            "%s publishes %d diagnostics accessor(s) whose name this layer no "
+            "longer parses: %s"
+            % (material.name, len(unmapped), ", ".join(sorted(unmapped)[:8]))
+        )
+    if off_mesh and not groups:
+        raise ValueError(
+            "%s publishes %d diagnostics accessor(s) and none names an element "
+            "this op meshes: %s"
+            % (material.name, len(off_mesh), ", ".join(sorted(off_mesh)[:8]))
+        )
+
     ordered = []
     for _, group in sorted(groups.items(), key=lambda item: item[0]):
         group["variants"] = tuple(
@@ -5689,7 +5784,9 @@ def _diagnostic_dispatch_groups(material, elements, declarations):
 
 def _diagnostic_dispatch_mapping(material_name, function_name, element_names):
     prefix = "%s_" % material_name
-    if not function_name.startswith(prefix) or not function_name.endswith("_soa_diagnostics"):
+    if not function_name.startswith(prefix) or not function_name.endswith(
+        ABI_DIAGNOSTICS_TAIL
+    ):
         return None
     suffix = function_name[len(prefix) :]
     for element_name, (mesh_element, dim) in sorted(
@@ -5711,14 +5808,14 @@ def _diagnostic_dispatch_mapping(material_name, function_name, element_names):
         repeated_prefix = "%s_" % element_name
         if op_suffix.startswith(repeated_prefix):
             op_suffix = op_suffix[len(repeated_prefix) :]
-        marker = "_soa_diagnostics"
+        marker = ABI_DIAGNOSTICS_TAIL
         if marker not in op_suffix:
-            return None
+            return _DISPATCH_NO_MARKER
         dispatch_suffix = op_suffix.replace(marker, "_%dd%s" % (dim, marker), 1)
         if dispatch_prefix:
             dispatch_suffix = "%s_%s" % (dispatch_prefix, dispatch_suffix)
         return "%s_%s" % (material_name, dispatch_suffix), mesh_element, dim
-    return None
+    return _DISPATCH_NO_ELEMENT
 
 
 def _diagnostic_dispatch_source(c_abi_header, groups):
@@ -6467,7 +6564,7 @@ def _performance_dispatch_cases(material_name, element_names, cases):
         for diagnostic in case["diagnostics"]:
             name = diagnostic["name"]
             dispatch_name = _diagnostic_dispatch_mapping(material_name, name, element_names)
-            if dispatch_name is None:
+            if not isinstance(dispatch_name, tuple):
                 entries.append(diagnostic)
             else:
                 entries.append(
