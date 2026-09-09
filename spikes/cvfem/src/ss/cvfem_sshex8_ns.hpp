@@ -2046,4 +2046,16 @@ inline void sscvfem_apply(SSMeshData &d, const scalar_t rho, const scalar_t mu,
         d.qgz.clear();
     }
     sscvfem_apply_macro_local_hoisted(d, rho, mu, dir, jv);
+    // The transient term's contribution to the Jacobian action, rho V a0 / dt on each
+    // velocity component. The flat path does this in
+    // apply_jacobian_action_accumulate and this line was simply missing, so the
+    // semi-structured residual carried the BDF term while the Jacobian the Krylov solver
+    // applied did not.
+    //
+    // It costs nothing at dt <= 0, which is why every steady result was unaffected and the
+    // omission survived: the ss pump solves the steady problem to 4.7e-15 and stalls its
+    // transient at 1.6 of a Re=20 target. For a small timestep rho V a0 / dt is the
+    // DOMINANT diagonal, so leaving it out does not perturb the Newton direction, it
+    // replaces it.
+    sscvfem_apply_transient_action(d, rho, dir, jv);
 }

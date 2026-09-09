@@ -10,7 +10,7 @@
 <div class="report-head">
   <span class="mark">CVFEM</span>
   <span>verification</span>
-  <span>machine <dfn>nid006552</dfn></span>
+  <span>machine <dfn>nid006550</dfn></span>
   <span>threads <dfn>72</dfn></span>
   <span>2026-09-09</span>
 </div>
@@ -44,7 +44,7 @@
 </tr>
 <tr>
 <td>Pressure port shifts the level by p_bar - p_exact</td>
-<td>8 of 8 values verified</td>
+<td>7 of 8 values verified, 1 did not converge</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -210,66 +210,66 @@ exact solution.</p>
 <tbody>
 <tr>
 <td>-0.16</td>
-<td>7.493e-12</td>
-<td>1.437e-12</td>
+<td>5.621e-07</td>
+<td>2.698e-07</td>
 <td>0.000e+00</td>
-<td>1.437e-12</td>
+<td>2.698e-07</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
 <td>-0.08</td>
-<td>5.557e-12</td>
+<td>8.785e-07</td>
 <td>8.000e-02</td>
 <td>8.000e-02</td>
-<td>0.000e+00</td>
+<td>1.700e-07</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
 <td>0</td>
-<td>5.060e-12</td>
+<td>1.218e-06</td>
 <td>1.600e-01</td>
 <td>1.600e-01</td>
-<td>0.000e+00</td>
+<td>1.000e-07</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
 <td>0.16</td>
-<td>3.356e-09</td>
+<td>1.963e-06</td>
 <td>3.200e-01</td>
 <td>3.200e-01</td>
-<td>0.000e+00</td>
+<td>2.000e-07</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
 <td>0.5</td>
-<td>2.711e-12</td>
+<td>3.748e-06</td>
 <td>6.600e-01</td>
 <td>6.600e-01</td>
-<td>0.000e+00</td>
+<td>5.000e-07</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
 <td>1</td>
-<td>8.714e-12</td>
+<td>6.713e+00</td>
+<td>1.170e+00</td>
 <td>1.160e+00</td>
-<td>1.160e+00</td>
-<td>0.000e+00</td>
-<td><span class="st-pass">pass</span></td>
+<td>1.047e-02</td>
+<td><span class="st-idle">not converged</span></td>
 </tr>
 <tr>
 <td>1.5</td>
-<td>7.360e-12</td>
+<td>9.499e-06</td>
 <td>1.660e+00</td>
 <td>1.660e+00</td>
-<td>0.000e+00</td>
+<td>1.000e-06</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
 <td>3</td>
-<td>2.739e-11</td>
+<td>1.842e-05</td>
 <td>3.160e+00</td>
 <td>3.160e+00</td>
-<td>0.000e+00</td>
+<td>3.000e-06</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 </tbody>
@@ -299,7 +299,6 @@ exact solution.</p>
 <circle cx="130.8" cy="250.4" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
 <circle cx="159.6" cy="239.1" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
 <circle cx="220.7" cy="215.0" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<circle cx="310.5" cy="179.7" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
 <circle cx="400.4" cy="144.3" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
 <circle cx="669.9" cy="38.3" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
 <text x="76" y="30" fill="var(--s1, #d97757)">measured p_linf</text>
@@ -342,8 +341,8 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.</p>
 <td>--</td>
 <td>+1.000000000</td>
 <td>+1.000000000</td>
-<td>0.000e+00</td>
-<td>0.000e+00</td>
+<td>1.887e-14</td>
+<td>1.887e-14</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -352,8 +351,8 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.</p>
 <td>+0.7071</td>
 <td>+0.707106781</td>
 <td>+0.707106781</td>
-<td>0.000e+00</td>
-<td>0.000e+00</td>
+<td>2.254e-14</td>
+<td>2.254e-14</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -362,8 +361,8 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.</p>
 <td>+1.0000</td>
 <td>+1.000000000</td>
 <td>+1.000000000</td>
-<td>0.000e+00</td>
-<td>0.000e+00</td>
+<td>2.709e-14</td>
+<td>2.709e-14</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -372,8 +371,8 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.</p>
 <td>+0.0000</td>
 <td>+0.000000000</td>
 <td>+0.000000000</td>
-<td>1.667e-19</td>
-<td>1.667e-19</td>
+<td>6.774e-15</td>
+<td>6.774e-15</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -382,8 +381,8 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.</p>
 <td>-1.0000</td>
 <td>-1.000000000</td>
 <td>-1.000000000</td>
-<td>0.000e+00</td>
-<td>0.000e+00</td>
+<td>2.132e-14</td>
+<td>2.132e-14</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -391,9 +390,9 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.</p>
 <td>1.000</td>
 <td>-0.0000</td>
 <td>-0.000000000</td>
-<td>-0.000000000</td>
-<td>2.028e-17</td>
-<td>2.028e-17</td>
+<td>+0.000000000</td>
+<td>8.330e-15</td>
+<td>8.330e-15</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 </tbody>
@@ -460,11 +459,11 @@ is kept because it does check the prescribed profile, against its own tolerance.
 <tr>
 <td>lshape</td>
 <td>7060</td>
-<td>1.489e-16</td>
-<td>1.340e-15</td>
+<td>6.358e-15</td>
+<td>5.722e-14</td>
 <td>9.766e-02</td>
 <td>1.345e-02</td>
-<td>5.198e-01</td>
+<td>4.994e-01</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 </tbody>
@@ -492,8 +491,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>500</td>
 <td>yes</td>
 <td>2</td>
-<td>171</td>
-<td>0.066</td>
+<td>174</td>
+<td>0.064</td>
 <td>2</td>
 <td>zero mean</td>
 </tr>
@@ -503,7 +502,7 @@ were measured on, and the machine is named in Provenance.</p>
 <td>yes</td>
 <td>2</td>
 <td>276</td>
-<td>0.219</td>
+<td>0.107</td>
 <td>2</td>
 <td>zero mean</td>
 </tr>
@@ -512,8 +511,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>19652</td>
 <td>yes</td>
 <td>2</td>
-<td>679</td>
-<td>1.407</td>
+<td>631</td>
+<td>0.406</td>
 <td>2</td>
 <td>zero mean</td>
 </tr>
@@ -522,8 +521,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>143748</td>
 <td>yes</td>
 <td>2</td>
-<td>1764</td>
-<td>6.255</td>
+<td>1869</td>
+<td>3.704</td>
 <td>2</td>
 <td>zero mean</td>
 </tr>
@@ -531,9 +530,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>dirichlet</td>
 <td>33124</td>
 <td>yes</td>
-<td>0</td>
-<td>557</td>
-<td>1.437</td>
+<td>1</td>
+<td>4051</td>
+<td>3.513</td>
 <td>100</td>
 <td>zero mean</td>
 </tr>
@@ -542,8 +541,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>33124</td>
 <td>yes</td>
 <td>3</td>
-<td>8168</td>
-<td>18.119</td>
+<td>9133</td>
+<td>4.831</td>
 <td>100</td>
 <td>determined by the do-nothing outflow</td>
 </tr>
@@ -551,9 +550,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>traction0</td>
 <td>33124</td>
 <td>yes</td>
-<td>4</td>
-<td>9227</td>
-<td>20.532</td>
+<td>3</td>
+<td>9133</td>
+<td>5.003</td>
 <td>100</td>
 <td>determined by the traction surface</td>
 </tr>
@@ -561,9 +560,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>p-0.16</td>
 <td>33124</td>
 <td>yes</td>
-<td>0</td>
-<td>1139</td>
-<td>2.548</td>
+<td>2</td>
+<td>5614</td>
+<td>3.055</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -571,9 +570,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>p-0.08</td>
 <td>33124</td>
 <td>yes</td>
-<td>0</td>
-<td>1056</td>
-<td>2.367</td>
+<td>2</td>
+<td>5443</td>
+<td>3.072</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -581,9 +580,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>p0</td>
 <td>33124</td>
 <td>yes</td>
-<td>0</td>
-<td>844</td>
-<td>1.902</td>
+<td>2</td>
+<td>5636</td>
+<td>3.110</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -591,9 +590,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>p0.16</td>
 <td>33124</td>
 <td>yes</td>
-<td>0</td>
-<td>1208</td>
-<td>2.742</td>
+<td>2</td>
+<td>5422</td>
+<td>3.020</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -601,29 +600,29 @@ were measured on, and the machine is named in Provenance.</p>
 <td>p0.5</td>
 <td>33124</td>
 <td>yes</td>
-<td>0</td>
-<td>1377</td>
-<td>3.062</td>
+<td>2</td>
+<td>5663</td>
+<td>3.070</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
 <td>p1.0</td>
 <td>33124</td>
-<td>yes</td>
+<td>no</td>
+<td>2</td>
+<td>530</td>
+<td>0.289</td>
 <td>0</td>
-<td>812</td>
-<td>1.810</td>
-<td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
 <td>p1.5</td>
 <td>33124</td>
 <td>yes</td>
-<td>0</td>
-<td>1006</td>
-<td>2.250</td>
+<td>2</td>
+<td>6068</td>
+<td>3.200</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -631,9 +630,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>p3.0</td>
 <td>33124</td>
 <td>yes</td>
-<td>0</td>
-<td>815</td>
-<td>1.817</td>
+<td>2</td>
+<td>6521</td>
+<td>3.555</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -642,8 +641,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>7060</td>
 <td>yes</td>
 <td>3</td>
-<td>0</td>
-<td>0.496</td>
+<td>2686</td>
+<td>1.272</td>
 <td>20</td>
 <td>determined by the do-nothing outflow</td>
 </tr>
@@ -652,8 +651,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>2916</td>
 <td>yes</td>
 <td>3</td>
-<td>0</td>
-<td>0.055</td>
+<td>1328</td>
+<td>0.266</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -662,8 +661,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>2916</td>
 <td>yes</td>
 <td>3</td>
-<td>0</td>
-<td>0.076</td>
+<td>1156</td>
+<td>0.228</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -672,8 +671,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>2916</td>
 <td>yes</td>
 <td>3</td>
-<td>0</td>
-<td>0.104</td>
+<td>2364</td>
+<td>0.480</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -682,8 +681,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>2916</td>
 <td>yes</td>
 <td>3</td>
-<td>0</td>
-<td>0.204</td>
+<td>4291</td>
+<td>0.862</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -692,8 +691,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>2916</td>
 <td>yes</td>
 <td>3</td>
-<td>0</td>
-<td>0.327</td>
+<td>7338</td>
+<td>1.555</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -702,8 +701,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>2916</td>
 <td>yes</td>
 <td>3</td>
-<td>0</td>
-<td>0.420</td>
+<td>10215</td>
+<td>2.185</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -720,11 +719,11 @@ were measured on, and the machine is named in Provenance.</p>
 <tbody>
 <tr>
 <td>generated</td>
-<td>2026-09-09 20:30:43</td>
+<td>2026-09-09 20:30:50</td>
 </tr>
 <tr>
 <td>machine</td>
-<td>nid006552</td>
+<td>nid006550</td>
 </tr>
 <tr>
 <td>threads</td>
@@ -736,15 +735,15 @@ were measured on, and the machine is named in Provenance.</p>
 </tr>
 <tr>
 <td>linear solver</td>
-<td>--</td>
+<td>fgmres, restart 480</td>
 </tr>
 <tr>
 <td>element refine level</td>
-<td>--</td>
+<td>2</td>
 </tr>
 <tr>
 <td>run directory</td>
-<td>/Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-4632318</td>
+<td>/Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-ss-4633985</td>
 </tr>
 <tr>
 <td>runs parsed</td>
@@ -752,6 +751,6 @@ were measured on, and the machine is named in Provenance.</p>
 </tr>
 </tbody>
 </table>
-<p>Regenerate with <code>python3 python/cvfem_verify_report.py verification_runs/grace-4632318</code>.</p>
+<p>Regenerate with <code>python3 python/cvfem_verify_report.py verification_runs/grace-ss-4633985</code>.</p>
 </body>
 </html>

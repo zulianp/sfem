@@ -57,7 +57,8 @@ static std::vector<real_t> state_of(const std::shared_ptr<smesh::Mesh> &m) {
 
 // Residual keyed by rounded coordinate.
 static std::map<std::array<long long, 3>, std::array<real_t, NF>> residual_of(
-        sfem::Context &ctx, const int cells, const int level, const real_t rc_scale) {
+        sfem::Context &ctx, const int cells, const int level, const real_t rc_scale,
+        const real_t dt = 0, const bool jacobian = false) {
     const int macro = cells / level;
     auto      mesh  = smesh::Mesh::create_hex8_cube(ctx.communicator(), macro, macro, macro,
                                                     0, 0, 0, LX, LY, LZ);
@@ -75,7 +76,33 @@ static std::map<std::array<long long, 3>, std::array<real_t, NF>> residual_of(
     f->add_operator(op);
     const auto          x = state_of(mesh);
     std::vector<real_t> r((size_t)mesh->n_nodes() * NF, 0);
-    f->gradient(x.data(), r.data());
+    if (dt > 0) {
+        // A history equal to the state makes the BDF term's residual contribution zero
+        // while leaving its JACOBIAN contribution -- rho V a0 / dt -- at full strength. So a
+        // Jacobian missing the term is visible here and a residual comparison would not see
+        // it, which is exactly how it survived.
+        std::vector<real_t> hist((size_t)mesh->n_nodes() * 3, 0);
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i)
+            for (int c = 0; c < 3; ++c) hist[(size_t)i * 3 + (size_t)c] = x[(size_t)i * NF + (size_t)c];
+        op->set_time_step(dt, 1);
+        op->set_velocity_history(hist.data(), nullptr);
+    }
+    if (jacobian) {
+        // Direction: another function of position, so it is the same field on both meshes.
+        const auto *const qx = mesh->points()->data()[0];
+        const auto *const qy = mesh->points()->data()[1];
+        const auto *const qz = mesh->points()->data()[2];
+        std::vector<real_t> dir((size_t)mesh->n_nodes() * NF, 0);
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+            dir[(size_t)i * NF + 0] = 0.31 - 0.12 * qx[i] + 0.07 * qy[i];
+            dir[(size_t)i * NF + 1] = -0.17 + 0.09 * qx[i] - 0.05 * qz[i];
+            dir[(size_t)i * NF + 2] = 0.23 + 0.04 * qy[i] - 0.11 * qz[i];
+            dir[(size_t)i * NF + 3] = 0.5 - 0.13 * qx[i] + 0.21 * qy[i];
+        }
+        f->apply(x.data(), dir.data(), r.data());
+    } else {
+        f->gradient(x.data(), r.data());
+    }
 
     std::map<std::array<long long, 3>, std::array<real_t, NF>> out;
     const auto *const px = mesh->points()->data()[0];
@@ -89,12 +116,15 @@ static std::map<std::array<long long, 3>, std::array<real_t, NF>> residual_of(
     return out;
 }
 
-static void compare(sfem::Context &ctx, const int cells, const int level, const real_t rc) {
-    const auto flat = residual_of(ctx, cells, 1, rc);
-    const auto ss   = residual_of(ctx, cells, level, rc);
+static void compare(sfem::Context &ctx, const int cells, const int level, const real_t rc,
+                    const real_t dt = 0, const bool jacobian = false) {
+    const auto flat = residual_of(ctx, cells, 1, rc, dt, jacobian);
+    const auto ss   = residual_of(ctx, cells, level, rc, dt, jacobian);
 
     char msg[160];
-    std::snprintf(msg, sizeof(msg), "level %d, rc %.1f: both see the same node set", level, (double)rc);
+    const char *const what = jacobian ? (dt > 0 ? "jacobian, dt>0" : "jacobian") : "residual";
+    std::snprintf(msg, sizeof(msg), "level %d, rc %.1f, %s: both see the same node set", level,
+                  (double)rc, what);
     check(flat.size() == ss.size(), msg);
 
     real_t                  worst[NF] = {0, 0, 0, 0}, scale[NF] = {0, 0, 0, 0};
@@ -150,7 +180,7 @@ static void compare(sfem::Context &ctx, const int cells, const int level, const 
     //
     // The threshold still has teeth for the thing it is here to catch: the hoisted geometry
     // at a non-power-of-two level reads 37 -- seven orders the wrong side of this line.
-    std::snprintf(msg, sizeof(msg), "level %d, rc %.1f: the residuals agree", level, (double)rc);
+    std::snprintf(msg, sizeof(msg), "level %d, rc %.1f: the %s agrees", level, (double)rc, what);
     check(rel < 1e-3, msg);
 }
 
@@ -167,6 +197,16 @@ int main(int argc, char **argv) {
     compare(*ctx, 12, 4, 1);
     compare(*ctx, 12, 2, 0);
     compare(*ctx, 12, 4, 0);
+
+    // The Jacobian ACTION, which is what a Krylov solver applies and what the residual
+    // comparison above cannot see. sscvfem_apply was missing the transient term entirely --
+    // the residual carried it, the block diagonal carried it, the block apply carried it,
+    // and the one path the linear solve actually uses did not. Every steady result was
+    // unaffected, so nothing noticed until a transient pump stalled at 1.6 of a Re=20
+    // target while the same case on a flat mesh reached it.
+    compare(*ctx, 12, 2, 1, 0.0, true);
+    compare(*ctx, 12, 2, 1, 0.05, true);
+    compare(*ctx, 12, 4, 1, 0.05, true);
 
     if (g_failures) {
         std::fprintf(stderr, "\ncvfem_flat_vs_ss_test: %d check(s) failed\n", g_failures);
