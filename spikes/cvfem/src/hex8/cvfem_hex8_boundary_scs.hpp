@@ -269,11 +269,43 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
                 }
             }
 
-            hex8_visc_jac_row<Atomic>(mu, ax, ay, az, w, i, slots, values);
-
             const scalar_t un   = ux[i] * ax + uy[i] * ay + uz[i] * az;
             const scalar_t mdot = rho * un;
             const smesh::count_t sii = slots[i * 8 + i];
+
+            // The natural-outflow branch, matching boundary_scs_add_residual and
+            // boundary_scs_add_jacobian_action. This function used to take nmask and
+            // ignore it, so on a do-nothing face the assembled matrix kept the pressure
+            // column and the viscous row that the residual drops -- it was not the
+            // derivative of anything the solver evaluates. The matrix-free path was
+            // unaffected (the action above has always branched), but the assembled
+            // matrix feeds the coarse-grid operators, the Vanka patch solves and the
+            // block-diagonal preconditioner, so the inconsistency reached the multigrid
+            // for every case with an open outlet.
+            if ((nmask >> f) & 1) {
+                // d/du of max(mdot, 0) * u_i: the same velocity block as the closed face
+                // where mdot > 0, and nothing where it is not. No pressure column, because
+                // the residual has no p_i * a term here; no viscous row, for the same
+                // reason. Continuity still carries the true flux and so keeps its row.
+                if (mdot > scalar_t(0)) {
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 0, rho * ax * ux[i] + mdot);
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 1, rho * ay * ux[i]);
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 2, rho * az * ux[i]);
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 0, rho * ax * uy[i]);
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 1, rho * ay * uy[i] + mdot);
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 2, rho * az * uy[i]);
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 0, rho * ax * uz[i]);
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 1, rho * ay * uz[i]);
+                    cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 2, rho * az * uz[i] + mdot);
+                }
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 0, rho * ax);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 1, rho * ay);
+                cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 2, rho * az);
+                continue;
+            }
+
+            hex8_visc_jac_row<Atomic>(mu, ax, ay, az, w, i, slots, values);
+
             cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 0, rho * ax * ux[i] + mdot);
             cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 1, rho * ay * ux[i]);
             cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 2, rho * az * ux[i]);
