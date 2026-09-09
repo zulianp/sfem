@@ -149,21 +149,13 @@ def fit_convergence_rate(scales, errors):
 
 # --------------------------------------------------------------------------- SVG
 
-# Colours are CSS custom properties so the figure follows the reader's light/dark theme,
-# with a literal fallback for a bare markdown_py page that defines none.
-SVG_CSS = """<style>
-.cvfig { --fg: #24292f; --muted: #57606a; --grid: #d0d7de; --s1: #0969da; --s2: #cf222e;
-         --s3: #1a7f37; --s4: #8250df; --surface: #ffffff; }
-@media (prefers-color-scheme: dark) {
-  .cvfig { --fg: #e6edf3; --muted: #9198a1; --grid: #30363d; --surface: #0d1117; }
-}
-.cvfig { font: 12px system-ui, -apple-system, sans-serif; max-width: 100%; height: auto; }
-.cvfig text { fill: var(--fg); }
-.cvfig .mut { fill: var(--muted); }
-</style>
-"""
-
-SERIES_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"]
+# Figures carry their palette as CSS custom properties so they follow docs/style.cscs.css,
+# and every one of them names a literal fallback -- var(--s1, #d97757) -- so a figure still
+# draws correctly in a Markdown viewer, or in any HTML that was produced without the
+# stylesheet beside it. There is no inline <style> block: presentation belongs in the
+# stylesheet, and a raw <style> at the top of a .md file is noise to every Markdown reader.
+SERIES_FALLBACK = ["#d97757", "#8c8880", "#4a6fa5", "#a8a29a"]
+SERIES_COLORS = ["var(--s%d, %s)" % (i + 1, c) for i, c in enumerate(SERIES_FALLBACK)]
 
 
 def _nice_ticks(lo, hi, count=5):
@@ -232,7 +224,7 @@ def svg_xy(series, xlabel, ylabel, logx=False, logy=False, width=720, height=330
         yy = py(val)
         if not (pad_t - 1 <= yy <= height - pad_b + 1):
             continue
-        o.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="var(--grid)" stroke-width="1"/>'
+        o.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>'
                  % (pad_l, yy, width - pad_r, yy))
         lab = ("1e%d" % round(v)) if logy else (fmt_y % val)
         o.append('<text class="mut" x="%d" y="%.1f" text-anchor="end">%s</text>'
@@ -242,7 +234,7 @@ def svg_xy(series, xlabel, ylabel, logx=False, logy=False, width=720, height=330
         xx = px(val)
         if not (pad_l - 1 <= xx <= width - pad_r + 1):
             continue
-        o.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="var(--grid)" stroke-width="1"/>'
+        o.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>'
                  % (xx, pad_t, xx, height - pad_b))
         lab = ("1e%d" % round(v)) if logx else (fmt_x % val)
         o.append('<text class="mut" x="%.1f" y="%d" text-anchor="middle">%s</text>'
@@ -264,7 +256,7 @@ def svg_xy(series, xlabel, ylabel, logx=False, logy=False, width=720, height=330
             o.append('<path d="%s" fill="none" stroke="%s" stroke-width="2"%s/>' % (pathd, col, dash))
         if style != "dash":
             for x, y in data:
-                o.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="%s" stroke="var(--surface)" '
+                o.append('<circle cx="%.1f" cy="%.1f" r="3.5" fill="%s" stroke="var(--surface, #ffffff)" '
                          'stroke-width="1.5"/>' % (px(x), py(y), col))
         o.append('<text x="%d" y="%d" fill="%s">%s</text>'
                  % (pad_l + 8, pad_t + 14 + i * 16, col, html.escape(name)))
@@ -279,7 +271,18 @@ def fmt(v, spec="%.3e", dash="--"):
 
 
 def status(ok):
-    return "pass" if ok else ("**FAIL**" if ok is False else "n/a")
+    # A span with a class rather than bold text: the stylesheet turns these into badges, and
+    # Markdown passes inline HTML through, so the same string is readable either way.
+    if ok is True:
+        return '<span class="st-pass">pass</span>'
+    if ok is False:
+        return '<span class="st-fail">FAIL</span>'
+    return '<span class="st-idle">n/a</span>'
+
+
+def note(text):
+    """A verdict that is not a verdict -- "not converged" and the like."""
+    return '<span class="st-idle">%s</span>' % html.escape(text)
 
 
 def table(headers, rows):
@@ -371,7 +374,7 @@ def section_boundary(runs, checks):
                 # mistake as counting it for one. The solver table below carries the
                 # detail, and the evidence line says how many landed here.
                 unconverged += 1
-                st = "not converged"
+                st = note("not converged")
             else:
                 ok = (err is not None and err <= 1e-6) and r.get("u_linf", 1) <= 1e-6
                 st = status(ok)
@@ -428,7 +431,7 @@ def section_conservation(runs, checks):
         inflow_ok = r.get("inflow_err") is None or r["inflow_err"] <= 0.05
         if r.get("converged") is False:
             unconverged += 1
-            st = "not converged"
+            st = note("not converged")
         else:
             ok = rel_res is not None and rel_res <= 1e-9 and inflow_ok
             st = status(ok)
@@ -530,7 +533,7 @@ def build_report(manifest, rundir):
     # into the paragraph above it, which Markdown then refused to treat as a heading.
     doc = "\n".join(head) + "\n" + "\n".join(p for p in parts if p.strip()) + "\n" + \
           "\n".join(t for t in tail if t is not None)
-    return SVG_CSS + "\n" + doc, n_fail
+    return doc, n_fail
 
 
 def selftest():
@@ -593,6 +596,45 @@ def selftest():
     return 1 if fails else 0
 
 
+DOC = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>%(title)s</title>
+<link rel="stylesheet" href="style.cscs.css">
+</head>
+<body>
+<div class="report-head">
+  <span class="mark">CVFEM</span>
+  <span>verification</span>
+  %(facts)s
+</div>
+%(body)s
+</body>
+</html>
+"""
+
+
+def write_html(target, fragment, manifest):
+    """Wrap markdown_py's fragment in a document that links the stylesheet.
+
+    The masthead carries what a reader needs to know before believing a number -- which
+    machine, how many threads, which commit -- rather than leaving it to the Provenance
+    table at the very bottom.
+    """
+    facts = []
+    for label, key in (("machine", "machine"), ("threads", "threads"), ("commit", "commit")):
+        v = manifest.get(key)
+        if v not in (None, "", "--"):
+            facts.append("<span>%s <dfn>%s</dfn></span>" % (label, html.escape(str(v))))
+    facts.append("<span>%s</span>" % datetime.datetime.now().strftime("%Y-%m-%d"))
+    with open(target, "w") as fh:
+        fh.write(DOC % {"title": "CVFEM verification report",
+                        "facts": "\n  ".join(facts),
+                        "body": fragment})
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -623,34 +665,48 @@ def main():
     print("wrote %s" % out)
 
     if args.html:
-        exe = shutil.which("markdown_py") or shutil.which("markdown_py3")
         target = os.path.splitext(out)[0] + ".html"
-        if exe:
+        exe = shutil.which("markdown_py") or shutil.which("markdown_py3")
+        if not exe:
+            # Not a failure: markdown_py is not bundled and is absent from the Alps uenv.
+            # The Markdown is the artifact; the HTML is a rendering of it.
+            print("markdown_py not found; wrote Markdown only. To render:\n"
+                  "  pip install --user markdown && markdown_py -x tables -o html %s -f %s"
+                  % (out, target))
+        else:
             # `tables` is the one that matters: every result on this page is a table, and
             # without it they render as paragraphs of pipes. The inline SVG needs no
-            # extension at all -- Markdown passes block-level HTML through untouched.
+            # extension -- Markdown passes block-level HTML through untouched.
             #
             # Extension sets are tried strongest first and the first that loads wins,
             # because markdown_py versions differ in what they ship: md_in_html arrived in
             # Markdown 3.3, and the markdown_py on this laptop is a Python 2.7 build that
             # fails to import it outright.
-            rc = 1
+            frag, rc = None, 1
             for exts in (["tables", "md_in_html"], ["tables"], []):
                 argv = [exe]
                 for e in exts:
                     argv += ["-x", e]
-                argv += ["-o", "html", out, "-f", target]
-                rc = subprocess.call(argv, stderr=subprocess.DEVNULL)
-                if rc == 0:
-                    print("wrote %s%s" % (target, "  (extensions: %s)" % ", ".join(exts) if exts else "  (no extensions)"))
+                argv += [out]
+                try:
+                    frag = subprocess.check_output(argv, stderr=subprocess.DEVNULL).decode("utf-8")
+                    rc = 0
                     break
+                except subprocess.CalledProcessError:
+                    continue
             if rc != 0:
                 print("markdown_py failed for every extension set; the Markdown stands on its own")
-        else:
-            # Not a failure: markdown_py is not bundled and is absent from the Alps uenv.
-            print("markdown_py not found; wrote Markdown only. To render:\n"
-                  "  pip install --user markdown && markdown_py -x tables -x md_in_html "
-                  "-o html %s -f %s" % (out, target))
+            else:
+                # markdown_py emits a bare fragment. Wrap it in a real document so the page
+                # has a title, a charset, a viewport and the stylesheet -- without which the
+                # tables are unreadable and the figures have no palette.
+                css_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs",
+                                       "style.cscs.css")
+                css_dst = os.path.join(os.path.dirname(os.path.abspath(target)), "style.cscs.css")
+                if os.path.exists(css_src) and os.path.abspath(css_src) != os.path.abspath(css_dst):
+                    shutil.copyfile(css_src, css_dst)
+                write_html(target, frag, manifest)
+                print("wrote %s%s" % (target, "" if exts else "  (no extensions)"))
 
     if args.strict and n_fail:
         sys.exit("%d verification check(s) failed" % n_fail)

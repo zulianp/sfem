@@ -20,6 +20,7 @@
 // Not self-contained, matching the convention of the other CVFEM headers: the includer
 // must define `scalar_t` and `N_FIELDS` before including this.
 
+#include <cassert>
 #include <cstdlib>
 #include <memory>
 #include <vector>
@@ -73,11 +74,18 @@ struct PackedData {
     ptrdiff_t                            st_max_local_nnz{0};
 };
 
-// Per-thread scratch arena, four slots, grown on demand and never shrunk.
+// Per-thread scratch arena, CVFEM_PACK_SCRATCH_SLOTS slots, grown on demand and never shrunk.
+static constexpr int CVFEM_PACK_SCRATCH_SLOTS = 8;
+
+// Per-thread scratch, indexed by slot. An out-of-range slot used to walk straight off the
+// end of these arrays and corrupt whatever thread_local storage followed -- the symptom was
+// a malloc abort ("pointer being freed was not allocated") far from the cause, so the bound
+// is checked rather than assumed. The check is once per call, not per element.
 template <typename T>
 static T *thread_scratch(const int slot, const size_t n) {
-    static thread_local T     *ptr[4] = {nullptr, nullptr, nullptr, nullptr};
-    static thread_local size_t cap[4] = {0, 0, 0, 0};
+    static thread_local T     *ptr[CVFEM_PACK_SCRATCH_SLOTS] = {};
+    static thread_local size_t cap[CVFEM_PACK_SCRATCH_SLOTS] = {};
+    assert(slot >= 0 && slot < CVFEM_PACK_SCRATCH_SLOTS);
     if (cap[slot] < n) {
         std::free(ptr[slot]);
         ptr[slot] = static_cast<T *>(std::calloc(n, sizeof(T)));
@@ -134,6 +142,14 @@ static SFEM_INLINE size_t packed_xyz_n(const PackedData &p) {
 static SFEM_INLINE size_t packed_rc_n(const PackedData &p) {
     const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
     return 6 * (size_t)n;
+}
+
+// The direction's reconstructed pressure gradient, staged only by the Jacobian action.
+// Kept out of packed_rc_n so the residual, which never reads it, allocates exactly what it
+// did before.
+static SFEM_INLINE size_t packed_qg_n(const PackedData &p) {
+    const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+    return 3 * (size_t)n;
 }
 
 static SFEM_INLINE smesh::idx_t pack_local_to_global(const PackedData &p,

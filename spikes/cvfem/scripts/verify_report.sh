@@ -143,12 +143,15 @@ fi
 
 # ---- global mass conservation on the one non-box domain the spike has ----
 if want step; then
-    # The configuration docs/CVFEM_Verification_Farrell.md section 3 records as solving:
-    # 40x8x4 macro at level 2, 47,268 dof, Re = 20, and SFEM_GMG=0. The knobs are not
-    # interchangeable -- at Re = 200, or with the multigrid preconditioner on, the case does
-    # not reach tolerance here, and an unconverged run cannot verify conservation.
+    # Flat, Re = 20, no multigrid, and an exact linear solve.
+    #
+    # SFEM_PRECOND=direct builds a dense LU of the fine Jacobian, which is affordable at
+    # 7,060 dofs and is the point: it takes the linear solver out of the question entirely,
+    # so what is left is a statement about the discretisation. Block-Jacobi cannot solve
+    # this case -- it has nothing to say about the pressure coupling and the Krylov residual
+    # wanders and then diverges -- and multigrid is deliberately not used here.
     run step lshape "mass_exact=$MASS_EXACT" -- SFEM_CASE=step SFEM_BOUNDARY_MASK=1 \
-        SFEM_ELEMENT_REFINE_LEVEL=2 SFEM_MU=0.1 SFEM_GMG=0
+        SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_MU=0.1 SFEM_GMG=0 SFEM_PRECOND=direct
 fi
 
 # ---- assemble the manifest ----
