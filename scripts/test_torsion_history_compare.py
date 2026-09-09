@@ -67,8 +67,14 @@ def check(root):
     original = yaml.safe_load(CASE.read_text())
     assert original["time"] == {"dt": 0.005, "t_end": 30.0}
     assert original["dynamics"] == {"type": "newmark", "density": 1.0, "beta": 0.64, "gamma": 0.6}
-    assert original["material"]["prony"] == [
-        {"g": 0.4, "tau": 1}, {"g": 0.4, "tau": 2}, {"g": 0.1, "tau": 5}, {"g": 0.05, "tau": 10}]
+    material = original["material"]
+    weights = [term["g"] for term in material["prony"]]
+    np.testing.assert_allclose(weights, np.array([0.08, 0.08, 0.06, 0.02]) / 1.24, rtol=1e-14)
+    assert [term["tau"] for term in material["prony"]] == [2.09, 13.03, 117.80, 349.87]
+    np.testing.assert_allclose(
+        np.array([material["C10"], material["C01"]]) * (1 - sum(weights)),
+        [1.555, 0.05], rtol=1e-14)
+    assert material["K"] == 50.0
     shortened = load_case(0.025)
     assert shortened["time"]["t_end"] == 0.025
     shortened["time"]["t_end"] = original["time"]["t_end"]

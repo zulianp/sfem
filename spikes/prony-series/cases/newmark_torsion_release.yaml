@@ -24,19 +24,23 @@
 mesh: mesh
 verbose: false
 material:
-  C10: 0.3
-  C01: 0.05
+  # Solid EPDM: Buchen et al. (2021), doi:10.1007/s00161-021-01004-4,
+  # Sec. 5.1 and Table 3. Instantaneous MR coefficients in MPa:
+  # C^0 = 1.24 C^inf; g_i = a_i / 1.24 (shared deviatoric relaxation).
+  # K and density remain benchmark assumptions; physical units need reconciliation.
+  C10: 1.9282
+  C01: 0.0620
   K: 50.0
-  # Same four Prony branches as the cantilever precision-comparison case; g_inf = 0.05.
+  # Instantaneous-normalized weights; g_inf = 1 / 1.24. Times in seconds.
   prony:
-  - g: 0.4
-    tau: 1.0
-  - g: 0.4
-    tau: 2.0
-  - g: 0.1
-    tau: 5.0
-  - g: 0.05
-    tau: 10.0
+  - g: 0.06451612903225806
+    tau: 2.09
+  - g: 0.06451612903225806
+    tau: 13.03
+  - g: 0.04838709677419355
+    tau: 117.80
+  - g: 0.016129032258064516
+    tau: 349.87
   wlf:
     enabled: false
 time:
