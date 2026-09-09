@@ -94,6 +94,18 @@ struct MeshData {
     // manufactured-solution case, where f = -(1/Re) lap(u) + (u.grad)u + grad(p).
     std::vector<scalar_t> fx, fy, fz;
     std::vector<scalar_t> node_vol;
+    // Transient term. dt <= 0 means steady, in which case nothing below is touched and the
+    // residual is bit-identical to what it was before this existed -- which is what every
+    // existing case and every recorded number depends on.
+    //
+    // The history is the velocity at the previous one or two time levels, three components
+    // interleaved per node the way the state vector is. Pressure has no time derivative in
+    // incompressible flow and no history: the continuity equation is a constraint, not an
+    // evolution equation, and giving it a mass term would be a different set of equations.
+    scalar_t              dt{0};
+    int                   bdf_order{1};
+    std::vector<scalar_t> u_prev;   // u^n,     3 * nnodes
+    std::vector<scalar_t> u_prev2;  // u^{n-1}, 3 * nnodes, BDF2 only
     // Per-element boundary-face bitmask, one bit per CVFEM local face. Empty means "decide
     // from the bounding box", which is what every box case does and keeps those results
     // bit-identical. A non-box domain must set it: a coordinate test cannot see a re-entrant
@@ -645,6 +657,11 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
 // identity slots, which is correct for every kernel however it writes, and only the eight
 // diagonal blocks are scattered. The call sequence mirrors assemble_jacobian_atomic_*
 // exactly; if those gain a term, this must too, and the gate will say so.
+// Both are defined below, after the element sweeps they share helpers with. The existing
+// forward declaration of build_node_volume sits further down than this function does.
+inline void     build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol);
+inline scalar_t transient_diag_weight(const MeshData &d, const scalar_t rho);
+
 inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
                                               const scalar_t        rho,
                                               const scalar_t        mu,
@@ -689,6 +706,23 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
             for (int k = 0; k < 16; ++k) CVFEM_ATOMIC_ADD(out[(size_t)g * 16 + k], blk[k]);
         }
     }
+
+    // The transient term's diagonal. It is rho V a0 / dt on each velocity component and
+    // nothing on pressure, so it strengthens exactly the block the smoother inverts and
+    // leaves the saddle-point structure alone. Adding it here rather than in the element
+    // kernels keeps it consistent with apply_transient, which is a post-pass for the same
+    // reason.
+    {
+        const scalar_t a = transient_diag_weight(d, rho);
+        if (a != scalar_t(0)) {
+            if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                const scalar_t w = a * d.node_vol[(size_t)i];
+                for (int c = 0; c < 3; ++c) diag[(size_t)i * 16 + (size_t)c * 4 + (size_t)c] += w;
+            }
+        }
+    }
 }
 
 inline void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol);  // defined below
@@ -717,12 +751,85 @@ inline void apply_body_force(MeshData &d) {
     }
 }
 
+// BDF1/BDF2 coefficients for r += rho V (a0 u^{n+1} + a1 u^n + a2 u^{n-1}) / dt.
+//
+// BDF2 needs two levels of history, so the first step of a run has none and must fall back
+// to BDF1. That is not an approximation to apologise for -- it is the standard start-up,
+// and it costs one step of first-order error in a sequence that is otherwise second-order.
+// The caller signals it by leaving u_prev2 empty.
+struct BdfCoeffs {
+    scalar_t a0, a1, a2;
+    int      order;
+};
+
+inline BdfCoeffs bdf_coeffs(const MeshData &d) {
+    const bool have_two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
+    if (have_two) return {scalar_t(1.5), scalar_t(-2), scalar_t(0.5), 2};
+    return {scalar_t(1), scalar_t(-1), scalar_t(0), 1};
+}
+
+// The transient term, as a per-node post-pass.
+//
+// In a control-volume scheme the mass matrix IS the control volume: the momentum equation
+// integrated over CV_i has d/dt of (rho u_i V_i), so the term is diagonal and V_i is
+// already computed for the body force and the MMS norms. There is no consistent mass
+// matrix to assemble and none should be introduced -- an FEM mass matrix here would be a
+// different discretisation, not a better one.
+//
+// This is a post-pass for the reason apply_body_force gives above: the term touches no
+// sub-control-surface flux, so one pass covers the sumfact, isoparametric and packed
+// sweeps at once rather than being threaded into five host kernels and five CUDA kernels.
+inline void apply_transient(MeshData &d, const scalar_t rho) {
+    if (d.dt <= scalar_t(0)) return;
+    if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+    const BdfCoeffs c   = bdf_coeffs(d);
+    const scalar_t  inv = scalar_t(1) / d.dt;
+    const bool      two = c.order == 2;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t w  = rho * d.node_vol[(size_t)i] * inv;
+        const size_t   k  = (size_t)i * 3;
+        const scalar_t p2x = two ? d.u_prev2[k + 0] : scalar_t(0);
+        const scalar_t p2y = two ? d.u_prev2[k + 1] : scalar_t(0);
+        const scalar_t p2z = two ? d.u_prev2[k + 2] : scalar_t(0);
+        d.rx[(size_t)i] += w * (c.a0 * d.ux[(size_t)i] + c.a1 * d.u_prev[k + 0] + c.a2 * p2x);
+        d.ry[(size_t)i] += w * (c.a0 * d.uy[(size_t)i] + c.a1 * d.u_prev[k + 1] + c.a2 * p2y);
+        d.rz[(size_t)i] += w * (c.a0 * d.uz[(size_t)i] + c.a1 * d.u_prev[k + 2] + c.a2 * p2z);
+    }
+}
+
+// The same term's contribution to the Jacobian: d/du of the above is rho V a0 / dt on each
+// of the three velocity diagonal entries. Pressure is untouched, so the saddle-point
+// structure -- and the reason the block-diagonal preconditioner needs Rhie-Chow to invert
+// the pressure entry at all -- is unchanged.
+inline scalar_t transient_diag_weight(const MeshData &d, const scalar_t rho) {
+    if (d.dt <= scalar_t(0)) return scalar_t(0);
+    if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return scalar_t(0);
+    return bdf_coeffs(d).a0 * rho / d.dt;
+}
+
+// Applied to the matrix-free Jacobian action, where the direction plays the role of u.
+inline void apply_transient_action(MeshData &d, const scalar_t rho,
+                                   const scalar_t *const SFEM_RESTRICT dir,
+                                   scalar_t *const SFEM_RESTRICT jv) {
+    const scalar_t a = transient_diag_weight(d, rho);
+    if (a == scalar_t(0)) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t w = a * d.node_vol[(size_t)i];
+        for (int c = 0; c < 3; ++c) jv[(ptrdiff_t)i * N_FIELDS + c] += w * dir[(ptrdiff_t)i * N_FIELDS + c];
+    }
+}
+
 inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual");
     assemble_nodal_p_grad(d, geom);
     if (geom == GeomKind::Isoparam) {
         apply_residual_atomic_isoparam(d, rho, mu);
         apply_body_force(d);
+    apply_transient(d, rho);
         return;
     }
     if (d.packed) {
@@ -730,10 +837,12 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
         cvfem_hex8_apply_residual_packed(d, *d.packed, rho, mu);
         apply_boundary_scs_residual(d, rho, mu, 0);
         apply_body_force(d);
+    apply_transient(d, rho);
         return;
     }
     apply_residual_atomic_sumfact(d, rho, mu);
     apply_body_force(d);
+    apply_transient(d, rho);
 }
 
 // zero_first=false accumulates into whatever is already in b. sfem::Function::hessian_bsr
@@ -858,6 +967,7 @@ inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, co
     } else {
         apply_jacobian_action_atomic_sumfact(d, rho, mu, dir, jv);
     }
+    apply_transient_action(d, rho, dir, jv);
 }
 
 inline void apply_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
