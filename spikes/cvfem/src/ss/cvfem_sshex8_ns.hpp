@@ -52,6 +52,10 @@ struct SSMeshData {
     // Harten band for the upwind switch, as an absolute mass-flux magnitude. Zero is the
     // hard switch, which is what every case that converges quadratically already uses.
     scalar_t                     upwind_eps{0};
+    // Whether sscvfem_apply_blocks carries the exact Rhie-Chow term, making it the true
+    // restriction of the operator. See sscvfem_wants_q_grad for why a preconditioner clears
+    // this and what it measured.
+    bool                         blocks_exact_rc{true};
 
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> pgx, pgy, pgz;
@@ -1042,6 +1046,31 @@ enum SSBlock : int {
 // rows outside its rows, around the unmodified full operator. That cannot disagree with
 // the operator, which is what makes it the right thing to check the fast path against --
 // the fast path restates the arithmetic and could drift.
+// SFEM_RC_EXACT_JAC, read once. Shared by the full apply, the block apply and the block
+// reference so the three cannot drift: whatever the operator differentiates through, the
+// blocks must differentiate through too, or they do not sum back to it.
+inline bool sscvfem_rc_exact_jac() {
+    static const int v = smesh::Env::read<int>("SFEM_RC_EXACT_JAC", 1);
+    return v != 0;
+}
+
+// Whether the direction's pressure gradient has to be reconstructed for this evaluation:
+// only the pressure-column blocks read it, so a velocity-column block skips the pass.
+//
+// d.blocks_exact_rc is how a *preconditioner* declines the term. The block apply defaults
+// to being the exact restriction of the operator, because that is the contract the four
+// blocks are checked against; but a preconditioner does not have to be the operator, and
+// measurement on Grace says it should not pay for being one here. The term costs one nodal
+// gradient reconstruction per pressure-column apply -- 0.919 ns/dof at 34,147,332 dofs on
+// 72 cores, which is +140% on B^T, +217% on C and +89% on the whole block operator -- and
+// changes the standalone convergence rate of the SIMPLE smoother by nothing at all: at
+// 75,140 dofs the two agree to six decimals at every sweep, 0.990157 against 0.990157 at
+// sweep 39. So the driver's smoother turns it off and the operator keeps it on.
+inline bool sscvfem_wants_q_grad(const SSMeshData &d, const int blocks) {
+    return (blocks & (SSBLOCK_UP | SSBLOCK_PP)) != 0 && d.blocks_exact_rc &&
+           sscvfem_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty();
+}
+
 inline void sscvfem_apply_blocks_ref(SSMeshData &d, const scalar_t rho, const scalar_t mu, const int blocks,
                                      const scalar_t *const SFEM_RESTRICT dir,
                                      scalar_t *const SFEM_RESTRICT       jv) {
@@ -1053,6 +1082,13 @@ inline void sscvfem_apply_blocks_ref(SSMeshData &d, const scalar_t rho, const sc
 
     for (ptrdiff_t i = 0; i < ndof; ++i) jv[i] = scalar_t(0);
 
+    const bool exact = sscvfem_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty();
+    if (!exact) {
+        d.qgx.clear();
+        d.qgy.clear();
+        d.qgz.clear();
+    }
+
     for (int pass = 0; pass < 2; ++pass) {
         const bool ucol = (pass == 0);
         if (ucol && !want_ucol) continue;
@@ -1063,6 +1099,13 @@ inline void sscvfem_apply_blocks_ref(SSMeshData &d, const scalar_t rho, const sc
             v[(size_t)n * 4 + 3] = ucol ? scalar_t(0) : dir[(size_t)n * 4 + 3];
         }
         std::fill(y.begin(), y.end(), scalar_t(0));
+        // Rhie-Chow's derivative reaches the kernel through d.qg, which is reconstructed
+        // from the direction's pressure -- ambient state, not an argument -- so masking the
+        // input vector does not mask it, and the reference would carry the whole correction
+        // into every block. Reconstruct it from the masked vector instead. That is what
+        // makes this a column restriction: the velocity pass sees zero pressure and so no
+        // correction at all, the pressure pass sees the whole of it.
+        if (exact) sscvfem_nodal_q_grad(d, v.data());
         // The default apply, named directly rather than through sscvfem_apply, which
         // is declared below this point.
         sscvfem_apply_macro_local_hoisted(d, rho, mu, v.data(), y.data());
@@ -1091,6 +1134,9 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
                                               const scalar_t *const SFEM_RESTRICT pgx,
                                               const scalar_t *const SFEM_RESTRICT pgy,
                                               const scalar_t *const SFEM_RESTRICT pgz,
+                                              const scalar_t *const SFEM_RESTRICT qgx,
+                                              const scalar_t *const SFEM_RESTRICT qgy,
+                                              const scalar_t *const SFEM_RESTRICT qgz,
                                               scalar_t *const SFEM_RESTRICT       r,
                                               const scalar_t ueps = scalar_t(0)) {
     constexpr bool uu = (Blocks & SSBLOCK_UU) != 0;
@@ -1155,7 +1201,19 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
         const scalar_t dmdot_v = (uu || pu) ? rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay +
                                                             (vz[i] + vz[j]) * az)
                                             : scalar_t(0);
-        const scalar_t dmdot_q = (up || pp) ? c * (q[i] - q[j]) : scalar_t(0);
+        // Rhie-Chow differentiates through the nodal pressure-gradient reconstruction, and
+        // that derivative is a pressure-column term -- it is built from the gradient of the
+        // *direction's* pressure -- so it belongs to B^T and C and to neither velocity-column
+        // block. sscvfem_action_hoisted carries it as c * dcorr. Omitting it here did not
+        // make any one block wrong in an obvious way; it made the four of them fail to sum
+        // back to the operator, which is exactly the second check the bench performs and had
+        // been reporting at 1.0e-01 since the exact term was introduced.
+        // qgx == nullptr is the frozen-pg form, as in the hoisted kernel.
+        const scalar_t dcorr = ((up || pp) && qgx) ? (half * (qgx[i] + qgx[j]) * g.dvec[s][0] +
+                                                      half * (qgy[i] + qgy[j]) * g.dvec[s][1] +
+                                                      half * (qgz[i] + qgz[j]) * g.dvec[s][2])
+                                                   : scalar_t(0);
+        const scalar_t dmdot_q = (up || pp) ? c * ((q[i] - q[j]) + dcorr) : scalar_t(0);
 
         if constexpr (mom) {
             scalar_t fx = 0, fy = 0, fz = 0;
@@ -1224,6 +1282,12 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
         std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
         std::vector<scalar_t>     lvx((size_t)nxe), lvy((size_t)nxe), lvz((size_t)nxe), lq((size_t)nxe);
         std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
+        // The direction's reconstructed gradient, staged exactly as the hoisted apply stages
+        // it, and only for a pressure-column block -- for A_uu and B the term is absent by
+        // construction, so this gather is skipped along with the rest of the pressure work.
+        const bool                has_qg = (up || pp) && !d.qgx.empty();
+        std::vector<scalar_t>     lqgx((size_t)(has_qg ? nxe : 0)), lqgy((size_t)(has_qg ? nxe : 0)),
+                                  lqgz((size_t)(has_qg ? nxe : 0));
         std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
 
 #pragma omp for schedule(static)
@@ -1263,6 +1327,11 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                     lvz[(size_t)a] = dir[(size_t)g * 4 + 2];
                 }
                 if constexpr (need_dir_q) lq[(size_t)a] = dir[(size_t)g * 4 + 3];
+                if (has_qg) {
+                    lqgx[(size_t)a] = d.qgx[(size_t)g];
+                    lqgy[(size_t)a] = d.qgy[(size_t)g];
+                    lqgz[(size_t)a] = d.qgz[(size_t)g];
+                }
             }
             // Anything not gathered must still read as zero, since the element kernels and
             // the boundary term take all of them regardless.
@@ -1299,6 +1368,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
 
                         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
                         scalar_t vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
+                        scalar_t qgx[8], qgy[8], qgz[8];
                         scalar_t r[CVFEM_HEX8_N_DOF];
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
@@ -1316,9 +1386,19 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                             pgx[a]      = lpgx[(size_t)l];
                             pgy[a]      = lpgy[(size_t)l];
                             pgz[a]      = lpgz[(size_t)l];
+                            if (has_qg) {
+                                qgx[a] = lqgx[(size_t)l];
+                                qgy[a] = lqgy[(size_t)l];
+                                qgz[a] = lqgz[(size_t)l];
+                            }
                         }
 
-                        sscvfem_action_blocks<Blocks>(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz, r);
+                        // d.upwind_eps, not the default zero: every other call site passes it,
+                        // and a block apply that smooths the upwind switch differently from
+                        // the operator is not a restriction of it either.
+                        sscvfem_action_blocks<Blocks>(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz,
+                                                      has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
+                                                      has_qg ? qgz : nullptr, r, d.upwind_eps);
 
                         // Boundary term, by input masking. Two passes only when both
                         // column groups are wanted, which for the full operator is the
@@ -1411,6 +1491,17 @@ inline scalar_t sscvfem_transient_diag_weight(const SSMeshData &d, const scalar_
 inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar_t mu, const int blocks,
                                  const scalar_t *const SFEM_RESTRICT dir,
                                  scalar_t *const SFEM_RESTRICT       jv) {
+    // The block apply is meant to be the restriction of the operator to a field block, so
+    // it differentiates through the same reconstruction the operator does. Only the
+    // pressure-column blocks read the result, so B and A_uu skip the pass entirely.
+    if (sscvfem_wants_q_grad(d, blocks)) {
+        sscvfem_nodal_q_grad(d, dir);
+    } else {
+        d.qgx.clear();
+        d.qgy.clear();
+        d.qgz.clear();
+    }
+
     switch (blocks & SSBLOCK_ALL) {
         // 0 selects no block at all: the sweep gathers the macro-element, computes
         // nothing, and scatters zeros. That is the floor any block specialisation can
@@ -1913,8 +2004,7 @@ inline void sscvfem_apply(SSMeshData &d, const scalar_t rho, const scalar_t mu,
     // SFEM_RC_EXACT_JAC=0 restores the frozen-pg Jacobian, for A/B against this fix. The
     // preconditioner is still built from the assembled Jacobian, which keeps the frozen form,
     // so making the action exact also makes the two disagree -- that is what the A/B measures.
-    static const int rc_exact = smesh::Env::read<int>("SFEM_RC_EXACT_JAC", 1);
-    if (rc_exact && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
+    if (sscvfem_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
         sscvfem_nodal_q_grad(d, dir);
     } else {
         d.qgx.clear();

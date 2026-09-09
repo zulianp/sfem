@@ -511,6 +511,27 @@ private:
                                                 const real_t             omega,
                                                 const int                inner,
                                                 const real_t             ds_scale) {
+        // SIMPLE takes the frozen-pressure-gradient block apply, not the exact restriction
+        // of the operator.
+        //
+        // sscvfem_apply_blocks can differentiate through the nodal pressure-gradient
+        // reconstruction, and by default it does, because the four field blocks are checked
+        // against the requirement that they sum back to the operator. A preconditioner is
+        // under no such obligation, and here the exact term is measurably not worth its
+        // price: on 72 Grace cores it adds one nodal gradient pass per pressure-column apply
+        // -- +140% on B^T and +217% on C at 34,147,332 dofs -- and moves this smoother's
+        // standalone convergence rate not at all. Measured to 40 sweeps at 75,140 dofs, the
+        // exact and frozen forms agree to six decimals at every single sweep, ending at
+        // 0.990157 against 0.990157.
+        //
+        // The block diagonal SIMPLE builds below is frozen anyway and cannot be otherwise:
+        // the exact term is nonlocal and does not fit the BSR sparsity pattern. So this also
+        // makes the two halves of the preconditioner consistent with each other.
+        //
+        // SFEM_SIMPLE_EXACT_RC=1 restores the exact form, which is how the numbers above
+        // were obtained and how they can be re-obtained.
+        op.set_option("blocks_exact_rc", smesh::Env::read<int>("SFEM_SIMPLE_EXACT_RC", 0) != 0);
+
         std::vector<real_t> bd((size_t)nnodes * 16, real_t(0));
         op.hessian_block_diag(x, bd.data());
 

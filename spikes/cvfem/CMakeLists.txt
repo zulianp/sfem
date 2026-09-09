@@ -122,7 +122,12 @@ target_include_directories(cvfem_hex8_ns_steady PRIVATE ${CVFEM_SFEM_ALGEBRA_INC
 target_include_directories(cvfem_sshex8_bench PRIVATE ${CVFEM_SFEM_OPERATORS_INCLUDES})
 cvfem_blas_target(cvfem_sshex8_bench)
 add_test(NAME cvfem_sshex8_agree COMMAND cvfem_sshex8_bench)
-set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0")
+# SFEM_BENCH_PROBE_DIAG=1 checks the block diagonal against the operator itself rather
+# than against the other block-diagonal implementation. It costs one apply per dof, so
+# it is off by default and had therefore never run anywhere; at these two sizes it adds
+# about 2.4 s, which is worth paying for the only check that the assembled diagonal is
+# a diagonal of anything.
+set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0;SFEM_BENCH_PROBE_DIAG=1")
 
 # ------------------------------------------------------------------------ tests
 # One test per file in tests/, filename == target name == ctest name, as SFEM does for

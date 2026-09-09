@@ -155,11 +155,27 @@ int main(int argc, char **argv) {
             if (probe_diag && ndof <= 20000) {
                 std::vector<scalar_t> ecol((size_t)ndof), ycol((size_t)ndof);
                 double                pmax = 0, pref = 0;
+                // Probed against the FROZEN-pg action, deliberately, and not against
+                // sscvfem_apply. The exact Rhie-Chow term differentiates through the nodal
+                // pressure-gradient reconstruction, which is nonlocal -- qg at a node reads
+                // p on its neighbours' neighbours -- so it does not fit the BSR sparsity
+                // pattern and the assembled Jacobian keeps the frozen form on purpose. The
+                // block diagonal is an extraction of that matrix, so the frozen action is
+                // what it is the diagonal *of*; probing it against the exact operator
+                // measured a documented approximation and reported it as a failure, which
+                // is the same trap tests/cvfem_ns_op_gate.cpp records at its top.
+                //
+                // The matrix-free block apply is a different matter and is NOT excused this
+                // way: it can carry the nonlocal term, so it must, and blk_agree below
+                // checks it with the exact term on.
+                d.qgx.clear();
+                d.qgy.clear();
+                d.qgz.clear();
                 for (ptrdiff_t c = 0; c < ndof; ++c) {
                     std::fill(ecol.begin(), ecol.end(), scalar_t(0));
                     ecol[(size_t)c] = scalar_t(1);
                     std::fill(ycol.begin(), ycol.end(), scalar_t(0));
-                    sscvfem_apply(d, rho, mu, ecol.data(), ycol.data());
+                    sscvfem_apply_macro_local_hoisted(d, rho, mu, ecol.data(), ycol.data());
                     // Column c of J touches the diagonal block of node c/4 in rows of the
                     // same node.
                     const ptrdiff_t node = c / 4, fld = c % 4;
