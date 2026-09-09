@@ -299,7 +299,14 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_packed");
     const size_t scratch_n = packed_scratch_n(p);
     const size_t rc_n      = packed_rc_n(p);
+    const size_t qg_n      = packed_qg_n(p);
     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
+    // The Rhie-Chow term differentiates through the nodal pressure-gradient reconstruction.
+    // apply_jacobian_action_accumulate reconstructs the direction's gradient into d.qg
+    // before calling this, or clears it, so a non-empty d.qgx is exactly the signal that the
+    // exact form is wanted. Without this the packed Jacobian is the frozen-pg one while the
+    // residual is not, and Newton is capped at a linear rate.
+    const bool   with_qg   = with_rc && !d.qgx.empty();
 
 #pragma omp parallel
     {
@@ -314,6 +321,10 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
         scalar_t *const SFEM_RESTRICT pack_pgx = pack_rc + 3 * nmax;
         scalar_t *const SFEM_RESTRICT pack_pgy = pack_rc + 4 * nmax;
         scalar_t *const SFEM_RESTRICT pack_pgz = pack_rc + 5 * nmax;
+        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, qg_n) : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
+        scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + nmax : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * nmax : nullptr;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
@@ -344,6 +355,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                 dstd[2]                            = dir[(ptrdiff_t)g * N_FIELDS + 2];
                 dstd[3]                            = dir[(ptrdiff_t)g * N_FIELDS + 3];
             }
+            if (with_qg)
+                cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
@@ -379,6 +392,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                 if (with_rc)
                     cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz, begin,
                                                    nlanes, rcp);
+                if (with_qg)
+                    cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
                 cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
                                                           mu,
                                                           cof0,
@@ -395,7 +410,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                                                           du_pack,
                                                           outp,
                                                           with_rc ? &rcp : nullptr,
-                                                          d.rhie_chow_scale);
+                                                          d.rhie_chow_scale,
+                                                          with_qg);
                 cvfem_hex8_scatter_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
             }
 

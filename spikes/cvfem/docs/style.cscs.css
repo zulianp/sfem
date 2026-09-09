@@ -1,0 +1,248 @@
+/* House style for CVFEM reports produced on CSCS Alps.
+ *
+ * Warm paper rather than a white screen, one accent colour, serif headings against a sans
+ * body, and a measure narrow enough to read -- with tables and figures allowed to break out
+ * of it, because a convergence table that wraps is worse than one that is wide.
+ *
+ * Not an official CSCS template and does not carry CSCS or ETH marks; it is the house style
+ * for these reports, named for where they are run.
+ *
+ * Everything is a custom property so the inline SVG the report emits can use the same
+ * palette. Each var() in that SVG carries a literal fallback, so a figure still draws
+ * correctly when the file is opened without this stylesheet.
+ */
+
+:root {
+    --paper:      #faf9f5;  /* page */
+    --surface:    #ffffff;  /* tables, figures */
+    --sunken:     #f2f0e9;  /* table headers, code */
+    --rule:       #e4e1d8;
+    --rule-firm:  #cfcabc;
+
+    --ink:        #141413;
+    --ink-muted:  #6b6862;
+    --ink-faint:  #8c8880;
+
+    --accent:     #d97757;  /* the one accent: links, rules, series 1 */
+    --accent-deep: #b8563a;
+
+    --pass:       #3f7d5c;
+    --fail:       #b3402f;
+    --idle:       #8c8880;
+
+    /* Figure series. Assigned by identity in the generator, never by rank, so a quantity
+     * keeps its colour from one figure to the next. */
+    --s1: #d97757;
+    --s2: #8c8880;
+    --s3: #4a6fa5;
+    --s4: #a8a29a;
+    --grid: #e4e1d8;
+
+    --measure: 46rem;
+
+    --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+    --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --mono:  ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --paper:     #1c1b18;
+        --surface:   #232220;
+        --sunken:    #2a2825;
+        --rule:      #35322d;
+        --rule-firm: #4a463f;
+
+        --ink:       #edeae2;
+        --ink-muted: #a7a29a;
+        --ink-faint: #857f76;
+
+        --accent:      #e08a6b;
+        --accent-deep: #f0a988;
+        --pass: #6aa585;
+        --fail: #e2705c;
+        --s1: #e08a6b;
+        --s2: #a7a29a;
+        --s3: #7fa3d4;
+        --s4: #6f6a62;
+        --grid: #35322d;
+    }
+}
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+    margin: 0;
+    padding: 3.5rem 1.5rem 6rem;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 16px/1.65 var(--sans);
+    font-feature-settings: "kern" 1, "liga" 1;
+}
+
+/* The measure applies to prose. Tables and figures opt out below. */
+body > * { max-width: var(--measure); margin-left: auto; margin-right: auto; }
+
+h1, h2, h3, h4 {
+    font-family: var(--serif);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+}
+
+h1 {
+    font-size: 2.25rem;
+    margin: 0 0 0.4em;
+    padding-bottom: 0.4em;
+    border-bottom: 2px solid var(--accent);
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin: 2.75em 0 0.7em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--rule);
+}
+
+h3 { font-size: 1.15rem; margin: 2em 0 0.5em; color: var(--ink-muted); }
+
+p { margin: 0 0 1.1em; }
+
+a { color: var(--accent-deep); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+code {
+    font: 400 0.875em/1.5 var(--mono);
+    background: var(--sunken);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+}
+
+/* The summary paragraph the generator writes: "N of M checks pass." */
+p > strong:first-child { font-weight: 600; }
+
+/* ---- tables: the substance of the page, so they break the measure ---- */
+
+table {
+    max-width: min(100%, 62rem);
+    width: max-content;
+    margin: 1.6em auto 2em;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+}
+
+thead th {
+    background: var(--sunken);
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    text-align: left;
+    padding: 0.6em 0.9em;
+    border-bottom: 1px solid var(--rule-firm);
+    white-space: nowrap;
+}
+
+tbody td {
+    padding: 0.5em 0.9em;
+    border-top: 1px solid var(--rule);
+    white-space: nowrap;
+}
+
+/* Numbers right-align; the first column is a label and stays left. */
+tbody td:not(:first-child) { text-align: right; font-family: var(--mono); font-size: 0.84rem; }
+tbody td:first-child { font-weight: 500; }
+tbody tr:hover td { background: var(--sunken); }
+
+/* ---- verdicts ---- */
+
+.st-pass, .st-fail, .st-idle {
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.15em 0.55em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.st-pass { color: var(--pass); background: color-mix(in srgb, var(--pass) 12%, transparent); }
+.st-fail { color: var(--fail); background: color-mix(in srgb, var(--fail) 14%, transparent); }
+.st-idle { color: var(--idle); background: color-mix(in srgb, var(--idle) 12%, transparent); }
+
+/* color-mix is recent; these keep the badge legible without it. */
+@supports not (color: color-mix(in srgb, red 10%, transparent)) {
+    .st-pass, .st-fail, .st-idle { background: var(--sunken); }
+}
+
+/* ---- figures ---- */
+
+svg.cvfig {
+    display: block;
+    max-width: min(100%, 62rem);
+    height: auto;
+    margin: 1.6em auto 2.4em;
+    padding: 0.75rem 0.5rem 0.25rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    font-family: var(--sans);
+    font-size: 12px;
+}
+svg.cvfig text { fill: var(--ink); }
+svg.cvfig .mut { fill: var(--ink-faint); }
+
+/* ---- the masthead the generator wraps the page in ---- */
+
+.report-head {
+    max-width: var(--measure);
+    margin: 0 auto 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+    align-items: baseline;
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+}
+.report-head .mark {
+    font-family: var(--serif);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+}
+.report-head .mark::before {
+    content: "";
+    display: inline-block;
+    width: 0.5rem; height: 0.5rem;
+    margin-right: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: 0.05em;
+}
+.report-head dfn { font-style: normal; color: var(--ink); font-family: var(--mono); font-size: 0.78rem; }
+
+hr { border: 0; border-top: 1px solid var(--rule); margin: 3em auto; }
+
+@media (max-width: 640px) {
+    body { padding: 2rem 1rem 4rem; font-size: 15px; }
+    h1 { font-size: 1.75rem; }
+    table { font-size: 0.82rem; }
+}
+
+@media print {
+    :root { --paper: #fff; --surface: #fff; }
+    body { padding: 0; font-size: 11pt; }
+    h2 { page-break-after: avoid; }
+    table, svg.cvfig { page-break-inside: avoid; }
+}

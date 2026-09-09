@@ -142,6 +142,32 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_from_pack(pack_idx_t **const SFEM_R
     }
 }
 
+// The direction's gradient into the same pack, called straight after the routine above
+// when the Jacobian action needs it. Padding lanes are zeroed here too: they multiply real
+// geometry and would otherwise contribute whatever the last sweep left behind.
+static SFEM_INLINE void cvfem_hex8_gather_qg_from_pack(pack_idx_t **const SFEM_RESTRICT     elems,
+                                                       const scalar_t *const SFEM_RESTRICT pack_qgx,
+                                                       const scalar_t *const SFEM_RESTRICT pack_qgy,
+                                                       const scalar_t *const SFEM_RESTRICT pack_qgz,
+                                                       const ptrdiff_t                     begin,
+                                                       const int                           nlanes,
+                                                       Hex8RhieChowPack                   &rc) {
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        if (lane < nlanes) {
+            const ptrdiff_t e = begin + lane;
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const pack_idx_t loc = elems[a][e];
+                rc.qgx[a][lane]      = pack_qgx[loc];
+                rc.qgy[a][lane]      = pack_qgy[loc];
+                rc.qgz[a][lane]      = pack_qgz[loc];
+            }
+        } else {
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+                rc.qgx[a][lane] = rc.qgy[a][lane] = rc.qgz[a][lane] = scalar_t(0);
+        }
+    }
+}
+
 static SFEM_INLINE void cvfem_hex8_scatter_simd_to_pack(pack_idx_t **const SFEM_RESTRICT elems,
                                                         scalar_t *const SFEM_RESTRICT    pack_out,
                                                         const ptrdiff_t                  begin,
@@ -185,6 +211,34 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_xyz_pgrad(const PackT              
         pack_pgx[n_contiguous + k]   = with_pg ? d.pgx[(size_t)g] : scalar_t(0);
         pack_pgy[n_contiguous + k]   = with_pg ? d.pgy[(size_t)g] : scalar_t(0);
         pack_pgz[n_contiguous + k]   = with_pg ? d.pgz[(size_t)g] : scalar_t(0);
+    }
+}
+
+// The same staging for the DIRECTION's reconstructed gradient, which only the Jacobian
+// action needs. Separate from the routine above rather than another pair of arguments on
+// it: the residual and the benchmark call that one and have nothing to put here.
+template <typename PackT, typename MeshT>
+static SFEM_INLINE void cvfem_hex8_fill_pack_qgrad(const PackT                       &p,
+                                                   const MeshT                       &d,
+                                                   const ptrdiff_t                    pack,
+                                                   const ptrdiff_t                    n_contiguous,
+                                                   const ptrdiff_t                    n_ghost,
+                                                   const smesh::idx_t *const SFEM_RESTRICT ghosts,
+                                                   scalar_t *const SFEM_RESTRICT      pack_qgx,
+                                                   scalar_t *const SFEM_RESTRICT      pack_qgy,
+                                                   scalar_t *const SFEM_RESTRICT      pack_qgz) {
+    const ptrdiff_t owned = p.owned_nodes_ptr[pack];
+    for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+        const ptrdiff_t g = owned + k;
+        pack_qgx[k]       = d.qgx[(size_t)g];
+        pack_qgy[k]       = d.qgy[(size_t)g];
+        pack_qgz[k]       = d.qgz[(size_t)g];
+    }
+    for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+        const smesh::idx_t g       = ghosts[k];
+        pack_qgx[n_contiguous + k] = d.qgx[(size_t)g];
+        pack_qgy[n_contiguous + k] = d.qgy[(size_t)g];
+        pack_qgz[n_contiguous + k] = d.qgz[(size_t)g];
     }
 }
 

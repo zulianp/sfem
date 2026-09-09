@@ -54,6 +54,9 @@ static void build(Run &r, const int pack_size, const bool lshape, sfem::Context 
     MeshData &d = r.d;
     d.mesh      = r.mesh;
     d.Lx = 10; d.Ly = 2; d.Lz = 1;
+    // Rhie-Chow on. With it off the Jacobian comparison below is vacuous, because the term
+    // whose derivative went missing is not evaluated at all.
+    d.rhie_chow_scale = 1;
     // The step driver names its sidesets before the operator is initialized, so a skin has
     // already been extracted by the time the packed layout renumbers the nodes. Reproduce
     // that order: it is the order under which the two paths disagreed.
@@ -187,6 +190,70 @@ static void compare_skin(sfem::Context &ctx, const ptrdiff_t expect) {
     check(sa == sb, "packed and unpacked select the same skin nodes");
 }
 
+// The Jacobian ACTION, which is where the two paths actually diverged.
+//
+// The residual comparison above passed for months while the packed Jacobian was missing the
+// derivative of the Rhie-Chow pressure-gradient reconstruction -- the residual carries the
+// term, so the residuals agreed; only the Jacobian did not. It cost the backward-facing step
+// its convergence: an 11.7% error in the continuity rows against a finite difference, which
+// does not make any single Newton step fail, it just caps Newton at a linear rate, which
+// looks like a hard problem rather than a bug.
+//
+// Nothing here checked it. tests/cvfem_ns_op_gate.cpp runs the whole gate with
+// SFEM_RC_EXACT_JAC=0 on purpose, so the exact term is off there by construction.
+static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *name) {
+    Run a, b;
+    build(a, 0, lshape, ctx);     // atomic
+    build(b, 2048, lshape, ctx);  // packed
+
+    auto keyed_jv = [](Run &r) {
+        MeshData &d = r.d;
+        assemble_nodal_p_grad(d, GeomKind::Affine);
+        // A direction that is a function of position, so it is the same field on both
+        // numberings even though the node indices are not.
+        const auto *const px = d.points[0];
+        const auto *const py = d.points[1];
+        const auto *const pz = d.points[2];
+        std::vector<scalar_t> dir((size_t)d.nnodes * N_FIELDS, 0), jv((size_t)d.nnodes * N_FIELDS, 0);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            const scalar_t x = px[i], y = py[i], z = pz[i];
+            dir[(size_t)i * 4 + 0] = 0.31 - 0.12 * x + 0.07 * y;
+            dir[(size_t)i * 4 + 1] = -0.17 + 0.09 * x - 0.05 * z;
+            dir[(size_t)i * 4 + 2] = 0.23 + 0.04 * y - 0.11 * z;
+            dir[(size_t)i * 4 + 3] = 0.5 - 0.13 * x + 0.21 * y - 0.03 * z;
+        }
+        apply_jacobian_action_accumulate(d, scalar_t(1), scalar_t(0.05), GeomKind::Affine,
+                                         dir.data(), jv.data());
+        std::map<std::array<long long, 3>, std::array<scalar_t, 4>> out;
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            const std::array<long long, 3> key{(long long)std::llround(px[i] * 1e6),
+                                               (long long)std::llround(py[i] * 1e6),
+                                               (long long)std::llround(pz[i] * 1e6)};
+            out[key] = {jv[(size_t)i * 4 + 0], jv[(size_t)i * 4 + 1],
+                        jv[(size_t)i * 4 + 2], jv[(size_t)i * 4 + 3]};
+        }
+        return out;
+    };
+
+    const auto ja = keyed_jv(a);
+    const auto jb = keyed_jv(b);
+    scalar_t worst = 0, scale = 0;
+    for (const auto &kv : ja) {
+        const auto it = jb.find(kv.first);
+        if (it == jb.end()) continue;
+        for (int c = 0; c < 4; ++c) {
+            worst = std::max(worst, std::fabs(kv.second[c] - it->second[c]));
+            scale = std::max(scale, std::fabs(kv.second[c]));
+        }
+    }
+    const scalar_t rel = scale > 0 ? worst / scale : worst;
+    std::printf("\n--- %s Jacobian action (Rhie-Chow on) ---\n", name);
+    std::printf("  worst |packed - atomic| = %.6e   relative %.6e\n", (double)worst, (double)rel);
+    char msg[192];
+    std::snprintf(msg, sizeof(msg), "%s: packed and atomic Jacobian actions agree", name);
+    check(rel < 1e-12, msg);
+}
+
 int main(int argc, char **argv) {
     auto ctx = sfem::initialize(argc, argv);
     // The box first: it is the case that already works, so if it fails the harness is at
@@ -195,6 +262,8 @@ int main(int argc, char **argv) {
     compare(*ctx, true, "L-shape");
     // 1765 nodes on the 40x8x4 L-shape, 771 of them strictly interior.
     compare_skin(*ctx, 994);
+    compare_jacobian(*ctx, false, "box");
+    compare_jacobian(*ctx, true, "L-shape");
 
     if (g_failures) {
         std::fprintf(stderr, "\ncvfem_packed_vs_atomic_test: %d check(s) failed\n", g_failures);

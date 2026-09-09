@@ -68,6 +68,12 @@ struct Hex8RhieChowPack {
     alignas(ALIGN_BYTES) scalar_t pgx[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t pgy[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t pgz[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    // The DIRECTION's reconstructed gradient, for the Jacobian action. Only the packed
+    // Jacobian fills these; the residual has no use for them and leaves them untouched,
+    // which is why the kernels take them behind a template flag rather than a null check.
+    alignas(ALIGN_BYTES) scalar_t qgx[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t qgy[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t qgz[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
 };
 
 /* Optional colocated Rhie–Chow: u_f = u_avg - D_f[(p_j-p_i)/h - 0.5(∇p_i+∇p_j)·e].
@@ -1490,7 +1496,7 @@ static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                
     }
 }
 
-template <int I, int J, bool RC = false>
+template <int I, int J, bool RC = false, bool QG = false>
 static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t                      rho,
                                                      const scalar_t                      mu,
                                                      const scalar_t                      rc_scale,
@@ -1533,6 +1539,20 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t             
                      half * (rc->pgz[I][lane] + rc->pgz[J][lane]) * dz);
             mdot -= coeff * corr;
             dmdot += coeff * (du.p[I][lane] - du.p[J][lane]);
+            // Rhie-Chow differentiates through the nodal pressure-gradient reconstruction,
+            // and this is that derivative: the same shape as `corr` above, built from the
+            // direction's reconstructed gradient instead of the state's. Its absence is not
+            // visible in the residual and does not make any single Newton step fail -- it
+            // caps Newton at a LINEAR rate, and only where the continuity rows matter enough
+            // to notice. On the backward-facing step it put the Jacobian 11.7% away from a
+            // finite difference of the residual in the continuity rows (0.3% in momentum)
+            // and the solve never reached its target; the same case on the atomic layout,
+            // which has always carried this term, sits at 2.8e-13.
+            if constexpr (QG) {
+                dmdot += coeff * (half * (rc->qgx[I][lane] + rc->qgx[J][lane]) * dx +
+                                  half * (rc->qgy[I][lane] + rc->qgy[J][lane]) * dy +
+                                  half * (rc->qgz[I][lane] + rc->qgz[J][lane]) * dz);
+            }
         }
         scalar_t amdot, sgn;
         cvfem_upwind_abs(mdot, ueps, amdot, sgn);
@@ -1622,7 +1642,7 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
                                     out);
 }
 
-template <bool RC = false>
+template <bool RC = false, bool QG = false>
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
                                                     const scalar_t                      mu,
                                                     const scalar_t                      rc_scale,
@@ -1641,18 +1661,18 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t              
                                                     const Hex8InputPack                &du,
                                                     const Hex8RhieChowPack             *rc,
                                                     Hex8ResidualPack                   &out) {
-    cvfem_hex8_conv_face_jv_simd<0, 1, RC>(rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<3, 2, RC>(rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<4, 5, RC>(rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<7, 6, RC>(rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<0, 3, RC>(rho, mu, rc_scale, half, one, Ax1, Ay1, Az1, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<1, 2, RC>(rho, mu, rc_scale, half, one, Ax1, Ay1, Az1, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<4, 7, RC>(rho, mu, rc_scale, half, one, Ax1, Ay1, Az1, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<5, 6, RC>(rho, mu, rc_scale, half, one, Ax1, Ay1, Az1, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<0, 4, RC>(rho, mu, rc_scale, half, one, Ax2, Ay2, Az2, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<1, 5, RC>(rho, mu, rc_scale, half, one, Ax2, Ay2, Az2, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<2, 6, RC>(rho, mu, rc_scale, half, one, Ax2, Ay2, Az2, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<3, 7, RC>(rho, mu, rc_scale, half, one, Ax2, Ay2, Az2, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<0, 1, RC, QG>(rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<3, 2, RC, QG>(rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<4, 5, RC, QG>(rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<7, 6, RC, QG>(rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<0, 3, RC, QG>(rho, mu, rc_scale, half, one, Ax1, Ay1, Az1, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<1, 2, RC, QG>(rho, mu, rc_scale, half, one, Ax1, Ay1, Az1, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<4, 7, RC, QG>(rho, mu, rc_scale, half, one, Ax1, Ay1, Az1, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<5, 6, RC, QG>(rho, mu, rc_scale, half, one, Ax1, Ay1, Az1, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<0, 4, RC, QG>(rho, mu, rc_scale, half, one, Ax2, Ay2, Az2, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<1, 5, RC, QG>(rho, mu, rc_scale, half, one, Ax2, Ay2, Az2, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<2, 6, RC, QG>(rho, mu, rc_scale, half, one, Ax2, Ay2, Az2, u, du, rc, out);
+    cvfem_hex8_conv_face_jv_simd<3, 7, RC, QG>(rho, mu, rc_scale, half, one, Ax2, Ay2, Az2, u, du, rc, out);
 }
 
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
@@ -1899,7 +1919,8 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
         const Hex8InputPack                  &du,
         Hex8ResidualPack                     &out,
         const Hex8RhieChowPack               *rc       = nullptr,
-        const scalar_t                        rc_scale = scalar_t(0)) {
+        const scalar_t                        rc_scale = scalar_t(0),
+        const bool                            has_qg   = false) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -1971,11 +1992,19 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
     cvfem_hex8_visc_dir_simd<0, 4, 1, 5, 2, 6, 3, 7>(
             mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax2, Ay2, Az2, out);
 
+    // Three instantiations rather than a runtime test inside the face loop: the term is
+    // either present for a whole sweep or absent for it, and has_qg == false must stay
+    // bit-identical to what this kernel emitted before the term existed.
     if (rc && rc_scale != scalar_t(0)) {
-        cvfem_hex8_conv_all_jv_simd<true>(
-                rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+        if (has_qg) {
+            cvfem_hex8_conv_all_jv_simd<true, true>(
+                    rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+        } else {
+            cvfem_hex8_conv_all_jv_simd<true, false>(
+                    rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+        }
     } else {
-        cvfem_hex8_conv_all_jv_simd<false>(
+        cvfem_hex8_conv_all_jv_simd<false, false>(
                 rho, mu, rc_scale, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
     }
 }

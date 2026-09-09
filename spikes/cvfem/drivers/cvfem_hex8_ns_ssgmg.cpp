@@ -4082,7 +4082,58 @@ int main(int argc, char **argv) {
                 sm->set_max_it(2 * gmg_smooth);
                 set_prec(sm);
             } else {
-                set_prec(timed("precond_total", make_block_jacobi(*op, x, cmask.data(), nnodes)));
+                // No hierarchy. SFEM_PRECOND chooses what preconditions the fine level, and
+                // the default stays block-Jacobi so every existing SFEM_GMG=0 run is
+                // untouched.
+                //
+                // It exists because block-Jacobi is the wrong preconditioner for a saddle
+                // point and the backward-facing step is where that bites. Point-block
+                // Jacobi has nothing to say about the pressure coupling -- A_pp is
+                // structurally zero without Rhie-Chow -- so on the step the linear residual
+                // wanders (0.0034 -> 0.070 -> 0.016 over 255 iterations at Re=1) and the
+                // next Newton step diverges outright. Poiseuille and the cavity are
+                // velocity-dominated enough not to care, which is why this went unnoticed.
+                //
+                //   bjacobi  (default) damped 4x4 point-block Jacobi
+                //   simple   SIMPLE: velocity predictor, pressure Schur correction. Built
+                //            for exactly this and already here, needing a semi-structured
+                //            mesh -- apply_blocks has no flat path -- but no hierarchy.
+                //   vanka    coupled solve per micro-element patch, likewise
+                //   direct   dense LU of the fine Jacobian, probed column by column. O(n)
+                //            applies and O(n^2) memory, so it is capped and is a
+                //            verification instrument, not a solver: it removes the linear
+                //            solve from the question entirely, which is what you want when
+                //            asking whether Newton and the conservation property are sound.
+                const std::string pc = smesh::Env::read_string("SFEM_PRECOND", "bjacobi");
+                const real_t      om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                if (pc == "direct") {
+                    const ptrdiff_t cap = (ptrdiff_t)smesh::Env::read<int>("SFEM_DIRECT_MAX_DOF", 20000);
+                    if (ndof > cap) {
+                        std::fprintf(stderr,
+                                     "SFEM_PRECOND=direct refuses %td dofs (cap %td, raise with "
+                                     "SFEM_DIRECT_MAX_DOF): it builds a dense %td x %td matrix.\n",
+                                     ndof, cap, ndof, ndof);
+                        return EXIT_FAILURE;
+                    }
+                    set_prec(timed("precond_total", make_dense_lu(linop, ndof)));
+                } else if (pc == "simple") {
+                    set_prec(timed("precond_total",
+                                   make_simple(*op, x, cmask.data(), nnodes, om,
+                                               smesh::Env::read<int>("SFEM_SIMPLE_INNER", 1),
+                                               smesh::Env::read<real_t>("SFEM_SIMPLE_DS", real_t(1)))));
+                } else if (pc == "vanka") {
+                    std::vector<uint8_t> cb((size_t)ndof, 0);
+                    for (ptrdiff_t k = 0; k < ndof; ++k) cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                    set_prec(timed("precond_total",
+                                   cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om)));
+                } else {
+                    if (pc != "bjacobi") {
+                        std::fprintf(stderr, "SFEM_PRECOND='%s' is not one of bjacobi|simple|vanka|direct\n",
+                                     pc.c_str());
+                        return EXIT_FAILURE;
+                    }
+                    set_prec(timed("precond_total", make_block_jacobi(*op, x, cmask.data(), nnodes)));
+                }
             }
             t_prec += smesh::time_seconds() - t0;
         }
