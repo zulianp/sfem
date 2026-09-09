@@ -4226,6 +4226,21 @@ int main(int argc, char **argv) {
                 // next Newton step diverges outright. Poiseuille and the cavity are
                 // velocity-dominated enough not to care, which is why this went unnoticed.
                 //
+                // The semi-structured operator behaves the same as the flat one under every
+                // one of these, which is the property that matters when choosing between the
+                // two discretisations. The backward-facing step at Re=20, same 7,060-dof fine
+                // mesh reached both ways -- flat 40x8x4, and 20x4x2 macro at level 2:
+                //
+                //     set-up                 flat                       semi-structured
+                //     direct                 20/20, sum 1.90e-17        20/20, sum 4.15e-17
+                //     fgmres r=480 bjacobi   20/20, 2688 its, 4.87e-15  20/20, 2689 its, 6.26e-15
+                //     bcgs bjacobi           0/20, diverges             0/20, diverges
+                //
+                // Including the failure: block-Jacobi is too weak for this saddle point on
+                // either path and gives out after 254 and 244 iterations respectively. That
+                // is the equivalence being claimed -- not that semi-structured is better, but
+                // that it is the same operator and answers to the same solvers.
+                //
                 //   bjacobi  (default) damped 4x4 point-block Jacobi
                 //   simple   SIMPLE: velocity predictor, pressure Schur correction. Built
                 //            for exactly this and already here, needing a semi-structured
@@ -4238,6 +4253,18 @@ int main(int argc, char **argv) {
                 //            asking whether Newton and the conservation property are sound.
                 const std::string pc = smesh::Env::read_string("SFEM_PRECOND", "bjacobi");
                 const real_t      om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                // simple and vanka need apply_blocks and a micro-element lattice, neither of
+                // which a flat mesh has. Both do say so further down, but from inside the
+                // construction and under MPI_Abort's noise; saying it here names the knob the
+                // caller typed and costs nothing.
+                if ((pc == "simple" || pc == "vanka") && !fs->has_semi_structured_mesh()) {
+                    std::fprintf(stderr,
+                                 "SFEM_PRECOND=%s needs a semi-structured mesh (set "
+                                 "SFEM_ELEMENT_REFINE_LEVEL > 1). On a flat mesh the choices are "
+                                 "bjacobi and direct.\n",
+                                 pc.c_str());
+                    return EXIT_FAILURE;
+                }
                 if (pc == "direct") {
                     const ptrdiff_t cap = (ptrdiff_t)smesh::Env::read<int>("SFEM_DIRECT_MAX_DOF", 20000);
                     if (ndof > cap) {
