@@ -3495,9 +3495,11 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
     scalar_weight_name = "%sq_weight" % reference_prefix
     lines = ["namespace sfem {", "namespace codegen {", ""]
 
-    for scalar_type in ("double", "float"):
-        suffix = "" if scalar_type == "double" else "_float"
-        public_name = "%s%s" % (public_base, suffix)
+    # One body, two entry points -- see `_packed_precision_forwarders`.
+    for scalar_type in ("s_t",):
+        suffix = ""
+        public_name = "%s_impl" % public_base
+        signature_start = len(lines)
         lines.extend(
             [
                 'extern "C" int %s(' % public_name,
@@ -3863,6 +3865,15 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "}",
                 "",
             ]
+        )
+
+        brace = lines.index(") {", signature_start)
+        signature = lines[signature_start + 1 : brace]
+        lines[signature_start] = "static SFEM_INLINE int %s(" % public_name
+        lines.insert(signature_start, "template <typename s_t>")
+        lines.remove("  using s_t = s_t;")
+        lines.extend(
+            _packed_precision_forwarders(public_base, signature, public_name)
         )
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
@@ -5092,6 +5103,43 @@ def _packed_affine_geometry_inputs(dim, metric):
     )
 
 
+
+def _packed_precision_forwarders(public_base, signature, impl_name):
+    """Two `extern "C"` entry points over one template.
+
+    The packed emission path wrote the whole kernel out once per precision, with
+    `using s_t = double;` or `using s_t = float;` at the top and the identical
+    text below it.  Every other path in this emitter already emits one
+    `template <typename s_t>` and forwards to it; these did not, so the same
+    arithmetic existed twice and could drift.
+
+    `signature` is the parameter list as emitted for the template -- it already
+    speaks `s_t` -- so each entry point is that list with the concrete type
+    substituted, and a call passing the parameters straight through.
+    """
+    import re as _re
+
+    names = []
+    for line in signature:
+        match = _re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*,?\s*$", line)
+        if not match:
+            raise ValueError("could not read a parameter name from %r" % line)
+        names.append(match.group(1))
+
+    lines = []
+    for scalar_type in ("double", "float"):
+        suffix = "" if scalar_type == "double" else "_float"
+        typed = [_re.sub(r"\bs_t\b", scalar_type, line) for line in signature]
+        lines.append('extern "C" int %s%s(' % (public_base, suffix))
+        lines.extend(typed)
+        lines.append(") {")
+        lines.append(
+            "  return %s<%s>(%s);" % (impl_name, scalar_type, ", ".join(names))
+        )
+        lines.extend(["}", ""])
+    return lines
+
+
 def _sfem_soa_packed_apply_public_wrappers(
     function_name,
     form_name,
@@ -5142,9 +5190,13 @@ def _sfem_soa_packed_apply_public_wrappers(
         two_pass = pass_mode == "two_pass"
         packed_token = "_%s_packed_two_pass_" % form_name if two_pass else "_%s_packed_" % form_name
         public_base = function_name.replace("_%s_" % form_name, packed_token)
-        for scalar_type in ("double", "float"):
-            suffix = "" if scalar_type == "double" else "_float"
-            public_name = "%s%s" % (public_base, suffix)
+        # One body, two entry points.  The body below already speaks `s_t`; it
+        # was emitted once per precision only because the alias was bound to a
+        # concrete type at the top instead of being a template parameter.
+        for scalar_type in ("s_t",):
+            suffix = ""
+            public_name = "%s_impl" % public_base
+            signature_start = len(lines)
             lines.extend(
                 [
                     'extern "C" int %s(' % public_name,
@@ -5695,6 +5747,16 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "",
                     ]
                 )
+
+            brace = lines.index(") {", signature_start)
+            signature = lines[signature_start + 1 : brace]
+            lines[signature_start] = "static SFEM_INLINE int %s(" % public_name
+            lines.insert(signature_start, "template <typename s_t>")
+            # The alias the body used to open with is the template parameter now.
+            lines.remove("  using s_t = s_t;")
+            lines.extend(
+                _packed_precision_forwarders(public_base, signature, public_name)
+            )
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
     return lines
