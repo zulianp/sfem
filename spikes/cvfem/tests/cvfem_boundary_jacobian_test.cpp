@@ -54,6 +54,8 @@ static void init(State &s) {
     }
 }
 
+static Hex8BoundaryDataT<scalar_t> g_bd{};
+
 static void residual_of(const State &s, const int fmask, const int nmask, scalar_t *r) {
     scalar_t ux[8], uy[8], uz[8], p[8], adj[9], det;
     for (int a = 0; a < 8; ++a) {
@@ -64,7 +66,7 @@ static void residual_of(const State &s, const int fmask, const int nmask, scalar
     }
     cvfem_hex8_affine_adj(s.x, s.y, s.z, adj, &det);
     std::memset(r, 0, sizeof(scalar_t) * CVFEM_HEX8_N_DOF);
-    boundary_scs_add_residual(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, p, r, fmask, nmask);
+    boundary_scs_add_residual(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, p, r, fmask, nmask, g_bd);
 }
 
 // The assembled boundary Jacobian as a dense 8x8 block matrix, via identity slots.
@@ -80,7 +82,7 @@ static void assembled_of(const State &s, const int fmask, const int nmask, std::
     for (int k = 0; k < 64; ++k) slots[k] = (smesh::count_t)k;
     values.assign(64 * 16, scalar_t(0));
     boundary_scs_add_jacobian<false>(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, slots,
-                                     values.data(), fmask, nmask);
+                                     values.data(), fmask, nmask, g_bd);
 }
 
 // d r[row] / d u[col], central difference.
@@ -163,7 +165,7 @@ int main() {
             scalar_t jv[CVFEM_HEX8_N_DOF];
             std::memset(jv, 0, sizeof(jv));
             boundary_scs_add_jacobian_action(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, vx, vy, vz,
-                                             q, jv, 0x3F, nmask);
+                                             q, jv, 0x3F, nmask, g_bd);
             // The same directional derivative by finite difference on the residual.
             State sp = s, sm = s;
             const scalar_t h = 1e-6;
@@ -192,6 +194,100 @@ int main() {
         const scalar_t worst = compare(s, 0x3F, 0x3F, &row, &col);
         std::printf("do-nothing faces:  worst |assembled - FD| = %.3e  (row %d, col %d)\n", (double)worst, row, col);
         check(worst < tol, "the assembled boundary Jacobian matches FD on do-nothing faces");
+    }
+
+    // 4. Prescribed traction. t = 0 must reproduce the do-nothing outflow exactly -- that
+    //    is what makes this a generalisation and not a change -- and a non-zero t must
+    //    move the residual without touching the Jacobian, since a constant traction has no
+    //    derivative.
+    {
+        scalar_t r_zero[CVFEM_HEX8_N_DOF], r_t[CVFEM_HEX8_N_DOF];
+        g_bd = {};
+        residual_of(s, 0x3F, 0x3F, r_zero);
+
+        Hex8BoundaryDataT<scalar_t> bd{};
+        bd.tx = 0.0; bd.ty = 0.0; bd.tz = 0.0;
+        g_bd  = bd;
+        residual_of(s, 0x3F, 0x3F, r_t);
+        scalar_t d = 0;
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) d = std::max(d, std::fabs(r_t[i] - r_zero[i]));
+        check(d == 0.0, "traction t = 0 reproduces the do-nothing outflow exactly");
+
+        bd.tx = 0.35; bd.ty = -0.2; bd.tz = 0.1;
+        g_bd  = bd;
+        residual_of(s, 0x3F, 0x3F, r_t);
+        d = 0;
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) d = std::max(d, std::fabs(r_t[i] - r_zero[i]));
+        check(d > 1e-3, "a non-zero traction moves the residual");
+
+        int            row = -1, col = -1;
+        const scalar_t worst = compare(s, 0x3F, 0x3F, &row, &col);
+        std::printf("traction faces:    worst |assembled - FD| = %.3e  (row %d, col %d)\n", (double)worst, row, col);
+        check(worst < tol, "the Jacobian still matches FD with a prescribed traction");
+        g_bd = {};
+    }
+
+    // 5. Prescribed pressure. The face behaves like a closed one with p_bar substituted, so
+    //    the residual must move with p_bar and the Jacobian must lose its pressure column
+    //    -- p_bar is data, not an unknown. Both are checked against FD, which is what would
+    //    catch the column being kept.
+    {
+        Hex8BoundaryDataT<scalar_t> bd{};
+        bd.pmask = 0x02;  // the x-max face only, so the others stay closed
+        bd.p_bar = 2.5;
+        g_bd     = bd;
+
+        scalar_t r_p[CVFEM_HEX8_N_DOF], r_closed[CVFEM_HEX8_N_DOF];
+        residual_of(s, 0x3F, 0, r_p);
+        g_bd = {};
+        residual_of(s, 0x3F, 0, r_closed);
+        scalar_t d = 0;
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) d = std::max(d, std::fabs(r_p[i] - r_closed[i]));
+        check(d > 1e-3, "a prescribed pressure moves the residual");
+
+        g_bd = bd;
+        int            row = -1, col = -1;
+        const scalar_t worst = compare(s, 0x3F, 0, &row, &col);
+        std::printf("pressure faces:    worst |assembled - FD| = %.3e  (row %d, col %d)\n", (double)worst, row, col);
+        check(worst < tol, "the assembled Jacobian matches FD with a prescribed pressure");
+
+        // And the action, on the same configuration.
+        scalar_t ux[8], uy[8], uz[8], vx[8], vy[8], vz[8], q[8], adj[9], det, jv[CVFEM_HEX8_N_DOF];
+        for (int a = 0; a < 8; ++a) {
+            ux[a] = s.u[a * 4 + 0]; uy[a] = s.u[a * 4 + 1]; uz[a] = s.u[a * 4 + 2];
+            vx[a] = 0.7 - 0.3 * s.x[a]; vy[a] = -0.2 + 0.4 * s.y[a];
+            vz[a] = 0.15 * s.z[a];      q[a]  = 0.5 - 0.25 * s.x[a];
+        }
+        cvfem_hex8_affine_adj(s.x, s.y, s.z, adj, &det);
+        std::memset(jv, 0, sizeof(jv));
+        boundary_scs_add_jacobian_action(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, vx, vy, vz, q,
+                                         jv, 0x3F, 0, g_bd);
+        State sp = s, sm = s;
+        const scalar_t h = 1e-6;
+        for (int a = 0; a < 8; ++a) {
+            sp.u[a * 4 + 0] += h * vx[a]; sm.u[a * 4 + 0] -= h * vx[a];
+            sp.u[a * 4 + 1] += h * vy[a]; sm.u[a * 4 + 1] -= h * vy[a];
+            sp.u[a * 4 + 2] += h * vz[a]; sm.u[a * 4 + 2] -= h * vz[a];
+            sp.u[a * 4 + 3] += h * q[a];  sm.u[a * 4 + 3] -= h * q[a];
+        }
+        scalar_t rp[CVFEM_HEX8_N_DOF], rm[CVFEM_HEX8_N_DOF];
+        residual_of(sp, 0x3F, 0, rp);
+        residual_of(sm, 0x3F, 0, rm);
+        scalar_t worst_a = 0;
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i)
+            worst_a = std::max(worst_a, std::fabs(jv[i] - (rp[i] - rm[i]) / (2 * h)));
+        std::printf("pressure faces:    worst |J v - FD|       = %.3e\n", (double)worst_a);
+        check(worst_a < tol, "the Jacobian action matches FD with a prescribed pressure");
+
+        // nmask must win where both select a face, or the two treatments would compound.
+        g_bd.pmask = 0x3F;
+        scalar_t r_both[CVFEM_HEX8_N_DOF], r_nat[CVFEM_HEX8_N_DOF];
+        residual_of(s, 0x3F, 0x3F, r_both);
+        g_bd = {};
+        residual_of(s, 0x3F, 0x3F, r_nat);
+        d = 0;
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) d = std::max(d, std::fabs(r_both[i] - r_nat[i]));
+        check(d == 0.0, "nmask wins where nmask and pmask select the same face");
     }
 
     if (g_failures) {
