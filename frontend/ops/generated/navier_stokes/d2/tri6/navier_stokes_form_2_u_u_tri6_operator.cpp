@@ -59,30 +59,6 @@ SFEM_INLINE const s_t *ageom_stream(
 
 } // namespace codegen
 } // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-
-template <typename s_t>
-struct navier_stokes_form_2_u_u_affine_reference_data {
-  static const s_t *q_weight() { return quad_tri_q6<s_t>::q_weight(); }
-  static const s_t *tri6_shape() { return ref_tri6_q6<s_t>::shape(); }
-  static const s_t *tri6_grad_ref_x() { return ref_tri6_q6<s_t>::grad_ref_x(); }
-  static const s_t *tri6_grad_ref_y() { return ref_tri6_q6<s_t>::grad_ref_y(); }
-};
-
-template <typename s_t>
-struct navier_stokes_form_2_u_u_isoparametric_reference_data {
-  static const s_t *q_weight() { return quad_tri_q6<s_t>::q_weight(); }
-  static const s_t *tri6_shape() { return ref_tri6_q6<s_t>::shape(); }
-  static const s_t *tri6_grad_ref_x() { return ref_tri6_q6<s_t>::grad_ref_x(); }
-  static const s_t *tri6_grad_ref_y() { return ref_tri6_q6<s_t>::grad_ref_y(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
 namespace sfem {
 namespace codegen {
 
@@ -427,8 +403,8 @@ static SFEM_INLINE int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh
   static constexpr int N_FIELD_STREAMS = 12;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const field_shape[NC] = {sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_shape()};
-  const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_grad_ref_x(), sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::tri6_grad_ref_y()};
+  const s_t *const field_shape[NC] = {sfem::codegen::ref_tri6_q6<s_t>::shape()};
+  const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y()};
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -476,7 +452,7 @@ static SFEM_INLINE int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_form_2_u_u_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_u_u_affine_reference_data<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
+    navier_stokes_form_2_u_u_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
@@ -581,8 +557,8 @@ static SFEM_INLINE int navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametr
   static constexpr int N_FIELD_STREAMS = 12;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_x();
-  const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_y();
+  const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
+  const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
@@ -646,11 +622,11 @@ static SFEM_INLINE int navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametr
       }
     }
 
-    const s_t *const field_shape[NC] = {sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_shape()};
-    const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_x(), sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::tri6_grad_ref_y()};
+    const s_t *const field_shape[NC] = {sfem::codegen::ref_tri6_q6<s_t>::shape()};
+    const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    navier_stokes_form_2_u_u_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_2_u_u_isoparametric_reference_data<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
+    navier_stokes_form_2_u_u_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];

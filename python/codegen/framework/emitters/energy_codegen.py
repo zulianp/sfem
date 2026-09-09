@@ -108,8 +108,6 @@ from codegen.framework.emitters.tensor_product_geometry import (
 )
 from codegen.framework.emitters.quadrature_codegen import (
     quadrature_reference_accessor,
-    quadrature_reference_struct_lines,
-    reference_forwarder_struct_lines,
     reference_header_files,
     reference_include_lines,
 )
@@ -3046,25 +3044,6 @@ def _sfem_soa_operator_source(
             source_builder,
         )
     )
-    lines.append("")
-    lines.extend(["namespace sfem {", "namespace codegen {", ""])
-    lines.extend(
-        reference_forwarder_struct_lines(
-            prefix,
-            "affine",
-            affine_quadrature_rule,
-            sfem_mesh_reference_data(affine_quadrature_rule),
-        )
-    )
-    lines.extend(
-        reference_forwarder_struct_lines(
-            prefix,
-            "isoparametric",
-            quadrature_rule,
-            sfem_mesh_reference_data(quadrature_rule),
-        )
-    )
-    lines.extend(["", "} // namespace codegen", "} // namespace sfem"])
     lines.append("")
 
     for form in forms:
@@ -9156,15 +9135,15 @@ def _sfem_soa_specialized_wrapper_arguments(
         offset = 1 + _sfem_soa_element_stream_count_from_params(wrapper_params)
         arguments.insert(
             offset,
-            quadrature_reference_accessor(prefix, "isoparametric", "shape_1d", "real_t"),
+            quadrature_reference_accessor(quadrature_rule, "shape_1d", "real_t"),
         )
         arguments.insert(
             offset + 1,
-            quadrature_reference_accessor(prefix, "isoparametric", "grad_1d", "real_t"),
+            quadrature_reference_accessor(quadrature_rule, "grad_1d", "real_t"),
         )
         arguments.insert(
             offset + 2,
-            quadrature_reference_accessor(prefix, "isoparametric", "q_weight_1d", "real_t"),
+            quadrature_reference_accessor(quadrature_rule, "q_weight_1d", "real_t"),
         )
         return tuple(arguments)
     if use_reference_gradient_vectors:
@@ -9172,26 +9151,23 @@ def _sfem_soa_specialized_wrapper_arguments(
         for component in range(quadrature_rule.dim):
             arguments.insert(
                 offset + component,
-                quadrature_reference_accessor(
-                    prefix,
-                    "isoparametric",
-                    _sfem_reference_gradient_vector_name(component),
+                quadrature_reference_accessor(quadrature_rule, _sfem_reference_gradient_vector_name(component),
                     "real_t",
                 ),
             )
         arguments.insert(
             offset + quadrature_rule.dim,
-            quadrature_reference_accessor(prefix, "isoparametric", "q_weight", "real_t"),
+            quadrature_reference_accessor(quadrature_rule, "q_weight", "real_t"),
         )
         return tuple(arguments)
     for array_input in reference_inputs:
         arguments.insert(
             1 + _sfem_soa_element_stream_count_from_params(wrapper_params),
-            quadrature_reference_accessor(prefix, "isoparametric", array_input.name, "real_t"),
+            quadrature_reference_accessor(quadrature_rule, array_input.name, "real_t"),
         )
     arguments.insert(
         1 + _sfem_soa_element_stream_count_from_params(wrapper_params) + len(reference_inputs),
-        quadrature_reference_accessor(prefix, "isoparametric", "q_weight", "real_t"),
+        quadrature_reference_accessor(quadrature_rule, "q_weight", "real_t"),
     )
     return tuple(arguments)
 
@@ -9309,14 +9285,6 @@ def _sfem_soa_element_api_header(
         "namespace codegen {",
         "",
     ]
-    lines.extend(
-        reference_forwarder_struct_lines(
-            prefix,
-            "isoparametric",
-            quadrature_rule,
-            sfem_mesh_reference_data(quadrature_rule),
-        )
-    )
     lines.append("")
     for operation in ("objective", "gradient"):
         form = forms_by_name.get(operation)
@@ -9578,22 +9546,19 @@ def _sfem_soa_element_api_common_params(form, dim, include_coords):
 def _sfem_soa_element_api_reference_args(prefix, quadrature_rule, use_tensor_product_reference, use_reference_gradient_vectors):
     if use_tensor_product_reference:
         return (
-            quadrature_reference_accessor(prefix, "isoparametric", "shape_1d"),
-            quadrature_reference_accessor(prefix, "isoparametric", "grad_1d"),
-            quadrature_reference_accessor(prefix, "isoparametric", "q_weight_1d"),
+            quadrature_reference_accessor(quadrature_rule, "shape_1d"),
+            quadrature_reference_accessor(quadrature_rule, "grad_1d"),
+            quadrature_reference_accessor(quadrature_rule, "q_weight_1d"),
         )
     if use_reference_gradient_vectors:
         return tuple(
-            quadrature_reference_accessor(
-                prefix,
-                "isoparametric",
-                _sfem_reference_gradient_vector_name(component),
+            quadrature_reference_accessor(quadrature_rule, _sfem_reference_gradient_vector_name(component),
             )
             for component in range(quadrature_rule.dim)
-        ) + (quadrature_reference_accessor(prefix, "isoparametric", "q_weight"),)
+        ) + (quadrature_reference_accessor(quadrature_rule, "q_weight"),)
     return (
-        quadrature_reference_accessor(prefix, "isoparametric", "grad_ref"),
-        quadrature_reference_accessor(prefix, "isoparametric", "q_weight"),
+        quadrature_reference_accessor(quadrature_rule, "grad_ref"),
+        quadrature_reference_accessor(quadrature_rule, "q_weight"),
     )
 
 
@@ -9723,8 +9688,8 @@ def _sfem_soa_element_api_coords_tile_lines(
                 "    tensor_gradient_contiguous<s_t, NQ, NS, VS, %d>(ne, %s, %s, bcoordinate_data, %d, coordinate_grad_ref + %d * NQ * ND * VS);"
                 % (
                     dim,
-                    quadrature_reference_accessor(prefix, "isoparametric", "shape_1d"),
-                    quadrature_reference_accessor(prefix, "isoparametric", "grad_1d"),
+                    quadrature_reference_accessor(quadrature_rule, "shape_1d"),
+                    quadrature_reference_accessor(quadrature_rule, "grad_1d"),
                     d,
                     d,
                 )
@@ -9744,13 +9709,13 @@ def _sfem_soa_element_api_coords_tile_lines(
                 "    const s_t *const %s = %s;"
                 % (
                     reference_name,
-                    quadrature_reference_accessor(prefix, "isoparametric", reference_name),
+                    quadrature_reference_accessor(quadrature_rule, reference_name),
                 )
             )
     else:
         lines.append(
             "    const s_t *const grad_ref = %s;"
-            % quadrature_reference_accessor(prefix, "isoparametric", "grad_ref")
+            % quadrature_reference_accessor(quadrature_rule, "grad_ref")
         )
     # The element API tiles are per element, so the scope the
     # element calls for can be printed here without the shared
@@ -9975,7 +9940,7 @@ def _sfem_soa_mesh_reference_alias_lines(
             "  const s_t *const %sq_weight = %s;"
             % (
                 reference_prefix,
-                quadrature_reference_accessor(prefix, geometry_mode, "q_weight"),
+                quadrature_reference_accessor(quadrature_rule, "q_weight"),
             )
         )
         return lines
@@ -9985,7 +9950,7 @@ def _sfem_soa_mesh_reference_alias_lines(
                 "  const s_t *const %s = %s;"
                 % (
                     "%s%s" % (reference_prefix, name),
-                    quadrature_reference_accessor(prefix, geometry_mode, name),
+                    quadrature_reference_accessor(quadrature_rule, name),
                 )
             )
         return lines
@@ -9997,14 +9962,14 @@ def _sfem_soa_mesh_reference_alias_lines(
                 % (
                     reference_prefix,
                     reference_name,
-                    quadrature_reference_accessor(prefix, geometry_mode, reference_name),
+                    quadrature_reference_accessor(quadrature_rule, reference_name),
                 )
             )
         lines.append(
             "  const s_t *const %sq_weight = %s;"
             % (
                 reference_prefix,
-                quadrature_reference_accessor(prefix, geometry_mode, "q_weight"),
+                quadrature_reference_accessor(quadrature_rule, "q_weight"),
             )
         )
         return lines
@@ -10016,14 +9981,14 @@ def _sfem_soa_mesh_reference_alias_lines(
             % (
                 reference_prefix,
                 array_input.name,
-                quadrature_reference_accessor(prefix, geometry_mode, array_input.name),
+                quadrature_reference_accessor(quadrature_rule, array_input.name),
             )
         )
     lines.append(
         "  const s_t *const %sq_weight = %s;"
         % (
             reference_prefix,
-            quadrature_reference_accessor(prefix, geometry_mode, "q_weight"),
+            quadrature_reference_accessor(quadrature_rule, "q_weight"),
         )
     )
     return lines

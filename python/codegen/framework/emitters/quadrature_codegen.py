@@ -9,41 +9,24 @@ def cpp_scalar_initializer_list(values, scalar_type="s_t"):
     return ", ".join(cpp_scalar_literal(value, scalar_type) for value in values)
 
 
-def quadrature_reference_struct_name(prefix, stage):
-    return "%s_%s_reference_data" % (prefix, stage)
+def quadrature_reference_accessor(cell_rule, reference_name, scalar_type="s_t"):
+    """The call that reads one reference table.
 
+    Named by the rule the table was evaluated at, not by the kernel that reads
+    it.  `sfem::codegen::navier_stokes_isoparametric_reference_data<s_t>::q_weight()`
+    becomes `sfem::codegen::quad_tet_q11<s_t>::q_weight()` -- shorter, and it says
+    what the table *is* rather than which kernel happened to want it.
 
-def quadrature_reference_accessor(prefix, stage, reference_name, scalar_type="s_t"):
-    return "sfem::codegen::%s<%s>::%s()" % (
-        quadrature_reference_struct_name(prefix, stage),
-        scalar_type,
-        reference_name,
-    )
-
-
-def quadrature_reference_struct_lines(prefix, stage, references):
-    struct_name = quadrature_reference_struct_name(prefix, stage)
-    lines = [
-        "",
-        "template <typename s_t>",
-        "struct %s {" % struct_name,
-    ]
-    for reference in references:
-        values = tuple(reference.values)
-        lines.extend(
-            [
-                "  static const s_t *%s() {" % reference.name,
-                "    static const s_t data[%d] = {%s};"
-                % (
-                    len(values),
-                    cpp_scalar_initializer_list(values, "s_t"),
-                ),
-                "    return data;",
-                "  }",
-            ]
-        )
-    lines.append("};")
-    return lines
+    The old per-kernel name was also not an identity.  `navier_stokes_form_1_p_affine_reference_data`
+    was defined twice in one program -- with a 6-point triangle rule in the 2-D
+    translation unit and an 11-point tetrahedron rule in the 3-D one, because the
+    mixed path names its struct from the bare material prefix with no element in
+    it.  Two bodies, one mangled symbol, and the linker keeps whichever it sees
+    first.  A name derived from the rule cannot collide that way: the two are
+    `quad_tri_q6` and `quad_tet_q11`.
+    """
+    owner, accessor = _owner(cell_rule, reference_name)
+    return "sfem::codegen::%s<%s>::%s()" % (owner, scalar_type, accessor)
 
 
 #: Where a shared reference header lives, relative to the generated tree root.
@@ -167,26 +150,6 @@ def split_reference_accessor(name):
         if name.endswith("_%s" % canonical):
             return name[: -len(canonical) - 1], canonical
     raise ValueError("'%s' is not a reference accessor this table knows" % name)
-
-
-def reference_forwarder_struct_lines(prefix, stage, cell_rule, references):
-    """The kernel's reference struct, forwarding to the shared tables.
-
-    The name a kernel reads stays exactly what it was -- `<prefix>_<stage>_reference_data`,
-    material-scoped and readable -- so not one of the 2,807 call sites moves.
-    What changes is that the numbers are no longer here: 174 structs held 20
-    distinct tables between them, and now each table has one home.
-    """
-    struct_name = quadrature_reference_struct_name(prefix, stage)
-    lines = ["", "template <typename s_t>", "struct %s {" % struct_name]
-    for reference in references:
-        owner, accessor = _owner(cell_rule, reference.name)
-        lines.append(
-            "  static const s_t *%s() { return %s<s_t>::%s(); }"
-            % (reference.name, owner, accessor)
-        )
-    lines.append("};")
-    return lines
 
 
 def reference_include_lines(cell_rule, references):

@@ -114,7 +114,6 @@ class ReferenceBasisDataPlan:
 @dataclass(frozen=True)
 class ReferenceDataSetPlan:
     stage: str
-    struct_name: str
     geometry_mode: GeometryMode
     family: str
     cell_element_type: str
@@ -130,7 +129,6 @@ class ReferenceDataSetPlan:
 
     def __post_init__(self):
         stage = str(self.stage)
-        struct_name = str(self.struct_name)
         geometry_mode = GeometryMode(self.geometry_mode)
         family = str(self.family)
         cell_element_type = str(self.cell_element_type).upper()
@@ -145,8 +143,6 @@ class ReferenceDataSetPlan:
         n_qp_1d = int(self.n_qp_1d)
         if stage not in ("affine", "isoparametric"):
             raise ValueError("reference-data stage must be affine or isoparametric")
-        if not struct_name:
-            raise ValueError("reference-data plan requires a struct name")
         if family not in ("simplex", "tensor_product"):
             raise ValueError("reference-data family must be simplex or tensor_product")
         if n_qp <= 0 or n_shape <= 0:
@@ -161,7 +157,6 @@ class ReferenceDataSetPlan:
             if basis.family != family:
                 raise ValueError("basis family does not match reference-data family")
         object.__setattr__(self, "stage", stage)
-        object.__setattr__(self, "struct_name", struct_name)
         object.__setattr__(self, "geometry_mode", geometry_mode)
         object.__setattr__(self, "family", family)
         object.__setattr__(self, "cell_element_type", cell_element_type)
@@ -207,17 +202,9 @@ class ReferenceDataSetPlan:
     def is_mixed_order(self):
         return len(self.unique_element_types) > 1
 
-    def accessor_call(self, accessor, scalar_type="s_t"):
-        return "sfem::codegen::%s<%s>::%s()" % (
-            self.struct_name,
-            str(scalar_type),
-            str(accessor),
-        )
-
     def to_dict(self):
         return {
             "stage": self.stage,
-            "struct_name": self.struct_name,
             "geometry_mode": self.geometry_mode.value,
             "family": self.family,
             "cell_element_type": self.cell_element_type,
@@ -364,7 +351,6 @@ def _reference_dataset_plan(prefix, stage, mode, cell_rule, family, field_types)
     basis_entries = _basis_entries(cell_rule, family, field_types)
     return ReferenceDataSetPlan(
         stage,
-        "%s_%s_reference_data" % (prefix, stage),
         mode,
         family,
         cell_rule.element_type,

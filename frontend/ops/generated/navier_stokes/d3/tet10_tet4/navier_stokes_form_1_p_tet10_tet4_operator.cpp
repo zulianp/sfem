@@ -60,40 +60,6 @@ SFEM_INLINE const s_t *ageom_stream(
 
 } // namespace codegen
 } // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-
-template <typename s_t>
-struct navier_stokes_form_1_p_affine_reference_data {
-  static const s_t *q_weight() { return quad_tet_q11<s_t>::q_weight(); }
-  static const s_t *tet10_shape() { return ref_tet10_q11<s_t>::shape(); }
-  static const s_t *tet10_grad_ref_x() { return ref_tet10_q11<s_t>::grad_ref_x(); }
-  static const s_t *tet10_grad_ref_y() { return ref_tet10_q11<s_t>::grad_ref_y(); }
-  static const s_t *tet10_grad_ref_z() { return ref_tet10_q11<s_t>::grad_ref_z(); }
-  static const s_t *tet4_shape() { return ref_tet4_q11<s_t>::shape(); }
-  static const s_t *tet4_grad_ref_x() { return ref_tet4_q11<s_t>::grad_ref_x(); }
-  static const s_t *tet4_grad_ref_y() { return ref_tet4_q11<s_t>::grad_ref_y(); }
-  static const s_t *tet4_grad_ref_z() { return ref_tet4_q11<s_t>::grad_ref_z(); }
-};
-
-template <typename s_t>
-struct navier_stokes_form_1_p_isoparametric_reference_data {
-  static const s_t *q_weight() { return quad_tet_q11<s_t>::q_weight(); }
-  static const s_t *tet10_shape() { return ref_tet10_q11<s_t>::shape(); }
-  static const s_t *tet10_grad_ref_x() { return ref_tet10_q11<s_t>::grad_ref_x(); }
-  static const s_t *tet10_grad_ref_y() { return ref_tet10_q11<s_t>::grad_ref_y(); }
-  static const s_t *tet10_grad_ref_z() { return ref_tet10_q11<s_t>::grad_ref_z(); }
-  static const s_t *tet4_shape() { return ref_tet4_q11<s_t>::shape(); }
-  static const s_t *tet4_grad_ref_x() { return ref_tet4_q11<s_t>::grad_ref_x(); }
-  static const s_t *tet4_grad_ref_y() { return ref_tet4_q11<s_t>::grad_ref_y(); }
-  static const s_t *tet4_grad_ref_z() { return ref_tet4_q11<s_t>::grad_ref_z(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
 namespace sfem {
 namespace codegen {
 
@@ -387,8 +353,8 @@ static SFEM_INLINE int navier_stokes_form_1_p_tet10_tet4_residual_affine_mesh_mi
   static constexpr int N_FIELD_STREAMS = 34;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const field_shape[NC] = {sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::tet10_shape(), sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::tet4_shape()};
-  const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::tet10_grad_ref_x(), sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::tet10_grad_ref_y(), sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::tet10_grad_ref_z(), sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::tet4_grad_ref_x(), sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::tet4_grad_ref_y(), sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::tet4_grad_ref_z()};
+  const s_t *const field_shape[NC] = {sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet4_q11<s_t>::shape()};
+  const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z()};
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -451,7 +417,7 @@ static SFEM_INLINE int navier_stokes_form_1_p_tet10_tet4_residual_affine_mesh_mi
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_form_1_p_d3_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[9], badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::q_weight(), bcurrent, boutput);
+    navier_stokes_form_1_p_d3_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[9], badjugate, field_shape, fgref, sfem::codegen::quad_tet_q11<s_t>::q_weight(), bcurrent, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
@@ -576,9 +542,9 @@ static SFEM_INLINE int navier_stokes_form_1_p_tet10_tet4_residual_isoparametric_
   static constexpr int N_FIELD_STREAMS = 34;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet10_grad_ref_x();
-  const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet10_grad_ref_y();
-  const s_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet10_grad_ref_z();
+  const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
+  const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
+  const s_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
@@ -663,11 +629,11 @@ static SFEM_INLINE int navier_stokes_form_1_p_tet10_tet4_residual_isoparametric_
       }
     }
 
-    const s_t *const field_shape[NC] = {sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet10_shape(), sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet4_shape()};
-    const s_t *const fgref[NC * ND] = {sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet10_grad_ref_x(), sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet10_grad_ref_y(), sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet10_grad_ref_z(), sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet4_grad_ref_x(), sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet4_grad_ref_y(), sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::tet4_grad_ref_z()};
+    const s_t *const field_shape[NC] = {sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet4_q11<s_t>::shape()};
+    const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    navier_stokes_form_1_p_d3_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::q_weight(), bcurrent, boutput);
+    navier_stokes_form_1_p_d3_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tet_q11<s_t>::q_weight(), bcurrent, boutput);
 
     {
       s_t *const RSTR out = u_out[0];

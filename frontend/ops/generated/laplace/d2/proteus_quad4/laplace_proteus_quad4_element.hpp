@@ -23,13 +23,6 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t>
-struct laplace_proteus_quad4_isoparametric_reference_data {
-  static const s_t *shape_1d() { return ref_line_p1_q2<s_t>::shape_1d(); }
-  static const s_t *grad_1d() { return ref_line_p1_q2<s_t>::grad_1d(); }
-  static const s_t *q_weight_1d() { return quad_line_q2<s_t>::q_weight_1d(); }
-};
-
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_proteus_quad4_energy_egeometry_soa(
         const ptrdiff_t nelements,
@@ -71,7 +64,7 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_egeometry_soa(
         bdet0[q * VS + lane] = det[q * nelements + evb + lane];
       }
     }
-    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
+    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -114,11 +107,11 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_ecoords_soa(
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
+    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -161,11 +154,11 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_esoa(
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
+    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -215,7 +208,7 @@ static SFEM_INLINE int laplace_proteus_quad4_gradient_egeometry_soa(
         bdet0[q * VS + lane] = det[q * nelements + evb + lane];
       }
     }
-    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bu_streams, bout_streams);
+    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -261,11 +254,11 @@ static SFEM_INLINE int laplace_proteus_quad4_gradient_ecoords_soa(
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bu_streams, bout_streams);
+    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -311,11 +304,11 @@ static SFEM_INLINE int laplace_proteus_quad4_gradient_esoa(
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bu_streams, bout_streams);
+    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -368,7 +361,7 @@ static SFEM_INLINE int laplace_proteus_quad4_hessian_egeometry_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      laplace_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bh_streams, bout_streams);
+      laplace_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -409,8 +402,8 @@ static SFEM_INLINE int laplace_proteus_quad4_hessian_ecoords_soa(
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
     s_t bh_data[NDOFS][VS];
@@ -429,7 +422,7 @@ static SFEM_INLINE int laplace_proteus_quad4_hessian_ecoords_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      laplace_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bh_streams, bout_streams);
+      laplace_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -470,8 +463,8 @@ static SFEM_INLINE int laplace_proteus_quad4_hessian_esoa(
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
     s_t bh_data[NDOFS][VS];
@@ -490,7 +483,7 @@ static SFEM_INLINE int laplace_proteus_quad4_hessian_esoa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      laplace_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), kappa, bh_streams, bout_streams);
+      laplace_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd

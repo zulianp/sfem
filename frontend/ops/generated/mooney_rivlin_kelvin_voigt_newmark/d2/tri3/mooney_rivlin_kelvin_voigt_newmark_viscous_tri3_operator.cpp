@@ -55,30 +55,6 @@ SFEM_INLINE const s_t *ageom_stream(
 
 } // namespace codegen
 } // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data {
-  static const s_t *shape() { return ref_tri3_q1<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tri3_q1<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tri3_q1<s_t>::grad_ref_y(); }
-  static const s_t *q_weight() { return quad_tri_q1<s_t>::q_weight(); }
-};
-
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data {
-  static const s_t *shape() { return ref_tri3_q1<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tri3_q1<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tri3_q1<s_t>::grad_ref_y(); }
-  static const s_t *q_weight() { return quad_tri_q1<s_t>::q_weight(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_esoa(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -91,7 +67,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_esoa(
     const double newmark_velocity_alpha,
     double *const RSTR output[6]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_residual_block<double, 1, 3, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
+  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_residual_block<double, 1, 3, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tri3_q1<double>::shape(), sfem::codegen::ref_tri3_q1<double>::grad_ref_x(), sfem::codegen::ref_tri3_q1<double>::grad_ref_y(), sfem::codegen::quad_tri_q1<double>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
   return SFEM_SUCCESS;
 }
 
@@ -107,7 +83,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_esoa_flo
     const float newmark_velocity_alpha,
     float *const RSTR output[6]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_residual_block<float, 1, 3, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
+  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_residual_block<float, 1, 3, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tri3_q1<float>::shape(), sfem::codegen::ref_tri3_q1<float>::grad_ref_x(), sfem::codegen::ref_tri3_q1<float>::grad_ref_y(), sfem::codegen::quad_tri_q1<float>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
   return SFEM_SUCCESS;
 }
 
@@ -143,10 +119,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data<s_t>::grad_ref_y();
-  const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_shape = sfem::codegen::ref_tri3_q1<s_t>::shape();
+  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -274,7 +250,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_e
     const double newmark_velocity_alpha,
     double *const RSTR output[6]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block<double, 1, 3, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<double>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
+  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block<double, 1, 3, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tri3_q1<double>::shape(), sfem::codegen::ref_tri3_q1<double>::grad_ref_x(), sfem::codegen::ref_tri3_q1<double>::grad_ref_y(), sfem::codegen::quad_tri_q1<double>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
   return SFEM_SUCCESS;
 }
 
@@ -291,7 +267,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_e
     const float newmark_velocity_alpha,
     float *const RSTR output[6]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block<float, 1, 3, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_isoparametric_reference_data<float>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
+  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block<float, 1, 3, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tri3_q1<float>::shape(), sfem::codegen::ref_tri3_q1<float>::grad_ref_x(), sfem::codegen::ref_tri3_q1<float>::grad_ref_y(), sfem::codegen::quad_tri_q1<float>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
   return SFEM_SUCCESS;
 }
 
@@ -330,10 +306,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data<s_t>::grad_ref_y();
-  const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_shape = sfem::codegen::ref_tri3_q1<s_t>::shape();
+  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {

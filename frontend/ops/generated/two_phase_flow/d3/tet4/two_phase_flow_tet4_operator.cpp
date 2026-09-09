@@ -55,32 +55,6 @@ SFEM_INLINE const s_t *ageom_stream(
 
 } // namespace codegen
 } // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-
-template <typename s_t>
-struct two_phase_flow_tet4_affine_reference_data {
-  static const s_t *shape() { return ref_tet4_q11<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tet4_q11<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tet4_q11<s_t>::grad_ref_y(); }
-  static const s_t *grad_ref_z() { return ref_tet4_q11<s_t>::grad_ref_z(); }
-  static const s_t *q_weight() { return quad_tet_q11<s_t>::q_weight(); }
-};
-
-template <typename s_t>
-struct two_phase_flow_tet4_isoparametric_reference_data {
-  static const s_t *shape() { return ref_tet4_q11<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tet4_q11<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tet4_q11<s_t>::grad_ref_y(); }
-  static const s_t *grad_ref_z() { return ref_tet4_q11<s_t>::grad_ref_z(); }
-  static const s_t *q_weight() { return quad_tet_q11<s_t>::q_weight(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
 namespace sfem {
 namespace codegen {
 
@@ -720,7 +694,7 @@ extern "C" int two_phase_flow_tet4_residual_esoa(
     const double rho_w0,
     double *const RSTR output[8]
 ) {
-  sfem::codegen::two_phase_flow_d3_simplex_residual_block<double, 11, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::shape(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::grad_ref_z(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::q_weight(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+  sfem::codegen::two_phase_flow_d3_simplex_residual_block<double, 11, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet4_q11<double>::shape(), sfem::codegen::ref_tet4_q11<double>::grad_ref_x(), sfem::codegen::ref_tet4_q11<double>::grad_ref_y(), sfem::codegen::ref_tet4_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
   return SFEM_SUCCESS;
 }
 
@@ -759,7 +733,7 @@ extern "C" int two_phase_flow_tet4_residual_esoa_float(
     const float rho_w0,
     float *const RSTR output[8]
 ) {
-  sfem::codegen::two_phase_flow_d3_simplex_residual_block<float, 11, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::shape(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::grad_ref_z(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::q_weight(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+  sfem::codegen::two_phase_flow_d3_simplex_residual_block<float, 11, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet4_q11<float>::shape(), sfem::codegen::ref_tet4_q11<float>::grad_ref_x(), sfem::codegen::ref_tet4_q11<float>::grad_ref_y(), sfem::codegen::ref_tet4_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), current, previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
   return SFEM_SUCCESS;
 }
 
@@ -823,11 +797,11 @@ static SFEM_INLINE int two_phase_flow_tet4_residual_a_msoa_impl(
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_shape = sfem::codegen::ref_tet4_q11<s_t>::shape();
+  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x();
+  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y();
+  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q11<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -1033,7 +1007,7 @@ extern "C" int two_phase_flow_tet4_jacobian_action_esoa(
     const double rho_w0,
     double *const RSTR output[8]
 ) {
-  sfem::codegen::two_phase_flow_d3_simplex_jacobian_action_block<double, 11, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::shape(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::grad_ref_z(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<double>::q_weight(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+  sfem::codegen::two_phase_flow_d3_simplex_jacobian_action_block<double, 11, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet4_q11<double>::shape(), sfem::codegen::ref_tet4_q11<double>::grad_ref_x(), sfem::codegen::ref_tet4_q11<double>::grad_ref_y(), sfem::codegen::ref_tet4_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
   return SFEM_SUCCESS;
 }
 
@@ -1072,7 +1046,7 @@ extern "C" int two_phase_flow_tet4_jacobian_action_esoa_float(
     const float rho_w0,
     float *const RSTR output[8]
 ) {
-  sfem::codegen::two_phase_flow_d3_simplex_jacobian_action_block<float, 11, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::shape(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::grad_ref_z(), sfem::codegen::two_phase_flow_tet4_isoparametric_reference_data<float>::q_weight(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
+  sfem::codegen::two_phase_flow_d3_simplex_jacobian_action_block<float, 11, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet4_q11<float>::shape(), sfem::codegen::ref_tet4_q11<float>::grad_ref_x(), sfem::codegen::ref_tet4_q11<float>::grad_ref_y(), sfem::codegen::ref_tet4_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), current, direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, output);
   return SFEM_SUCCESS;
 }
 
@@ -1136,11 +1110,11 @@ static SFEM_INLINE int two_phase_flow_tet4_jacobian_action_a_msoa_impl(
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::two_phase_flow_tet4_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_shape = sfem::codegen::ref_tet4_q11<s_t>::shape();
+  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x();
+  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y();
+  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q11<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {

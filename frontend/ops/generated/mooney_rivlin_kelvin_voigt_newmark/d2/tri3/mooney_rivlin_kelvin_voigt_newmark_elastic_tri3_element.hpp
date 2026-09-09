@@ -23,14 +23,6 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data {
-  static const s_t *shape() { return ref_tri3_q1<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tri3_q1<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tri3_q1<s_t>::grad_ref_y(); }
-  static const s_t *q_weight() { return quad_tri_q1<s_t>::q_weight(); }
-};
-
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_energy_egeometry_soa(
         const ptrdiff_t nelements,
@@ -74,7 +66,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_energy_eg
         bdet0[q * VS + lane] = det[q * nelements + evb + lane];
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -117,8 +109,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_energy_ec
     s_t badj2[NQ * VS];
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
     {
         const int q = 0;  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
@@ -172,7 +164,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_energy_ec
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -215,8 +207,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_energy_es
     s_t badj2[NQ * VS];
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
     {
         const int q = 0;  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
@@ -270,7 +262,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_energy_es
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -322,7 +314,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
         bdet0[q * VS + lane] = det[q * nelements + evb + lane];
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -368,8 +360,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
     s_t badj2[NQ * VS];
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
     {
         const int q = 0;  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
@@ -423,7 +415,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -469,8 +461,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
     s_t badj2[NQ * VS];
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
     {
         const int q = 0;  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
@@ -524,7 +516,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -582,7 +574,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_hessian_e
           bout_data[stream][lane] = s_t(0);
         }
       }
-      mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -626,8 +618,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_hessian_e
     s_t badj2[NQ * VS];
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
     {
         const int q = 0;  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
@@ -697,7 +689,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_hessian_e
           bout_data[stream][lane] = s_t(0);
         }
       }
-      mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -741,8 +733,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_hessian_e
     s_t badj2[NQ * VS];
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
     {
         const int q = 0;  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
@@ -812,7 +804,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_hessian_e
           bout_data[stream][lane] = s_t(0);
         }
       }
-      mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd

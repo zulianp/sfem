@@ -23,15 +23,6 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t>
-struct laplace_tet4_isoparametric_reference_data {
-  static const s_t *shape() { return ref_tet4_q1<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tet4_q1<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tet4_q1<s_t>::grad_ref_y(); }
-  static const s_t *grad_ref_z() { return ref_tet4_q1<s_t>::grad_ref_z(); }
-  static const s_t *q_weight() { return quad_tet_q1<s_t>::q_weight(); }
-};
-
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int laplace_tet4_energy_egeometry_soa(
         const ptrdiff_t nelements,
@@ -84,7 +75,7 @@ static SFEM_INLINE int laplace_tet4_energy_egeometry_soa(
         bdet0[q * VS + lane] = det[q * nelements + evb + lane];
       }
     }
-    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
+    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -131,9 +122,9 @@ static SFEM_INLINE int laplace_tet4_energy_ecoords_soa(
     s_t badj7[NQ * VS];
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y();
-    const s_t *const grad_ref_z = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
+    const s_t *const grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
     {
         const int q = 0;  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
@@ -239,7 +230,7 @@ static SFEM_INLINE int laplace_tet4_energy_ecoords_soa(
             badj_streams, bdet0, q * VS + lane);
       }
     }
-    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
+    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -286,9 +277,9 @@ static SFEM_INLINE int laplace_tet4_energy_esoa(
     s_t badj7[NQ * VS];
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y();
-    const s_t *const grad_ref_z = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
+    const s_t *const grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
     {
         const int q = 0;  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
@@ -394,7 +385,7 @@ static SFEM_INLINE int laplace_tet4_energy_esoa(
             badj_streams, bdet0, q * VS + lane);
       }
     }
-    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bvalue);
+    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bu_streams, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -455,7 +446,7 @@ static SFEM_INLINE int laplace_tet4_gradient_egeometry_soa(
         bdet0[q * VS + lane] = det[q * nelements + evb + lane];
       }
     }
-    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -505,9 +496,9 @@ static SFEM_INLINE int laplace_tet4_gradient_ecoords_soa(
     s_t badj7[NQ * VS];
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y();
-    const s_t *const grad_ref_z = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
+    const s_t *const grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
     {
         const int q = 0;  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
@@ -613,7 +604,7 @@ static SFEM_INLINE int laplace_tet4_gradient_ecoords_soa(
             badj_streams, bdet0, q * VS + lane);
       }
     }
-    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -663,9 +654,9 @@ static SFEM_INLINE int laplace_tet4_gradient_esoa(
     s_t badj7[NQ * VS];
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y();
-    const s_t *const grad_ref_z = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
+    const s_t *const grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
     {
         const int q = 0;  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
@@ -771,7 +762,7 @@ static SFEM_INLINE int laplace_tet4_gradient_esoa(
             badj_streams, bdet0, q * VS + lane);
       }
     }
-    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -835,7 +826,7 @@ static SFEM_INLINE int laplace_tet4_hessian_egeometry_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -880,9 +871,9 @@ static SFEM_INLINE int laplace_tet4_hessian_ecoords_soa(
     s_t badj7[NQ * VS];
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y();
-    const s_t *const grad_ref_z = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
+    const s_t *const grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
     {
         const int q = 0;  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
@@ -1004,7 +995,7 @@ static SFEM_INLINE int laplace_tet4_hessian_ecoords_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -1049,9 +1040,9 @@ static SFEM_INLINE int laplace_tet4_hessian_esoa(
     s_t badj7[NQ * VS];
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y();
-    const s_t *const grad_ref_z = sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z();
+    const s_t *const grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
+    const s_t *const grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
+    const s_t *const grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
     {
         const int q = 0;  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
@@ -1173,7 +1164,7 @@ static SFEM_INLINE int laplace_tet4_hessian_esoa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::grad_ref_z(), sfem::codegen::laplace_tet4_isoparametric_reference_data<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd

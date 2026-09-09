@@ -52,29 +52,6 @@ SFEM_INLINE const s_t *ageom_stream(
 namespace sfem {
 namespace codegen {
 
-
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data {
-  static const s_t *shape() { return ref_tri3_q1<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tri3_q1<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tri3_q1<s_t>::grad_ref_y(); }
-  static const s_t *q_weight() { return quad_tri_q1<s_t>::q_weight(); }
-};
-
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data {
-  static const s_t *shape() { return ref_tri3_q1<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tri3_q1<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tri3_q1<s_t>::grad_ref_y(); }
-  static const s_t *q_weight() { return quad_tri_q1<s_t>::q_weight(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
 static const KernelDiagnostics mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_soa_diagnostics_data = {
   "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_soa",
   "TRI3",
@@ -231,7 +208,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
   static constexpr int NS = 3;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -518,7 +495,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
   static constexpr int NS = 3;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -800,7 +777,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_m
   static constexpr int NS = 3;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {

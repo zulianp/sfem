@@ -52,27 +52,6 @@ SFEM_INLINE const s_t *ageom_stream(
 namespace sfem {
 namespace codegen {
 
-
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_affine_reference_data {
-  static const s_t *shape_1d() { return ref_line_p1_q2<s_t>::shape_1d(); }
-  static const s_t *grad_1d() { return ref_line_p1_q2<s_t>::grad_1d(); }
-  static const s_t *q_weight_1d() { return quad_line_q2<s_t>::q_weight_1d(); }
-};
-
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data {
-  static const s_t *shape_1d() { return ref_line_p1_q2<s_t>::shape_1d(); }
-  static const s_t *grad_1d() { return ref_line_p1_q2<s_t>::grad_1d(); }
-  static const s_t *q_weight_1d() { return quad_line_q2<s_t>::q_weight_1d(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
 static const KernelDiagnostics mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_soa_diagnostics_data = {
   "mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_soa",
   "PROTEUS_QUAD4",
@@ -228,9 +207,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -523,9 +502,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -813,9 +792,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 

@@ -55,28 +55,6 @@ SFEM_INLINE const s_t *ageom_stream(
 
 } // namespace codegen
 } // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-
-template <typename s_t>
-struct two_phase_flow_form_1_p_c_proteus_quad4_affine_reference_data {
-  static const s_t *shape_1d() { return ref_line_p1_q4<s_t>::shape_1d(); }
-  static const s_t *grad_1d() { return ref_line_p1_q4<s_t>::grad_1d(); }
-  static const s_t *q_weight_1d() { return quad_line_q4<s_t>::q_weight_1d(); }
-};
-
-template <typename s_t>
-struct two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data {
-  static const s_t *shape_1d() { return ref_line_p1_q4<s_t>::shape_1d(); }
-  static const s_t *grad_1d() { return ref_line_p1_q4<s_t>::grad_1d(); }
-  static const s_t *q_weight_1d() { return quad_line_q4<s_t>::q_weight_1d(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
 namespace sfem {
 namespace codegen {
 
@@ -706,7 +684,7 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_esoa(
     const double porosity,
     double *const RSTR output[8]
 ) {
-  sfem::codegen::two_phase_flow_form_1_p_c_d2_tensor_product_residual_block<double, 16, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<double>::shape_1d(), sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<double>::grad_1d(), sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<double>::q_weight_1d(), current, previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, output);
+  sfem::codegen::two_phase_flow_form_1_p_c_d2_tensor_product_residual_block<double, 16, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_line_p1_q4<double>::shape_1d(), sfem::codegen::ref_line_p1_q4<double>::grad_1d(), sfem::codegen::quad_line_q4<double>::q_weight_1d(), current, previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, output);
   return SFEM_SUCCESS;
 }
 
@@ -735,7 +713,7 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_esoa_float(
     const float porosity,
     float *const RSTR output[8]
 ) {
-  sfem::codegen::two_phase_flow_form_1_p_c_d2_tensor_product_residual_block<float, 16, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<float>::shape_1d(), sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<float>::grad_1d(), sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<float>::q_weight_1d(), current, previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, output);
+  sfem::codegen::two_phase_flow_form_1_p_c_d2_tensor_product_residual_block<float, 16, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_line_p1_q4<float>::shape_1d(), sfem::codegen::ref_line_p1_q4<float>::grad_1d(), sfem::codegen::quad_line_q4<float>::q_weight_1d(), current, previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, output);
   return SFEM_SUCCESS;
 }
 
@@ -784,9 +762,9 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_quad4_residual_a_msoa_i
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
   const idx_t *const RSTR field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
 
 #pragma omp parallel for schedule(static)
@@ -969,9 +947,9 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_quad4_residual_i_msoa_i
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const isoparametric_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
   const idx_t *const RSTR field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
 
 #pragma omp parallel for schedule(static)
@@ -1154,7 +1132,7 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_esoa(
     const double *const RSTR determinant,
     double *const RSTR output[8]
 ) {
-  sfem::codegen::two_phase_flow_form_1_p_c_d2_tensor_product_jacobian_action_block<double, 16, 4, 16>(ne, geometry_stride, determinant, sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<double>::shape_1d(), sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<double>::q_weight_1d(), output);
+  sfem::codegen::two_phase_flow_form_1_p_c_d2_tensor_product_jacobian_action_block<double, 16, 4, 16>(ne, geometry_stride, determinant, sfem::codegen::ref_line_p1_q4<double>::shape_1d(), sfem::codegen::quad_line_q4<double>::q_weight_1d(), output);
   return SFEM_SUCCESS;
 }
 
@@ -1164,7 +1142,7 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_esoa_floa
     const float *const RSTR determinant,
     float *const RSTR output[8]
 ) {
-  sfem::codegen::two_phase_flow_form_1_p_c_d2_tensor_product_jacobian_action_block<float, 16, 4, 16>(ne, geometry_stride, determinant, sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<float>::shape_1d(), sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<float>::q_weight_1d(), output);
+  sfem::codegen::two_phase_flow_form_1_p_c_d2_tensor_product_jacobian_action_block<float, 16, 4, 16>(ne, geometry_stride, determinant, sfem::codegen::ref_line_p1_q4<float>::shape_1d(), sfem::codegen::quad_line_q4<float>::q_weight_1d(), output);
   return SFEM_SUCCESS;
 }
 
@@ -1187,9 +1165,9 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_a
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
   const idx_t *const RSTR field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
 
 #pragma omp parallel for schedule(static)
@@ -1277,9 +1255,9 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_i
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const isoparametric_shape_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::two_phase_flow_form_1_p_c_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
   const idx_t *const RSTR field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
 
 #pragma omp parallel for schedule(static)

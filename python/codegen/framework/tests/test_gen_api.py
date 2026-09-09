@@ -2130,15 +2130,26 @@ int main() {
         self.assertIn("static constexpr int NQ = 4;", contents[affine:isoparametric])
         self.assertIn("const s_t *const affine_grad_ref_x", contents[affine:isoparametric])
         self.assertIn("const s_t *const affine_q_weight", contents[affine:isoparametric])
+        # The struct a mode reads *is* the statement now: a 4-point rule and an
+        # 11-point rule are different names, so "the two modes do not share a
+        # quadrature rule" no longer needs a separate assertion about NQ.
         self.assertIn(
-            "neohookean_ogden_tet10_affine_reference_data<s_t>::grad_ref_x()",
+            "sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x()",
+            contents[affine:isoparametric],
+        )
+        self.assertIn(
+            "sfem::codegen::quad_tet_q4<s_t>::q_weight()",
             contents[affine:isoparametric],
         )
         self.assertIn("static constexpr int NQ = 11;", contents[isoparametric:])
         self.assertIn("const s_t *const isoparametric_grad_ref_x", contents[isoparametric:])
         self.assertIn("const s_t *const isoparametric_q_weight", contents[isoparametric:])
         self.assertIn(
-            "neohookean_ogden_tet10_isoparametric_reference_data<s_t>::grad_ref_x()",
+            "sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x()",
+            contents[isoparametric:],
+        )
+        self.assertIn(
+            "sfem::codegen::quad_tet_q11<s_t>::q_weight()",
             contents[isoparametric:],
         )
 
@@ -2943,11 +2954,14 @@ int main() {
             self.assertEqual(dataset.accessors, ("q_weight_1d", "shape_1d", "grad_1d"))
             self.assertEqual(dataset.unique_element_types, ("HEX8",))
             self.assertFalse(dataset.is_mixed_order)
-            self.assertEqual(
-                dataset.accessor_call("shape_1d"),
-                "sfem::codegen::neohookean_ogden_hex8_%s_reference_data<s_t>::shape_1d()"
-                % dataset.stage,
-            )
+            # The dataset names a rule, and each basis names itself; there is no
+            # per-kernel struct for the plan to name any more.
+            self.assertEqual(dataset.rule_key, "quad_line_q%d" % dataset.n_qp_1d)
+            for basis in dataset.basis_entries:
+                self.assertEqual(
+                    basis.accessor_call(basis.struct_name, "shape_1d"),
+                    "sfem::codegen::%s<s_t>::shape_1d()" % basis.struct_name,
+                )
 
         residual_input = gen.UserInputStage.create(two_phase_flow, ("TRI3",), 16, None)
         residual_plan = gen.SpecializedFormManipulationStage(
@@ -3829,11 +3843,13 @@ int main() {
             )
             with open(operator) as input_file:
                 contents = input_file.read()
-            self.assertIn("struct stokes_isoparametric_reference_data", contents)
-            self.assertIn("static const s_t *hex27_shape_1d()", contents)
-            self.assertIn("static const s_t *hex27_grad_1d()", contents)
-            self.assertIn("static const s_t *hex8_shape_1d()", contents)
-            self.assertIn("static const s_t *hex8_grad_1d()", contents)
+            self.assertNotIn("struct stokes_isoparametric_reference_data", contents)
+            # Two bases at one rule: two headers, and one rule header between
+            # them.  That is what dedup means now -- there is no per-kernel struct
+            # left for the two to share.
+            self.assertIn('#include "../../reference/line_p2_q4.hpp"', contents)
+            self.assertIn('#include "../../reference/line_p1_q4.hpp"', contents)
+            self.assertIn('#include "../../reference/quad_line_q4.hpp"', contents)
             # The numbers are no longer here.  Deduplication used to mean "one
             # table per element type inside this struct"; it now means one table
             # in the whole tree, so what this source should show is the forward
@@ -3841,8 +3857,8 @@ int main() {
             self.assertNotIn("static const s_t data[", contents)
             self.assertIn("<s_t>::", contents)
             self.assertIn(
-                "field_shape_1d[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::hex27_shape_1d(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<s_t>::hex8_shape_1d()}",
+                "field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), "
+                "sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()}",
                 contents,
             )
             self.assertIn(
@@ -3911,11 +3927,10 @@ int main() {
             ) as input_file:
                 tet_local = input_file.read()
 
-            self.assertIn("struct stokes_isoparametric_reference_data", tri)
-            self.assertIn("static const s_t *tri6_shape()", tri)
-            self.assertIn("static const s_t *tri6_grad_ref_x()", tri)
-            self.assertIn("static const s_t *tri3_shape()", tri)
-            self.assertIn("static const s_t *tri3_grad_ref_y()", tri)
+            self.assertNotIn("struct stokes_isoparametric_reference_data", tri)
+            self.assertIn('#include "../../reference/tri6_q6.hpp"', tri)
+            self.assertIn('#include "../../reference/tri3_q6.hpp"', tri)
+            self.assertIn('#include "../../reference/quad_tri_q6.hpp"', tri)
             # The numbers are no longer here.  Deduplication used to mean "one
             # table per element type inside this struct"; it now means one table
             # in the whole tree, so what this source should show is the forward
@@ -3923,20 +3938,19 @@ int main() {
             self.assertNotIn("static const s_t data[", tri)
             self.assertIn("<s_t>::", tri)
             self.assertIn(
-                "field_shape[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::tri6_shape(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<s_t>::tri3_shape()}",
+                "field_shape[NC] = {sfem::codegen::ref_tri6_q6<s_t>::shape(), "
+                "sfem::codegen::ref_tri3_q6<s_t>::shape()}",
                 tri,
             )
             self.assertIn(
-                "isoparametric_cell_grad_ref_0 = sfem::codegen::stokes_isoparametric_reference_data<s_t>::tri6_grad_ref_x()",
+                "isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x()",
                 tri,
             )
 
-            self.assertIn("struct stokes_isoparametric_reference_data", tet)
-            self.assertIn("static const s_t *tet10_shape()", tet)
-            self.assertIn("static const s_t *tet10_grad_ref_z()", tet)
-            self.assertIn("static const s_t *tet4_shape()", tet)
-            self.assertIn("static const s_t *tet4_grad_ref_z()", tet)
+            self.assertNotIn("struct stokes_isoparametric_reference_data", tet)
+            self.assertIn('#include "../../reference/tet10_q11.hpp"', tet)
+            self.assertIn('#include "../../reference/tet4_q11.hpp"', tet)
+            self.assertIn('#include "../../reference/quad_tet_q11.hpp"', tet)
             # The numbers are no longer here.  Deduplication used to mean "one
             # table per element type inside this struct"; it now means one table
             # in the whole tree, so what this source should show is the forward
@@ -3944,12 +3958,12 @@ int main() {
             self.assertNotIn("static const s_t data[", tet)
             self.assertIn("<s_t>::", tet)
             self.assertIn(
-                "field_shape[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::tet10_shape(), "
-                "sfem::codegen::stokes_isoparametric_reference_data<s_t>::tet4_shape()}",
+                "field_shape[NC] = {sfem::codegen::ref_tet10_q11<s_t>::shape(), "
+                "sfem::codegen::ref_tet4_q11<s_t>::shape()}",
                 tet,
             )
             self.assertIn(
-                "isoparametric_cell_grad_ref_2 = sfem::codegen::stokes_isoparametric_reference_data<s_t>::tet10_grad_ref_z()",
+                "isoparametric_cell_grad_ref_2 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z()",
                 tet,
             )
 

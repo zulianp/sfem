@@ -57,32 +57,6 @@ SFEM_INLINE const s_t *ageom_stream(
 
 } // namespace codegen
 } // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data {
-  static const s_t *shape() { return ref_tet10_q4<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tet10_q4<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tet10_q4<s_t>::grad_ref_y(); }
-  static const s_t *grad_ref_z() { return ref_tet10_q4<s_t>::grad_ref_z(); }
-  static const s_t *q_weight() { return quad_tet_q4<s_t>::q_weight(); }
-};
-
-template <typename s_t>
-struct mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data {
-  static const s_t *shape() { return ref_tet10_q11<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tet10_q11<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tet10_q11<s_t>::grad_ref_y(); }
-  static const s_t *grad_ref_z() { return ref_tet10_q11<s_t>::grad_ref_z(); }
-  static const s_t *q_weight() { return quad_tet_q11<s_t>::q_weight(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_esoa(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -95,7 +69,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_esoa(
     const double newmark_velocity_alpha,
     double *const RSTR output[30]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block<double, 11, 10, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
+  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block<double, 11, 10, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet10_q11<double>::shape(), sfem::codegen::ref_tet10_q11<double>::grad_ref_x(), sfem::codegen::ref_tet10_q11<double>::grad_ref_y(), sfem::codegen::ref_tet10_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
   return SFEM_SUCCESS;
 }
 
@@ -111,7 +85,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_esoa_fl
     const float newmark_velocity_alpha,
     float *const RSTR output[30]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block<float, 11, 10, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
+  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block<float, 11, 10, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet10_q11<float>::shape(), sfem::codegen::ref_tet10_q11<float>::grad_ref_x(), sfem::codegen::ref_tet10_q11<float>::grad_ref_y(), sfem::codegen::ref_tet10_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
   return SFEM_SUCCESS;
 }
 
@@ -155,11 +129,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
   static constexpr int NC = 3;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_shape = sfem::codegen::ref_tet10_q4<s_t>::shape();
+  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
+  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
+  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_z();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -321,11 +295,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual
   static constexpr int NC = 3;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const isoparametric_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::shape();
-  const s_t *const isoparametric_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
-  const s_t *const isoparametric_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
-  const s_t *const isoparametric_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
-  const s_t *const isoparametric_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::q_weight();
+  const s_t *const isoparametric_shape = sfem::codegen::ref_tet10_q11<s_t>::shape();
+  const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
+  const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
+  const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
+  const s_t *const isoparametric_q_weight = sfem::codegen::quad_tet_q11<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -501,7 +475,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_
     const double newmark_velocity_alpha,
     double *const RSTR output[30]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block<double, 11, 10, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<double>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
+  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block<double, 11, 10, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet10_q11<double>::shape(), sfem::codegen::ref_tet10_q11<double>::grad_ref_x(), sfem::codegen::ref_tet10_q11<double>::grad_ref_y(), sfem::codegen::ref_tet10_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
   return SFEM_SUCCESS;
 }
 
@@ -518,7 +492,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_
     const float newmark_velocity_alpha,
     float *const RSTR output[30]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block<float, 11, 10, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::shape(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::grad_ref_x(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::grad_ref_y(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::grad_ref_z(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<float>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
+  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block<float, 11, 10, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet10_q11<float>::shape(), sfem::codegen::ref_tet10_q11<float>::grad_ref_x(), sfem::codegen::ref_tet10_q11<float>::grad_ref_y(), sfem::codegen::ref_tet10_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
   return SFEM_SUCCESS;
 }
 
@@ -566,11 +540,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
   static constexpr int NC = 3;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_affine_reference_data<s_t>::q_weight();
+  const s_t *const affine_shape = sfem::codegen::ref_tet10_q4<s_t>::shape();
+  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
+  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
+  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_z();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -747,11 +721,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian
   static constexpr int NC = 3;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const isoparametric_shape = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::shape();
-  const s_t *const isoparametric_grad_ref_x = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_x();
-  const s_t *const isoparametric_grad_ref_y = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_y();
-  const s_t *const isoparametric_grad_ref_z = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::grad_ref_z();
-  const s_t *const isoparametric_q_weight = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_isoparametric_reference_data<s_t>::q_weight();
+  const s_t *const isoparametric_shape = sfem::codegen::ref_tet10_q11<s_t>::shape();
+  const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
+  const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
+  const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
+  const s_t *const isoparametric_q_weight = sfem::codegen::quad_tet_q11<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {

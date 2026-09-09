@@ -140,9 +140,7 @@ GENERATED = os.path.join(
 )
 
 _TABLE = re.compile(r"    static const s_t data\[\d+\] = \{s_t")
-_FORWARDER = re.compile(
-    r"  static const s_t \*([a-z0-9_]+)\(\) \{ return ([a-z0-9_]+)<s_t>::([a-z0-9_]+)\(\); \}"
-)
+_CALL = re.compile(r"sfem::codegen::((?:ref_|quad_)[a-z0-9_]+)<[a-z_]+>::([a-z0-9_]+)\(\)")
 
 
 class TheTablesLiveInOnePlaceTest(unittest.TestCase):
@@ -180,9 +178,9 @@ class TheTablesLiveInOnePlaceTest(unittest.TestCase):
             "%d sources carry reference tables of their own" % len(self.elsewhere),
         )
 
-    def test_every_forwarder_names_a_header_that_exists(self):
-        """A forwarder to a struct nobody emits is a compile error, so this
-        cannot fail silently -- it fails early instead, with the name."""
+    def test_every_call_names_a_header_that_exists(self):
+        """A call into a struct nobody emits is a compile error, so this cannot
+        fail silently -- it fails early instead, with the name."""
         structs = set()
         for name in os.listdir(os.path.join(GENERATED, "reference")):
             with open(os.path.join(GENERATED, "reference", name), encoding="utf-8") as handle:
@@ -194,9 +192,36 @@ class TheTablesLiveInOnePlaceTest(unittest.TestCase):
                 if not name.endswith((".cpp", ".hpp")):
                     continue
                 with open(os.path.join(base, name), encoding="utf-8", errors="replace") as handle:
-                    for match in _FORWARDER.finditer(handle.read()):
+                    for match in _CALL.finditer(handle.read()):
                         seen += 1
-                        if match.group(2) not in structs:
-                            unknown.add(match.group(2))
-        self.assertGreater(seen, 400)
+                        if match.group(1) not in structs:
+                            unknown.add(match.group(1))
+        self.assertGreater(seen, 2000)
         self.assertEqual(sorted(unknown), [])
+
+    def test_no_kernel_keeps_a_reference_struct_of_its_own(self):
+        """The per-kernel struct is gone, and its name was never an identity.
+
+        `navier_stokes_form_1_p_affine_reference_data` was defined twice in one
+        program -- a 6-point triangle rule in the 2-D translation unit, an
+        11-point tetrahedron rule in the 3-D one -- because the mixed path names
+        its struct from the bare material prefix, with no element in it.  Two
+        bodies, one mangled symbol.  Naming a table after the rule it belongs to
+        cannot collide that way, and this checks the old names have not returned.
+
+        The boundary kernels are the exception: `emitters/boundary_codegen.py`
+        emits its own structs and does not go through `plans/reference_data.py`
+        at all.
+        """
+        offenders = []
+        for base, _dirs, files in os.walk(GENERATED):
+            for name in files:
+                if not name.endswith((".cpp", ".hpp")):
+                    continue
+                relative = os.path.relpath(os.path.join(base, name), GENERATED)
+                if "boundary" in relative:
+                    continue
+                with open(os.path.join(base, name), encoding="utf-8", errors="replace") as handle:
+                    if "_reference_data" in handle.read():
+                        offenders.append(relative)
+        self.assertEqual(sorted(offenders)[:8], [])

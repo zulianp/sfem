@@ -60,32 +60,6 @@ SFEM_INLINE const s_t *ageom_stream(
 
 } // namespace codegen
 } // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-
-template <typename s_t>
-struct navier_stokes_form_1_p_affine_reference_data {
-  static const s_t *q_weight_1d() { return quad_line_q4<s_t>::q_weight_1d(); }
-  static const s_t *hex27_shape_1d() { return ref_line_p2_q4<s_t>::shape_1d(); }
-  static const s_t *hex27_grad_1d() { return ref_line_p2_q4<s_t>::grad_1d(); }
-  static const s_t *hex8_shape_1d() { return ref_line_p1_q4<s_t>::shape_1d(); }
-  static const s_t *hex8_grad_1d() { return ref_line_p1_q4<s_t>::grad_1d(); }
-};
-
-template <typename s_t>
-struct navier_stokes_form_1_p_isoparametric_reference_data {
-  static const s_t *q_weight_1d() { return quad_line_q4<s_t>::q_weight_1d(); }
-  static const s_t *hex27_shape_1d() { return ref_line_p2_q4<s_t>::shape_1d(); }
-  static const s_t *hex27_grad_1d() { return ref_line_p2_q4<s_t>::grad_1d(); }
-  static const s_t *hex8_shape_1d() { return ref_line_p1_q4<s_t>::shape_1d(); }
-  static const s_t *hex8_grad_1d() { return ref_line_p1_q4<s_t>::grad_1d(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
 namespace sfem {
 namespace codegen {
 
@@ -379,8 +353,8 @@ static SFEM_INLINE int navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_mi
   static constexpr int N_FIELD_STREAMS = 89;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const field_shape_1d[NC] = {sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::hex27_shape_1d(), sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::hex8_shape_1d()};
-  const s_t *const field_grad_1d[NC] = {sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::hex27_grad_1d(), sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::hex8_grad_1d()};
+  const s_t *const field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()};
+  const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
   const idx_t *const RSTR field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
   const idx_t *const RSTR field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
   const idx_t *const RSTR field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
@@ -447,7 +421,7 @@ static SFEM_INLINE int navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_mi
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_form_1_p_d3_tensor_product_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[9], badjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_form_1_p_affine_reference_data<s_t>::q_weight_1d(), bcurrent, boutput);
+    navier_stokes_form_1_p_d3_tensor_product_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[9], badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bcurrent, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
@@ -572,8 +546,8 @@ static SFEM_INLINE int navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_
   static constexpr int N_FIELD_STREAMS = 89;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const isoparametric_shape_1d = sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::hex27_shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::hex27_grad_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
   const idx_t *const RSTR field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
   const idx_t *const RSTR field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
   const idx_t *const RSTR field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
@@ -659,11 +633,11 @@ static SFEM_INLINE int navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
-    const s_t *const field_shape_1d[NC] = {sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::hex27_shape_1d(), sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::hex8_shape_1d()};
-    const s_t *const field_grad_1d[NC] = {sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::hex27_grad_1d(), sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::hex8_grad_1d()};
+    const s_t *const field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()};
+    const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    navier_stokes_form_1_p_d3_tensor_product_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape_1d, field_grad_1d, sfem::codegen::navier_stokes_form_1_p_isoparametric_reference_data<s_t>::q_weight_1d(), bcurrent, boutput);
+    navier_stokes_form_1_p_d3_tensor_product_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bcurrent, boutput);
 
     {
       s_t *const RSTR out = u_out[0];

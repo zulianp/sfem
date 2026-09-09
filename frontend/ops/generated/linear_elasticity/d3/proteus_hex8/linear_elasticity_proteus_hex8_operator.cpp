@@ -53,27 +53,6 @@ SFEM_INLINE const s_t *ageom_stream(
 namespace sfem {
 namespace codegen {
 
-
-template <typename s_t>
-struct linear_elasticity_proteus_hex8_affine_reference_data {
-  static const s_t *shape_1d() { return ref_line_p1_q2<s_t>::shape_1d(); }
-  static const s_t *grad_1d() { return ref_line_p1_q2<s_t>::grad_1d(); }
-  static const s_t *q_weight_1d() { return quad_line_q2<s_t>::q_weight_1d(); }
-};
-
-template <typename s_t>
-struct linear_elasticity_proteus_hex8_isoparametric_reference_data {
-  static const s_t *shape_1d() { return ref_line_p1_q2<s_t>::shape_1d(); }
-  static const s_t *grad_1d() { return ref_line_p1_q2<s_t>::grad_1d(); }
-  static const s_t *q_weight_1d() { return quad_line_q2<s_t>::q_weight_1d(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
 static const KernelDiagnostics linear_elasticity_proteus_hex8_objective_soa_diagnostics_data = {
   "linear_elasticity_proteus_hex8_objective_soa",
   "PROTEUS_HEX8",
@@ -237,9 +216,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_a_msoa_imp
   static constexpr int NS = 8;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -446,9 +425,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_packed_a_m
   (void)nnodes;
   (void)n_shared_nodes;
 
-  const s_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -675,9 +654,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_i_msoa_imp
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -867,9 +846,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_packed_i_m
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
   const geom_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -1226,9 +1205,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_a_msoa_impl(
   static constexpr int NS = 8;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -1423,9 +1402,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_a_msoa_imp
   static constexpr int VS = 16;
   (void)nnodes;
 
-  const s_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -1670,9 +1649,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_two_pass_a
   static constexpr int VS = 16;
   (void)nnodes;
 
-  const s_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -1928,9 +1907,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_i_msoa_impl(
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -2108,9 +2087,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_i_msoa_imp
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
   const geom_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -2341,9 +2320,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_two_pass_i
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
   const geom_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -2724,9 +2703,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_a_msoa_impl(
   static constexpr int NS = 8;
   static constexpr int VS = 16;
   (void)nnodes;
-  const s_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -2921,9 +2900,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_a_msoa_impl(
   static constexpr int VS = 16;
   (void)nnodes;
 
-  const s_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -3168,9 +3147,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_two_pass_a_ms
   static constexpr int VS = 16;
   (void)nnodes;
 
-  const s_t *const affine_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_affine_reference_data<s_t>::q_weight_1d();
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -3426,9 +3405,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_i_msoa_impl(
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -3606,9 +3585,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_i_msoa_impl(
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
   const geom_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -3839,9 +3818,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_two_pass_i_ms
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
   const geom_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
   static constexpr int NQ1 = 2;
   static constexpr int NS1 = 2;
 
@@ -4166,9 +4145,9 @@ static int linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl(
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
-  const s_t *const isoparametric_shape_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::shape_1d();
-  const s_t *const isoparametric_grad_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::linear_elasticity_proteus_hex8_isoparametric_reference_data<s_t>::q_weight_1d();
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   int unsupported_matrix_format = 0;
 #pragma omp parallel for schedule(static) reduction(|:unsupported_matrix_format)

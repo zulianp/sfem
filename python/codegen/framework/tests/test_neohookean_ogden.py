@@ -896,10 +896,19 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         operator_source = source_by_path["generated_quad4_tensor_product_operator.cpp"]
         local_source = source_by_path["generated_quad4_tensor_product_local.hpp"]
 
-        self.assertIn("struct generated_quad4_tensor_product_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<s_t>::shape_1d()", operator_source)
-        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<s_t>::grad_1d()", operator_source)
-        self.assertIn("generated_quad4_tensor_product_isoparametric_reference_data<s_t>::q_weight_1d()", operator_source)
+        self.assertNotIn("struct generated_quad4_tensor_product_isoparametric_reference_data", operator_source)
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::shape_1d\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_1d\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::q_weight_1d\(\)",
+        )
         self.assertNotIn("generated_quad4_tensor_product_quad4_grad_ref", operator_source)
         self.assertNotIn("generated_quad4_tensor_product_quad4_q_weight[", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", operator_source)
@@ -995,10 +1004,19 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         operator_source = source_by_path["generated_hex8_tensor_product_operator.cpp"]
         local_source = source_by_path["generated_hex8_tensor_product_local.hpp"]
 
-        self.assertIn("struct generated_hex8_tensor_product_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<s_t>::shape_1d()", operator_source)
-        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<s_t>::grad_1d()", operator_source)
-        self.assertIn("generated_hex8_tensor_product_isoparametric_reference_data<s_t>::q_weight_1d()", operator_source)
+        self.assertNotIn("struct generated_hex8_tensor_product_isoparametric_reference_data", operator_source)
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::shape_1d\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_1d\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::q_weight_1d\(\)",
+        )
         self.assertNotIn("generated_hex8_tensor_product_hex8_grad_ref", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", operator_source)
         self.assertNotIn("GRAD_REF_NCOMPONENTS", local_source)
@@ -1088,9 +1106,15 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("s_t grad_ref", local_source)
         self.assertNotIn("grad_ref[shape", local_source)
         self.assertNotIn("grad_ref_data", local_source)
-        self.assertIn("struct generated_weak_neohookean_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_weak_neohookean_isoparametric_reference_data<s_t>::grad_ref_x()", operator_source)
-        self.assertIn("generated_weak_neohookean_isoparametric_reference_data<s_t>::grad_ref_y()", operator_source)
+        self.assertNotIn("struct generated_weak_neohookean_isoparametric_reference_data", operator_source)
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_ref_x\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_ref_y\(\)",
+        )
         self.assertIn(
             "gu_ref0_values[lane] += weak_u_streams[shape * 2 + 0][lane] * grad_ref_x[q * NS + shape];",
             local_source,
@@ -1288,10 +1312,19 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         tensor_source = source_by_path["tensor_product_kernels.hpp"]
         operator_source = source_by_path["generated_hex27_weak_neohookean_operator.cpp"]
 
-        self.assertIn("struct generated_hex27_weak_neohookean_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<s_t>::shape_1d()", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<s_t>::grad_1d()", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<s_t>::q_weight_1d()", operator_source)
+        self.assertNotIn("struct generated_hex27_weak_neohookean_isoparametric_reference_data", operator_source)
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::shape_1d\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_1d\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::q_weight_1d\(\)",
+        )
         self.assertNotIn("generated_hex27_weak_neohookean_hex27_apply_soa_impl", operator_source)
         self.assertIn("generated_hex27_weak_neohookean_hex27_apply_a_msoa_impl", operator_source)
         self.assertIn("generated_hex27_weak_neohookean_hex27_apply_i_msoa_impl", operator_source)
@@ -1604,13 +1637,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("shape_1d", mesh_impl_signature)
         self.assertNotIn("grad_1d", mesh_impl_signature)
         self.assertNotIn("q_weight_1d", mesh_impl_signature)
-        self.assertIn(
-            "struct generated_hex8_neohookean_isoparametric_action_isoparametric_reference_data",
+        self.assertNotIn("struct generated_hex8_neohookean_isoparametric_action_isoparametric_reference_data", operator_source)
+        self.assertRegex(
             operator_source,
-        )
-        self.assertIn(
-            "generated_hex8_neohookean_isoparametric_action_isoparametric_reference_data<s_t>::shape_1d()",
-            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::shape_1d\(\)",
         )
         # The four 1-D shape values live in `reference/line_p1_q2.hpp` now, and
         # this source forwards into it rather than carrying them.
@@ -2134,10 +2164,19 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn('#include "kernel_math.hpp"', local_source)
         self.assertIn("static SFEM_INLINE T pow_2", math_source)
         self.assertIn("static SFEM_INLINE T pow_m2", math_source)
-        self.assertIn("struct generated_neohookean_ogden_isoparametric_reference_data", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<s_t>::grad_ref_x()", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<s_t>::grad_ref_y()", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<s_t>::q_weight()", operator_source)
+        self.assertNotIn("struct generated_neohookean_ogden_isoparametric_reference_data", operator_source)
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_ref_x\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_ref_y\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::q_weight\(\)",
+        )
         self.assertIn('#include "kernel_diagnostics.hpp"', operator_source)
         self.assertNotIn("struct SfemKernelDiagnostics", operator_source)
         self.assertIn("#ifndef SFEM_CODEGEN_KERNEL_DIAGNOSTICS_HPP", diagnostics_source)
@@ -2212,9 +2251,18 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("accumulator_t", operator_source)
         self.assertNotIn("accumulator_t", local_source)
         self.assertNotIn("typedef double s_t;", local_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<s_t>::grad_ref_x()", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<s_t>::grad_ref_y()", operator_source)
-        self.assertIn("generated_neohookean_ogden_isoparametric_reference_data<s_t>::q_weight()", operator_source)
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_ref_x\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::grad_ref_y\(\)",
+        )
+        self.assertRegex(
+            operator_source,
+            r"sfem::codegen::(?:ref|quad)_\w+<s_t>::q_weight\(\)",
+        )
         self.assertIn("static constexpr int NQ = 1;", operator_source)
         self.assertIn("static constexpr int NS = 3;", operator_source)
         self.assertIn("for (int q = 0; q < NQ; ++q)", operator_source)

@@ -53,29 +53,6 @@ SFEM_INLINE const s_t *ageom_stream(
 namespace sfem {
 namespace codegen {
 
-
-template <typename s_t>
-struct laplace_tri3_affine_reference_data {
-  static const s_t *shape() { return ref_tri3_q1<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tri3_q1<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tri3_q1<s_t>::grad_ref_y(); }
-  static const s_t *q_weight() { return quad_tri_q1<s_t>::q_weight(); }
-};
-
-template <typename s_t>
-struct laplace_tri3_isoparametric_reference_data {
-  static const s_t *shape() { return ref_tri3_q1<s_t>::shape(); }
-  static const s_t *grad_ref_x() { return ref_tri3_q1<s_t>::grad_ref_x(); }
-  static const s_t *grad_ref_y() { return ref_tri3_q1<s_t>::grad_ref_y(); }
-  static const s_t *q_weight() { return quad_tri_q1<s_t>::q_weight(); }
-};
-
-} // namespace codegen
-} // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
 static const KernelDiagnostics laplace_tri3_objective_soa_diagnostics_data = {
   "laplace_tri3_objective_soa",
   "TRI3",
@@ -842,9 +819,9 @@ static int laplace_tri3_hessian_i_msoa_assemble_impl(
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
-  const s_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
-  const s_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
-  const s_t *const isoparametric_q_weight = sfem::codegen::laplace_tri3_isoparametric_reference_data<s_t>::q_weight();
+  const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+  const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
+  const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
   int unsupported_matrix_format = 0;
 #pragma omp parallel for schedule(static) reduction(|:unsupported_matrix_format)
