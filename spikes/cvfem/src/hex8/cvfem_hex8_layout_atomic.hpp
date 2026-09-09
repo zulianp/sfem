@@ -15,6 +15,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
                                                        scalar_t *const       jv) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
 
+    const Hex8Extras opt(d);
+
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
@@ -29,7 +31,18 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
         }
         scalar_t adj[9], det;
         load_hex8_adj(d, e, adj, &det);
-        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
+        // Branch rather than pass `ex.rc` and `p` unconditionally: with --rhie-chow off the
+        // literal call below hands the kernel a default-constructed rc and a null pressure,
+        // both of which fold away at inline time, so the default path emits exactly the code
+        // it emitted before this option existed. A runtime-valued rc would leave the
+        // Rhie-Chow branch in the hot loop for every run that does not ask for it.
+        if (opt.with_rc) {
+            Hex8ExtraScratch ex;
+            ex.load(d, opt, e);
+            cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, ex.rc, p);
+        } else {
+            cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
+        }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);

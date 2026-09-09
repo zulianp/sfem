@@ -193,6 +193,14 @@ struct MeshData {
     std::vector<scalar_t> pgx, pgy, pgz;   // nodal pressure gradient (Rhie-Chow)
     scalar_t              rhie_chow_scale{0};
 
+    // The same reconstruction applied to the Krylov DIRECTION's pressure, which only the
+    // Jacobian action reads. It is kept separate from pgx/pgy/pgz because the two have
+    // opposite lifetimes: pg is a function of the state and is hoisted across a whole
+    // Krylov solve, whereas qg changes with every direction and so cannot be hoisted out
+    // of anything. That asymmetry is the point of measuring it -- see the note on
+    // --rhie-chow-jac in the benchmark driver.
+    std::vector<scalar_t> qgx, qgy, qgz;   // nodal gradient of the direction's pressure
+
     std::vector<uint8_t>  face_mask;       // per element, bits 0..5 = the six CVFEM faces
     scalar_t              Lx{0}, Ly{0}, Lz{0};
 };
@@ -469,9 +477,15 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
 struct Hex8Extras {
     int with_rc{0};
     int with_bnd{0};
+    // The exact Rhie-Chow Jacobian, which differentiates through the nodal gradient
+    // reconstruction as well. Only the Jacobian action fills qgx/qgy/qgz, so this is off
+    // wherever they are empty and the kernel falls back to the frozen-gradient form.
+    int with_qg{0};
 
     explicit Hex8Extras(const MeshData &d)
-        : with_rc(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0)), with_bnd(!d.face_mask.empty()) {}
+        : with_rc(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0)),
+          with_bnd(!d.face_mask.empty()),
+          with_qg(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0) && !d.qgx.empty()) {}
 };
 
 // Per-element scratch for the above. Declared inside the element loop; `rc` points into
@@ -479,6 +493,7 @@ struct Hex8Extras {
 struct Hex8ExtraScratch {
     scalar_t     x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
     scalar_t     pgx[CVFEM_HEX8_N_NODES], pgy[CVFEM_HEX8_N_NODES], pgz[CVFEM_HEX8_N_NODES];
+    scalar_t     qgx[CVFEM_HEX8_N_NODES], qgy[CVFEM_HEX8_N_NODES], qgz[CVFEM_HEX8_N_NODES];
     Hex8RhieChow rc{};
     int          fmask{0};
 
@@ -494,6 +509,17 @@ struct Hex8ExtraScratch {
                 pgz[a]               = d.pgz[g];
             }
             rc = Hex8RhieChow{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+            if (opt.with_qg) {
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                    const smesh::idx_t g = d.elems[a][e];
+                    qgx[a]               = d.qgx[g];
+                    qgy[a]               = d.qgy[g];
+                    qgz[a]               = d.qgz[g];
+                }
+                rc.qgx = qgx;
+                rc.qgy = qgy;
+                rc.qgz = qgz;
+            }
         }
     }
 };

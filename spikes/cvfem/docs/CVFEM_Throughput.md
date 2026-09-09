@@ -38,41 +38,58 @@ loop and cannot carry a scope of its own without paying for one per element. So
 its column is blank for the semi-structured rows and its cost is inside theirs;
 the two boundary shares are not comparable and the sweep shares are not either.
 
-## Against the bench, and an unexplained factor
+## Against the bench: what the missing factor was
 
 perf/baseline_grace.csv records `jac_action_packed_sumfact` at 1933 MDOF/s, and
 re-measured on one allocation with three repeats it is 1695 (spread 3%). The scope
-above reads 607. These are the same kernel, and the trace figure already EXCLUDES
-the boundary pass and the nodal gradient -- they are sibling scopes, listed
-separately in the tables below -- so the cascade in docs/CVFEM_Operator_Cascade.md
-does not account for the difference.
+above reads 607-625. These are the same kernel, and the trace figure already
+EXCLUDES the boundary pass and the nodal gradient -- they are sibling scopes,
+listed separately in the tables below -- so the cascade in
+docs/CVFEM_Operator_Cascade.md did not account for the difference.
 
-What is established:
+The bench could not measure the configuration the solver runs: it refused
+`--rhie-chow` with `--jac-action` on `--layout packed`, because the bench's packed
+staging never carried the term. That staging now exists (`--rhie-chow` with
+`--jac-action`, layout packed or store, geom affine), and it agrees with the atomic
+reference to 7.9e-16 relative, so the two measurements can finally be put on the
+same axis.
 
-  * The bench figure carries NO Rhie-Chow term. The solver carries two: the
-    in-kernel correction, and the derivative of the nodal pressure-gradient
-    reconstruction that the Jacobian differentiates through.
-  * The bench CANNOT measure the configuration the solver runs. It refuses
-    `--rhie-chow` with `--jac-action` on `--layout packed`, because the bench's own
-    packed staging never carried the term -- a separate code family from the
-    solver's, guarded by a mutual #error. So no bench number has ever described
-    this kernel as the solver runs it.
-  * Rhie-Chow costs the ATOMIC Jacobian action nothing at all, 817 -> 816 MDOF/s.
-    That factor cannot be carried across: atomic runs at half the packed rate and
-    is scatter bound, so arithmetic added to it is free in a way it need not be
-    on packed.
-  * The thread binding is not the explanation. OMP_PROC_BIND=true and close
-    measure 1711 and 1718 MDOF/s, equal within a 3% run-to-run spread; spread is
-    the slow one at 1490.
-  * Problem size does not explain it in the helpful direction. The flat sweep here
-    peaks at 687 MDOF/s near 560k dof and DECLINES to 607 by 4.3M, so measuring at
-    the bench's 8.6M would read lower still, not higher.
+Grace, one node, 72 threads, OMP_PROC_BIND=true, --exclusive, 11,212,884 dof
+(n=140), 20 repeats after 5 warmup:
 
-So roughly a factor of three is real and is not yet attributed. The way to settle
-it is to extend the bench's packed staging to carry Rhie-Chow for the Jacobian
-action, which would let one measurement bracket the other instead of leaving them
-in different configurations. Until then, quoting ~2000 MDOF/s for this kernel means
-the version without Rhie-Chow, and the solver does not run that version.
+| packed Jacobian action | MDOF/s | vs. the plain kernel |
+|---|---:|---:|
+| element kernel, no Rhie-Chow (what the baseline quotes) | 1878 | 1.00x |
+| element kernel, with Rhie-Chow | 871 | 2.16x slower |
+| the whole matvec: kernel + the direction's nodal gradient | 467 | 4.02x slower |
+
+**Rhie-Chow costs the packed element kernel 2.16x**, and the direction's gradient
+reconstruction costs another 1.86x on top of it -- 46% of every matvec, measured
+directly (`frac_jac_action_qgrad`, 0.41 at one thread rising to 0.47 at 72 as the
+element sweep parallelises slightly better than the reconstruction's atomic
+scatter). So of the ~3x that was unattributed, 2.16x is the Rhie-Chow term inside
+the kernel and the rest of the gap is a sibling scope that was never in the bench
+at all.
+
+The residual discrepancy is 871 (bench) against 607-625 (solver), a factor of 1.4
+rather than 3.1, and the two are no longer in different configurations -- they run
+on different meshes (a plain cube against the constrained channel) and at different
+sizes. That is an ordinary gap; the factor of three was not.
+
+Two further things this settles:
+
+  * Scaling is not the problem. With Rhie-Chow the sweep goes 7.53 -> 463.8 MDOF/s
+    from 1 to 72 threads (61.6x); without it, 30.8 -> 1881 (61.1x). The Rhie-Chow
+    path parallelises just as well. The cost is arithmetic and a second sweep.
+  * The thread binding was never the explanation. OMP_PROC_BIND=true and close
+    measure 1711 and 1718 MDOF/s, equal within a 3% spread; spread is the slow one
+    at 1490.
+
+Quoting ~2000 MDOF/s for this kernel still means the version without Rhie-Chow,
+and the solver does not run that version. The number to quote for what the solver
+runs is 467 MDOF/s at 11.2M dof on 72 Grace cores.
+
+Reproduce with `jobs/fused_rc.sbatch`.
 
 
 ## Per configuration
