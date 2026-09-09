@@ -30,7 +30,7 @@ material:
   # K and density remain benchmark assumptions; physical units need reconciliation.
   C10: 1.9282
   C01: 0.0620
-  K: 50.0
+  K: 190
   # Instantaneous-normalized weights; g_inf = 1 / 1.24. Times in seconds.
   prony:
   - g: 0.06451612903225806
@@ -48,7 +48,7 @@ time:
   t_end: 30.0
 dynamics:
   type: newmark
-  density: 1.0
+  density: 1.0e-5
   beta: 0.64
   gamma: 0.6
 torsion:
@@ -58,7 +58,7 @@ torsion:
   - 0.0
   - 0.1
   - 0.1
-  angle: 6.4
+  angle: 5
   ramp_time: 4.0
   release:
     mode: free
