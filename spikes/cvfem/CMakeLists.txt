@@ -153,6 +153,47 @@ foreach(TEST_SOURCE ${CVFEM_TESTS})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()
 
+# ------------------------------------------------ generated headers match their generators
+#
+# The three headers under src/generated/ and src/cases/ are committed artifacts compiled as
+# ordinary source, and nothing regenerated or diffed them, so they could drift from the
+# scripts that emit them unnoticed. Each generator now has a --check mode that regenerates
+# in memory and compares, writing nothing.
+#
+# Registered only when a Python with SymPy is actually available: the check needs the same
+# library the headers were emitted with, and a test that silently passes because the
+# interpreter was missing would be worse than no test. Regeneration is slow (about a minute
+# for the HEX8 kernels), so the two large synthesizers carry a longer timeout and a label,
+# and only the cheap MMS case runs by default.
+find_program(CVFEM_PYTHON NAMES python3 python
+             HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../../venv/bin ${CMAKE_CURRENT_SOURCE_DIR}/../../.venv/bin
+             NO_CMAKE_SYSTEM_PATH)
+if(NOT CVFEM_PYTHON)
+    find_program(CVFEM_PYTHON NAMES python3 python)
+endif()
+
+if(CVFEM_PYTHON)
+    execute_process(COMMAND ${CVFEM_PYTHON} -c "import sympy"
+                    RESULT_VARIABLE _cvfem_no_sympy OUTPUT_QUIET ERROR_QUIET)
+    if(_cvfem_no_sympy EQUAL 0)
+        add_test(NAME cvfem_mms_case_is_current
+                 COMMAND ${CVFEM_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/python/gen_mms_case.py --check)
+        foreach(_elem hex8 tet4)
+            add_test(NAME cvfem_sympy_kernels_${_elem}_are_current
+                     COMMAND ${CVFEM_PYTHON}
+                             ${CMAKE_CURRENT_SOURCE_DIR}/python/synthesize_cvfem_${_elem}_ns_upwind_sympy.py
+                             --check)
+            set_tests_properties(cvfem_sympy_kernels_${_elem}_are_current
+                                 PROPERTIES TIMEOUT 600 LABELS codegen)
+        endforeach()
+        message(STATUS "cvfem: generator checks enabled (${CVFEM_PYTHON})")
+    else()
+        message(STATUS "cvfem: generator checks skipped -- ${CVFEM_PYTHON} has no sympy")
+    endif()
+else()
+    message(STATUS "cvfem: generator checks skipped -- no python found")
+endif()
+
 # Guards the guards, and so is the one target that must not go through
 # cvfem_target_defaults: it links nothing and defines nothing, because what it tests is
 # the build's floating-point options in isolation. It fails if they have folded
