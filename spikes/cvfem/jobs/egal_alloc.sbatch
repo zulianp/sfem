@@ -59,7 +59,7 @@ mkdir -p "$OUT"
 COMMON="SFEM_CASE=poiseuille SFEM_NX=12 SFEM_NY=3 SFEM_NZ=3 SFEM_ELEMENT_REFINE_LEVEL=8 \
         SFEM_GMG=1 SFEM_GMG_GALERKIN=2 SFEM_GMG_EGAL=1 SFEM_NL_MAX_IT=1 \
         SFEM_LSOLVE_MAX_IT=60 SFEM_VERIFY_TOL=1e9 OMP_NUM_THREADS=72 \
-        OMP_PROC_BIND=close OMP_PLACES=cores"
+        OMP_PROC_BIND=true OMP_PLACES=cores"
 
 echo "### baseline: page faults and transfer time ###"
 srun -u --ntasks=1 --cpus-per-task=72 --uenv="$UENV_IMAGE" --view="$UENV_VIEW" \

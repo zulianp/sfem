@@ -3,7 +3,7 @@
 # solves the same number of dofs and only the macro-element size changes.
 cd "$(dirname "$0")/.."
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-72}
-export OMP_PROC_BIND=close OMP_PLACES=cores
+export OMP_PROC_BIND=true OMP_PLACES=cores
 export SFEM_BENCH_REPS=${SFEM_BENCH_REPS:-5}
 echo "L    ndof       naive       macro       affine      hoist       em24        em32        bd_nv     bd_mac    pgrad     hoist+pg   agree      bd_agree"
 for pair in "2:32" "4:16" "8:8" "16:4"; do

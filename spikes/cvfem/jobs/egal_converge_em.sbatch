@@ -46,14 +46,14 @@ BIN="./build_alps/cvfem_hex8_ns_ssgmg"
 OUT="$SCRATCH/egal_out"
 mkdir -p "$OUT"
 
-export OMP_PROC_BIND=close
+export OMP_PROC_BIND=true
 export OMP_PLACES=cores
 
 for eg in 1; do
     [ "$eg" = 0 ] && name="probe" || name="element-wise"
     echo "### ${name} : full Newton, 108 macro-elements, L=4, 72 threads ###"
     srun -u --ntasks=1 --cpus-per-task=72 --uenv="$UENV_IMAGE" --view="$UENV_VIEW" \
-        bash -lc "OMP_NUM_THREADS=72 OMP_PROC_BIND=close OMP_PLACES=cores \
+        bash -lc "OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                   SFEM_CASE=poiseuille SFEM_NX=12 SFEM_NY=3 SFEM_NZ=3 \
                   SFEM_ELEMENT_REFINE_LEVEL=4 SFEM_GMG=1 SFEM_GMG_GALERKIN=2 \
                   SFEM_GMG_EGAL=${eg} ${BIN} ${OUT}" \

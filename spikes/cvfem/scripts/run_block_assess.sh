@@ -3,7 +3,7 @@
 # problem size (macros * level held constant, so every row solves the same dofs).
 cd "$(dirname "$0")/.."
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-72}
-export OMP_PROC_BIND=close OMP_PLACES=cores
+export OMP_PROC_BIND=true OMP_PLACES=cores
 export SFEM_BENCH_REPS=${SFEM_BENCH_REPS:-6}
 export SFEM_BENCH_VERBOSE_BLOCKS=1
 for pair in "2:32" "4:16" "8:8" "16:4"; do
