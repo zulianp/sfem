@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 
 from codegen.framework.fem.basis import basis_plan_for_element_at_cell_rule
-from codegen.framework.fem.reference import sfem_simplex_grad_ref_name
+from codegen.framework.fem.reference import (
+    sfem_basis_reference_data,
+    sfem_quadrature_reference_data,
+    sfem_simplex_grad_ref_name,
+)
 from codegen.framework.fem.geometry import GeometryMode
 
 
@@ -17,6 +21,10 @@ class ReferenceBasisDataPlan:
     n_qp_1d: int = 0
     shape_accessor: str = ""
     gradient_accessors: tuple = ()
+    #: The evaluated shape and gradient tables, canonically named.  The plan
+    #: carries the numbers so that one artifact can be emitted from them; the
+    #: emitters used to recompute them from the rule at four independent sites.
+    tables: tuple = ()
 
     def __post_init__(self):
         role = str(self.role)
@@ -49,10 +57,34 @@ class ReferenceBasisDataPlan:
         object.__setattr__(self, "n_qp_1d", n_qp_1d)
         object.__setattr__(self, "shape_accessor", shape_accessor)
         object.__setattr__(self, "gradient_accessors", gradient_accessors)
+        object.__setattr__(self, "tables", tuple(self.tables))
 
     @property
     def is_tensor_product(self):
         return self.family == "tensor_product"
+
+    @property
+    def key(self):
+        """The (basis, rule) identity: which shared header this basis lives in.
+
+        A basis is not identified by its element alone.  The HEX8 basis under a
+        HEX27 cell rule is sampled at three points per direction where its own
+        cell rule samples two, so `line_p1_q3` and `line_p1_q2` are different
+        tables of the same polynomial basis.  Conversely the TET4 basis under a
+        TET10 cell rule *is* the TET4 cell basis at that rule, which is why a
+        Taylor-Hood pair decomposes into headers a pure-element material already
+        uses.
+
+        Tensor-product bases key on the 1-D basis rather than the element,
+        because the tables are 1-D: PROTEUS_HEX8 and PROTEUS_QUAD4 share one.
+        """
+        if self.is_tensor_product:
+            return "line_p%d_q%d" % (self.n_shape_1d - 1, self.n_qp_1d)
+        return "%s_q%d" % (self.element_type.lower(), self.n_qp)
+
+    @property
+    def struct_name(self):
+        return "ref_%s" % self.key
 
     @property
     def accessors(self):
@@ -77,6 +109,7 @@ class ReferenceBasisDataPlan:
             "n_qp_1d": self.n_qp_1d,
             "shape_accessor": self.shape_accessor,
             "gradient_accessors": list(self.gradient_accessors),
+            "key": self.key,
         }
 
 
@@ -93,6 +126,9 @@ class ReferenceDataSetPlan:
     basis_entries: tuple
     field_element_types: tuple = ()
     n_qp_1d: int = 0
+    #: The rule's weights.  Kept apart from the basis tables because they are
+    #: keyed by the rule alone: two bases sharing a rule share one set.
+    weight_tables: tuple = ()
 
     def __post_init__(self):
         stage = str(self.stage)
@@ -137,10 +173,28 @@ class ReferenceDataSetPlan:
         object.__setattr__(self, "basis_entries", basis_entries)
         object.__setattr__(self, "field_element_types", field_element_types)
         object.__setattr__(self, "n_qp_1d", n_qp_1d)
+        object.__setattr__(self, "weight_tables", tuple(self.weight_tables))
 
     @property
     def is_tensor_product(self):
         return self.family == "tensor_product"
+
+    @property
+    def rule_key(self):
+        """The quadrature rule's identity, independent of any basis.
+
+        The domain rather than the element: a TET4 and a TET10 kernel at the same
+        order integrate over the same reference tetrahedron with the same points,
+        so they name the same rule.  A tensor-product rule is 1-D.
+
+        If two genuinely different rules ever produce the same key, generation
+        stops: `pipeline/driver.py _merge_files` refuses two different bodies for
+        one path, so an under-specified key is a hard error rather than a silent
+        choice between them.
+        """
+        if self.is_tensor_product:
+            return "quad_line_q%d" % self.n_qp_1d
+        return "quad_%s_q%d" % (_reference_domain(self.cell_element_type), self.n_qp)
 
     @property
     def accessors(self):
@@ -177,6 +231,7 @@ class ReferenceDataSetPlan:
             "weight_accessor": self.weight_accessor,
             "accessors": list(self.accessors),
             "field_element_types": list(self.field_element_types),
+            "rule_key": self.rule_key,
             "basis_entries": [basis.to_dict() for basis in self.basis_entries],
         }
 
@@ -323,6 +378,7 @@ def _reference_dataset_plan(prefix, stage, mode, cell_rule, family, field_types)
         basis_entries,
         field_types,
         cell_rule.tensor_product_n_qp_1d if family == "tensor_product" else 0,
+        sfem_quadrature_reference_data(cell_rule),
     )
 
 
@@ -346,11 +402,18 @@ def _basis_entries(cell_rule, family, field_types):
                 % element_type
             )
         accessor_prefix = element_type.lower() if prefix_accessors else ""
-        ret.append(_basis_entry_from_basis(basis, family, accessor_prefix))
+        ret.append(
+            _basis_entry_from_basis(
+                basis,
+                family,
+                accessor_prefix,
+                sfem_basis_reference_data(element_type, cell_rule),
+            )
+        )
     return tuple(ret)
 
 
-def _basis_entry_from_basis(basis, family, accessor_prefix):
+def _basis_entry_from_basis(basis, family, accessor_prefix, tables=()):
     if family == "tensor_product":
         shape = _prefixed_name(accessor_prefix, "shape_1d")
         grads = (_prefixed_name(accessor_prefix, "grad_1d"),)
@@ -369,7 +432,27 @@ def _basis_entry_from_basis(basis, family, accessor_prefix):
         basis.n_qp_1d,
         shape,
         grads,
+        tables,
     )
+
+
+#: The reference domain each element integrates over.  Elements sharing a domain
+#: at the same order share their quadrature points and weights.
+_REFERENCE_DOMAINS = (
+    ("TET", "tet"),
+    ("TRI", "tri"),
+    ("QUAD", "quad"),
+    ("HEX", "hex"),
+    ("EDGE", "edge"),
+)
+
+
+def _reference_domain(element_type):
+    name = str(element_type).upper()
+    for token, domain in _REFERENCE_DOMAINS:
+        if token in name:
+            return domain
+    raise ValueError("no reference domain is known for element '%s'" % element_type)
 
 
 def _prefixed_name(prefix, suffix):
