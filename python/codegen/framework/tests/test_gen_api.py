@@ -3834,8 +3834,12 @@ int main() {
             self.assertIn("static const s_t *hex27_grad_1d()", contents)
             self.assertIn("static const s_t *hex8_shape_1d()", contents)
             self.assertIn("static const s_t *hex8_grad_1d()", contents)
-            self.assertIn("static const s_t data[", contents)
-            self.assertIn("s_t(", contents)
+            # The numbers are no longer here.  Deduplication used to mean "one
+            # table per element type inside this struct"; it now means one table
+            # in the whole tree, so what this source should show is the forward
+            # into it -- and no literal of its own.
+            self.assertNotIn("static const s_t data[", contents)
+            self.assertIn("<s_t>::", contents)
             self.assertIn(
                 "field_shape_1d[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::hex27_shape_1d(), "
                 "sfem::codegen::stokes_isoparametric_reference_data<s_t>::hex8_shape_1d()}",
@@ -3912,8 +3916,12 @@ int main() {
             self.assertIn("static const s_t *tri6_grad_ref_x()", tri)
             self.assertIn("static const s_t *tri3_shape()", tri)
             self.assertIn("static const s_t *tri3_grad_ref_y()", tri)
-            self.assertIn("static const s_t data[", tri)
-            self.assertIn("s_t(", tri)
+            # The numbers are no longer here.  Deduplication used to mean "one
+            # table per element type inside this struct"; it now means one table
+            # in the whole tree, so what this source should show is the forward
+            # into it -- and no literal of its own.
+            self.assertNotIn("static const s_t data[", tri)
+            self.assertIn("<s_t>::", tri)
             self.assertIn(
                 "field_shape[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::tri6_shape(), "
                 "sfem::codegen::stokes_isoparametric_reference_data<s_t>::tri3_shape()}",
@@ -3929,8 +3937,12 @@ int main() {
             self.assertIn("static const s_t *tet10_grad_ref_z()", tet)
             self.assertIn("static const s_t *tet4_shape()", tet)
             self.assertIn("static const s_t *tet4_grad_ref_z()", tet)
-            self.assertIn("static const s_t data[", tet)
-            self.assertIn("s_t(", tet)
+            # The numbers are no longer here.  Deduplication used to mean "one
+            # table per element type inside this struct"; it now means one table
+            # in the whole tree, so what this source should show is the forward
+            # into it -- and no literal of its own.
+            self.assertNotIn("static const s_t data[", tet)
+            self.assertIn("<s_t>::", tet)
             self.assertIn(
                 "field_shape[NC] = {sfem::codegen::stokes_isoparametric_reference_data<s_t>::tet10_shape(), "
                 "sfem::codegen::stokes_isoparametric_reference_data<s_t>::tet4_shape()}",

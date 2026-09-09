@@ -46,6 +46,14 @@ from codegen.framework.emitters.energy_codegen import _sfem_soa_diagnostics_head
 from codegen.framework.fem import sfem_fem_policy, sfem_tensor_hex_shape_index
 from codegen.framework.plans.scheduling import build_expression_graph
 
+def _ensure_parent(path):
+    """A generated path may carry a directory -- `reference/<key>.hpp` does."""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+
+
 
 def neohookean_ogden_energy(F, mu, lmbda):
     dim = F.shape[0]
@@ -419,6 +427,7 @@ def generated_neohookean_weak_form_files(element_type, prefix, vector_size=16, l
 
 def compile_generated_shared_library(compiler, tmpdir, generated_files, operator_filename, library_name):
     for generated in generated_files:
+        _ensure_parent(os.path.join(tmpdir, generated.path))
         with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
             output.write(generated.source)
 
@@ -924,6 +933,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
+                _ensure_parent(os.path.join(tmpdir, generated.path))
                 with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
                     output.write(generated.source)
 
@@ -1013,6 +1023,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
+                _ensure_parent(os.path.join(tmpdir, generated.path))
                 with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
                     output.write(generated.source)
 
@@ -1106,6 +1117,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
+                _ensure_parent(os.path.join(tmpdir, generated.path))
                 with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
                     output.write(generated.source)
 
@@ -1181,6 +1193,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
+                _ensure_parent(os.path.join(tmpdir, generated.path))
                 with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
                     output.write(generated.source)
 
@@ -1303,6 +1316,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
+                _ensure_parent(os.path.join(tmpdir, generated.path))
                 with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
                     output.write(generated.source)
 
@@ -1598,10 +1612,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             "generated_hex8_neohookean_isoparametric_action_isoparametric_reference_data<s_t>::shape_1d()",
             operator_source,
         )
-        self.assertIn(
-            "static const s_t data[4] = {s_t(",
-            operator_source,
-        )
+        # The four 1-D shape values live in `reference/line_p1_q2.hpp` now, and
+        # this source forwards into it rather than carrying them.
+        self.assertNotIn("static const s_t data[4] = {s_t(", operator_source)
+        self.assertIn('#include "../../../reference/line_p1_q2.hpp"', operator_source)
         isoparametric_mesh_source = operator_source.split(
             "static SFEM_INLINE int %s_hex8_gradient_i_msoa_impl"
             % prefix,
@@ -2235,6 +2249,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
+                _ensure_parent(os.path.join(tmpdir, generated.path))
                 with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as output:
                     output.write(generated.source)
 

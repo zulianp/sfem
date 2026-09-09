@@ -175,6 +175,7 @@ from codegen.framework.symbolic.weak_forms import (
 )
 from codegen.framework.plans.emission import ElementEmissionPlan as _ElementEmissionPlan
 from codegen.framework.plans.generation import GenerationPlan as _GenerationPlan
+from codegen.framework.emitters.quadrature_codegen import REFERENCE_DIRECTORY
 from codegen.framework.plans.matrix_formats import (
     MatrixAssemblyVariantPlan,
     MatrixFormat,
@@ -1660,10 +1661,34 @@ def _layout_codegen_source(unit, context, filename, source, local_headers):
                 '#include "%s"' % header,
                 '#include "%s"' % relative,
             )
+    # The reference headers are a family, so their includes move by path rather
+    # than by a lookup of each name.
+    if directory:
+        relocated = relocated.replace(
+            '#include "%s/' % REFERENCE_DIRECTORY,
+            '#include "%s/' % _relative_codegen_include(directory, REFERENCE_DIRECTORY),
+        )
     return relocated
 
 
+def _is_shared_reference_header(filename):
+    """`reference/<key>.hpp` -- one basis's or one rule's tables.
+
+    Matched by shape rather than by membership in a frozenset, because unlike
+    `kernel_math.hpp` this is a *family*: a new element or a new quadrature order
+    adds a file, and a fixed list of names could not follow.
+    """
+    normalized = str(filename).replace(os.sep, "/")
+    return normalized.startswith(
+        "%s/" % REFERENCE_DIRECTORY
+    ) and normalized.endswith((".hpp", ".cuh"))
+
+
 def _codegen_file_directory(unit, context, filename):
+    if _is_shared_reference_header(filename):
+        # The path already carries its directory, and the file is shared by every
+        # material, so it must not be pushed down into d3/tet4/.
+        return ""
     if filename in _CODEGEN_COMMON_HEADERS:
         return ""
     if _is_codegen_local_header(filename):
@@ -1736,6 +1761,9 @@ def _relocate_generated_primitive_headers(files, out_dir, material_name):
     for header in _CODEGEN_SHARED_PRIMITIVE_HEADERS:
         if header in files:
             header_targets[header] = os.path.join("..", header)
+    for filename in files:
+        if _is_shared_reference_header(filename):
+            header_targets[filename] = os.path.join("..", filename)
 
     if not header_targets:
         return files
