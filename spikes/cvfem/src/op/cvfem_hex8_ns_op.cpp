@@ -291,18 +291,81 @@ namespace sfem {
                 }
             }
 
-            // Traction and prescribed pressure are not wired here. Every sscvfem_* call
-            // site invokes boundary_scs_add_* without the trailing Hex8BoundaryDataT, so a
-            // named sideset would compile a mask that no kernel ever reads and the run would
-            // quietly solve the do-nothing problem instead. Refuse rather than mislead.
-            if (!traction_sideset.empty() || !pressure_sideset.empty()) {
+            // Traction and prescribed pressure, at the macro level and by the same
+            // compile_sideset_mask, then projected onto each micro cell by sscvfem_bd. Only
+            // the masks need projecting; the values are per-sideset constants.
+            impl_->ss.macro_pressure_mask.clear();
+            impl_->ss.macro_traction_mask.clear();
+            impl_->ss.bc_tx = impl_->ss.bc_ty = impl_->ss.bc_tz = scalar_t(0);
+            impl_->ss.bc_p                                      = scalar_t(0);
+            if ((!traction_sideset.empty() || !pressure_sideset.empty()) &&
+                !smesh::Env::read<int>("SFEM_BOUNDARY_MASK", 0)) {
                 SFEM_ERROR(
-                        "CVFEMNavierStokes: traction ('%s') and pressure ('%s') boundary "
-                        "conditions are HEX8 flat-mesh only -- the semi-structured kernels do "
-                        "not take boundary data, so naming them here would be silently "
-                        "ignored. Run with SFEM_ELEMENT_REFINE_LEVEL=1.\n",
+                        "CVFEMNavierStokes: traction ('%s') / pressure ('%s') need "
+                        "SFEM_BOUNDARY_MASK=1; without it no face mask is compiled and the "
+                        "condition would be silently absent.\n",
                         traction_sideset.c_str(), pressure_sideset.c_str());
                 return SFEM_FAILURE;
+            }
+            if (!traction_sideset.empty()) {
+                auto named = mesh->sidesets(traction_sideset);
+                if (named.empty() || !named.front()) {
+                    SFEM_ERROR("CVFEMNavierStokes: traction sideset '%s' not found\n",
+                               traction_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
+                const ptrdiff_t nf = compile_sideset_mask(named.front(), impl_->ss.nmacro,
+                                                          impl_->ss.macro_traction_mask);
+                if (nf < 0) {
+                    SFEM_ERROR("CVFEMNavierStokes: malformed traction sideset '%s'\n",
+                               traction_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
+                // A traction condition IS the natural condition with a value, so its faces
+                // join the natural set -- the same union the flat path performs.
+                if (impl_->ss.macro_natural_mask.empty())
+                    impl_->ss.macro_natural_mask.assign((size_t)impl_->ss.nmacro, 0);
+                for (size_t e = 0; e < impl_->ss.macro_natural_mask.size(); ++e)
+                    impl_->ss.macro_natural_mask[e] =
+                            (uint8_t)(impl_->ss.macro_natural_mask[e] | impl_->ss.macro_traction_mask[e]);
+                impl_->ss.bc_tx = (scalar_t)traction[0];
+                impl_->ss.bc_ty = (scalar_t)traction[1];
+                impl_->ss.bc_tz = (scalar_t)traction[2];
+                std::printf("traction (ss): %td macro faces from sideset '%s', t = (%g %g %g)\n", nf,
+                            traction_sideset.c_str(), (double)traction[0], (double)traction[1],
+                            (double)traction[2]);
+            }
+            if (!pressure_sideset.empty()) {
+                auto named = mesh->sidesets(pressure_sideset);
+                if (named.empty() || !named.front()) {
+                    SFEM_ERROR("CVFEMNavierStokes: pressure sideset '%s' not found\n",
+                               pressure_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
+                const ptrdiff_t nf = compile_sideset_mask(named.front(), impl_->ss.nmacro,
+                                                          impl_->ss.macro_pressure_mask);
+                if (nf < 0) {
+                    SFEM_ERROR("CVFEMNavierStokes: malformed pressure sideset '%s'\n",
+                               pressure_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
+                impl_->ss.bc_p = (scalar_t)pressure_value;
+                std::printf("pressure (ss): %td macro faces from sideset '%s', p_bar = %g\n", nf,
+                            pressure_sideset.c_str(), (double)pressure_value);
+            }
+            // Same tie-break refusal as the flat path: the kernel lets the natural face win
+            // where both select one, and relying on that is always a misconfiguration.
+            if (!impl_->ss.macro_pressure_mask.empty() && !impl_->ss.macro_natural_mask.empty()) {
+                ptrdiff_t clash = 0;
+                for (size_t e = 0; e < impl_->ss.macro_pressure_mask.size(); ++e)
+                    if (impl_->ss.macro_pressure_mask[e] & impl_->ss.macro_natural_mask[e]) ++clash;
+                if (clash) {
+                    SFEM_ERROR(
+                            "CVFEMNavierStokes: %td macro element(s) have a face in both the "
+                            "pressure sideset '%s' and the natural/traction set.\n",
+                            clash, pressure_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
             }
 
             // Deterministic two-pass scatter, the semi-structured counterpart of the packed
@@ -544,21 +607,72 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    // The semi-structured twin. Same statement, same kernel, and the mask projected onto
+    // each micro cell exactly as the operator does it -- so this measures the surface the
+    // operator sees at this level rather than the macro faces the sideset names.
+    int CVFEMNavierStokes::sideset_mass_flux_ss(const real_t *const                   x,
+                                                const std::shared_ptr<smesh::Sideset> &ss,
+                                                real_t                                &out) {
+        auto &d = impl_->ss;
+        std::vector<uint8_t> macro;
+        if (compile_sideset_mask(ss, d.nmacro, macro) < 0) {
+            SFEM_ERROR("CVFEMNavierStokes::sideset_mass_flux: malformed sideset\n");
+            return SFEM_FAILURE;
+        }
+        sscvfem_unpack(d, x);
+        const int L = d.level;
+        int       off[8];
+        sscvfem_corner_offsets(L, off);
+        long double q = 0;
+#pragma omp parallel for reduction(+ : q)
+        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+            const int mm = (int)macro[(size_t)e];
+            if (!mm) continue;
+            for (int zi = 0; zi < L; ++zi) {
+                for (int yi = 0; yi < L; ++yi) {
+                    for (int xi = 0; xi < L; ++xi) {
+                        const int fm = sscvfem_micro_face_mask(mm, L, xi, yi, zi);
+                        if (!fm) continue;
+                        const int base = sscvfem_lidx(L, xi, yi, zi);
+                        scalar_t  xe[8], ye[8], ze[8], uxe[8], uye[8], uze[8], pe[8];
+                        for (int a = 0; a < 8; ++a) {
+                            const smesh::idx_t g = d.elems[base + off[a]][e];
+                            xe[a]  = (scalar_t)d.points[0][g];
+                            ye[a]  = (scalar_t)d.points[1][g];
+                            ze[a]  = (scalar_t)d.points[2][g];
+                            uxe[a] = d.ux[(size_t)g];
+                            uye[a] = d.uy[(size_t)g];
+                            uze[a] = d.uz[(size_t)g];
+                            pe[a]  = d.p[(size_t)g];
+                        }
+                        scalar_t adj[9], det, re[CVFEM_HEX8_N_DOF];
+                        sscvfem_micro_geom(xe, ye, ze, adj, &det);
+                        for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) re[k] = 0;
+                        boundary_scs_add_residual((scalar_t)rho, (scalar_t)mu, 0, adj, det, d.Lx,
+                                                  d.Ly, d.Lz, xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
+                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+                            q += (long double)re[a * N_FIELDS + 3];
+                    }
+                }
+            }
+        }
+        out = (real_t)q;
+        return SFEM_SUCCESS;
+    }
+
     int CVFEMNavierStokes::sideset_mass_flux(const real_t *const x, const std::string &sideset,
                                              real_t &out) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::sideset_mass_flux");
         out = 0;
         if (!impl_->initialized) return SFEM_FAILURE;
-        if (impl_->semi_structured) {
-            SFEM_ERROR("CVFEMNavierStokes::sideset_mass_flux: flat HEX8 meshes only\n");
-            return SFEM_FAILURE;
-        }
         auto mesh  = impl_->space->mesh_ptr();
         auto named = mesh->sidesets(sideset);
         if (named.empty() || !named.front()) {
             SFEM_ERROR("CVFEMNavierStokes::sideset_mass_flux: sideset '%s' not found\n", sideset.c_str());
             return SFEM_FAILURE;
         }
+        if (impl_->semi_structured) return sideset_mass_flux_ss(x, named.front(), out);
+
         auto &d = impl_->d;
         std::vector<uint8_t> mask;
         if (compile_sideset_mask(named.front(), d.nelements, mask) < 0) {

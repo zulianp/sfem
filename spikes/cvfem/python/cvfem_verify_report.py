@@ -598,6 +598,7 @@ def build_report(manifest, rundir):
                    ["threads", manifest.get("threads", "--")],
                    ["commit", manifest.get("commit", "--")],
                    ["linear solver", manifest.get("solver", "--")],
+                   ["element refine level", manifest.get("level", "--")],
                    ["run directory", os.path.abspath(rundir)],
                    ["runs parsed", "%d of %d" % (sum(1 for r in runs if not r.get("missing")),
                                                  len(runs))]]),

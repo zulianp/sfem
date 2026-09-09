@@ -50,6 +50,7 @@ uenv run $UENV_ARGS -- env \
     DRIVER="${DRIVER:-${BUILD:-$SPIKE_ROOT/build_blk}/cvfem_hex8_ns_ssgmg}" \
     OUT="$OUT" \
     VERIFY_GROUPS="${VERIFY_GROUPS:-mms bc port step pump}" \
+    VERIFY_LEVEL="${VERIFY_LEVEL:-1}" \
     OMP_NUM_THREADS="$OMP_NUM_THREADS" \
     bash "$SPIKE_ROOT/scripts/verify_report.sh"
 

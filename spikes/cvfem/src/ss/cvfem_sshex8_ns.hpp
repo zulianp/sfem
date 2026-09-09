@@ -77,6 +77,13 @@ struct SSMeshData {
     // Faces carrying the do-nothing outflow. Empty means none, which is every case except
     // the backward-facing step, so the outflow branch is never taken elsewhere.
     std::vector<uint8_t> macro_natural_mask;
+    // The value-carrying conditions, at the same macro level and for the same reason: a
+    // sideset stores (macro element, local face), which a level change does not touch, so
+    // one mask is correct at every level of a hierarchy.
+    std::vector<uint8_t> macro_pressure_mask;
+    std::vector<uint8_t> macro_traction_mask;
+    scalar_t             bc_tx{0}, bc_ty{0}, bc_tz{0};
+    scalar_t             bc_p{0};
 
     // Deterministic scatter tables, built once. Null means the atomic path.
     std::shared_ptr<struct SSScatter> scatter;
@@ -321,6 +328,30 @@ static SFEM_INLINE int sscvfem_micro_face_mask(const int macro, const int L, con
     if (zi == L - 1) m |= macro & 0x20;  // face 5, z-max
     return m;
 }
+
+// The boundary data for one micro cell, with its face selectors projected down from the
+// macro element exactly as the face and natural masks are.
+//
+// The values are per-sideset constants and need no projection; only the masks that say
+// WHICH faces carry them do. Declared after sscvfem_micro_face_mask because it uses it, and
+// after Hex8BoundaryDataT, which the boundary header defines.
+static SFEM_INLINE Hex8BoundaryDataT<scalar_t> sscvfem_bd(const SSMeshData &d, const ptrdiff_t e,
+                                                          const int L, const int xi, const int yi,
+                                                          const int zi) {
+    Hex8BoundaryDataT<scalar_t> bd;
+    bd.tx    = d.bc_tx;
+    bd.ty    = d.bc_ty;
+    bd.tz    = d.bc_tz;
+    bd.p_bar = d.bc_p;
+    bd.tmask = d.macro_traction_mask.empty()
+                       ? 0
+                       : sscvfem_micro_face_mask((int)d.macro_traction_mask[(size_t)e], L, xi, yi, zi);
+    bd.pmask = d.macro_pressure_mask.empty()
+                       ? 0
+                       : sscvfem_micro_face_mask((int)d.macro_pressure_mask[(size_t)e], L, xi, yi, zi);
+    return bd;
+}
+
 
 inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
                                        const int stride, std::vector<scalar_t> &ogx,
@@ -950,7 +981,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
                                                   sscvfem_micro_face_mask(
                                                           d.macro_natural_mask.empty() ? 0
                                                               : (int)d.macro_natural_mask[(size_t)e],
-                                                          L, xi, yi, zi));
+                                                          L, xi, yi, zi),
+                                                  sscvfem_bd(d, e, L, xi, yi, zi));
 
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
@@ -1757,7 +1789,8 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                                                   sscvfem_micro_face_mask(
                                                           d.macro_natural_mask.empty() ? 0
                                                               : (int)d.macro_natural_mask[(size_t)e],
-                                                          L, xi, yi, zi));
+                                                          L, xi, yi, zi),
+                                                  sscvfem_bd(d, e, L, xi, yi, zi));
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
                             for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
@@ -1947,7 +1980,8 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
                                                   sscvfem_micro_face_mask(
                                                           d.macro_natural_mask.empty() ? 0
                                                               : (int)d.macro_natural_mask[(size_t)e],
-                                                          L, xi, yi, zi));
+                                                          L, xi, yi, zi),
+                                                  sscvfem_bd(d, e, L, xi, yi, zi));
                     }
                 }
             }

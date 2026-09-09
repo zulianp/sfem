@@ -319,7 +319,8 @@ namespace cvfem_ss {
                                             : sscvfem_micro_face_mask((int)d.macro_face_mask[(size_t)e], L, xi, yi, zi),
                                     d.macro_natural_mask.empty()
                                             ? 0
-                                            : sscvfem_micro_face_mask((int)d.macro_natural_mask[(size_t)e], L, xi, yi, zi));
+                                            : sscvfem_micro_face_mask((int)d.macro_natural_mask[(size_t)e], L, xi, yi, zi),
+                                    sscvfem_bd(d, e, L, xi, yi, zi));
 
                             if (!g.fine_constrained.empty()) {
                                 for (int a = 0; a < 8; ++a) {
