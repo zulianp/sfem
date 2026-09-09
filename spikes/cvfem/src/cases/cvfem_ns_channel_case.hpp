@@ -17,7 +17,7 @@
 
 namespace cvfem_case {
 
-    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step };
+    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step, Pump };
 
     inline bool parse_case(const std::string &name, FlowCase &out) {
         if (name == "poiseuille") {
@@ -44,6 +44,10 @@ namespace cvfem_case {
             out = FlowCase::MMS;
             return true;
         }
+        if (name == "pump" || name == "diaphragm" || name == "diaphragm_pump") {
+            out = FlowCase::Pump;
+            return true;
+        }
         return false;
     }
 
@@ -57,6 +61,70 @@ namespace cvfem_case {
         const T tol = T(1e-8) * std::max(L, T(1));
         return std::fabs(c - value) <= tol;
     }
+
+    // ------------------------------------------------------------------ diaphragm pump
+    //
+    // A closed chamber with two openings in it: a diaphragm that moves, and a port that
+    // lets fluid in or out. It is the smallest thing that is recognisably a pump, and it
+    // exists to exercise the boundary conditions on something they were built for rather
+    // than on a channel.
+    //
+    //   the chamber   [0,Lx] x [0,Ly] x [0,Lz], every wall no-slip except the two below
+    //   the diaphragm the whole face y = Ly, prescribed u = (0, -V, 0)
+    //   the port      a centred square patch of the floor y = 0, held at a pressure
+    //
+    // The diaphragm is TRANSPIRATION on a fixed mesh, not a moving boundary: the mesh does
+    // not deform and the wall does not move, the velocity is simply prescribed through it.
+    // That is exact for the mass it carries -- which is the whole point here -- and wrong
+    // about the geometric nonlinearity of a real diaphragm, which an ALE formulation would
+    // capture and this deliberately does not. Amplitudes small against Ly are the regime
+    // where the difference does not matter.
+    //
+    // What makes it worth having is that it is falsifiable in one line. The domain is fixed
+    // and the flow incompressible, so the flux through the whole boundary is zero; the walls
+    // carry none and the diaphragm carries exactly -V times its area, because its velocity
+    // is prescribed. So
+    //
+    //     flux through the port  ==  V * Lx * Lz
+    //
+    // exactly, with no closed-form solution needed anywhere. If transpiration is not moving
+    // the mass it claims to, that identity breaks, and it breaks by the amount of the lie.
+    //
+    // Valves are out of scope, so this does not rectify: the port is an opening, and over a
+    // full sinusoidal cycle the pump moves fluid back and forth and nets nothing. Adding a
+    // valve means making the port's condition depend on the sign of its own flux, which is
+    // a different and much less pleasant problem.
+    template <typename T>
+    inline bool pump_on_diaphragm(const T y, const T Ly) {
+        return on_plane(y, Ly, Ly);
+    }
+
+    // The port patch, by the same predicate the sideset and the nodeset are both built
+    // from, so the two cannot disagree about which faces are open.
+    // STRICTLY inside the patch, and the strictness is load-bearing.
+    //
+    // This one predicate answers two questions -- which faces are the opening, and which
+    // nodes are free of no-slip -- and the rim is where they part company. A face is in the
+    // port if its centroid is inside, and a centroid is never on the rim. A NODE on the rim
+    // is shared between a port face and a wall face, and if it is left free the wall face
+    // beside it carries a velocity and leaks: measured, a rim admitted this way sent 0.196
+    // of a swept 1.000 out through the walls instead of the port, while the diaphragm
+    // carried exactly its -1.000. So the rim belongs to the wall, which a strict inequality
+    // says and a tolerant one does not.
+    //
+    // Subtracting the tolerance rather than adding it is what makes the difference: a node
+    // sitting exactly on the rim, which is where they sit whenever the patch aligns with the
+    // grid, must fall outside.
+    template <typename T>
+    inline bool pump_on_port(const T x, const T y, const T z, const T Lx, const T Ly, const T Lz,
+                             const T port_frac) {
+        if (!on_plane(y, T(0), Ly)) return false;
+        const T hx  = T(0.5) * port_frac * Lx;
+        const T hz  = T(0.5) * port_frac * Lz;
+        const T tol = T(1e-8) * std::max(std::max(Lx, Lz), T(1));
+        return std::fabs(x - T(0.5) * Lx) < hx - tol && std::fabs(z - T(0.5) * Lz) < hz - tol;
+    }
+
 
     // Fully developed flow between plates at y = 0 and y = Ly. Couette is driven by the
     // lid, Poiseuille by the pressure gradient G = 8 mu U / Ly^2 that produces peak
@@ -93,6 +161,18 @@ namespace cvfem_case {
             const T Re = T(1) / mu;
             cvfem_mms::velocity(x, y, z, ux, uy, uz);
             cvfem_mms::pressure(x, y, z, Re, p);
+            return;
+        }
+        if (flow == FlowCase::Pump) {
+            // No closed form. Like the cavity, this returns the boundary data rather than a
+            // solution: the diaphragm's normal velocity where the diaphragm is, and zero
+            // elsewhere, which is the no-slip the rest of the chamber wants. U is the
+            // AMPLITUDE -- the driver scales the whole set by the waveform through
+            // DirichletConditions::set_time, so this stays a function of position alone.
+            ux = T(0);
+            uy = pump_on_diaphragm(y, Ly) ? -U : T(0);
+            uz = T(0);
+            p  = T(0);
             return;
         }
         if (flow == FlowCase::Step) {

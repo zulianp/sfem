@@ -2699,7 +2699,13 @@ int main(int argc, char **argv) {
     const bool        want_cavity = smesh::Env::read_string("SFEM_CASE", "") == "cavity" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid_driven_cavity";
-    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", want_step ? 10 : ((want_mms || want_cavreg) ? 2 : (want_cavity ? 1 : 4)));
+    // The diaphragm pump: a closed chamber with a moving wall and one port. See the block
+    // comment in src/cases/cvfem_ns_channel_case.hpp for the geometry and for the identity
+    // it is checked against. A cube by default, so the diaphragm area is Lx*Lz and the
+    // arithmetic in that identity is visible rather than buried.
+    const bool        want_pump   = case_req == "pump" || case_req == "diaphragm" ||
+                           case_req == "diaphragm_pump";
+    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", want_step ? 10 : ((want_mms || want_cavreg) ? 2 : ((want_cavity || want_pump) ? 1 : 4)));
     const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg || want_step) ? 2 : 1);
     const real_t      Lz         = smesh::Env::read<real_t>("SFEM_LZ", (want_mms || want_cavreg) ? 2 : 1);
     const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", 1);
@@ -2810,7 +2816,10 @@ int main(int argc, char **argv) {
     // configured, several hundred lines below, because the sidesets are built now and a
     // condition naming one that was never registered would fail for the wrong reason.
     const std::string want_traction_sideset = smesh::Env::read_string("SFEM_TRACTION_SIDESET", "");
-    const std::string want_pressure_sideset = smesh::Env::read_string("SFEM_PRESSURE_SIDESET", "");
+    // The pump's port defaults to being the pressure boundary, because that is what a port
+    // is; naming SFEM_PRESSURE_SIDESET explicitly still wins.
+    const std::string want_pressure_sideset =
+            smesh::Env::read_string("SFEM_PRESSURE_SIDESET", want_pump ? "port" : "");
     const bool        want_named_bc = !want_traction_sideset.empty() || !want_pressure_sideset.empty();
     // A face carrying a traction or pressure condition must not also carry Dirichlet
     // velocity data. It is the same invariant cvfem_ns_channel_case.hpp states for the
@@ -2826,7 +2835,7 @@ int main(int argc, char **argv) {
     const bool outlet_governed = want_natural_outlet || want_traction_sideset == "outlet" ||
                                  want_pressure_sideset == "outlet";
     std::shared_ptr<smesh::Sideset> step_skin, step_outlet;
-    if (want_step || want_natural_outlet || want_named_bc) {
+    if (!want_pump && (want_step || want_natural_outlet || want_named_bc)) {
         step_skin = smesh::skin_sideset(mesh);
         auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)Lx, 1e-6);
         if (!step_skin || outs.empty()) {
@@ -2841,6 +2850,60 @@ int main(int argc, char **argv) {
         mesh->add_sideset("outlet", step_outlet);
         std::printf("sidesets: skin %td faces, outlet %td faces\n",
                     (ptrdiff_t)step_skin->parent()->size(), (ptrdiff_t)step_outlet->parent()->size());
+        setenv("SFEM_BOUNDARY_MASK", "1", 0);
+    }
+
+    // The pump's two openings, both derived from the SAME coordinate predicates the
+    // Dirichlet set below uses. That is the point of building them here rather than from a
+    // plane: cvfem_ns_channel_case.hpp states the invariant that the boundary marking and
+    // the constraint set must decide the same faces, and deriving both from one predicate
+    // removes the possibility of disagreement instead of testing for it.
+    //
+    // The port is a patch and not a whole face, so create_from_plane cannot express it;
+    // create_from_selector takes the predicate directly.
+    const real_t pump_port_frac = smesh::Env::read<real_t>("SFEM_PUMP_PORT", real_t(0.5));
+    if (want_pump) {
+        auto skin = smesh::skin_sideset(mesh);
+        auto port = smesh::Sideset::create_from_selector(
+                mesh, [&](const smesh::geom_t x, const smesh::geom_t y, const smesh::geom_t z) {
+                    return cvfem_case::pump_on_port<real_t>((real_t)x, (real_t)y, (real_t)z, Lx, Ly, Lz,
+                                                            pump_port_frac);
+                });
+        if (!skin || port.empty()) {
+            std::fprintf(stderr, "pump: could not build the chamber sidesets\n");
+            return EXIT_FAILURE;
+        }
+        auto diaphragm = smesh::Sideset::create_from_selector(
+                mesh, [&](const smesh::geom_t /*x*/, const smesh::geom_t y, const smesh::geom_t /*z*/) {
+                    return cvfem_case::pump_on_diaphragm<real_t>((real_t)y, Ly);
+                });
+        if (diaphragm.empty()) {
+            std::fprintf(stderr, "pump: could not build the diaphragm sideset\n");
+            return EXIT_FAILURE;
+        }
+        mesh->add_sideset("skin", skin);
+        mesh->add_sideset("port", port.front());
+        // Named only so the flux through it can be measured; no boundary condition reads it,
+        // because the diaphragm is Dirichlet and lives in the constraint set.
+        mesh->add_sideset("diaphragm", diaphragm.front());
+        const ptrdiff_t n_port = (ptrdiff_t)port.front()->parent()->size();
+        // A port of no faces is a closed chamber with a moving wall pushing into an
+        // incompressible fluid, which has no solution. Say so here rather than let the
+        // linear solver discover it.
+        if (n_port == 0) {
+            std::fprintf(stderr,
+                         "pump: SFEM_PUMP_PORT=%g selected no faces at this resolution -- the "
+                         "chamber has no opening and the problem is unsolvable. Raise it, or "
+                         "raise SFEM_N.\n",
+                         (double)pump_port_frac);
+            return EXIT_FAILURE;
+        }
+        std::printf("pump: chamber %gx%gx%g  diaphragm area %g  port %td faces (frac %g)\n",
+                    (double)Lx, (double)Ly, (double)Lz, (double)(Lx * Lz), n_port,
+                    (double)pump_port_frac);
+        // The port is where the fluid leaves, so it carries the pressure and must not also
+        // carry velocity data; the diaphragm carries velocity and must not carry pressure.
+        // Both are set by name below.
         setenv("SFEM_BOUNDARY_MASK", "1", 0);
     }
     // SFEM_ELEMENT_REFINE_LEVEL > 1 turns the mesh semi-structured: the cells above become
@@ -3012,6 +3075,7 @@ int main(int argc, char **argv) {
     const ptrdiff_t     ndof   = nnodes * N_FIELDS;
     std::vector<real_t> p_exact;
     ptrdiff_t           pin_node = 0;  // pressure pin, needed again by the MMS diagnostics
+    std::shared_ptr<sfem::DirichletConditions> dirichlet;
 
     // Built after op->initialize(), and that order is required rather than incidental:
     // initialize() renumbers the mesh nodes for the packed layout, so node indices taken
@@ -3113,6 +3177,26 @@ int main(int argc, char **argv) {
                     uvw_uy.push_back(uy);
                     uvw_uz.push_back(uz);
                 }
+            } else if (flow == cvfem_case::FlowCase::Pump) {
+                // Every wall of the chamber, all three components, EXCEPT the port.
+                //
+                // The diaphragm is in here too and is not a special case: it is a wall whose
+                // prescribed velocity happens to be non-zero and normal, which is what makes
+                // transpiration cost no new constraint machinery. exact_state supplies
+                // (0, -U, 0) there and zero elsewhere.
+                //
+                // The port is left out entirely -- no velocity data at all -- because it
+                // carries the prescribed pressure, and a face cannot carry both. Constrain
+                // it here and the port is overridden while the log still reports it applied,
+                // which is the failure the outlet_governed test above exists to prevent.
+                const bool on_port = cvfem_case::pump_on_port<real_t>(x, y, z, Lx, Ly, Lz, pump_port_frac);
+                const bool on_wall = wall_y || inlet || outlet || span;  // the chamber is a box
+                if (on_wall && !on_port) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(ux);
+                    uvw_uy.push_back(uy);
+                    uvw_uz.push_back(uz);
+                }
             } else if (flow == cvfem_case::FlowCase::CavityRegularized) {
                 // No-slip on every wall including the spanwise pair, with the lid profile on
                 // y = Ly. This is a genuinely three-dimensional cavity, which is what their
@@ -3189,7 +3273,12 @@ int main(int argc, char **argv) {
         else
             std::printf("pressure pin: DISABLED\n");
 
-        f->add_constraint(sfem::DirichletConditions::create(fs, conds));
+        // Kept rather than discarded: the pump drives its diaphragm by rescaling these
+        // values every time step through set_time, which is the mechanism
+        // DirichletConditions already has for a time-varying load and which spares this
+        // driver from rebuilding the whole constraint set once per step.
+        dirichlet = sfem::DirichletConditions::create(fs, conds);
+        f->add_constraint(dirichlet);
 
         // The manufactured solution is driven by a body force. This must happen after
         // op->initialize() -- which ran above -- because the packed path renumbers mesh
@@ -3531,9 +3620,38 @@ int main(int argc, char **argv) {
         std::printf("transient: dt %g, %d steps, BDF%d\n", (double)dt_step, nsteps, bdf_order);
     }
 
+    // The diaphragm waveform. A steady run leaves this at 1, which is a diaphragm held at
+    // a constant displacement rate -- not a physical pump cycle, but the configuration in
+    // which the swept-volume identity is easiest to read, and the one the verification
+    // harness checks.
+    //
+    // With a timestep it becomes V sin(2 pi t / T). Note this does NOT rectify: the port is
+    // an opening with no valve, so over a full cycle the chamber breathes in and out and
+    // nets nothing. Rectification needs the port's condition to depend on the sign of its
+    // own flux, which is a different and much less pleasant problem, and is out of scope.
+    const real_t pump_period = smesh::Env::read<real_t>("SFEM_PUMP_PERIOD", real_t(1));
+    real_t       pump_scale  = 1;
+
     for (int tstep = 0; tstep < (dt_step > real_t(0) ? nsteps : 1); ++tstep) {
     if (dt_step > real_t(0)) std::printf("=== step %d/%d  t = %g ===\n", tstep + 1, nsteps,
                                          (double)((tstep + 1) * dt_step));
+    if (want_pump && dt_step > real_t(0) && dirichlet) {
+        const real_t t_now = (tstep + 1) * dt_step;
+        pump_scale         = std::sin(real_t(2) * real_t(M_PI) * t_now / pump_period);
+        // set_time snapshots the base values on its first call and thereafter writes
+        // scale * base, so passing the waveform as the global scale drives every prescribed
+        // velocity together. In this case only the diaphragm is non-zero, so that is exactly
+        // the diaphragm; the no-slip walls scale from zero to zero.
+        dirichlet->set_time(t_now, pump_scale);
+        // And put the new values into the state. set_time rewrites what the constraint
+        // holds; it does not touch x, and the Newton loop only ever applies ZERO constraints
+        // to its correction, so without this the diaphragm keeps whatever velocity the
+        // initial apply_constraints gave it and the waveform is a number in a log line. It
+        // read v_diaphragm = 0 at the end of a cycle while still carrying its full amplitude
+        // of flux.
+        f->apply_constraints(x);
+        std::printf("pump: t = %g  v_diaphragm = %g\n", (double)t_now, (double)(U * pump_scale));
+    }
 
     for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
     const real_t rho_use = rho_schedule[stage];
@@ -4490,6 +4608,41 @@ int main(int argc, char **argv) {
             }
         }
         phase_report();
+
+        // ------------------------------------------------------------------- the pump
+        //
+        // What the diaphragm displaces must leave through the port. The chamber is fixed and
+        // the flow incompressible, so the flux through its closed boundary is zero; the walls
+        // carry none, the diaphragm's velocity is prescribed, and the port is the only other
+        // opening. So the port must carry exactly what the diaphragm sweeps:
+        //
+        //     Q_port  ==  rho * V * Lx * Lz
+        //
+        // with no closed-form solution anywhere in it. This is the check transpiration has to
+        // pass -- it says the prescribed normal velocity moved the mass it claimed to -- and
+        // it fails by the size of the lie if the boundary control volumes on either surface
+        // are not closed the way the masks think they are.
+        //
+        // Both fluxes come from Op::sideset_mass_flux, which integrates on the operator's own
+        // sub-control surfaces. The second line is the weaker but independent statement that
+        // the two openings balance each other, which holds even if the amplitude is wrong.
+        if (flow == cvfem_case::FlowCase::Pump) {
+            real_t q_port = 0, q_diaphragm = 0;
+            if (op->sideset_mass_flux(x, "port", q_port) == SFEM_SUCCESS &&
+                op->sideset_mass_flux(x, "diaphragm", q_diaphragm) == SFEM_SUCCESS) {
+                // The area vectors point out of the domain: a positive flux leaves. The
+                // diaphragm moves in -y against an outward +y, so it carries -V*area, and
+                // the port carries the opposite. pump_scale is the waveform at this instant,
+                // 1 for a steady run.
+                const real_t swept = rho * U * Lx * Lz * pump_scale;
+                std::printf("pump: swept %.12f  port %.12f  diaphragm %.12f\n",
+                            (double)swept, (double)q_port, (double)q_diaphragm);
+                std::printf("pump: |port - swept| %.6e   |port + diaphragm| %.6e\n",
+                            (double)std::fabs(q_port - swept),
+                            (double)std::fabs(q_port + q_diaphragm));
+            }
+        }
+
         if (flow == cvfem_case::FlowCase::Step) {
             // Global mass balance. This is the check that detects an unclosed control volume
             // along the step: if a step face is missing its boundary sub-control-surface
@@ -4615,7 +4768,16 @@ int main(int argc, char **argv) {
     std::printf("u_linf: %.6e  p_linf: %.6e\n", u_linf, p_linf);
         std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
 
-        if (!converged || u_linf > verify_tol) {
+        // The pump has no closed-form solution, so u_linf against exact_state -- which
+        // returns its boundary data -- measures nothing and would fail every correct run.
+        // Its verification is the swept-volume identity printed above, which is exact and is
+        // what the report checks; convergence is still required.
+        if (flow == cvfem_case::FlowCase::Pump) {
+            if (!converged) {
+                std::fprintf(stderr, "verification failed (pump did not converge)\n");
+                return EXIT_FAILURE;
+            }
+        } else if (!converged || u_linf > verify_tol) {
             std::fprintf(stderr, "verification failed (converged=%d, u_linf=%.6e, tol=%g)\n", converged ? 1 : 0, u_linf, verify_tol);
             return EXIT_FAILURE;
         }

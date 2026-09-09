@@ -71,6 +71,16 @@ FIELDS = {
     "outflow":      (r"outflow flux\s+(\S+)", float),
     "imbalance":    (r"imbalance \(out-in\)\s+(\S+)", float),
     "imbalance_rel": (r"imbalance \(out-in\)\s+\S+\s+relative\s+(\S+)", float),
+    # The diaphragm pump. swept is what the prescribed normal velocity displaces; the port
+    # is what actually left. They are the same number or transpiration is not doing what it
+    # claims. The last v_diaphragm on the log is the waveform at the instant measured.
+    "pump_swept":    (r"^pump: swept\s+(\S+)", float),
+    "pump_port":     (r"^pump: swept\s+\S+\s+port\s+(\S+)", float),
+    "pump_diaph":    (r"^pump: swept\s+\S+\s+port\s+\S+\s+diaphragm\s+(\S+)", float),
+    "pump_err":      (r"^pump: \|port - swept\|\s+(\S+)", float),
+    "pump_balance":  (r"^pump: \|port - swept\|\s+\S+\s+\|port \+ diaphragm\|\s+(\S+)", float),
+    "pump_area":     (r"^pump: chamber \S+\s+diaphragm area\s+(\S+)", float),
+    "pump_faces":    (r"^pump: chamber .*port\s+(\d+) faces", int),
 }
 
 # Fields whose value is text rather than a number.
@@ -103,6 +113,9 @@ def parse_log(path):
     # `newton_converged: 1` is the only place the driver states convergence, and it is the
     # field most often clipped by interleaving, so it is read on its own and left absent
     # rather than defaulted -- "did not converge" and "did not say" are different claims.
+    vs = re.findall(r"^pump: t = (\S+)\s+v_diaphragm = (\S+)", text, re.MULTILINE)
+    if vs:
+        out["pump_t"], out["pump_v"] = float(vs[-1][0]), float(vs[-1][1])
     m = re.search(r"\bnewton_converged:\s+(\d+)", text)
     if m:
         out["converged"] = m.group(1) == "1"
@@ -402,6 +415,66 @@ def section_boundary(runs, checks):
     return "\n".join(body) + "\n" if len(body) > 2 else ""
 
 
+def section_pump(runs, checks):
+    """The diaphragm pump, judged on an identity rather than on a solution."""
+    rows = [r for r in runs if r["group"] == "pump" and "pump_swept" in r]
+    if not rows:
+        return ""
+    rows.sort(key=lambda r: r.get("pump_t", 0))
+    body = ["## Diaphragm pump", "",
+            "A closed chamber with a diaphragm that moves and one port that lets fluid in or",
+            "out. The diaphragm is transpiration on a fixed mesh: the wall does not move, its",
+            "normal velocity is prescribed through it. That is exact for the mass it carries",
+            "and silent about the geometric nonlinearity a real diaphragm has, which an ALE",
+            "formulation would capture and this deliberately does not.", "",
+            "It is checked on an identity, not against a solution, because it has none. The",
+            "chamber is fixed and the flow incompressible, so the flux through its closed",
+            "boundary is zero; the walls carry none and the diaphragm's velocity is",
+            "prescribed. So the port must carry exactly what the diaphragm sweeps,",
+            "`rho V Lx Lz`, and if transpiration is moving the wrong mass the identity fails",
+            "by exactly that much. Both fluxes are integrated on the operator's own boundary",
+            "sub-control surfaces, so this measures the discretisation rather than a second",
+            "quadrature's opinion of it.", "",
+            "There is no valve, so the pump does not rectify: over a full cycle it moves",
+            "fluid back and forth and nets nothing. That is the scope, not an oversight.", ""]
+    out, bad, unconverged = [], 0, 0
+    for r in rows:
+        err, bal = r.get("pump_err"), r.get("pump_balance")
+        if r.get("converged") is False:
+            unconverged += 1
+            st = note("not converged")
+        else:
+            ok = err is not None and err <= 1e-12 and bal is not None and bal <= 1e-12
+            st = status(ok)
+            if not ok:
+                bad += 1
+        out.append([r.get("label", r["log"]), fmt(r.get("pump_t"), "%.3f"), fmt(r.get("pump_v"), "%+.4f"),
+                    fmt(r.get("pump_swept"), "%+.9f"), fmt(r.get("pump_port"), "%+.9f"),
+                    fmt(err), fmt(bal), st])
+    # Column names without absolute-value bars: a "|" inside a Markdown table cell is a
+    # column separator, and "|port - swept|" silently split the header into two extra empty
+    # columns while the body rows kept eight, which renders as a table with its headings
+    # shifted one place left of the numbers they name.
+    body.append(table(["run", "t", "v diaphragm", "swept", "port flux",
+                       "abs(port - swept)", "abs(port + diaphragm)", "status"], out))
+    n_scored = len(rows) - unconverged
+    checks.append(("Pump: the port carries what the diaphragm sweeps",
+                   "%d of %d instant(s) verified%s" % (
+                       n_scored - bad, len(rows),
+                       "" if not unconverged else ", %d did not converge" % unconverged),
+                   bad == 0 and n_scored >= 1))
+
+    pts = [(r["pump_v"], r["pump_port"]) for r in rows
+           if r.get("pump_v") is not None and r.get("pump_port") is not None]
+    if len(pts) >= 2:
+        area = rows[0].get("pump_area") or 1.0
+        line = [(v, v * area) for v, _ in pts]
+        body.append(svg_xy([("port flux", pts, "points"), ("rho V Lx Lz", line, "dash")],
+                           "prescribed diaphragm velocity", "flux through the port",
+                           caption="Pump: swept volume against port flux") + "\n")
+    return "\n".join(body) + "\n"
+
+
 def section_conservation(runs, checks):
     rows = [r for r in runs if "mass_sum" in r or "imbalance_rel" in r]
     if not rows:
@@ -501,6 +574,7 @@ def build_report(manifest, rundir):
     parts = [section_unit(manifest, checks),
              section_mms(runs, checks),
              section_boundary(runs, checks),
+             section_pump(runs, checks),
              section_conservation(runs, checks)]
 
     head = ["# CVFEM verification report", "",
