@@ -115,8 +115,6 @@ from codegen.framework.fem.reference import (
 )
 from codegen.framework.emitters.quadrature_codegen import (
     quadrature_reference_accessor,
-    quadrature_reference_struct_lines,
-    reference_forwarder_struct_lines,
     reference_header_files,
     reference_include_lines,
 )
@@ -1261,7 +1259,6 @@ def _mixed_local_reference_params(cell_rule, n_fields, dim, dependencies, basis_
 
 
 def _mixed_reference_pointer_lines(
-    reference_data,
     system,
     cell_rule,
     dependencies,
@@ -1279,10 +1276,10 @@ def _mixed_reference_pointer_lines(
             % (
                 indent,
                 ", ".join(
-                    "sfem::codegen::%s::%s_shape_1d()"
-                    % (
-                        reference_data,
-                        _tensor_reference_prefix(
+                    quadrature_reference_accessor(
+                        cell_rule,
+                        "%s_shape_1d"
+                        % _tensor_reference_prefix(
                             _field_element_type(group.name, cell_rule, field_element_types)
                         ),
                     )
@@ -1296,10 +1293,10 @@ def _mixed_reference_pointer_lines(
                 % (
                     indent,
                     ", ".join(
-                        "sfem::codegen::%s::%s_grad_1d()"
-                        % (
-                            reference_data,
-                            _tensor_reference_prefix(
+                        quadrature_reference_accessor(
+                            cell_rule,
+                            "%s_grad_1d"
+                            % _tensor_reference_prefix(
                                 _field_element_type(group.name, cell_rule, field_element_types)
                             ),
                         )
@@ -1314,10 +1311,10 @@ def _mixed_reference_pointer_lines(
         % (
             indent,
             ", ".join(
-                "sfem::codegen::%s::%s_shape()"
-                % (
-                    reference_data,
-                    _simplex_reference_prefix(
+                quadrature_reference_accessor(
+                    cell_rule,
+                    "%s_shape"
+                    % _simplex_reference_prefix(
                         _field_element_type(group.name, cell_rule, field_element_types)
                     ),
                 )
@@ -1333,9 +1330,8 @@ def _mixed_reference_pointer_lines(
                     _field_element_type(group.name, cell_rule, field_element_types)
                 )
                 grad_refs.append(
-                    "sfem::codegen::%s::%s()"
-                    % (
-                        reference_data,
+                    quadrature_reference_accessor(
+                        cell_rule,
                         sfem_simplex_grad_ref_name(
                             "%s_grad_ref" % reference_prefix,
                             d,
@@ -1349,7 +1345,7 @@ def _mixed_reference_pointer_lines(
     return lines
 
 
-def _mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family=None):
+def _mixed_reference_call_args(cell_rule, dependencies, basis_family=None):
     """The matching call arguments -- same plan, so they cannot disagree.
 
     The buffers a caller passes through by name, and the quadrature weights it
@@ -1357,7 +1353,7 @@ def _mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_fa
     the signature declares.
     """
     return [
-        "sfem::codegen::%s::%s()" % (reference_data, stream.name)
+        quadrature_reference_accessor(cell_rule, stream.name)
         if stream.from_reference_data
         else stream.name
         for stream in mixed_reference_streams(
@@ -4113,31 +4109,6 @@ def _operator_source(
         lines.append('#include "hex8_laplacian_inline_cpu.hpp"')
         lines.append("")
     lines.extend(_affine_geometry_stream_helper_lines())
-    lines.extend(
-        [
-            "",
-            "namespace sfem {",
-            "namespace codegen {",
-            "",
-        ]
-    )
-    lines.extend(
-        reference_forwarder_struct_lines(
-            prefix,
-            AFFINE_MODE,
-            affine_specialization.quadrature_rule,
-            sfem_mesh_reference_data(affine_specialization.quadrature_rule),
-        )
-    )
-    lines.extend(
-        reference_forwarder_struct_lines(
-            prefix,
-            ISOPARAMETRIC_MODE,
-            rule,
-            sfem_mesh_reference_data(rule),
-        )
-    )
-    lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
     if emit_diagnostics:
         lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
         lines.append("")
@@ -4232,7 +4203,7 @@ def _operator_source(
             def spell(stream):
                 if stream.role is DataStreamRole.REFERENCE:
                     return quadrature_reference_accessor(
-                        prefix, ISOPARAMETRIC_MODE, stream.name, scalar_type
+                        rule, stream.name, scalar_type
                     )
                 return stream.name
 
@@ -4363,17 +4334,6 @@ def _mixed_operator_source(
     ]
     lines.extend(_affine_geometry_stream_helper_lines())
     lines.extend(
-        [
-            "",
-            "namespace sfem {",
-            "namespace codegen {",
-            "",
-        ]
-    )
-    lines.extend(_mixed_reference_data_lines(prefix, AFFINE_MODE, rule, system, field_element_types, basis_family))
-    lines.extend(_mixed_reference_data_lines(prefix, ISOPARAMETRIC_MODE, rule, system, field_element_types, basis_family))
-    lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
-    lines.extend(
         _mixed_residual_diagnostics_lines(
             system,
             prefix,
@@ -4440,15 +4400,6 @@ def _mixed_operator_source(
             )
         )
     return "\n".join(lines)
-
-
-def _mixed_reference_data_lines(prefix, reference_stage, cell_rule, system, field_element_types, basis_family=None):
-    return reference_forwarder_struct_lines(
-        prefix,
-        reference_stage,
-        cell_rule,
-        _mixed_reference_data(cell_rule, system, field_element_types, basis_family),
-    )
 
 
 def _mixed_reference_data(cell_rule, system, field_element_types, basis_family=None):
@@ -4520,26 +4471,32 @@ def _simplex_reference_prefix(element_type):
 
 
 def _mixed_tensor_cell_reference_alias_lines(prefix, reference_stage, cell_rule):
-    reference_data = "%s_%s_reference_data<s_t>" % (prefix, reference_stage)
     reference_prefix = _tensor_reference_prefix(cell_rule.element_type)
     return [
-        "  const s_t *const %s_shape_1d = sfem::codegen::%s::%s_shape_1d();"
-        % (reference_stage, reference_data, reference_prefix),
-        "  const s_t *const %s_grad_1d = sfem::codegen::%s::%s_grad_1d();"
-        % (reference_stage, reference_data, reference_prefix),
+        "  const s_t *const %s_shape_1d = %s;"
+        % (
+            reference_stage,
+            quadrature_reference_accessor(cell_rule, "%s_shape_1d" % reference_prefix),
+        ),
+        "  const s_t *const %s_grad_1d = %s;"
+        % (
+            reference_stage,
+            quadrature_reference_accessor(cell_rule, "%s_grad_1d" % reference_prefix),
+        ),
     ]
 
 
 def _mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule):
-    reference_data = "%s_%s_reference_data<s_t>" % (prefix, reference_stage)
     reference_prefix = _simplex_reference_prefix(cell_rule.element_type)
     return [
-        "  const s_t *const %s_cell_grad_ref_%d = sfem::codegen::%s::%s();"
+        "  const s_t *const %s_cell_grad_ref_%d = %s;"
         % (
             reference_stage,
             d,
-            reference_data,
-            sfem_simplex_grad_ref_name("%s_grad_ref" % reference_prefix, d),
+            quadrature_reference_accessor(
+                cell_rule,
+                sfem_simplex_grad_ref_name("%s_grad_ref" % reference_prefix, d),
+            ),
         )
         for d in range(cell_rule.dim)
     ]
@@ -4580,7 +4537,6 @@ def _mixed_affine_function(
 
     impl = "%s_%s_%s_affine_mesh_mixed_impl" % (prefix, element, form)
     block = "%s_%s_block" % (local_prefix, form)
-    reference_data = "%s_%s_reference_data<s_t>" % (prefix, reference_stage)
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -4617,7 +4573,6 @@ def _mixed_affine_function(
         return lines
     lines.extend(
         _mixed_reference_pointer_lines(
-            reference_data,
             system,
             cell_rule,
             dependencies,
@@ -4695,7 +4650,7 @@ def _mixed_affine_function(
     call_args.extend(
         _geometry_buffer_arguments(dependencies, dim, {"adjugate": "badjugate"})
     )
-    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
+    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, basis_family))
     call_args.extend(
         block_stream_args[group.name]
         for group in _dependency_stream_groups(dependencies)
@@ -4820,7 +4775,6 @@ def _mixed_isoparametric_function(
             ]
         )
         return lines
-    reference_data = "%s_%s_reference_data<s_t>" % (prefix, reference_stage)
     tensor_product = _is_tensor_product_family(cell_rule, basis_family)
     tensor_product_geometry = _is_tensor_product_family(cell_rule, geometry_family)
     if tensor_product:
@@ -4929,7 +4883,6 @@ def _mixed_isoparametric_function(
     lines.extend([""])
     lines.extend(
         _mixed_reference_pointer_lines(
-            reference_data,
             system,
             cell_rule,
             dependencies,
@@ -4961,7 +4914,7 @@ def _mixed_isoparametric_function(
     call_args.extend(
         _geometry_buffer_arguments(dependencies, dim, {"adjugate": "badjugate"})
     )
-    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
+    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, basis_family))
     call_args.extend(
         block_stream_args[group.name]
         for group in _dependency_stream_groups(dependencies)
@@ -8844,7 +8797,7 @@ def _mesh_reference_alias_lines(prefix, rule, geometry_mode, emit_reference_basi
         "  const s_t *const %s = %s;"
         % (
             _mesh_reference_name(geometry_mode, reference.name),
-            quadrature_reference_accessor(prefix, geometry_mode, reference.name),
+            quadrature_reference_accessor(rule, reference.name),
         )
         for reference in references
     ]
