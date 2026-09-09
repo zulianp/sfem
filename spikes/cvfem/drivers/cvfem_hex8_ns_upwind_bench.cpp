@@ -340,6 +340,8 @@ int main(int argc, char **argv) {
                     "                 pressure-pressure coupling at all, which is a smaller and\n"
                     "                 faster operator than the one the solver runs.\n"
                     "  --pgrad-per-apply  rebuild the nodal pressure gradient inside every apply\n"
+                    "                     (--jac-action always rebuilds the DIRECTION's gradient,\n"
+                    "                      which cannot be hoisted, and reports it separately)\n"
                     "                 instead of hoisting it out of the timed loop. The gradient is\n"
                     "                 a full element sweep, about 39%% of an apply, and hoisting it\n"
                     "                 across a Krylov solve is worth 1.26x off the whole linear\n"
@@ -390,17 +392,27 @@ int main(int argc, char **argv) {
     // packed, colored and store sweeps carry their element data through Hex8RhieChowPack
     // and that staging is not wired up here yet; asking for it there has to fail rather
     // than quietly return a number measured without it.
-    // The residual carries Rhie-Chow on atomic and on the packed/store SIMD sumfact path.
-    // The colored sweep and the assembled Jacobian on the packed layouts still need their
-    // staging extended, so those combinations are refused rather than measured without it.
-    const bool rc_layout_ok = layout == "atomic" || ((layout == "packed" || layout == "store") &&
-                                                     !assemble && !assemble_diag && !bsr_apply && !jac_action);
+    // The residual and the Jacobian action carry Rhie-Chow on atomic and on the
+    // packed/store SIMD sumfact path. The colored sweep and the assembled Jacobian on the
+    // packed layouts still need their staging extended, so those combinations are refused
+    // rather than measured without it.
+    const bool rc_layout_ok =
+            layout == "atomic" ||
+            ((layout == "packed" || layout == "store") && !assemble && !assemble_diag && !bsr_apply);
     if (rhie_chow && !rc_layout_ok) {
         std::fprintf(stderr,
-                     "--rhie-chow is implemented for --layout atomic, and for the residual on "
-                     "--layout packed|store (got '%s'%s)\n",
+                     "--rhie-chow is implemented for --layout atomic, and for the residual and "
+                     "the Jacobian action on --layout packed|store (got '%s'%s)\n",
                      layout.c_str(),
-                     (assemble || assemble_diag || bsr_apply || jac_action) ? " with a non-residual operation" : "");
+                     (assemble || assemble_diag || bsr_apply) ? " with an assembly operation" : "");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // The isoparametric Jacobian-action kernels take no Rhie-Chow argument at all
+    // (cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd), so this combination would
+    // report a throughput measured without the term. Refuse it rather than measure it.
+    if (rhie_chow && jac_action && geom == "isoparam") {
+        std::fprintf(stderr, "--rhie-chow with --jac-action is implemented for --geom affine only\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -615,7 +627,13 @@ int main(int argc, char **argv) {
             (void)thread_scratch<scalar_t>(0, scratch_n);
             (void)thread_scratch<scalar_t>(1, scratch_n);
             if (assemble || verify_jac || jac_action || bsr_apply) (void)thread_scratch<scalar_t>(2, slot2_n);
-            if (geom_kind == GeomKind::Isoparam || verify) (void)thread_scratch<scalar_t>(3, packed_xyz_n(packed));
+            // Slot 3 grows from three arrays to six under --rhie-chow (coordinates plus the
+            // nodal pressure gradient) and slot 4 appears only for the Jacobian action's
+            // direction gradient. Touched here so the first timed call does not pay for the
+            // allocation.
+            if (geom_kind == GeomKind::Isoparam || verify || rhie_chow)
+                (void)thread_scratch<scalar_t>(3, rhie_chow ? packed_rc_n(packed) : packed_xyz_n(packed));
+            if (rhie_chow && jac_action) (void)thread_scratch<scalar_t>(4, packed_qg_n(packed));
         }
     }
 
@@ -843,7 +861,23 @@ int main(int argc, char **argv) {
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) jac_dir[(size_t)i] = 1.0 + 0.01 * scalar_t(i % 7);
     }
+    // The Jacobian action's Rhie-Chow term differentiates through the nodal gradient
+    // reconstruction, so it needs that reconstruction applied to the Krylov DIRECTION's
+    // pressure as well as to the state's. The two have opposite lifetimes and that is the
+    // whole point of measuring this: the state's gradient is a function of the Newton
+    // iterate and is hoisted out of the entire Krylov solve (SFEM_PGRAD_CACHE), while the
+    // direction's changes with every matvec and cannot be hoisted out of anything. It is
+    // therefore rebuilt inside the timed lambda, unconditionally, and timed separately so
+    // its share of the matvec is visible rather than folded into the element sweep.
+    double qgrad_seconds = 0;
+    const bool with_qgrad = rhie_chow && jac_action;
     auto jac_action_fn = [&]() {
+        if (with_qgrad) {
+            const double t0 = wall_time();
+            cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, jac_dir.data() + 3, N_FIELDS,
+                                           d.qgx, d.qgy, d.qgz);
+            qgrad_seconds += wall_time() - t0;
+        }
         if (layout == "colored")
             apply_jacobian_action_colored(d, packed, colors, rho, mu, jac_dir.data(), jac_out.data(), geom_kind);
         else if (layout == "packed" || layout == "store")
@@ -994,6 +1028,29 @@ int main(int argc, char **argv) {
     }
     const double t1 = wall_time();
 
+    // The new staging checked against the reference layout, outside the timed region.
+    // The `checksum` printed below cannot do this job here: the Jacobian action telescopes,
+    // so summing it over a near-uniform direction gives ~1e-15 whether or not the
+    // Rhie-Chow term is present, and two layouts that disagree everywhere still agree in
+    // that sum. A max-abs difference does not cancel.
+    if (with_qgrad && layout != "atomic") {
+        std::vector<scalar_t> jv_ref((size_t)d.nnodes * N_FIELDS, 0.0);
+        apply_jacobian_action_atomic(d, rho, mu, jac_dir.data(), jv_ref.data());
+        scalar_t ref_max = 0;
+        for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) ref_max = std::max(ref_max, std::fabs(jv_ref[(size_t)i]));
+        const scalar_t err = max_abs_diff(jv_ref.data(), jac_out.data(), d.nnodes * N_FIELDS);
+        const scalar_t rel = ref_max > scalar_t(0) ? err / ref_max : err;
+        std::printf("jac_action_rc_vs_atomic_rel: %.6e\n", (double)rel);
+        if (!(rel < 1.0e-10)) {
+            std::fprintf(stderr,
+                         "packed Jacobian action with Rhie-Chow disagrees with the atomic "
+                         "reference (rel %.3e)\n",
+                         (double)rel);
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+    }
+
     const double seconds          = t1 - t0;
     const double seconds_per_call = seconds / double(repeat);
     // Primary metric: unique mesh degrees of freedom per second, i.e. the number of
@@ -1110,6 +1167,17 @@ int main(int argc, char **argv) {
         std::printf("  MELEM/s_jac_action: %.3f\n", melems);
         std::printf("  GFLOP/s_jac_action_model: %.3f\n", elem_apps * jac_action_flops / seconds / 1.0e9);
         std::printf("  flops_per_element_jac_action_model: %.1f\n", jac_action_flops);
+        if (with_qgrad) {
+            // Reported next to the matvec, not subtracted from it: it IS part of every
+            // matvec the solver performs. Splitting it out says how much of the gap
+            // between this figure and a Rhie-Chow-free one is the element kernel and how
+            // much is the reconstruction sweep in front of it.
+            const double per_call = qgrad_seconds / double(repeat);
+            std::printf("  seconds_per_jac_action_qgrad: %.6e\n", per_call);
+            std::printf("  frac_jac_action_qgrad: %.4f\n", qgrad_seconds / seconds);
+            std::printf("  MDOF/s_jac_action_kernel_only: %.3f\n",
+                        double(n_dofs) / (seconds_per_call - per_call) / 1.0e6);
+        }
     }
     if (bsr_apply) {
         const double bsr_apply_flops = double(bsr.nnz) * 2.0 * 16.0;

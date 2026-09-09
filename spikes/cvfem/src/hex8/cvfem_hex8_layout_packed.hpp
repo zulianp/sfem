@@ -436,6 +436,14 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                        scalar_t *const        jv,
                                                        const GeomKind         geom_kind) {
     const size_t scratch_n = packed_scratch_n(p);
+    // Rhie-Chow staged per pack, exactly as apply_residual_packed does it and exactly as
+    // the solver's own packed Jacobian does (cvfem_hex8_ns_packed.hpp). Slot 3 grows from
+    // three arrays to six when it is on, and slot 4 carries the direction's reconstructed
+    // gradient -- the term that makes this the *exact* Rhie-Chow Jacobian rather than the
+    // frozen-gradient one the assembled matrix keeps.
+    const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+    const bool   with_qg   = with_rc && !d.qgx.empty();
+    const size_t slot3_n   = with_rc ? packed_rc_n(p) : packed_xyz_n(p);
 
 #pragma omp parallel
     {
@@ -443,11 +451,18 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                geom_kind == GeomKind::Isoparam ? thread_scratch<scalar_t>(3, packed_xyz_n(p)) : nullptr;
+                (geom_kind == GeomKind::Isoparam || with_rc) ? thread_scratch<scalar_t>(3, slot3_n) : nullptr;
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(p)) : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
+        scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
@@ -469,6 +484,12 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
             Hex8InputPack    du_pack;
             Hex8ResidualPack outp;
             Hex8CoordPack    xyz;
+            Hex8RhieChowPack rcp;
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
+                                               pack_pgx, pack_pgy, pack_pgz);
+            if (with_qg)
+                cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
             if (geom_kind == GeomKind::Isoparam)
                 fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
             for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
@@ -512,8 +533,29 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                       cof7,
                                                       cof8,
                                                       det);
-                    cvfem_hex8_ns_upwind_jacobian_action_simd(
-                            rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, u_pack, du_pack, outp);
+                    if (with_rc)
+                        cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz,
+                                                       begin, nlanes, rcp);
+                    if (with_qg)
+                        cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
+                    cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
+                                                              mu,
+                                                              cof0,
+                                                              cof1,
+                                                              cof2,
+                                                              cof3,
+                                                              cof4,
+                                                              cof5,
+                                                              cof6,
+                                                              cof7,
+                                                              cof8,
+                                                              det,
+                                                              u_pack,
+                                                              du_pack,
+                                                              outp,
+                                                              with_rc ? &rcp : nullptr,
+                                                              d.rhie_chow_scale,
+                                                              with_qg);
                 }
                 scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
             }
