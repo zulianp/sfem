@@ -22,3 +22,6 @@ verification_runs/
 
 # Visualisation bundles: raw fields and their XDMF, regenerable from a job id.
 viz/
+
+# Raw trace CSVs behind docs/CVFEM_Throughput.md, regenerable from a job id.
+perf/trace-*/

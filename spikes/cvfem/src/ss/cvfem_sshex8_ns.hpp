@@ -119,6 +119,7 @@ struct SSScatter {
 };
 
 inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
+    SFEM_TRACE_SCOPE("sscvfem::build_scatter");
     const int       nxe = d.nxe;
     const ptrdiff_t ne  = d.nmacro;
 
@@ -260,6 +261,7 @@ static SFEM_INLINE void sscvfem_corner_offsets(const int L, int off[8]) {
 }
 
 inline void sscvfem_init(SSMeshData &d, const std::shared_ptr<smesh::Mesh> &mesh, const int level) {
+    SFEM_TRACE_SCOPE("sscvfem::init");
     d.mesh   = mesh;
     d.level  = level;
     d.nnodes = mesh->n_nodes();
@@ -356,6 +358,7 @@ static SFEM_INLINE Hex8BoundaryDataT<scalar_t> sscvfem_bd(const SSMeshData &d, c
 inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
                                        const int stride, std::vector<scalar_t> &ogx,
                                        std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz) {
+    SFEM_TRACE_SCOPE("sscvfem::nodal_grad_strided");
     ogx.assign((size_t)d.nnodes, 0);
     ogy.assign((size_t)d.nnodes, 0);
     ogz.assign((size_t)d.nnodes, 0);
@@ -1523,6 +1526,7 @@ inline scalar_t sscvfem_transient_diag_weight(const SSMeshData &d, const scalar_
 inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar_t mu, const int blocks,
                                  const scalar_t *const SFEM_RESTRICT dir,
                                  scalar_t *const SFEM_RESTRICT       jv) {
+    SFEM_TRACE_SCOPE("sscvfem::apply_blocks");
     // The block apply is meant to be the restriction of the operator to a field block, so
     // it differentiates through the same reconstruction the operator does. Only the
     // pressure-column blocks read the result, so B and A_uu skip the pass entirely.
@@ -1565,6 +1569,7 @@ inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar
 // collects |det|/8. The macro geometry is affine, so one determinant serves every micro
 // element of a macro element and the inner loops are pure index arithmetic.
 inline void sscvfem_node_volume(SSMeshData &d, std::vector<scalar_t> &node_vol) {
+    SFEM_TRACE_SCOPE("sscvfem::node_volume");
     node_vol.assign((size_t)d.nnodes, scalar_t(0));
     const int L = d.level;
     int       off[8];
@@ -1613,6 +1618,7 @@ inline void sscvfem_apply_body_force(SSMeshData &d, scalar_t *const SFEM_RESTRIC
 // cvfem_hex8_ns_core.hpp -- same coefficients, same lumped control volume, same reason for
 // being a post-pass rather than a term inside the macro-element sweeps.
 inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t *const SFEM_RESTRICT res) {
+    SFEM_TRACE_SCOPE("sscvfem::apply_transient");
     if (d.dt <= scalar_t(0)) return;
     if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
@@ -1658,6 +1664,7 @@ inline scalar_t sscvfem_transient_diag_weight(const SSMeshData &d, const scalar_
 inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
                                            const scalar_t *const SFEM_RESTRICT dir,
                                            scalar_t *const SFEM_RESTRICT       jv) {
+    SFEM_TRACE_SCOPE("sscvfem::apply_transient_action");
     const scalar_t a = sscvfem_transient_diag_weight(d, rho);
     if (a == scalar_t(0)) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
@@ -2046,6 +2053,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
 inline void sscvfem_apply(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                           const scalar_t *const SFEM_RESTRICT dir,
                           scalar_t *const SFEM_RESTRICT       jv) {
+    SFEM_TRACE_SCOPE("sscvfem::apply");
     // Rhie-Chow differentiates through the nodal pressure-gradient reconstruction, so the
     // direction's own reconstructed gradient is needed for the Jacobian action to be exact.
     // One extra pass per apply, the same shape as the one already done for p.
