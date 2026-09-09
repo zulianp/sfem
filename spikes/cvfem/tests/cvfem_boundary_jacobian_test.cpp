@@ -213,12 +213,39 @@ int main() {
         for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) d = std::max(d, std::fabs(r_t[i] - r_zero[i]));
         check(d == 0.0, "traction t = 0 reproduces the do-nothing outflow exactly");
 
+        // A value with no face selected is still the do-nothing outflow. tmask is what
+        // makes a traction condition addressable, so that a run can hold one surface under
+        // traction while another stays genuinely free; without this check the two could
+        // drift apart and every natural face would quietly inherit the value.
         bd.tx = 0.35; bd.ty = -0.2; bd.tz = 0.1;
+        bd.tmask = 0;
+        g_bd  = bd;
+        residual_of(s, 0x3F, 0x3F, r_t);
+        d = 0;
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) d = std::max(d, std::fabs(r_t[i] - r_zero[i]));
+        check(d == 0.0, "a traction value with tmask = 0 is still the do-nothing outflow");
+
+        bd.tmask = 0x3F;
         g_bd  = bd;
         residual_of(s, 0x3F, 0x3F, r_t);
         d = 0;
         for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) d = std::max(d, std::fabs(r_t[i] - r_zero[i]));
         check(d > 1e-3, "a non-zero traction moves the residual");
+
+        // Only the selected faces. One face under traction must move strictly less than
+        // all six, which is what says the mask is read per face rather than as a flag.
+        scalar_t r_one[CVFEM_HEX8_N_DOF];
+        bd.tmask = 0x02;  // x-max alone
+        g_bd     = bd;
+        residual_of(s, 0x3F, 0x3F, r_one);
+        scalar_t d_one = 0, d_all = 0;
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) {
+            d_one = std::max(d_one, std::fabs(r_one[i] - r_zero[i]));
+            d_all = std::max(d_all, std::fabs(r_t[i] - r_zero[i]));
+        }
+        check(d_one > 1e-3 && d_one < d_all, "tmask selects which faces carry the traction");
+        bd.tmask = 0x3F;
+        g_bd     = bd;
 
         int            row = -1, col = -1;
         const scalar_t worst = compare(s, 0x3F, 0x3F, &row, &col);

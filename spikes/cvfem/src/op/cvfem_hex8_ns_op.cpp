@@ -291,6 +291,20 @@ namespace sfem {
                 }
             }
 
+            // Traction and prescribed pressure are not wired here. Every sscvfem_* call
+            // site invokes boundary_scs_add_* without the trailing Hex8BoundaryDataT, so a
+            // named sideset would compile a mask that no kernel ever reads and the run would
+            // quietly solve the do-nothing problem instead. Refuse rather than mislead.
+            if (!traction_sideset.empty() || !pressure_sideset.empty()) {
+                SFEM_ERROR(
+                        "CVFEMNavierStokes: traction ('%s') and pressure ('%s') boundary "
+                        "conditions are HEX8 flat-mesh only -- the semi-structured kernels do "
+                        "not take boundary data, so naming them here would be silently "
+                        "ignored. Run with SFEM_ELEMENT_REFINE_LEVEL=1.\n",
+                        traction_sideset.c_str(), pressure_sideset.c_str());
+                return SFEM_FAILURE;
+            }
+
             // Deterministic two-pass scatter, the semi-structured counterpart of the packed
             // HEX8 layout. Off gives the atomic scatter, which is not reproducible across
             // thread counts.
@@ -363,6 +377,21 @@ namespace sfem {
         // fine Krylov solve performs zero iterations.
         d.face_mask.clear();
         d.natural_mask.clear();
+        d.traction_mask.clear();
+        d.pressure_mask.clear();
+        d.bc_tx = d.bc_ty = d.bc_tz = scalar_t(0);
+        d.bc_p                      = scalar_t(0);
+        // A named condition with no mask to compile it into would do nothing at all, and
+        // would look exactly like a run that had none.
+        if (!smesh::Env::read<int>("SFEM_BOUNDARY_MASK", 0) &&
+            (!traction_sideset.empty() || !pressure_sideset.empty())) {
+            SFEM_ERROR(
+                    "CVFEMNavierStokes: traction ('%s') / pressure ('%s') need "
+                    "SFEM_BOUNDARY_MASK=1; without it no face mask is compiled and the "
+                    "condition would be silently absent.\n",
+                    traction_sideset.c_str(), pressure_sideset.c_str());
+            return SFEM_FAILURE;
+        }
         if (smesh::Env::read<int>("SFEM_BOUNDARY_MASK", 0)) {
             auto named_skin = mesh->sidesets("skin");
             if (!named_skin.empty() && named_skin.front()) {
@@ -390,6 +419,72 @@ namespace sfem {
                     for (int a = 0; a < 8; ++a) ident[a] = a;
                     report_mask_extent("flat natural", d.natural_mask, d.elems, d.points, ident);
                     report_mask_extent("flat skin", d.face_mask, d.elems, d.points, ident);
+                }
+            }
+
+            // Prescribed traction. Compiled exactly as the natural outflow is, then unioned
+            // into the natural set: a traction condition is the natural condition carrying a
+            // value, so requiring it to be named in both sidesets would be a way to get it
+            // wrong and no way to get it more right.
+            if (!traction_sideset.empty()) {
+                auto named = mesh->sidesets(traction_sideset);
+                if (named.empty() || !named.front()) {
+                    SFEM_ERROR("CVFEMNavierStokes: traction sideset '%s' not found\n",
+                               traction_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
+                const ptrdiff_t nf = compile_sideset_mask(named.front(), d.nelements, d.traction_mask);
+                if (nf < 0) {
+                    SFEM_ERROR("CVFEMNavierStokes: malformed traction sideset '%s'\n",
+                               traction_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
+                if (d.natural_mask.empty()) d.natural_mask.assign((size_t)d.nelements, 0);
+                for (size_t e = 0; e < d.natural_mask.size(); ++e)
+                    d.natural_mask[e] = (uint8_t)(d.natural_mask[e] | d.traction_mask[e]);
+                d.bc_tx = (scalar_t)traction[0];
+                d.bc_ty = (scalar_t)traction[1];
+                d.bc_tz = (scalar_t)traction[2];
+                std::printf("traction (flat): %td faces from sideset '%s', t = (%g %g %g)\n", nf,
+                            traction_sideset.c_str(), (double)traction[0], (double)traction[1],
+                            (double)traction[2]);
+            }
+
+            // Prescribed pressure.
+            if (!pressure_sideset.empty()) {
+                auto named = mesh->sidesets(pressure_sideset);
+                if (named.empty() || !named.front()) {
+                    SFEM_ERROR("CVFEMNavierStokes: pressure sideset '%s' not found\n",
+                               pressure_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
+                const ptrdiff_t nf = compile_sideset_mask(named.front(), d.nelements, d.pressure_mask);
+                if (nf < 0) {
+                    SFEM_ERROR("CVFEMNavierStokes: malformed pressure sideset '%s'\n",
+                               pressure_sideset.c_str());
+                    return SFEM_FAILURE;
+                }
+                d.bc_p = (scalar_t)pressure_value;
+                std::printf("pressure (flat): %td faces from sideset '%s', p_bar = %g\n", nf,
+                            pressure_sideset.c_str(), (double)pressure_value);
+            }
+
+            // The kernel lets the natural face win where both select one. That is a
+            // defensible tie-break to have written down, but as a *configuration* it is
+            // always a mistake -- one of the two sidesets is not what its author thought --
+            // and a silently ignored port is exactly the failure this whole path exists to
+            // avoid. So the tie-break stays in the kernel and the overlap is refused here.
+            if (!d.pressure_mask.empty() && !d.natural_mask.empty()) {
+                ptrdiff_t clash = 0;
+                for (size_t e = 0; e < d.pressure_mask.size(); ++e)
+                    if (d.pressure_mask[e] & d.natural_mask[e]) ++clash;
+                if (clash) {
+                    SFEM_ERROR(
+                            "CVFEMNavierStokes: %td element(s) have a face in both the pressure "
+                            "sideset '%s' and the natural/traction set; a face cannot be both "
+                            "traction-free and pressure-prescribed.\n",
+                            clash, pressure_sideset.c_str());
+                    return SFEM_FAILURE;
                 }
             }
         }
@@ -447,6 +542,14 @@ namespace sfem {
 
         impl_->initialized = true;
         return SFEM_SUCCESS;
+    }
+
+    bool CVFEMNavierStokes::fixes_pressure_level() const {
+        // Any natural face drops p_i * a from the momentum rows, which is precisely what
+        // removes the constant-pressure nullspace; a prescribed pressure fixes the level
+        // outright. Traction is the natural condition, so it counts whatever its value.
+        return !natural_outflow_sideset.empty() || !traction_sideset.empty() ||
+               !pressure_sideset.empty();
     }
 
     void CVFEMNavierStokes::set_option(const std::string &name, bool val) {
@@ -734,6 +837,18 @@ namespace sfem {
         // measurement is worth more than the guess it refutes.
         if (smesh::Env::read_string("SFEM_GMG_COARSE_OUTFLOW", "natural") != "closed")
             ret->natural_outflow_sideset = natural_outflow_sideset;
+
+        // The value-carrying conditions travel too, and unconditionally: the measurement
+        // recorded above says a coarse operator has to match the fine one more closely
+        // rather than less, and a coarse level that kept p_i*a where the fine level has a
+        // port would be the same singular-coarse-operator failure in a different disguise.
+        // The sidesets themselves are copied below, so the names resolve at every level.
+        ret->traction_sideset = traction_sideset;
+        ret->traction[0]      = traction[0];
+        ret->traction[1]      = traction[1];
+        ret->traction[2]      = traction[2];
+        ret->pressure_sideset = pressure_sideset;
+        ret->pressure_value   = pressure_value;
 
         // Carry the named sidesets down to the coarse mesh.
         //
