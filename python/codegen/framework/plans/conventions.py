@@ -27,6 +27,8 @@ declared fields and parameters, which is the check that would have caught `S`
 being both the kernel scalar type and the per-dimension shape count.
 """
 
+import re
+
 from dataclasses import dataclass
 
 
@@ -360,7 +362,113 @@ def diagnostics_tail(name):
 #: The traversal a kernel name announces before its geometry token.  Unabbreviated
 #: for now: it is 0.08% of the tree and `packed` is the word every driver flag,
 #: plan field and benchmark column already uses.
-ABI_TRAVERSAL_SPELLING = (("packed", "packed"),)
+#: Longest first, because `packed` is a prefix of the others.
+#:
+#: The three-word forms come from two different plans and mean two different
+#: things.  `packed_two_pass` is a matrix-free traversal (`plans/apply_variants.py`
+#: `MeshTraversal`); `packed_one_pass` and `packed_two_pass` are also matrix
+#: assembly passes (`plans/matrix_formats.py` `PackedAssemblyPass`), which is why
+#: the middle spelling appears once and covers both.  They are listed together
+#: because this table answers one question -- what may occupy the slot between
+#: the verb and the geometry -- and both do.
+#:
+#: `packed_one_pass` is not emitted by any shipped material, only by
+#: `tests/test_m11_matrix_formats.py`.  It was missing from the first version of
+#: this table for exactly that reason, and the omission was caught by that test
+#: rather than by the tree, which is the argument for deriving a vocabulary from
+#: the plans rather than from a sample of the output.
+ABI_TRAVERSAL_SPELLING = (
+    ("packed_one_pass", "packed_one_pass"),
+    ("packed_two_pass", "packed_two_pass"),
+    ("packed", "packed"),
+)
+
+#: Which dispatch translation unit each traversal belongs in.
+#:
+#: Both pack, so both go in `*_packed_<geometry>_dispatch.cpp`.  This is a
+#: separate mapping from the spelling because a two-pass kernel must not be
+#: routed to a unit of its own, and because the file name keeps the long word --
+#: file names are outside the abbreviation.
+ABI_TRAVERSAL_UNIT = {
+    "packed_one_pass": "packed",
+    "packed_two_pass": "packed",
+    "packed": "packed",
+}
+
+#: The verb slot: what kernel a name is, not what mathematics it computes.
+#:
+#: Longest first, because `objective_steps` contains `objective` and
+#: `hessian_bsr` contains `hessian`.  `residual` and `jacobian_action` are the
+#: residual path's words for `gradient` and `apply`; `CONVENTIONS.md` records
+#: that they are not canonical, and they are listed here because they are what
+#: the tree publishes today.
+ABI_VERBS = (
+    "hessian_block_diag_sym",
+    "objective_steps",
+    "jacobian_action",
+    "matrix_assembly",
+    "inexact_apply",
+    "hessian_bsr",
+    "hessian_crs",
+    "objective",
+    "gradient",
+    "residual",
+    "hessian",
+    "energy",
+    "apply",
+)
+
+#: The store an inexact apply reads, which occupies the same slot a traversal
+#: does.  See `INEXACT.md`.
+ABI_INEXACT_MODES = ("tangent", "stored", "compressed")
+
+
+def abi_qualifier(name):
+    """What sits between the verb and the geometry token, or `""` for nothing.
+
+    This slot is why `_dispatch_source_kind` used to sniff the name for
+    `_packed_`.  A sniff cannot tell "this kernel is not packed" from "the token
+    for packed has moved and I no longer recognise it", and the second silently
+    merged two dispatch translation units into one.  Parsing the slot instead
+    makes the two distinguishable: an occupant this table does not know is an
+    error, and an empty slot is a plain kernel.
+
+    The parse is total over the tree -- every published mesh-kernel name has a
+    verb from `ABI_VERBS`, and the slot after it holds one of six things.
+    """
+    classified = classify_abi_name(name)
+    if classified is None or classified[0] != "mesh":
+        raise ValueError("%s is not a published mesh kernel" % name)
+    head = name[: name.find(classified[1])]
+    head = re.sub(r"_\d+d$", "", head)  # the dimension a dispatch name inserts
+    for verb in ABI_VERBS:
+        index = head.rfind("_%s" % verb)
+        if index < 0:
+            continue
+        slot = head[index + len(verb) + 1 :]
+        if not slot:
+            return ""
+        known = tuple(short for _, short in ABI_TRAVERSAL_SPELLING) + ABI_INEXACT_MODES
+        for candidate in known:
+            if slot == "_%s" % candidate:
+                return candidate
+        raise ValueError(
+            "%s carries an unknown qualifier %r between its verb and its "
+            "geometry; the naming table and the emitters disagree" % (name, slot)
+        )
+    raise ValueError("no verb from the table appears in %s" % name)
+
+
+def abi_geometry(name):
+    """The geometry a published mesh-kernel name is specialised for."""
+    classified = classify_abi_name(name)
+    if classified is None or classified[0] != "mesh":
+        raise ValueError("%s is not a published mesh kernel" % name)
+    marker = classified[1]
+    for geometry, short in ABI_GEOMETRY_SPELLING:
+        if marker.startswith("_%s_" % short):
+            return geometry
+    raise ValueError("no geometry token in %s" % name)
 
 
 def dimension_markers():

@@ -154,6 +154,143 @@ class MarkerTableTest(unittest.TestCase):
         self.assertEqual([n for n in names if conventions.classify_abi_name(n) is None], [])
 
 
+class QualifierSlotTest(unittest.TestCase):
+    """The slot between the verb and the geometry has to parse, not be sniffed.
+
+    `_dispatch_source_kind` decides which translation unit a dispatch entry point
+    is written into, and it used to decide by looking for `_packed_` in the name.
+    A search cannot tell "this kernel is not packed" from "the token for packed
+    has moved and I no longer recognise it"; the second reads as the first, the
+    packed entry points join the plain ones, and two translation units silently
+    become one.  Parsing the slot makes the two distinguishable.
+    """
+
+    def setUp(self):
+        if not os.path.isdir(GENERATED):
+            self.skipTest("generated tree not present")
+        self.mesh = [
+            n for n in _published_names()
+            if (conventions.classify_abi_name(n) or ("",))[0] == "mesh"
+        ]
+
+    def test_every_mesh_name_has_a_verb_and_a_known_qualifier(self):
+        self.assertGreater(len(self.mesh), 1000)
+        unparsed = []
+        for name in sorted(self.mesh):
+            try:
+                conventions.abi_qualifier(name)
+            except ValueError as error:
+                unparsed.append("%s: %s" % (name, error))
+        self.assertEqual(unparsed[:5], [], "%d names do not parse" % len(unparsed))
+
+    def test_the_qualifier_slot_is_actually_used(self):
+        """A total parse over an always-empty slot proves nothing."""
+        seen = collections.Counter(conventions.abi_qualifier(n) for n in self.mesh)
+        self.assertGreater(seen[""], 0)
+        self.assertGreater(seen["packed"], 0)
+        self.assertGreater(seen["packed_two_pass"], 0)
+
+    def test_the_qualifier_table_covers_every_plan_value(self):
+        """The table must come from the plans, not from a sample of the output.
+
+        The first version of it was read off the shipped tree, which does not
+        emit `packed_one_pass` -- only `tests/test_m11_matrix_formats.py` does.
+        Generation refused that name the first time a test reached it.  Reading
+        the plans here is what makes the omission visible without waiting for a
+        material to exercise the combination.
+
+        `plans/conventions.py` cannot import these enums: `apply_variants` already
+        imports the naming table, and the dependency only points one way.  So the
+        agreement is asserted rather than derived.
+        """
+        from codegen.framework.plans.apply_variants import MeshTraversal
+        from codegen.framework.plans.matrix_formats import PackedAssemblyPass
+
+        known = {short for _, short in conventions.ABI_TRAVERSAL_SPELLING}
+        # `MeshTraversal` is a plain class of string constants; `PackedAssemblyPass`
+        # is an Enum.  Read both the way each is written.
+        expected = {
+            value
+            for name, value in vars(MeshTraversal).items()
+            if not name.startswith("_") and isinstance(value, str)
+            and value != MeshTraversal.STANDARD
+        }
+        expected |= {
+            "packed_%s" % assembly.value
+            for assembly in PackedAssemblyPass
+            if assembly.value != "none"
+        }
+        self.assertEqual(
+            expected - known,
+            set(),
+            "a plan value has no spelling in the naming table",
+        )
+        for qualifier in known:
+            self.assertIn(
+                qualifier,
+                conventions.ABI_TRAVERSAL_UNIT,
+                "%s has a spelling but no translation unit" % qualifier,
+            )
+
+    def test_a_moved_traversal_token_is_refused(self):
+        """The guard is live: move the spelling and the tree stops parsing.
+
+        Asserting this keeps a future failure from being "fixed" by widening the
+        table until everything matches again.
+        """
+        original = conventions.ABI_TRAVERSAL_SPELLING
+        try:
+            conventions.ABI_TRAVERSAL_SPELLING = (
+                ("packed_two_pass", "2p"), ("packed", "pk"),
+            )
+            refused = 0
+            for name in self.mesh:
+                try:
+                    conventions.abi_qualifier(name)
+                except ValueError:
+                    refused += 1
+        finally:
+            conventions.ABI_TRAVERSAL_SPELLING = original
+        self.assertGreater(refused, 100)
+        for name in self.mesh:
+            conventions.abi_qualifier(name)  # and it parses again afterwards
+
+    def test_the_file_split_on_disk_matches_the_parse(self):
+        """Each dispatch translation unit holds exactly the kinds it is named for.
+
+        This is the property the sniff used to break without saying so: the file
+        was still written, just with the wrong contents in it.
+        """
+        mismatched = []
+        inspected = []
+        for base, _dirs, files in os.walk(GENERATED):
+            if os.path.basename(base) != "op":
+                continue
+            for name in files:
+                if not name.endswith("_dispatch.cpp") or "diagnostics" in name:
+                    continue
+                # `sfem_GeneratedLaplace_packed_affine_dispatch.cpp` -- the kind
+                # is what follows the operator name.
+                stem = name[: -len("_dispatch.cpp")]
+                with open(os.path.join(base, name), encoding="utf-8") as handle:
+                    text = handle.read()
+                # The entry points carry the export macro; the plain
+                # `extern "C"` lines above them are the private per-element
+                # declarations this unit calls into.
+                for symbol in re.findall(
+                    r'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int (\w+)\(', text
+                ):
+                    if (conventions.classify_abi_name(symbol) or ("",))[0] != "mesh":
+                        continue
+                    inspected.append(symbol)
+                    got = op_wrappers._dispatch_source_kind(symbol)
+                    if not stem.endswith(got):
+                        mismatched.append("%s in %s (parsed %s)" % (symbol, name, got))
+        # The check is only worth having if it reached the entry points at all.
+        self.assertGreater(len(inspected), 100)
+        self.assertEqual(mismatched[:5], [], "%d misfiled" % len(mismatched))
+
+
 class DeclineReasonsTest(unittest.TestCase):
     """The two ways a name gets no dispatch are not interchangeable.
 
