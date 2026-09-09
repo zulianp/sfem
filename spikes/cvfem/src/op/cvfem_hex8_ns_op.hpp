@@ -127,6 +127,10 @@ namespace sfem {
         // against something known -- the volume a prescribed normal velocity sweeps.
         int sideset_mass_flux(const real_t *const x, const std::string &sideset, real_t &out);
 
+        // The timestep this operator was given, so clone_onto can hand it to a coarse level.
+        real_t dt_for_clone() const;
+        int    bdf_order_for_clone() const;
+
     private:
         int sideset_mass_flux_ss(const real_t *const x, const std::shared_ptr<smesh::Sideset> &ss,
                                  real_t &out);
