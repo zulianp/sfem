@@ -142,7 +142,7 @@ set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACRO
 file(GLOB CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
 list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_guard_selftest.cpp)
 
-set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test)
+set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test)
 foreach(TEST_SOURCE ${CVFEM_TESTS})
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})

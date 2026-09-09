@@ -219,6 +219,42 @@ namespace sfem {
             // not consulted here, since the macro Jacobian is computed once and reused.
             impl_->semi_structured = true;
             const int level        = smesh::semistructured_level(*mesh);
+
+            // Powers of two only, and the reason is arithmetic rather than taste.
+            //
+            // sscvfem_apply_macro_local_hoisted computes the cell geometry ONCE per macro
+            // element, from the micro cell at the lattice origin, and reuses it for all L^3
+            // cells. That is exact when every micro cell is congruent, which is true of an
+            // affine macro element in exact arithmetic -- and true in FLOATING POINT only
+            // when the subdivision is a power of two. geom_t is single precision, 1/2 and
+            // 1/4 are representable and 1/3 and 1/6 are not, so at L = 3 the lattice
+            // positions carry a rounding the hoisted geometry does not see.
+            //
+            // Measured by the bench's own naive-vs-macro agreement, which is the same
+            // operator computed two ways on one mesh:
+            //
+            //     L = 2   2.53e-16      L = 3   2.12e-06
+            //     L = 4   2.31e-16      L = 6   2.59e-06
+            //
+            // Small in the operator and not small downstream: on Poiseuille, whose exact
+            // solution this scheme otherwise reproduces to 1e-11, it converges to 8e-02 at
+            // L = 3. The block diagonal is unaffected -- it computes geometry per micro
+            // cell -- which is why blk_agree stayed at 1e-16 throughout and nothing noticed.
+            //
+            // It went unnoticed because the ctest ran levels 2 and 4, and every level used
+            // in this work has been a power of two. Refusing is the honest stopgap; the fix
+            // is to compute the geometry per micro cell in that sweep, which costs what the
+            // hoisting was introduced to save and so wants its own measurement.
+            if (level > 1 && (level & (level - 1)) != 0) {
+                SFEM_ERROR(
+                        "CVFEMNavierStokes: internal level %d is not a power of two. The "
+                        "hoisted macro-element geometry is only exact when the lattice "
+                        "subdivides congruently in floating point, and at this level the "
+                        "operator is wrong by about 2e-06 -- enough to move a converged "
+                        "Poiseuille solution from 1e-11 to 8e-02. Use 2, 4, 8 or 16.\n",
+                        level);
+                return SFEM_FAILURE;
+            }
             sscvfem_init(impl_->ss, mesh, level);
 
             // SFEM_BOUNDARY_MASK=1 replaces the bounding-box coordinate test with the
