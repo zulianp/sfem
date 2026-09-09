@@ -248,10 +248,12 @@ were measured on, and the machine is named in Provenance.
 
 | field | value |
 |---|---|
-| generated | 2026-09-09 15:50:11 |
+| generated | 2026-09-09 20:30:43 |
 | machine | nid006552 |
 | threads | 72 |
 | commit | -- |
+| linear solver | -- |
+| element refine level | -- |
 | run directory | /Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-4632318 |
 | runs parsed | 22 of 22 |
 

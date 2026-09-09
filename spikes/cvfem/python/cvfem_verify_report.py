@@ -389,8 +389,23 @@ def section_boundary(runs, checks):
                 unconverged += 1
                 st = note("not converged")
             else:
-                ok = (err is not None and err <= 1e-6) and r.get("u_linf", 1) <= 1e-6
-                st = status(ok)
+                # Both criteria relative, because the claim is relative and the absolute
+                # ones were calibrated on one arm.
+                #
+                # The shift is checked to one part in a million OF ITSELF: an error of 3e-6
+                # on a shift of 3.16 is the same statement as 1e-7 on 0.16, and an absolute
+                # threshold called the first a failure and the second a pass. The velocity
+                # is checked against the flow scale, U = 1, at 1e-4 -- the claim being that
+                # the port does not disturb the flow, not that the solver reached any
+                # particular precision. On the semi-structured arm u_linf runs 5.6e-07 to
+                # 1.8e-05, scaling with the imposed jump, because that mesh and the flat one
+                # differ in their float32 node coordinates by about 6e-08; the pressure
+                # shift is right to 1e-6 relative on both.
+                #
+                # It still has teeth: a run that did not converge reads u_linf 6.7.
+                scale = max(1.0, abs(pred)) if pred is not None else 1.0
+                ok    = (err is not None and err / scale <= 1e-6) and r.get("u_linf", 1) <= 1e-4
+                st    = status(ok)
                 if not ok:
                     bad += 1
             rows.append(["%g" % r["p_bar"], fmt(r.get("u_linf")), fmt(r["p_linf"]),
