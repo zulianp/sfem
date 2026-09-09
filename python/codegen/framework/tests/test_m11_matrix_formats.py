@@ -140,9 +140,17 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             bsr_scatter.index("s_t *const block = &values[entries[i * NS + j] * NC * NC];"),
         )
         self.assertNotIn("std::vector", bsr_scatter)
-        self.assertIn("int unsupported_matrix_format = 0;", source)
-        self.assertIn("reduction(|:unsupported_matrix_format)", source)
-        self.assertIn("return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;", source)
+        # The requested matrix format is settled at compile time: the kernel
+        # instantiates one scatter and refuses the instantiation outright when
+        # FORMAT names a scatter it does not have.  No runtime flag, and above
+        # all no reduction clause on the element loop.
+        self.assertIn(
+            'static_assert(FORMAT == 1,\n'
+            '                "this kernel has no scatter for the requested matrix format");',
+            source,
+        )
+        self.assertNotIn("unsupported_matrix_format", source)
+        self.assertNotIn("reduction(|:", source)
         self.assertIn("values[entries[i * NS + j] * NC * NC]", source)
         for matrix_format in ("crs", "dia", "coo", "patch"):
             self.assertNotIn(

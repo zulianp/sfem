@@ -491,8 +491,8 @@ def tensor_product_coordinate_gradient_lines(
                 % (indent, tensor_gradient, dim),
                 "%s    ne, %s, %s, %s, %d,"
                 % (indent, shape_name, grad_name, evaluator_streams, component),
-                "%s    %s + %d * NQ * %s * VS);"
-                % (indent, gradient_name, component, dim_name),
+                "%s    %s + %s);"
+                % (indent, gradient_name, c_product(component, "NQ", dim_name, "VS")),
             ]
         )
     return lines

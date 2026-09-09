@@ -2266,18 +2266,22 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
         for test in range(layout.n_shape(row)):
             if dependencies.value_coefficients[row]:
                 lines.append(
-                    "      const s_t test_value_%s_%d = field_shape[%d][q * %s + %d];"
-                    % (field.name, test, reference_index, n_shape_name, test)
+                    "      const s_t test_value_%s_%d = field_shape[%d][%s];"
+                    % (
+                        field.name,
+                        test,
+                        reference_index,
+                        c_sum(c_product("q", n_shape_name), test),
+                    )
                 )
             for d in range(dim):
                 if not dependencies.gradient_coefficients[row][d]:
                     continue
                 terms = [
-                    "fgref[%s][q * %s + %d] * adj%d"
+                    "fgref[%s][%s] * adj%d"
                     % (
                         c_sum(c_product(reference_index, "ND"), k),
-                        n_shape_name,
-                        test,
+                        c_sum(c_product("q", n_shape_name), test),
                         k * dim + d,
                     )
                     for k in range(dim)
@@ -2551,21 +2555,20 @@ def _mixed_local_field_evaluation_lines(
                     )
                     if group.uses_value:
                         lines.append(
-                            "%s%s%s += %s * field_shape[%d][q * %s + %d];"
+                            "%s%s%s += %s * field_shape[%d][%s];"
                             % (
                                 indent,
                                 field.name,
                                 group.symbol_suffix,
                                 coeff_name,
                                 reference_index,
-                                n_shape_name,
-                                trial,
+                                c_sum(c_product("q", n_shape_name), trial),
                             )
                         )
                     if group.uses_gradient:
                         for d in range(dim):
                             lines.append(
-                                "%s%s%s_grad_%d_ref += %s * fgref[%s][q * %s + %d];"
+                                "%s%s%s_grad_%d_ref += %s * fgref[%s][%s];"
                                 % (
                                     indent,
                                     field.name,
@@ -2573,8 +2576,7 @@ def _mixed_local_field_evaluation_lines(
                                     d,
                                     coeff_name,
                                     c_sum(c_product(reference_index, "ND"), d),
-                                    n_shape_name,
-                                    trial,
+                                    c_sum(c_product("q", n_shape_name), trial),
                                 )
                             )
             else:
@@ -2987,7 +2989,8 @@ def _simplex_local_body(
                     "coeff",
                     (),
                     expr_ref(
-                        "%s[trial * NC + %d][lane]" % (group.name, field_index)
+                        "%s[%s][lane]"
+                        % (group.name, c_sum(c_product("trial", "NC"), field_index))
                     ),
                 )
             ]
@@ -3132,7 +3135,9 @@ def _simplex_local_body(
         if terms:
             test_body.append(
                 ScatterNode(
-                    expr_ref("output[test * NC + %d][lane]" % row),
+                    expr_ref(
+                        "output[%s][lane]" % c_sum(c_product("test", "NC"), row)
+                    ),
                     expr_ref("q_weight[q] * det * (%s)" % " + ".join(terms)),
                     "+=",
                 )
@@ -3804,8 +3809,8 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
                     )
             lines.append("%sfor (int trial = 0; trial < NS; ++trial) {" % indent)
             lines.append(
-                "%s  const s_t coeff = %s[trial * NC + %d][lane];"
-                % (indent, group.name, field_index)
+                "%s  const s_t coeff = %s[%s][lane];"
+                % (indent, group.name, c_sum(c_product("trial", "NC"), field_index))
             )
             if group.uses_value:
                 lines.append(
@@ -3895,8 +3900,11 @@ def _tensor_field_alias_nodes(system, dependencies):
                         stem,
                         (),
                         expr_ref(
-                            "%s_value[(%d * NQ + q) * VS + lane]"
-                            % (group.name, field_index)
+                            "%s_value[%s * VS + lane]"
+                            % (
+                                group.name,
+                                c_group(c_sum(c_product(field_index, "NQ"), "q")),
+                            )
                         ),
                     )
                 )
@@ -4910,12 +4918,12 @@ def _mixed_isoparametric_function(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "bcoordinates[%d][lane] * %s_cell_grad_ref_%d[q * CELL_NS + %d]"
+                    "bcoordinates[%d][lane] * %s_cell_grad_ref_%d[%s]"
                     % (
                         shape * dim + i,
                         reference_stage,
                         j,
-                        shape,
+                        c_sum(c_product("q", "CELL_NS"), shape),
                     )
                     for shape in range(cell_rule.n_shape)
                 ]
