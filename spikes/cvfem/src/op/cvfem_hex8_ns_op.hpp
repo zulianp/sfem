@@ -90,6 +90,20 @@ namespace sfem {
         // Dirichlet set derived from the same object.
         std::string natural_outflow_sideset;
 
+        // Transient term. dt <= 0 -- the default -- means steady, and nothing is
+        // evaluated, so every steady case and every recorded number is unaffected.
+        //
+        // Both must be called after initialize(), for the same reason set_body_force
+        // must: the packed path renumbers mesh nodes, so history built against the
+        // pre-initialize numbering would be silently scrambled rather than rejected.
+        //
+        // set_velocity_history takes the three components interleaved per node, the
+        // layout the state vector already uses, and prev2 may be null -- BDF2 then falls
+        // back to BDF1, which is the correct start-up for the first step of a run.
+        // Passing null for prev clears the history and switches the term off.
+        void set_time_step(const real_t dt, const int bdf_order);
+        void set_velocity_history(const real_t *prev, const real_t *prev2);
+
         // Control volume per node -- the CVFEM lumped mass. Exposed because the driver
         // cannot include the kernel headers, and the MMS error norms are volume-weighted.
         int node_volume(real_t *const out) const;
