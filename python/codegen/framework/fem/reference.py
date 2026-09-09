@@ -889,6 +889,58 @@ def sfem_mesh_reference_data(rule):
     return sfem_reference_data(rule)
 
 
+def _join_reference_name(prefix, suffix):
+    """`<prefix>_<suffix>`, or just `<suffix>` when there is no prefix.
+
+    An empty prefix is the shared-header case: each basis gets its own struct
+    there, so `shape()` is unambiguous and needs no element to disambiguate it.
+    """
+    prefix = str(prefix)
+    return "%s_%s" % (prefix, suffix) if prefix else str(suffix)
+
+
+def sfem_basis_reference_data(element_type, cell_rule):
+    """One basis's shape and gradient tables at a cell rule, canonically named.
+
+    This is `sfem_reference_data` without the quadrature weights, generalised to
+    a basis that is not the cell's own.  The two halves separate because they are
+    keyed differently: the tables below belong to (basis, rule) and the weights to
+    the rule alone, so two bases sharing a rule share one set of weights.
+
+    The cell's own basis reads the rule's tables directly, exactly as
+    `sfem_reference_data` does, so the values are unchanged; a field basis is
+    evaluated at the cell rule's points.
+    """
+    element_type = str(element_type).upper()
+    is_cell = element_type == str(cell_rule.element_type).upper()
+    if cell_rule.is_tensor_product:
+        if is_cell:
+            return (
+                SfemReferenceData("shape_1d", cell_rule.tensor_product_shape_values_1d),
+                SfemReferenceData("grad_1d", cell_rule.tensor_product_shape_gradients_1d),
+            )
+        return sfem_tensor_product_field_reference_data(element_type, cell_rule, "")
+    if is_cell:
+        shape, gradients = sfem_shape_data_for_element_at_cell_rule(
+            cell_rule.element_type, cell_rule
+        )
+        return (SfemReferenceData("shape", shape),) + sfem_split_reference_gradient_data(
+            "grad_ref",
+            gradients,
+            cell_rule.n_qp,
+            cell_rule.n_shape,
+            cell_rule.dim,
+        )
+    return sfem_simplex_field_reference_data(element_type, cell_rule, "")
+
+
+def sfem_quadrature_reference_data(cell_rule):
+    """The rule's weights, canonically named -- the half keyed by the rule alone."""
+    if cell_rule.is_tensor_product:
+        return (SfemReferenceData("q_weight_1d", cell_rule.tensor_product_weights_1d),)
+    return (SfemReferenceData("q_weight", cell_rule.weights),)
+
+
 def sfem_tensor_product_field_reference_data(element_type, cell_rule, prefix):
     element_type = str(element_type).upper()
     if not cell_rule.is_tensor_product:
@@ -904,8 +956,8 @@ def sfem_tensor_product_field_reference_data(element_type, cell_rule, prefix):
     else:
         raise ValueError("unsupported tensor-product field element '%s'" % element_type)
     return (
-        SfemReferenceData("%s_shape_1d" % prefix, shape_values_1d),
-        SfemReferenceData("%s_grad_1d" % prefix, shape_gradients_1d),
+        SfemReferenceData(_join_reference_name(prefix, "shape_1d"), shape_values_1d),
+        SfemReferenceData(_join_reference_name(prefix, "grad_1d"), shape_gradients_1d),
     )
 
 
@@ -916,9 +968,9 @@ def sfem_simplex_field_reference_data(element_type, cell_rule, prefix):
     shape, gradients = sfem_shape_data_for_element_at_cell_rule(element_type, cell_rule)
     n_shape = len(shape) // cell_rule.n_qp
     return (
-        (SfemReferenceData("%s_shape" % prefix, shape),)
+        (SfemReferenceData(_join_reference_name(prefix, "shape"), shape),)
         + sfem_split_reference_gradient_data(
-            "%s_grad_ref" % prefix,
+            _join_reference_name(prefix, "grad_ref"),
             gradients,
             cell_rule.n_qp,
             n_shape,
