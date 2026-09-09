@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include "../mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
+#include "../../../reference/quad_tri_q1.hpp"
+#include "../../../reference/tri3_q1.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -23,22 +25,10 @@ namespace codegen {
 
 template <typename s_t>
 struct mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_isoparametric_reference_data {
-  static const s_t *shape() {
-    static const s_t data[3] = {s_t(0.33333333333333343), s_t(0.33333333333333331), s_t(0.33333333333333331)};
-    return data;
-  }
-  static const s_t *grad_ref_x() {
-    static const s_t data[3] = {s_t(-1), s_t(1), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_y() {
-    static const s_t data[3] = {s_t(-1), s_t(0), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight() {
-    static const s_t data[1] = {s_t(0.5)};
-    return data;
-  }
+  static const s_t *shape() { return ref_tri3_q1<s_t>::shape(); }
+  static const s_t *grad_ref_x() { return ref_tri3_q1<s_t>::grad_ref_x(); }
+  static const s_t *grad_ref_y() { return ref_tri3_q1<s_t>::grad_ref_y(); }
+  static const s_t *q_weight() { return quad_tri_q1<s_t>::q_weight(); }
 };
 
 template <typename s_t, int VS = 16>

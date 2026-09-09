@@ -1,0 +1,18 @@
+#ifndef SFEM_CODEGEN_REFERENCE_QUAD_TRI_Q1_HPP
+#define SFEM_CODEGEN_REFERENCE_QUAD_TRI_Q1_HPP
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t>
+struct quad_tri_q1 {
+  static const s_t *q_weight() {
+    static const s_t data[1] = {s_t(0.5)};
+    return data;
+  }
+};
+
+}  // namespace codegen
+}  // namespace sfem
+
+#endif

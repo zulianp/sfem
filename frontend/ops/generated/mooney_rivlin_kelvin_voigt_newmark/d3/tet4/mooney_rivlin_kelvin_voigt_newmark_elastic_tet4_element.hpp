@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include "../mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
+#include "../../../reference/quad_tet_q1.hpp"
+#include "../../../reference/tet4_q1.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -23,26 +25,11 @@ namespace codegen {
 
 template <typename s_t>
 struct mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_isoparametric_reference_data {
-  static const s_t *shape() {
-    static const s_t data[4] = {s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25)};
-    return data;
-  }
-  static const s_t *grad_ref_x() {
-    static const s_t data[4] = {s_t(-1), s_t(1), s_t(0), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_y() {
-    static const s_t data[4] = {s_t(-1), s_t(0), s_t(1), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_z() {
-    static const s_t data[4] = {s_t(-1), s_t(0), s_t(0), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight() {
-    static const s_t data[1] = {s_t(0.16666666666666666)};
-    return data;
-  }
+  static const s_t *shape() { return ref_tet4_q1<s_t>::shape(); }
+  static const s_t *grad_ref_x() { return ref_tet4_q1<s_t>::grad_ref_x(); }
+  static const s_t *grad_ref_y() { return ref_tet4_q1<s_t>::grad_ref_y(); }
+  static const s_t *grad_ref_z() { return ref_tet4_q1<s_t>::grad_ref_z(); }
+  static const s_t *q_weight() { return quad_tet_q1<s_t>::q_weight(); }
 };
 
 template <typename s_t, int VS = 16>

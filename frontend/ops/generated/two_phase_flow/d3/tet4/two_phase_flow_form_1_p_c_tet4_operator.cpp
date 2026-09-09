@@ -6,6 +6,8 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
+#include "../../../reference/quad_tet_q11.hpp"
+#include "../../../reference/tet4_q11.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -60,50 +62,20 @@ namespace codegen {
 
 template <typename s_t>
 struct two_phase_flow_form_1_p_c_tet4_affine_reference_data {
-  static const s_t *shape() {
-    static const s_t data[44] = {s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.78571428571428581), s_t(0.071428571428571425), s_t(0.071428571428571425), s_t(0.071428571428571425), s_t(0.071428571428571452), s_t(0.7857142857142857), s_t(0.071428571428571425), s_t(0.071428571428571425), s_t(0.07142857142857148), s_t(0.071428571428571425), s_t(0.7857142857142857), s_t(0.071428571428571425), s_t(0.071428571428571508), s_t(0.071428571428571425), s_t(0.071428571428571425), s_t(0.7857142857142857), s_t(0.10059642383320075), s_t(0.39940357616679922), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.10059642383320078), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.10059642383320078), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.39940357616679922), s_t(0.39940357616679922), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.1005964238332008), s_t(0.39940357616679922)};
-    return data;
-  }
-  static const s_t *grad_ref_x() {
-    static const s_t data[44] = {s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_y() {
-    static const s_t data[44] = {s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_z() {
-    static const s_t data[44] = {s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight() {
-    static const s_t data[11] = {s_t(-0.013155555555555556), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887)};
-    return data;
-  }
+  static const s_t *shape() { return ref_tet4_q11<s_t>::shape(); }
+  static const s_t *grad_ref_x() { return ref_tet4_q11<s_t>::grad_ref_x(); }
+  static const s_t *grad_ref_y() { return ref_tet4_q11<s_t>::grad_ref_y(); }
+  static const s_t *grad_ref_z() { return ref_tet4_q11<s_t>::grad_ref_z(); }
+  static const s_t *q_weight() { return quad_tet_q11<s_t>::q_weight(); }
 };
 
 template <typename s_t>
 struct two_phase_flow_form_1_p_c_tet4_isoparametric_reference_data {
-  static const s_t *shape() {
-    static const s_t data[44] = {s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.78571428571428581), s_t(0.071428571428571425), s_t(0.071428571428571425), s_t(0.071428571428571425), s_t(0.071428571428571452), s_t(0.7857142857142857), s_t(0.071428571428571425), s_t(0.071428571428571425), s_t(0.07142857142857148), s_t(0.071428571428571425), s_t(0.7857142857142857), s_t(0.071428571428571425), s_t(0.071428571428571508), s_t(0.071428571428571425), s_t(0.071428571428571425), s_t(0.7857142857142857), s_t(0.10059642383320075), s_t(0.39940357616679922), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.10059642383320078), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.10059642383320078), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.39940357616679922), s_t(0.39940357616679922), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.39940357616679922), s_t(0.1005964238332008), s_t(0.1005964238332008), s_t(0.39940357616679922)};
-    return data;
-  }
-  static const s_t *grad_ref_x() {
-    static const s_t data[44] = {s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_y() {
-    static const s_t data[44] = {s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0), s_t(-1), s_t(0), s_t(1), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_z() {
-    static const s_t data[44] = {s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(0), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight() {
-    static const s_t data[11] = {s_t(-0.013155555555555556), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.0076222222222222221), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887), s_t(0.024888888888888887)};
-    return data;
-  }
+  static const s_t *shape() { return ref_tet4_q11<s_t>::shape(); }
+  static const s_t *grad_ref_x() { return ref_tet4_q11<s_t>::grad_ref_x(); }
+  static const s_t *grad_ref_y() { return ref_tet4_q11<s_t>::grad_ref_y(); }
+  static const s_t *grad_ref_z() { return ref_tet4_q11<s_t>::grad_ref_z(); }
+  static const s_t *q_weight() { return quad_tet_q11<s_t>::q_weight(); }
 };
 
 } // namespace codegen

@@ -177,7 +177,8 @@
     "d3/proteus_hex8",
     "d3/tet10",
     "d3/tet4",
-    "op"
+    "op",
+    "reference"
   ],
   "header_api": [
     {

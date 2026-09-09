@@ -6,6 +6,8 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
+#include "../../../reference/line_p1_q3.hpp"
+#include "../../../reference/quad_line_q3.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -60,34 +62,16 @@ namespace codegen {
 
 template <typename s_t>
 struct two_phase_flow_form_2_p_c_p_c_proteus_hex8_affine_reference_data {
-  static const s_t *shape_1d() {
-    static const s_t data[6] = {s_t(0.8872983346207417), s_t(0.1127016653792583), s_t(0.5), s_t(0.5), s_t(0.1127016653792583), s_t(0.8872983346207417)};
-    return data;
-  }
-  static const s_t *grad_1d() {
-    static const s_t data[6] = {s_t(-1), s_t(1), s_t(-1), s_t(1), s_t(-1), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight_1d() {
-    static const s_t data[3] = {s_t(0.27777777777777779), s_t(0.44444444444444442), s_t(0.27777777777777779)};
-    return data;
-  }
+  static const s_t *shape_1d() { return ref_line_p1_q3<s_t>::shape_1d(); }
+  static const s_t *grad_1d() { return ref_line_p1_q3<s_t>::grad_1d(); }
+  static const s_t *q_weight_1d() { return quad_line_q3<s_t>::q_weight_1d(); }
 };
 
 template <typename s_t>
 struct two_phase_flow_form_2_p_c_p_c_proteus_hex8_isoparametric_reference_data {
-  static const s_t *shape_1d() {
-    static const s_t data[6] = {s_t(0.8872983346207417), s_t(0.1127016653792583), s_t(0.5), s_t(0.5), s_t(0.1127016653792583), s_t(0.8872983346207417)};
-    return data;
-  }
-  static const s_t *grad_1d() {
-    static const s_t data[6] = {s_t(-1), s_t(1), s_t(-1), s_t(1), s_t(-1), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight_1d() {
-    static const s_t data[3] = {s_t(0.27777777777777779), s_t(0.44444444444444442), s_t(0.27777777777777779)};
-    return data;
-  }
+  static const s_t *shape_1d() { return ref_line_p1_q3<s_t>::shape_1d(); }
+  static const s_t *grad_1d() { return ref_line_p1_q3<s_t>::grad_1d(); }
+  static const s_t *q_weight_1d() { return quad_line_q3<s_t>::q_weight_1d(); }
 };
 
 } // namespace codegen

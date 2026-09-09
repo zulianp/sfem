@@ -20,6 +20,8 @@ makes sharing safe, so it is what needs testing:
     merged.  Those are two different failure modes and both are cheap to state.
 """
 
+import os
+import re
 import unittest
 
 from codegen.framework.emitters import quadrature_codegen
@@ -129,3 +131,72 @@ class TheHeaderIsSelfContainedTest(unittest.TestCase):
     def test_the_header_carries_no_weights(self):
         """The weights are the rule's, not the basis's."""
         self.assertNotIn("q_weight", self.source)
+
+
+GENERATED = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
+    "frontend", "ops", "generated",
+)
+
+_TABLE = re.compile(r"    static const s_t data\[\d+\] = \{s_t")
+_FORWARDER = re.compile(
+    r"  static const s_t \*([a-z0-9_]+)\(\) \{ return ([a-z0-9_]+)<s_t>::([a-z0-9_]+)\(\); \}"
+)
+
+
+class TheTablesLiveInOnePlaceTest(unittest.TestCase):
+    """A table is emitted once and forwarded to, never copied.
+
+    The failure this guards is not subtle to state and was easy to reach: an
+    emitter prints the numbers inline again, and the tree quietly grows a second
+    copy that nothing keeps in step with the first.
+    """
+
+    def setUp(self):
+        if not os.path.isdir(GENERATED):
+            self.skipTest("generated tree not present")
+        self.shared, self.elsewhere = [], []
+        for base, _dirs, files in os.walk(GENERATED):
+            for name in files:
+                if not name.endswith((".cpp", ".hpp")):
+                    continue
+                path = os.path.join(base, name)
+                with open(path, encoding="utf-8", errors="replace") as handle:
+                    text = handle.read()
+                if not _TABLE.search(text):
+                    continue
+                relative = os.path.relpath(path, GENERATED)
+                (self.shared if relative.startswith("reference" + os.sep)
+                 else self.elsewhere).append(relative)
+
+    def test_the_shared_headers_exist_and_hold_tables(self):
+        self.assertGreater(len(self.shared), 10)
+
+    def test_no_table_is_written_outside_them(self):
+        self.assertEqual(
+            sorted(self.elsewhere)[:10],
+            [],
+            "%d sources carry reference tables of their own" % len(self.elsewhere),
+        )
+
+    def test_every_forwarder_names_a_header_that_exists(self):
+        """A forwarder to a struct nobody emits is a compile error, so this
+        cannot fail silently -- it fails early instead, with the name."""
+        structs = set()
+        for name in os.listdir(os.path.join(GENERATED, "reference")):
+            with open(os.path.join(GENERATED, "reference", name), encoding="utf-8") as handle:
+                structs.update(re.findall(r"struct ([a-z0-9_]+) \{", handle.read()))
+        self.assertGreater(len(structs), 10)
+        unknown, seen = set(), 0
+        for base, _dirs, files in os.walk(GENERATED):
+            for name in files:
+                if not name.endswith((".cpp", ".hpp")):
+                    continue
+                with open(os.path.join(base, name), encoding="utf-8", errors="replace") as handle:
+                    for match in _FORWARDER.finditer(handle.read()):
+                        seen += 1
+                        if match.group(2) not in structs:
+                            unknown.add(match.group(2))
+        self.assertGreater(seen, 400)
+        self.assertEqual(sorted(unknown), [])

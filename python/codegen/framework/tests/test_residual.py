@@ -27,6 +27,14 @@ from codegen.framework.plans.scheduling import (
 )
 from codegen.framework.plans.residual_model import residual_emission_model_from_system
 
+def _ensure_parent(path):
+    """A generated path may carry a directory -- `reference/<key>.hpp` does."""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+
+
 
 def _element_emission_plan(element, vector_size=16, quadrature_order=None):
     return emission_plan_for_element(element, vector_size, quadrature_order)
@@ -443,6 +451,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 )
                 for generated in files:
                     path = os.path.join(tmpdir, generated.path)
+                    _ensure_parent(path)
                     with open(path, "w", encoding="utf-8") as stream:
                         stream.write(generated.source)
                 family = (
@@ -711,6 +720,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in files:
+                _ensure_parent(os.path.join(tmpdir, generated.path))
                 with open(
                     os.path.join(tmpdir, generated.path),
                     "w",
@@ -758,6 +768,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             )
             with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
                 for generated in files:
+                    _ensure_parent(os.path.join(tmpdir, generated.path))
                     with open(
                         os.path.join(tmpdir, generated.path),
                         "w",

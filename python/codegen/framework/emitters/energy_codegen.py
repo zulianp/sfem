@@ -109,6 +109,9 @@ from codegen.framework.emitters.tensor_product_geometry import (
 from codegen.framework.emitters.quadrature_codegen import (
     quadrature_reference_accessor,
     quadrature_reference_struct_lines,
+    reference_forwarder_struct_lines,
+    reference_header_files,
+    reference_include_lines,
 )
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.form_transformations import (
@@ -668,7 +671,7 @@ def generate_sfem_soa_cpp_files(
     return tuple(
         GeneratedKernelFile(entry.path, _prune_unused_spatial_dim(entry.source))
         for entry in files
-    )
+    ) + _sfem_soa_reference_header_files((affine_quadrature_rule, quadrature_rule))
 
 
 def generate_sfem_soa_cpp_files_for_element(
@@ -2954,6 +2957,30 @@ def _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item):
             lines.append("    %s[%s] %s element_vector[%d];" % (stream, work_item, op, idx))
 
 
+def _sfem_soa_reference_header_paths(rules):
+    """The shared reference headers a source forwards into, once each.
+
+    Paths rather than `#include` lines: `operator_preamble_lines` already takes
+    `extra_headers` and spells the directive, so this goes through the hook that
+    exists instead of adding a second one.
+    """
+    seen = []
+    for rule in rules:
+        for line in reference_include_lines(rule, sfem_mesh_reference_data(rule)):
+            path = line.split('"')[1]
+            if path not in seen:
+                seen.append(path)
+    return tuple(seen)
+
+
+def _sfem_soa_reference_header_files(rules):
+    seen = {}
+    for rule in rules:
+        for entry in reference_header_files(rule, sfem_mesh_reference_data(rule)):
+            seen[entry.path] = entry
+    return tuple(seen[path] for path in sorted(seen))
+
+
 def _sfem_soa_operator_source(
     forms,
     prefix,
@@ -2982,7 +3009,12 @@ def _sfem_soa_operator_source(
             local_name,
             geometry_name,
             diagnostics_name,
-            extra_headers=(() if hessian_name is None else (hessian_name,)),
+            extra_headers=(
+                (() if hessian_name is None else (hessian_name,))
+                + _sfem_soa_reference_header_paths(
+                    (affine_quadrature_rule, quadrature_rule)
+                )
+            ),
         ),
         "",
         "#include <cstdint>",
@@ -3017,16 +3049,18 @@ def _sfem_soa_operator_source(
     lines.append("")
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
     lines.extend(
-        quadrature_reference_struct_lines(
+        reference_forwarder_struct_lines(
             prefix,
             "affine",
+            affine_quadrature_rule,
             sfem_mesh_reference_data(affine_quadrature_rule),
         )
     )
     lines.extend(
-        quadrature_reference_struct_lines(
+        reference_forwarder_struct_lines(
             prefix,
             "isoparametric",
+            quadrature_rule,
             sfem_mesh_reference_data(quadrature_rule),
         )
     )
@@ -9255,6 +9289,9 @@ def _sfem_soa_element_api_header(
         "#include <stddef.h>",
         '#include "%s"' % local_name,
         '#include "%s"' % geometry_name,
+        *reference_include_lines(
+            quadrature_rule, sfem_mesh_reference_data(quadrature_rule)
+        ),
         "",
         "#ifndef SFEM_SUCCESS",
         "#define SFEM_SUCCESS 0",
@@ -9273,9 +9310,10 @@ def _sfem_soa_element_api_header(
         "",
     ]
     lines.extend(
-        quadrature_reference_struct_lines(
+        reference_forwarder_struct_lines(
             prefix,
             "isoparametric",
+            quadrature_rule,
             sfem_mesh_reference_data(quadrature_rule),
         )
     )

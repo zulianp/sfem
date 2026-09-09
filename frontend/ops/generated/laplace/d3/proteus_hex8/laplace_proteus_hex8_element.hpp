@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include "../laplace_d3_tensor_product_local.hpp"
 #include "../../../geometry_kernels.hpp"
+#include "../../../reference/line_p1_q2.hpp"
+#include "../../../reference/quad_line_q2.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -23,18 +25,9 @@ namespace codegen {
 
 template <typename s_t>
 struct laplace_proteus_hex8_isoparametric_reference_data {
-  static const s_t *shape_1d() {
-    static const s_t data[4] = {s_t(0.78867513459481287), s_t(0.21132486540518708), s_t(0.21132486540518713), s_t(0.78867513459481287)};
-    return data;
-  }
-  static const s_t *grad_1d() {
-    static const s_t data[4] = {s_t(-1), s_t(1), s_t(-1), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight_1d() {
-    static const s_t data[2] = {s_t(0.5), s_t(0.5)};
-    return data;
-  }
+  static const s_t *shape_1d() { return ref_line_p1_q2<s_t>::shape_1d(); }
+  static const s_t *grad_1d() { return ref_line_p1_q2<s_t>::grad_1d(); }
+  static const s_t *q_weight_1d() { return quad_line_q2<s_t>::q_weight_1d(); }
 };
 
 template <typename s_t, int VS = 16>

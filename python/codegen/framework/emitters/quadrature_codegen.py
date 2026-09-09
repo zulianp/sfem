@@ -116,3 +116,123 @@ def reference_rule_header_source(dataset):
     lines = _reference_header_lines(dataset.rule_key, dataset.rule_key, dataset.weight_tables)
     return "\n".join(lines) + "\n"
 
+
+
+def _owner(cell_rule, reference_name):
+    """`(struct, accessor)` for one table: which shared struct holds it, and what
+    it is called there.
+
+    Resolved from the rule the table was *evaluated at* -- the emission site has
+    it in hand together with the values -- so the header a kernel reads is by
+    construction the header its numbers came from.  Nothing here infers a rule
+    from a geometry mode, which is where this would have gone wrong: the affine
+    and isoparametric structs of one kernel are built from different rules, and
+    for the coupled residual path they are built from the same one.
+    """
+    from codegen.framework.plans.reference_data import basis_key_for, rule_key_for
+
+    name = str(reference_name)
+    if name.startswith("q_weight"):
+        return rule_key_for(cell_rule), name
+    prefix, canonical = split_reference_accessor(name)
+    element = prefix.upper() if prefix else cell_rule.element_type
+    return "ref_%s" % basis_key_for(element, cell_rule), canonical
+
+
+#: The canonical accessor names, longest first so `shape_1d` is not read as an
+#: element-prefixed `shape` and `grad_ref_x` is not read as `grad_ref`.
+_CANONICAL_ACCESSORS = (
+    "shape_1d",
+    "grad_1d",
+    "grad_ref_x",
+    "grad_ref_y",
+    "grad_ref_z",
+    "grad_ref",
+    "shape",
+)
+
+
+def split_reference_accessor(name):
+    """`(element_prefix, canonical_name)`.
+
+    A mixed kernel's struct disambiguates its two bases by prefixing the
+    accessor -- `tri6_shape` beside `tri3_shape`.  In a shared header each basis
+    has a struct of its own, so the prefix is the struct and the accessor keeps
+    its plain name.
+    """
+    name = str(name)
+    for canonical in _CANONICAL_ACCESSORS:
+        if name == canonical:
+            return "", canonical
+        if name.endswith("_%s" % canonical):
+            return name[: -len(canonical) - 1], canonical
+    raise ValueError("'%s' is not a reference accessor this table knows" % name)
+
+
+def reference_forwarder_struct_lines(prefix, stage, cell_rule, references):
+    """The kernel's reference struct, forwarding to the shared tables.
+
+    The name a kernel reads stays exactly what it was -- `<prefix>_<stage>_reference_data`,
+    material-scoped and readable -- so not one of the 2,807 call sites moves.
+    What changes is that the numbers are no longer here: 174 structs held 20
+    distinct tables between them, and now each table has one home.
+    """
+    struct_name = quadrature_reference_struct_name(prefix, stage)
+    lines = ["", "template <typename s_t>", "struct %s {" % struct_name]
+    for reference in references:
+        owner, accessor = _owner(cell_rule, reference.name)
+        lines.append(
+            "  static const s_t *%s() { return %s<s_t>::%s(); }"
+            % (reference.name, owner, accessor)
+        )
+    lines.append("};")
+    return lines
+
+
+def reference_include_lines(cell_rule, references):
+    """The shared headers a kernel's reference struct forwards into."""
+    owners = []
+    for reference in references:
+        owner, _ = _owner(cell_rule, reference.name)
+        key = owner[4:] if owner.startswith("ref_") else owner
+        if key not in owners:
+            owners.append(key)
+    return ['#include "%s"' % reference_header_path(key) for key in sorted(owners)]
+
+
+def reference_header_files(cell_rule, references):
+    """The shared headers holding this kernel's tables.
+
+    Emitted by every kernel that reads them, byte for byte the same; the file
+    name is the deduplication and `pipeline/driver.py _merge_files` -- which
+    refuses two different bodies for one path -- is the check on it.
+    """
+    from codegen.framework.emitters.artifacts import GeneratedKernelFile
+    from codegen.framework.plans.reference_data import rule_weight_accessor
+
+    grouped = {}
+    for reference in references:
+        owner, accessor = _owner(cell_rule, reference.name)
+        key = owner[4:] if owner.startswith("ref_") else owner
+        grouped.setdefault((key, owner), []).append(
+            SfemReferenceLike(accessor, reference.values)
+        )
+    files = []
+    for (key, owner), tables in sorted(grouped.items()):
+        includes = ()
+        if owner.startswith("ref_"):
+            rule_owner, _ = _owner(cell_rule, rule_weight_accessor(cell_rule))
+            includes = ("%s.hpp" % rule_owner,)
+        source = "\n".join(_reference_header_lines(key, owner, tables, includes)) + "\n"
+        files.append(GeneratedKernelFile(reference_header_path(key), source))
+    return tuple(files)
+
+
+class SfemReferenceLike(object):
+    """A table under its shared-header name."""
+
+    __slots__ = ("name", "values")
+
+    def __init__(self, name, values):
+        self.name = name
+        self.values = tuple(values)

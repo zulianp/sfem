@@ -78,9 +78,7 @@ class ReferenceBasisDataPlan:
         Tensor-product bases key on the 1-D basis rather than the element,
         because the tables are 1-D: PROTEUS_HEX8 and PROTEUS_QUAD4 share one.
         """
-        if self.is_tensor_product:
-            return "line_p%d_q%d" % (self.n_shape_1d - 1, self.n_qp_1d)
-        return "%s_q%d" % (self.element_type.lower(), self.n_qp)
+        return _basis_key(self.element_type, self.family, self.n_shape_1d, self.n_qp_1d, self.n_qp)
 
     @property
     def struct_name(self):
@@ -192,9 +190,7 @@ class ReferenceDataSetPlan:
         one path, so an under-specified key is a hard error rather than a silent
         choice between them.
         """
-        if self.is_tensor_product:
-            return "quad_line_q%d" % self.n_qp_1d
-        return "quad_%s_q%d" % (_reference_domain(self.cell_element_type), self.n_qp)
+        return _rule_key(self.family, self.n_qp_1d, self.cell_element_type, self.n_qp)
 
     @property
     def accessors(self):
@@ -445,6 +441,45 @@ _REFERENCE_DOMAINS = (
     ("HEX", "hex"),
     ("EDGE", "edge"),
 )
+
+
+def _basis_key(element_type, family, n_shape_1d, n_qp_1d, n_qp):
+    if family == "tensor_product":
+        return "line_p%d_q%d" % (int(n_shape_1d) - 1, int(n_qp_1d))
+    return "%s_q%d" % (str(element_type).lower(), int(n_qp))
+
+
+def _rule_key(family, n_qp_1d, cell_element_type, n_qp):
+    if family == "tensor_product":
+        return "quad_line_q%d" % int(n_qp_1d)
+    return "quad_%s_q%d" % (_reference_domain(cell_element_type), int(n_qp))
+
+
+def rule_weight_accessor(cell_rule):
+    """What a rule's weights are called: `q_weight_1d` on a tensor product,
+    `q_weight` on a simplex.
+
+    Here rather than in the emitter because choosing between two spellings by
+    inspecting a rule is a decision, and emission spells results.
+    """
+    return "q_weight_1d" if cell_rule.is_tensor_product else "q_weight"
+
+
+def basis_key_for(element_type, cell_rule):
+    """`ReferenceBasisDataPlan.key` for a basis named only by its element.
+
+    The emitters reach the key this way: they hold the rule the tables were
+    evaluated at, not the plan.
+    """
+    basis = basis_plan_for_element_at_cell_rule(element_type, cell_rule, "cell")
+    family = "tensor_product" if basis.is_tensor_product else "simplex"
+    return _basis_key(element_type, family, basis.n_shape_1d, basis.n_qp_1d, basis.n_qp)
+
+
+def rule_key_for(cell_rule):
+    """`ReferenceDataSetPlan.rule_key` for a rule on its own."""
+    family = "tensor_product" if cell_rule.is_tensor_product else "simplex"
+    return _rule_key(family, cell_rule.tensor_product_n_qp_1d, cell_rule.element_type, cell_rule.n_qp)
 
 
 def _reference_domain(element_type):

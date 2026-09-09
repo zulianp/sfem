@@ -116,6 +116,9 @@ from codegen.framework.fem.reference import (
 from codegen.framework.emitters.quadrature_codegen import (
     quadrature_reference_accessor,
     quadrature_reference_struct_lines,
+    reference_forwarder_struct_lines,
+    reference_header_files,
+    reference_include_lines,
 )
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
@@ -1736,6 +1739,9 @@ def generate_coupled_residual_sfem_files(
         ),
         GeneratedKernelFile(local_name, local_source),
         GeneratedKernelFile(operator_name, operator_source),
+    ) + _reference_header_files(
+        (affine_specialization.quadrature_rule, specialization.quadrature_rule),
+        sfem_mesh_reference_data,
     )
 
 
@@ -1856,6 +1862,11 @@ def generate_mixed_residual_sfem_files(
         ),
         GeneratedKernelFile(local_name, local_source),
         GeneratedKernelFile(operator_name, operator_source),
+    ) + _reference_header_files(
+        # `_mixed_operator_source` prints both geometry modes from the cell rule,
+        # so the cell rule is the only one whose tables this source reads.
+        (cell_specialization.quadrature_rule,),
+        lambda rule: _mixed_reference_data(rule, system, field_element_types, family),
     )
 
 
@@ -4010,6 +4021,25 @@ def _geometry_metric_grouping_lines(
     return lines
 
 
+def _reference_header_files(rules, references_for):
+    """The shared headers these rules' tables live in, once each."""
+    seen = {}
+    for rule in rules:
+        for entry in reference_header_files(rule, references_for(rule)):
+            seen[entry.path] = entry
+    return tuple(seen[path] for path in sorted(seen))
+
+
+def _reference_includes(rules, references_for):
+    """The shared reference headers a source forwards into, once each."""
+    seen = []
+    for rule in rules:
+        for line in reference_include_lines(rule, references_for(rule)):
+            if line not in seen:
+                seen.append(line)
+    return tuple(seen)
+
+
 def _operator_source(
     system,
     prefix,
@@ -4041,6 +4071,10 @@ def _operator_source(
         '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
         '#include "packed_thread_scratch.hpp"',
+        *_reference_includes(
+            (affine_specialization.quadrature_rule, rule),
+            sfem_mesh_reference_data,
+        ),
         "#if defined(__has_include)",
         '#if __has_include("smesh_types.hpp")',
         '#include "smesh_types.hpp"',
@@ -4088,16 +4122,18 @@ def _operator_source(
         ]
     )
     lines.extend(
-        quadrature_reference_struct_lines(
+        reference_forwarder_struct_lines(
             prefix,
             AFFINE_MODE,
+            affine_specialization.quadrature_rule,
             sfem_mesh_reference_data(affine_specialization.quadrature_rule),
         )
     )
     lines.extend(
-        quadrature_reference_struct_lines(
+        reference_forwarder_struct_lines(
             prefix,
             ISOPARAMETRIC_MODE,
+            rule,
             sfem_mesh_reference_data(rule),
         )
     )
@@ -4295,6 +4331,12 @@ def _mixed_operator_source(
     lines = [
         "#include <type_traits>",
         '#include "%s"' % local_name,
+        *_reference_includes(
+            (rule,),
+            lambda cell_rule: _mixed_reference_data(
+                cell_rule, system, field_element_types, basis_family
+            ),
+        ),
         '#include "kernel_math.hpp"',
         '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
@@ -4401,9 +4443,10 @@ def _mixed_operator_source(
 
 
 def _mixed_reference_data_lines(prefix, reference_stage, cell_rule, system, field_element_types, basis_family=None):
-    return quadrature_reference_struct_lines(
+    return reference_forwarder_struct_lines(
         prefix,
         reference_stage,
+        cell_rule,
         _mixed_reference_data(cell_rule, system, field_element_types, basis_family),
     )
 

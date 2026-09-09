@@ -6,6 +6,8 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
+#include "../../../reference/quad_tet_q1.hpp"
+#include "../../../reference/tet4_q1.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -60,50 +62,20 @@ namespace codegen {
 
 template <typename s_t>
 struct mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_affine_reference_data {
-  static const s_t *shape() {
-    static const s_t data[4] = {s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25)};
-    return data;
-  }
-  static const s_t *grad_ref_x() {
-    static const s_t data[4] = {s_t(-1), s_t(1), s_t(0), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_y() {
-    static const s_t data[4] = {s_t(-1), s_t(0), s_t(1), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_z() {
-    static const s_t data[4] = {s_t(-1), s_t(0), s_t(0), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight() {
-    static const s_t data[1] = {s_t(0.16666666666666666)};
-    return data;
-  }
+  static const s_t *shape() { return ref_tet4_q1<s_t>::shape(); }
+  static const s_t *grad_ref_x() { return ref_tet4_q1<s_t>::grad_ref_x(); }
+  static const s_t *grad_ref_y() { return ref_tet4_q1<s_t>::grad_ref_y(); }
+  static const s_t *grad_ref_z() { return ref_tet4_q1<s_t>::grad_ref_z(); }
+  static const s_t *q_weight() { return quad_tet_q1<s_t>::q_weight(); }
 };
 
 template <typename s_t>
 struct mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_isoparametric_reference_data {
-  static const s_t *shape() {
-    static const s_t data[4] = {s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25)};
-    return data;
-  }
-  static const s_t *grad_ref_x() {
-    static const s_t data[4] = {s_t(-1), s_t(1), s_t(0), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_y() {
-    static const s_t data[4] = {s_t(-1), s_t(0), s_t(1), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_z() {
-    static const s_t data[4] = {s_t(-1), s_t(0), s_t(0), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight() {
-    static const s_t data[1] = {s_t(0.16666666666666666)};
-    return data;
-  }
+  static const s_t *shape() { return ref_tet4_q1<s_t>::shape(); }
+  static const s_t *grad_ref_x() { return ref_tet4_q1<s_t>::grad_ref_x(); }
+  static const s_t *grad_ref_y() { return ref_tet4_q1<s_t>::grad_ref_y(); }
+  static const s_t *grad_ref_z() { return ref_tet4_q1<s_t>::grad_ref_z(); }
+  static const s_t *q_weight() { return quad_tet_q1<s_t>::q_weight(); }
 };
 
 } // namespace codegen

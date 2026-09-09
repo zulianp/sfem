@@ -6,6 +6,8 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
+#include "../../../reference/quad_tri_q6.hpp"
+#include "../../../reference/tri3_q6.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -60,42 +62,18 @@ namespace codegen {
 
 template <typename s_t>
 struct two_phase_flow_form_2_p_w_p_c_tri3_affine_reference_data {
-  static const s_t *shape() {
-    static const s_t data[18] = {s_t(0.10810301816807022), s_t(0.44594849091596489), s_t(0.44594849091596489), s_t(0.44594849091596489), s_t(0.10810301816807021), s_t(0.44594849091596489), s_t(0.44594849091596489), s_t(0.44594849091596489), s_t(0.10810301816807021), s_t(0.81684757298045851), s_t(0.091576213509770743), s_t(0.091576213509770743), s_t(0.091576213509770743), s_t(0.81684757298045851), s_t(0.091576213509770743), s_t(0.091576213509770743), s_t(0.091576213509770743), s_t(0.81684757298045851)};
-    return data;
-  }
-  static const s_t *grad_ref_x() {
-    static const s_t data[18] = {s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_y() {
-    static const s_t data[18] = {s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight() {
-    static const s_t data[6] = {s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.054975871827660998), s_t(0.054975871827660998), s_t(0.054975871827660998)};
-    return data;
-  }
+  static const s_t *shape() { return ref_tri3_q6<s_t>::shape(); }
+  static const s_t *grad_ref_x() { return ref_tri3_q6<s_t>::grad_ref_x(); }
+  static const s_t *grad_ref_y() { return ref_tri3_q6<s_t>::grad_ref_y(); }
+  static const s_t *q_weight() { return quad_tri_q6<s_t>::q_weight(); }
 };
 
 template <typename s_t>
 struct two_phase_flow_form_2_p_w_p_c_tri3_isoparametric_reference_data {
-  static const s_t *shape() {
-    static const s_t data[18] = {s_t(0.10810301816807022), s_t(0.44594849091596489), s_t(0.44594849091596489), s_t(0.44594849091596489), s_t(0.10810301816807021), s_t(0.44594849091596489), s_t(0.44594849091596489), s_t(0.44594849091596489), s_t(0.10810301816807021), s_t(0.81684757298045851), s_t(0.091576213509770743), s_t(0.091576213509770743), s_t(0.091576213509770743), s_t(0.81684757298045851), s_t(0.091576213509770743), s_t(0.091576213509770743), s_t(0.091576213509770743), s_t(0.81684757298045851)};
-    return data;
-  }
-  static const s_t *grad_ref_x() {
-    static const s_t data[18] = {s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0), s_t(-1), s_t(1), s_t(0)};
-    return data;
-  }
-  static const s_t *grad_ref_y() {
-    static const s_t data[18] = {s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1), s_t(-1), s_t(0), s_t(1)};
-    return data;
-  }
-  static const s_t *q_weight() {
-    static const s_t data[6] = {s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.11169079483900569), s_t(0.054975871827660998), s_t(0.054975871827660998), s_t(0.054975871827660998)};
-    return data;
-  }
+  static const s_t *shape() { return ref_tri3_q6<s_t>::shape(); }
+  static const s_t *grad_ref_x() { return ref_tri3_q6<s_t>::grad_ref_x(); }
+  static const s_t *grad_ref_y() { return ref_tri3_q6<s_t>::grad_ref_y(); }
+  static const s_t *q_weight() { return quad_tri_q6<s_t>::q_weight(); }
 };
 
 } // namespace codegen
