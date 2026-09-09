@@ -12,15 +12,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include "../../../packed_thread_scratch.hpp"
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
 
 namespace sfem {
 namespace codegen {
@@ -104,85 +95,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex8_objectiv
   return &sfem::codegen::laplace_proteus_hex8_objective_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_hex8_objective_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::laplace_proteus_hex8_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_hex8_objective_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_hex8_objective_soa",
-      &sfem::codegen::laplace_proteus_hex8_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_objective_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_hex8_objective_soa_float",
-      &sfem::codegen::laplace_proteus_hex8_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_hex8_objective_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_hex8_objective_a_msoa",
-      &sfem::codegen::laplace_proteus_hex8_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_objective_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_hex8_objective_a_msoa_float",
-      &sfem::codegen::laplace_proteus_hex8_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_hex8_objective_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_hex8_objective_i_msoa",
-      &sfem::codegen::laplace_proteus_hex8_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_objective_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_hex8_objective_i_msoa_float",
-      &sfem::codegen::laplace_proteus_hex8_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_hex8_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -209,7 +126,6 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_a_msoa_impl(
   static constexpr int NC = 1;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  static constexpr int VS = 16;
   (void)nnodes;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
@@ -313,6 +229,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_a_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_hex8_objective_steps_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -326,42 +243,26 @@ extern "C" int laplace_proteus_hex8_objective_steps_a_msoa(
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
+        const void *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
+        const void *const RSTR hx,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
-  return sfem::codegen::laplace_proteus_hex8_objective_steps_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
-}
-
-extern "C" int laplace_proteus_hex8_objective_steps_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
-) {
-  return sfem::codegen::laplace_proteus_hex8_objective_steps_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_hex8_objective_steps_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_hex8_objective_steps_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_objective_steps_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -523,6 +424,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_a_msoa_impl(
 }
 
 extern "C" int laplace_proteus_hex8_objective_steps_packed_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -543,49 +445,26 @@ extern "C" int laplace_proteus_hex8_objective_steps_packed_a_msoa(
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t u_stride,
-    const double *const RSTR ux,
+    const void *const RSTR ux,
     const ptrdiff_t h_stride,
-    const double *const RSTR hx,
+    const void *const RSTR hx,
     const int nsteps,
-    const double *const RSTR steps,
-    double *const RSTR value
+    const void *const RSTR steps,
+    void *const RSTR value
 ) {
-  return laplace_proteus_hex8_objective_steps_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
-}
-
-extern "C" int laplace_proteus_hex8_objective_steps_packed_a_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float kappa,
-    const ptrdiff_t u_stride,
-    const float *const RSTR ux,
-    const ptrdiff_t h_stride,
-    const float *const RSTR hx,
-    const int nsteps,
-    const float *const RSTR steps,
-    float *const RSTR value
-) {
-  return laplace_proteus_hex8_objective_steps_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_objective_steps_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_objective_steps_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_objective_steps_packed_a_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -595,7 +474,7 @@ extern "C" int laplace_proteus_hex8_objective_steps_packed_a_msoa_float(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_hex8_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -614,7 +493,6 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_i_msoa_impl(
   static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -727,37 +605,31 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_i_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_hex8_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
+        const void *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
+        const void *const RSTR hx,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
-  return sfem::codegen::laplace_proteus_hex8_objective_steps_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
-}
-
-extern "C" int laplace_proteus_hex8_objective_steps_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
-) {
-  return sfem::codegen::laplace_proteus_hex8_objective_steps_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_hex8_objective_steps_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_hex8_objective_steps_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_objective_steps_i_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -931,6 +803,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_i_msoa_impl(
 }
 
 extern "C" int laplace_proteus_hex8_objective_steps_packed_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -942,40 +815,26 @@ extern "C" int laplace_proteus_hex8_objective_steps_packed_i_msoa(
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const geom_t *const *const RSTR points,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t u_stride,
-    const double *const RSTR ux,
+    const void *const RSTR ux,
     const ptrdiff_t h_stride,
-    const double *const RSTR hx,
+    const void *const RSTR hx,
     const int nsteps,
-    const double *const RSTR steps,
-    double *const RSTR value
+    const void *const RSTR steps,
+    void *const RSTR value
 ) {
-  return laplace_proteus_hex8_objective_steps_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
-}
-
-extern "C" int laplace_proteus_hex8_objective_steps_packed_i_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const geom_t *const *const RSTR points,
-    const float kappa,
-    const ptrdiff_t u_stride,
-    const float *const RSTR ux,
-    const ptrdiff_t h_stride,
-    const float *const RSTR hx,
-    const int nsteps,
-    const float *const RSTR steps,
-    float *const RSTR value
-) {
-  return laplace_proteus_hex8_objective_steps_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_objective_steps_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_objective_steps_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_objective_steps_packed_i_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -1036,85 +895,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex8_gradient
   return &sfem::codegen::laplace_proteus_hex8_gradient_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_hex8_gradient_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::laplace_proteus_hex8_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_hex8_gradient_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_hex8_gradient_soa",
-      &sfem::codegen::laplace_proteus_hex8_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_gradient_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_hex8_gradient_soa_float",
-      &sfem::codegen::laplace_proteus_hex8_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_hex8_gradient_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_hex8_gradient_a_msoa",
-      &sfem::codegen::laplace_proteus_hex8_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_gradient_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_hex8_gradient_a_msoa_float",
-      &sfem::codegen::laplace_proteus_hex8_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_hex8_gradient_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_hex8_gradient_i_msoa",
-      &sfem::codegen::laplace_proteus_hex8_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_gradient_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_hex8_gradient_i_msoa_float",
-      &sfem::codegen::laplace_proteus_hex8_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_hex8_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1138,7 +923,6 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_a_msoa_impl(
   static constexpr int NC = 1;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  static constexpr int VS = 16;
   (void)nnodes;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
@@ -1240,6 +1024,7 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_a_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_hex8_gradient_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1253,36 +1038,23 @@ extern "C" int laplace_proteus_hex8_gradient_a_msoa(
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const RSTR outx
+        void *const RSTR outx
 ) {
-  return sfem::codegen::laplace_proteus_hex8_gradient_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_gradient_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx
-) {
-  return sfem::codegen::laplace_proteus_hex8_gradient_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_hex8_gradient_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_hex8_gradient_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_gradient_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -1455,6 +1227,7 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_packed_a_msoa_impl(
 }
 
 extern "C" int laplace_proteus_hex8_gradient_packed_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1475,43 +1248,23 @@ extern "C" int laplace_proteus_hex8_gradient_packed_a_msoa(
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t u_stride,
-    const double *const RSTR ux,
+    const void *const RSTR ux,
     const ptrdiff_t out_stride,
-    double *const RSTR outx
+    void *const RSTR outx
 ) {
-  return laplace_proteus_hex8_gradient_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_gradient_packed_a_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float kappa,
-    const ptrdiff_t u_stride,
-    const float *const RSTR ux,
-    const ptrdiff_t out_stride,
-    float *const RSTR outx
-) {
-  return laplace_proteus_hex8_gradient_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_gradient_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_gradient_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_gradient_packed_a_msoa", -1, (int)scalar_bytes);
 }
 
 template <typename s_t>
@@ -1698,6 +1451,7 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_impl
 }
 
 extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1713,7 +1467,7 @@ extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa(
     const ptrdiff_t *const RSTR ghost_reduce_ptr,
     const ptrdiff_t *const RSTR ghost_reduce_idx,
     const idx_t *const RSTR ghost_reduce_dest,
-    double *const RSTR ghost_buf,
+    void *const RSTR ghost_buf,
     const geom_t *const RSTR g_adj0,
     const geom_t *const RSTR g_adj1,
     const geom_t *const RSTR g_adj2,
@@ -1724,49 +1478,23 @@ extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa(
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t u_stride,
-    const double *const RSTR ux,
+    const void *const RSTR ux,
     const ptrdiff_t out_stride,
-    double *const RSTR outx
+    void *const RSTR outx
 ) {
-  return laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const ptrdiff_t n_ghost_entries,
-    const ptrdiff_t n_ghost_reduce_rows,
-    const ptrdiff_t *const RSTR ghost_reduce_ptr,
-    const ptrdiff_t *const RSTR ghost_reduce_idx,
-    const idx_t *const RSTR ghost_reduce_dest,
-    float *const RSTR ghost_buf,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float kappa,
-    const ptrdiff_t u_stride,
-    const float *const RSTR ux,
-    const ptrdiff_t out_stride,
-    float *const RSTR outx
-) {
-  return laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_gradient_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -1776,7 +1504,7 @@ extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_float(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_hex8_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1792,7 +1520,6 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_i_msoa_impl(
   static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -1903,31 +1630,28 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_i_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_hex8_gradient_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const RSTR outx
+        void *const RSTR outx
 ) {
-  return sfem::codegen::laplace_proteus_hex8_gradient_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_gradient_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx
-) {
-  return sfem::codegen::laplace_proteus_hex8_gradient_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_hex8_gradient_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_hex8_gradient_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_gradient_i_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -2104,6 +1828,7 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_packed_i_msoa_impl(
 }
 
 extern "C" int laplace_proteus_hex8_gradient_packed_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2115,34 +1840,23 @@ extern "C" int laplace_proteus_hex8_gradient_packed_i_msoa(
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const geom_t *const *const RSTR points,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t u_stride,
-    const double *const RSTR ux,
+    const void *const RSTR ux,
     const ptrdiff_t out_stride,
-    double *const RSTR outx
+    void *const RSTR outx
 ) {
-  return laplace_proteus_hex8_gradient_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, ux, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_gradient_packed_i_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const geom_t *const *const RSTR points,
-    const float kappa,
-    const ptrdiff_t u_stride,
-    const float *const RSTR ux,
-    const ptrdiff_t out_stride,
-    float *const RSTR outx
-) {
-  return laplace_proteus_hex8_gradient_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, ux, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_gradient_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_gradient_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_gradient_packed_i_msoa", -1, (int)scalar_bytes);
 }
 
 template <typename s_t>
@@ -2333,6 +2047,7 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_packed_two_pass_i_msoa_impl
 }
 
 extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2348,42 +2063,25 @@ extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_i_msoa(
     const ptrdiff_t *const RSTR ghost_reduce_ptr,
     const ptrdiff_t *const RSTR ghost_reduce_idx,
     const idx_t *const RSTR ghost_reduce_dest,
-    double *const RSTR ghost_buf,
+    void *const RSTR ghost_buf,
     const geom_t *const *const RSTR points,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t u_stride,
-    const double *const RSTR ux,
+    const void *const RSTR ux,
     const ptrdiff_t out_stride,
-    double *const RSTR outx
+    void *const RSTR outx
 ) {
-  return laplace_proteus_hex8_gradient_packed_two_pass_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, u_stride, ux, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_i_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const ptrdiff_t n_ghost_entries,
-    const ptrdiff_t n_ghost_reduce_rows,
-    const ptrdiff_t *const RSTR ghost_reduce_ptr,
-    const ptrdiff_t *const RSTR ghost_reduce_idx,
-    const idx_t *const RSTR ghost_reduce_dest,
-    float *const RSTR ghost_buf,
-    const geom_t *const *const RSTR points,
-    const float kappa,
-    const ptrdiff_t u_stride,
-    const float *const RSTR ux,
-    const ptrdiff_t out_stride,
-    float *const RSTR outx
-) {
-  return laplace_proteus_hex8_gradient_packed_two_pass_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, u_stride, ux, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_gradient_packed_two_pass_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_gradient_packed_two_pass_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_gradient_packed_two_pass_i_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -2444,85 +2142,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex8_apply_so
   return &sfem::codegen::laplace_proteus_hex8_apply_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_hex8_apply_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::laplace_proteus_hex8_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_hex8_apply_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_hex8_apply_soa",
-      &sfem::codegen::laplace_proteus_hex8_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_apply_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_hex8_apply_soa_float",
-      &sfem::codegen::laplace_proteus_hex8_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_hex8_apply_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_hex8_apply_a_msoa",
-      &sfem::codegen::laplace_proteus_hex8_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_apply_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_hex8_apply_a_msoa_float",
-      &sfem::codegen::laplace_proteus_hex8_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_hex8_apply_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_hex8_apply_i_msoa",
-      &sfem::codegen::laplace_proteus_hex8_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_hex8_apply_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_hex8_apply_i_msoa_float",
-      &sfem::codegen::laplace_proteus_hex8_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_hex8_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2546,7 +2170,6 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_a_msoa_impl(
   static constexpr int NC = 1;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  static constexpr int VS = 16;
   (void)nnodes;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
@@ -2648,6 +2271,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_a_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_hex8_apply_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2661,36 +2285,23 @@ extern "C" int laplace_proteus_hex8_apply_a_msoa(
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const RSTR outx
+        void *const RSTR outx
 ) {
-  return sfem::codegen::laplace_proteus_hex8_apply_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_apply_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx
-) {
-  return sfem::codegen::laplace_proteus_hex8_apply_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_hex8_apply_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_hex8_apply_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -2863,6 +2474,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_a_msoa_impl(
 }
 
 extern "C" int laplace_proteus_hex8_apply_packed_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2883,43 +2495,23 @@ extern "C" int laplace_proteus_hex8_apply_packed_a_msoa(
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t h_stride,
-    const double *const RSTR hx,
+    const void *const RSTR hx,
     const ptrdiff_t out_stride,
-    double *const RSTR outx
+    void *const RSTR outx
 ) {
-  return laplace_proteus_hex8_apply_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_apply_packed_a_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float kappa,
-    const ptrdiff_t h_stride,
-    const float *const RSTR hx,
-    const ptrdiff_t out_stride,
-    float *const RSTR outx
-) {
-  return laplace_proteus_hex8_apply_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_apply_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_apply_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_a_msoa", -1, (int)scalar_bytes);
 }
 
 template <typename s_t>
@@ -3106,6 +2698,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl(
 }
 
 extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -3121,7 +2714,7 @@ extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa(
     const ptrdiff_t *const RSTR ghost_reduce_ptr,
     const ptrdiff_t *const RSTR ghost_reduce_idx,
     const idx_t *const RSTR ghost_reduce_dest,
-    double *const RSTR ghost_buf,
+    void *const RSTR ghost_buf,
     const geom_t *const RSTR g_adj0,
     const geom_t *const RSTR g_adj1,
     const geom_t *const RSTR g_adj2,
@@ -3132,49 +2725,23 @@ extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa(
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t h_stride,
-    const double *const RSTR hx,
+    const void *const RSTR hx,
     const ptrdiff_t out_stride,
-    double *const RSTR outx
+    void *const RSTR outx
 ) {
-  return laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const ptrdiff_t n_ghost_entries,
-    const ptrdiff_t n_ghost_reduce_rows,
-    const ptrdiff_t *const RSTR ghost_reduce_ptr,
-    const ptrdiff_t *const RSTR ghost_reduce_idx,
-    const idx_t *const RSTR ghost_reduce_dest,
-    float *const RSTR ghost_buf,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float kappa,
-    const ptrdiff_t h_stride,
-    const float *const RSTR hx,
-    const ptrdiff_t out_stride,
-    float *const RSTR outx
-) {
-  return laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -3184,7 +2751,7 @@ extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_float(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_hex8_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -3200,7 +2767,6 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_i_msoa_impl(
   static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -3311,31 +2877,28 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_i_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_hex8_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const RSTR outx
+        void *const RSTR outx
 ) {
-  return sfem::codegen::laplace_proteus_hex8_apply_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, h_stride, hx, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_apply_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx
-) {
-  return sfem::codegen::laplace_proteus_hex8_apply_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, h_stride, hx, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_hex8_apply_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_hex8_apply_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_i_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -3512,6 +3075,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_i_msoa_impl(
 }
 
 extern "C" int laplace_proteus_hex8_apply_packed_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -3523,34 +3087,23 @@ extern "C" int laplace_proteus_hex8_apply_packed_i_msoa(
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const geom_t *const *const RSTR points,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t h_stride,
-    const double *const RSTR hx,
+    const void *const RSTR hx,
     const ptrdiff_t out_stride,
-    double *const RSTR outx
+    void *const RSTR outx
 ) {
-  return laplace_proteus_hex8_apply_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, h_stride, hx, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_apply_packed_i_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const geom_t *const *const RSTR points,
-    const float kappa,
-    const ptrdiff_t h_stride,
-    const float *const RSTR hx,
-    const ptrdiff_t out_stride,
-    float *const RSTR outx
-) {
-  return laplace_proteus_hex8_apply_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, h_stride, hx, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_apply_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_apply_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_i_msoa", -1, (int)scalar_bytes);
 }
 
 template <typename s_t>
@@ -3741,6 +3294,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl(
 }
 
 extern "C" int laplace_proteus_hex8_apply_packed_two_pass_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -3756,42 +3310,25 @@ extern "C" int laplace_proteus_hex8_apply_packed_two_pass_i_msoa(
     const ptrdiff_t *const RSTR ghost_reduce_ptr,
     const ptrdiff_t *const RSTR ghost_reduce_idx,
     const idx_t *const RSTR ghost_reduce_dest,
-    double *const RSTR ghost_buf,
+    void *const RSTR ghost_buf,
     const geom_t *const *const RSTR points,
-    const double kappa,
+    const real_t kappa,
     const ptrdiff_t h_stride,
-    const double *const RSTR hx,
+    const void *const RSTR hx,
     const ptrdiff_t out_stride,
-    double *const RSTR outx
+    void *const RSTR outx
 ) {
-  return laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, h_stride, hx, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_hex8_apply_packed_two_pass_i_msoa_float(
-    const ptrdiff_t n_packs,
-    const ptrdiff_t n_elements_per_pack,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    const ptrdiff_t max_nodes_per_pack,
-    uint16_t **const RSTR elements,
-    const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
-    const ptrdiff_t *const RSTR ghost_ptr,
-    const idx_t *const RSTR ghost_idx,
-    const ptrdiff_t n_ghost_entries,
-    const ptrdiff_t n_ghost_reduce_rows,
-    const ptrdiff_t *const RSTR ghost_reduce_ptr,
-    const ptrdiff_t *const RSTR ghost_reduce_idx,
-    const idx_t *const RSTR ghost_reduce_dest,
-    float *const RSTR ghost_buf,
-    const geom_t *const *const RSTR points,
-    const float kappa,
-    const ptrdiff_t h_stride,
-    const float *const RSTR hx,
-    const ptrdiff_t out_stride,
-    float *const RSTR outx
-) {
-  return laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, h_stride, hx, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_two_pass_i_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -3994,53 +3531,49 @@ static int laplace_proteus_hex8_hessian_i_msoa_assemble_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_hex8_hessian_crs_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        double *const RSTR values
+        void *const RSTR values
 ) {
-  return sfem::codegen::laplace_proteus_hex8_hessian_i_msoa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int laplace_proteus_hex8_hessian_crs_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        float *const RSTR values
-) {
-  return sfem::codegen::laplace_proteus_hex8_hessian_i_msoa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_hex8_hessian_i_msoa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_hex8_hessian_i_msoa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_hessian_crs_i_msoa", -1, (int)scalar_bytes);
 }
 
 extern "C" int laplace_proteus_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        double *const RSTR values
+        void *const RSTR values
 ) {
-  return sfem::codegen::laplace_proteus_hex8_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int laplace_proteus_hex8_hessian_bsr_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        float *const RSTR values
-) {
-  return sfem::codegen::laplace_proteus_hex8_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_hex8_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_hex8_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
 }

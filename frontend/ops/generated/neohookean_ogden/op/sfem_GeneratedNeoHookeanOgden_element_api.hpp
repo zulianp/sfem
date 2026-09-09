@@ -2,13 +2,6 @@
 
 #include <cstddef>
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-
 #include "../d2/proteus_quad4/neohookean_ogden_proteus_quad4_element.hpp"
 #include "../d2/quad4/neohookean_ogden_quad4_element.hpp"
 #include "../d2/tri3/neohookean_ogden_tri3_element.hpp"

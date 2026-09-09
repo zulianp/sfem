@@ -608,9 +608,11 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             packed_apply_begin = operator_source.index(
                 "neohookean_ogden_tet10_apply_packed_i_msoa"
             )
+            # The next entry point, whatever it is: the packed apply used to be
+            # delimited by its own `_float` twin, and there is no twin now.
             packed_apply_end = operator_source.index(
-                'extern "C" int neohookean_ogden_tet10_apply_packed_i_msoa_float',
-                packed_apply_begin,
+                '\nextern "C" ',
+                operator_source.index("{", packed_apply_begin),
             )
             packed_apply = operator_source[packed_apply_begin:packed_apply_end]
             self.assertIn("sfem::codegen::thread_scratch<s_t>", packed_apply)

@@ -8,7 +8,13 @@
 #include "kernel_math.hpp"
 #include "linear_elasticity_tet4_inexact_apply_inline.hpp"
 
+#include "generated_abi.inc"
+
+//: `Sbar`'s component count for a three-dimensional element.
+#define TANGENT_COMPONENTS 45
+
 extern "C" int linear_elasticity_tet4_apply_a_msoa(
+        const int,
         const ptrdiff_t, const ptrdiff_t, idx_t **const,
         const geom_t *const, const geom_t *const, const geom_t *const,
         const geom_t *const, const geom_t *const, const geom_t *const,
@@ -67,17 +73,36 @@ int main() {
     std::vector<double> ax(nnodes,0), ay(nnodes,0), az(nnodes,0);
     std::vector<double> bx(nnodes,0), by(nnodes,0), bz(nnodes,0);
 
-    linear_elasticity_tet4_apply_a_msoa(nelements, nnodes, evp.data(),
+    // `Sbar` is 45 numbers per element in three dimensions, stored one
+    // component-plane at a time.  The padding keeps each plane's start clear of
+    // the previous plane's tail for the vector loads.
+    const ptrdiff_t tangent_element_stride = nelements + 64;
+
+    linear_elasticity_tet4_apply_a_msoa(SFEM_CODEGEN_F64, nelements, nnodes, evp.data(),
         adj[0].data(),adj[1].data(),adj[2].data(),adj[3].data(),adj[4].data(),
         adj[5].data(),adj[6].data(),adj[7].data(),adj[8].data(), det.data(),
         lmbda, mu, 1, hx.data(), hy.data(), hz.data(), 1, ax.data(), ay.data(), az.data());
 
-    sfem::codegen::linear_elasticity_tet4_apply_inexact_a_msoa_impl<double, geom_t>(
-        nelements, nnodes, evp.data(),
+    // The inexact apply is two kernels, not one: the projected tangent `Sbar`
+    // is assembled once per state, and the apply reads it instead of the
+    // geometry and the state.  That split is the whole point of the
+    // construction -- see the README -- so the comparison performs both, and
+    // what it compares is still one exact apply against one inexact one.
+    //
+    // `linear_elasticity`'s tangent does not depend on the state, so the
+    // assembly is handed a zero state and still produces the same `Sbar`.
+    std::vector<double> tangent((size_t)tangent_element_stride * TANGENT_COMPONENTS);
+    sfem::codegen::linear_elasticity_tet4_inexact_apply_tangent_a_msoa_impl<double, geom_t, double>(
+        nelements, evp.data(),
         adj[0].data(),adj[1].data(),adj[2].data(),adj[3].data(),adj[4].data(),
         adj[5].data(),adj[6].data(),adj[7].data(),adj[8].data(), det.data(),
         lmbda, mu,
         1, zero.data(), zero.data(), zero.data(),
+        1, tangent_element_stride, tangent.data());
+
+    sfem::codegen::linear_elasticity_tet4_inexact_apply_stored_a_msoa_impl<double, double>(
+        nelements, evp.data(),
+        1, tangent_element_stride, tangent.data(),
         1, hx.data(), hy.data(), hz.data(),
         1, bx.data(), by.data(), bz.data());
 

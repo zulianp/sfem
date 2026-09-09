@@ -3697,18 +3697,12 @@ int main() {
                 "stokes_tri6_tri3_residual_esoa_diagnostics",
                 contents,
             )
-            self.assertIn(
-                "stokes_tri6_tri3_jacobian_action_esoa_arithmetic_intensity",
-                contents,
-            )
-            self.assertIn(
-                "stokes_tri6_tri3_residual_a_msoa_print_rate",
-                contents,
-            )
-            self.assertIn(
-                "stokes_tri6_tri3_jacobian_action_i_msoa_float_print_rate",
-                contents,
-            )
+            # The record is published; the helpers that take it are not
+            # wrapped per kernel any more.  `KernelDiagnostics_print_rate` and
+            # `_arithmetic_intensity` live in `kernel_diagnostics.hpp` and a
+            # caller holding the record calls them directly.
+            self.assertNotIn("_arithmetic_intensity(", contents)
+            self.assertNotIn("_print_rate(", contents)
             self.assertIn("s_t *const RSTR u_out[2]", contents)
             self.assertNotIn("u0_out", contents)
             self.assertNotIn("u1_out", contents)

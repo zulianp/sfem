@@ -92,6 +92,87 @@ def field_stream_groups(dependencies):
     return tuple(groups)
 
 
+#: Which of a field's symbols carry its value in a given role, and which carry
+#: its gradient.  The roles differ in spelling only, so the table keeps the
+#: three answers together rather than spreading them through three branches.
+_ROLE_FIELD_SYMBOLS = {
+    "current": (
+        lambda field: (field.value,),
+        lambda field: tuple(field.gradient),
+    ),
+    "previous": (
+        lambda field: () if field.previous_value is None else (field.previous_value,),
+        lambda field: tuple(field.previous_gradient),
+    ),
+    "direction": (
+        lambda field: (field.direction_value,),
+        lambda field: tuple(field.direction_gradient),
+    ),
+}
+
+
+@dataclass(frozen=True)
+class FieldStreamUsage:
+    """What one field contributes to one role, as opposed to the whole system."""
+
+    uses_value: bool
+    uses_gradient: bool
+
+    @property
+    def is_read(self):
+        return self.uses_value or self.uses_gradient
+
+
+def field_stream_usage(dependencies, field, role):
+    """Whether this field's value and gradient are read, in this role.
+
+    `field_stream_groups` above answers the same question for the system as a
+    whole: does *any* field's value appear in the form, does *any* field's
+    gradient.  That is the right question for the kernel's signature and for
+    which reference tables it needs, and the wrong one for what to stage per
+    field.
+
+    A block of a coupled system reads a subset of the fields it is handed.  The
+    (p_w, p_w) block of `two_phase_flow` reads p_c's value -- the residual
+    contains `p_c - p_w` -- and never its gradient; staging by the system-wide
+    answer zero-filled three gradient accumulators, ran them over every trial
+    function, mapped them to the physical element with a divide each, and
+    dropped the result.  A transitive dead-store scan over the shipped tree
+    found 1557 such assignments.
+
+    The information to avoid it was already on the dependency set: it records
+    the exact symbols the expressions use, per role, and a field knows which of
+    its symbols are its value and which its gradient.  This intersects the two.
+    """
+    role = str(role)
+    if role not in FIELD_STREAM_ROLES:
+        raise ValueError(
+            "field stream role must be one of %s; got '%s'"
+            % (", ".join(FIELD_STREAM_ROLES), role)
+        )
+    used = set(getattr(dependencies, "%s_symbols" % role, ()))
+    if not used:
+        # Some construction paths build a dependency set from the role flags
+        # alone, with no symbol detail -- `ResidualDependencies` allows
+        # `current=True` with an empty `current_symbols`.  There is nothing to
+        # refine per field then, so the group-wide answer stands.
+        #
+        # The fallback direction is the safe one, and the asymmetry is the
+        # point: a field that is staged and not read costs arithmetic, while a
+        # field that is read and not staged does not compile.
+        group = field_stream_group(dependencies, role)
+        if group is None:
+            return FieldStreamUsage(uses_value=False, uses_gradient=False)
+        return FieldStreamUsage(
+            uses_value=group.uses_value, uses_gradient=group.uses_gradient
+        )
+    value_symbols, gradient_symbols = _ROLE_FIELD_SYMBOLS[role]
+    return FieldStreamUsage(
+        uses_value=any(symbol in used for symbol in value_symbols(field)),
+        uses_gradient=any(symbol in used for symbol in gradient_symbols(field)),
+    )
+
+
 def field_stream_group(dependencies, name):
     """One group by role name, or ``None`` if the form does not need it."""
     name = str(name)

@@ -93,14 +93,9 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_residual_block(
   tensor_evaluate_value<s_t, NQ, U_NS, VS, ND, 1>(
       ne, field_shape_1d[0], previous_u2_streams, previous_u2_value);
   s_t current_p_value[NQ * VS];
-  s_t current_p_grad_ref[NQ * ND * VS];
   const s_t *const current_p_streams[P_NS] = {current[81], current[82], current[83], current[84], current[85], current[86], current[87], current[88]};
-  tensor_evaluate<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], field_grad_1d[1], current_p_streams, current_p_value, current_p_grad_ref);
-  s_t previous_p_value[NQ * VS];
-  const s_t *const previous_p_streams[P_NS] = {previous[81], previous[82], previous[83], previous[84], previous[85], previous[86], previous[87], previous[88]};
   tensor_evaluate_value<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], previous_p_streams, previous_p_value);
+      ne, field_shape_1d[1], current_p_streams, current_p_value);
   s_t u0_value_coeff[NQ * VS];
   s_t u0_grad_coeff_ref[NQ * ND * VS];
   s_t u1_value_coeff[NQ * VS];
@@ -152,13 +147,6 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_residual_block(
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
       const s_t u2_old = previous_u2_value[q * VS + lane];
       const s_t p = current_p_value[q * VS + lane];
-      const s_t p_grad_0_ref = current_p_grad_ref[(q * ND + 0) * VS + lane];
-      const s_t p_grad_1_ref = current_p_grad_ref[(q * ND + 1) * VS + lane];
-      const s_t p_grad_2_ref = current_p_grad_ref[(q * ND + 2) * VS + lane];
-      const s_t p_grad_0 = (p_grad_0_ref * adj0 + p_grad_1_ref * adj3 + p_grad_2_ref * adj6) / det;
-      const s_t p_grad_1 = (p_grad_0_ref * adj1 + p_grad_1_ref * adj4 + p_grad_2_ref * adj7) / det;
-      const s_t p_grad_2 = (p_grad_0_ref * adj2 + p_grad_1_ref * adj5 + p_grad_2_ref * adj8) / det;
-      const s_t p_old = previous_p_value[q * VS + lane];
       const s_t residual_tmp0 = rho/dt;
       const s_t residual_tmp1 = -p;
       const s_t residual_tmp2 = nu*rho;
@@ -266,12 +254,8 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_residual_block_con
   tensor_evaluate_value_contiguous<s_t, NQ, U_NS, VS, ND, 1>(
       ne, field_shape_1d[0], previous + 54, previous_u2_value);
   s_t current_p_value[NQ * VS];
-  s_t current_p_grad_ref[NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], field_grad_1d[1], current + 81, current_p_value, current_p_grad_ref);
-  s_t previous_p_value[NQ * VS];
   tensor_evaluate_value_contiguous<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], previous + 81, previous_p_value);
+      ne, field_shape_1d[1], current + 81, current_p_value);
   s_t u0_value_coeff[NQ * VS];
   s_t u0_grad_coeff_ref[NQ * ND * VS];
   s_t u1_value_coeff[NQ * VS];
@@ -323,13 +307,6 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_residual_block_con
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
       const s_t u2_old = previous_u2_value[q * VS + lane];
       const s_t p = current_p_value[q * VS + lane];
-      const s_t p_grad_0_ref = current_p_grad_ref[(q * ND + 0) * VS + lane];
-      const s_t p_grad_1_ref = current_p_grad_ref[(q * ND + 1) * VS + lane];
-      const s_t p_grad_2_ref = current_p_grad_ref[(q * ND + 2) * VS + lane];
-      const s_t p_grad_0 = (p_grad_0_ref * adj0 + p_grad_1_ref * adj3 + p_grad_2_ref * adj6) / det;
-      const s_t p_grad_1 = (p_grad_0_ref * adj1 + p_grad_1_ref * adj4 + p_grad_2_ref * adj7) / det;
-      const s_t p_grad_2 = (p_grad_0_ref * adj2 + p_grad_1_ref * adj5 + p_grad_2_ref * adj8) / det;
-      const s_t p_old = previous_p_value[q * VS + lane];
       const s_t residual_tmp0 = rho/dt;
       const s_t residual_tmp1 = -p;
       const s_t residual_tmp2 = nu*rho;
@@ -435,15 +412,10 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_jacobian_action_bl
   const s_t *const direction_u2_streams[U_NS] = {direction[54], direction[55], direction[56], direction[57], direction[58], direction[59], direction[60], direction[61], direction[62], direction[63], direction[64], direction[65], direction[66], direction[67], direction[68], direction[69], direction[70], direction[71], direction[72], direction[73], direction[74], direction[75], direction[76], direction[77], direction[78], direction[79], direction[80]};
   tensor_evaluate<s_t, NQ, U_NS, VS, ND, 1>(
       ne, field_shape_1d[0], field_grad_1d[0], direction_u2_streams, direction_u2_value, direction_u2_grad_ref);
-  s_t previous_p_value[NQ * VS];
-  const s_t *const previous_p_streams[P_NS] = {previous[81], previous[82], previous[83], previous[84], previous[85], previous[86], previous[87], previous[88]};
-  tensor_evaluate_value<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], previous_p_streams, previous_p_value);
   s_t direction_p_value[NQ * VS];
-  s_t direction_p_grad_ref[NQ * ND * VS];
   const s_t *const direction_p_streams[P_NS] = {direction[81], direction[82], direction[83], direction[84], direction[85], direction[86], direction[87], direction[88]};
-  tensor_evaluate<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], field_grad_1d[1], direction_p_streams, direction_p_value, direction_p_grad_ref);
+  tensor_evaluate_value<s_t, NQ, P_NS, VS, ND, 1>(
+      ne, field_shape_1d[1], direction_p_streams, direction_p_value);
   s_t u0_value_coeff[NQ * VS];
   s_t u0_grad_coeff_ref[NQ * ND * VS];
   s_t u1_value_coeff[NQ * VS];
@@ -494,14 +466,7 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_jacobian_action_bl
       const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
       const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
-      const s_t p_old = previous_p_value[q * VS + lane];
       const s_t p_direction = direction_p_value[q * VS + lane];
-      const s_t p_direction_grad_0_ref = direction_p_grad_ref[(q * ND + 0) * VS + lane];
-      const s_t p_direction_grad_1_ref = direction_p_grad_ref[(q * ND + 1) * VS + lane];
-      const s_t p_direction_grad_2_ref = direction_p_grad_ref[(q * ND + 2) * VS + lane];
-      const s_t p_direction_grad_0 = (p_direction_grad_0_ref * adj0 + p_direction_grad_1_ref * adj3 + p_direction_grad_2_ref * adj6) / det;
-      const s_t p_direction_grad_1 = (p_direction_grad_0_ref * adj1 + p_direction_grad_1_ref * adj4 + p_direction_grad_2_ref * adj7) / det;
-      const s_t p_direction_grad_2 = (p_direction_grad_0_ref * adj2 + p_direction_grad_1_ref * adj5 + p_direction_grad_2_ref * adj8) / det;
       const s_t residual_tmp0 = convection_scale*rho;
       const s_t residual_tmp1 = residual_tmp0*u0_old;
       const s_t residual_tmp2 = residual_tmp0*u1_old;
@@ -609,13 +574,9 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_jacobian_action_bl
   s_t direction_u2_grad_ref[NQ * ND * VS];
   tensor_evaluate_contiguous<s_t, NQ, U_NS, VS, ND, 1>(
       ne, field_shape_1d[0], field_grad_1d[0], direction + 54, direction_u2_value, direction_u2_grad_ref);
-  s_t previous_p_value[NQ * VS];
-  tensor_evaluate_value_contiguous<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], previous + 81, previous_p_value);
   s_t direction_p_value[NQ * VS];
-  s_t direction_p_grad_ref[NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], field_grad_1d[1], direction + 81, direction_p_value, direction_p_grad_ref);
+  tensor_evaluate_value_contiguous<s_t, NQ, P_NS, VS, ND, 1>(
+      ne, field_shape_1d[1], direction + 81, direction_p_value);
   s_t u0_value_coeff[NQ * VS];
   s_t u0_grad_coeff_ref[NQ * ND * VS];
   s_t u1_value_coeff[NQ * VS];
@@ -666,14 +627,7 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_jacobian_action_bl
       const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
       const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
-      const s_t p_old = previous_p_value[q * VS + lane];
       const s_t p_direction = direction_p_value[q * VS + lane];
-      const s_t p_direction_grad_0_ref = direction_p_grad_ref[(q * ND + 0) * VS + lane];
-      const s_t p_direction_grad_1_ref = direction_p_grad_ref[(q * ND + 1) * VS + lane];
-      const s_t p_direction_grad_2_ref = direction_p_grad_ref[(q * ND + 2) * VS + lane];
-      const s_t p_direction_grad_0 = (p_direction_grad_0_ref * adj0 + p_direction_grad_1_ref * adj3 + p_direction_grad_2_ref * adj6) / det;
-      const s_t p_direction_grad_1 = (p_direction_grad_0_ref * adj1 + p_direction_grad_1_ref * adj4 + p_direction_grad_2_ref * adj7) / det;
-      const s_t p_direction_grad_2 = (p_direction_grad_0_ref * adj2 + p_direction_grad_1_ref * adj5 + p_direction_grad_2_ref * adj8) / det;
       const s_t residual_tmp0 = convection_scale*rho;
       const s_t residual_tmp1 = residual_tmp0*u0_old;
       const s_t residual_tmp2 = residual_tmp0*u1_old;

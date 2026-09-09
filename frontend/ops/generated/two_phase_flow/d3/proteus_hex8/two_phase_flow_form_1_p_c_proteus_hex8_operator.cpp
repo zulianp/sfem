@@ -14,15 +14,6 @@
 #endif
 #endif
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -109,82 +100,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_pro
   return &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_diagnostics_data;
 }
 
-extern "C" double two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_diagnostics_data,
-      nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -237,38 +152,6 @@ static const KernelDiagnostics two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_diagnostics(void) {
   return &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_diagnostics_data;
-}
-
-extern "C" double two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_diagnostics_data,
-      nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_w_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
 }
 
 namespace sfem {
@@ -325,38 +208,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_pro
   return &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c_diagnostics_data;
 }
 
-extern "C" double two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c_diagnostics_data,
-      nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_w_p_c_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -409,38 +260,6 @@ static const KernelDiagnostics two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p
 
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_diagnostics(void) {
   return &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_diagnostics_data;
-}
-
-extern "C" double two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_diagnostics_data,
-      nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_w_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
 }
 
 namespace sfem {
@@ -497,38 +316,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_pro
   return &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c_diagnostics_data;
 }
 
-extern "C" double two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c_diagnostics_data,
-      nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_p_c_p_c_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -583,148 +370,50 @@ extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_pro
   return &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" double two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_diagnostics_data,
-      nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa(
+    const int scalar_bytes,
     const int ne,
     const ptrdiff_t geometry_stride,
-    const double *const RSTR determinant,
-    const double *const RSTR adjugate[9],
-    const double *const RSTR current[16],
-    const double *const RSTR previous[16],
-    const double C_ka1,
-    const double C_ka2,
-    const double K_0,
-    const double K_1,
-    const double K_2,
-    const double K_3,
-    const double K_4,
-    const double K_5,
-    const double K_6,
-    const double K_7,
-    const double K_8,
-    const double M_c,
-    const double P_r,
-    const double R,
-    const double S_res,
-    const double T,
-    const double Z,
-    const double dt,
-    const double m,
-    const double mu_c,
-    const double porosity,
-    double *const RSTR output[16]
+    const void *const RSTR determinant,
+    const void *const RSTR adjugate[9],
+    const void *const RSTR current[16],
+    const void *const RSTR previous[16],
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t m,
+    const real_t mu_c,
+    const real_t porosity,
+    void *const RSTR output[16]
 ) {
-  sfem::codegen::two_phase_flow_form_1_p_c_d3_tensor_product_residual_block<double, 27, 8, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), current, previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, output);
-  return SFEM_SUCCESS;
-}
-
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa_float(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const float *const RSTR determinant,
-    const float *const RSTR adjugate[9],
-    const float *const RSTR current[16],
-    const float *const RSTR previous[16],
-    const float C_ka1,
-    const float C_ka2,
-    const float K_0,
-    const float K_1,
-    const float K_2,
-    const float K_3,
-    const float K_4,
-    const float K_5,
-    const float K_6,
-    const float K_7,
-    const float K_8,
-    const float M_c,
-    const float P_r,
-    const float R,
-    const float S_res,
-    const float T,
-    const float Z,
-    const float dt,
-    const float m,
-    const float mu_c,
-    const float porosity,
-    float *const RSTR output[16]
-) {
-  sfem::codegen::two_phase_flow_form_1_p_c_d3_tensor_product_residual_block<float, 27, 8, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), current, previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, output);
-  return SFEM_SUCCESS;
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        sfem::codegen::two_phase_flow_form_1_p_c_d3_tensor_product_residual_block<double, 27, 8, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (double *const *)output);
+        return SFEM_SUCCESS;
+    }
+    case (int)sizeof(float): {
+        sfem::codegen::two_phase_flow_form_1_p_c_d3_tensor_product_residual_block<float, 27, 8, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (float *const *)output);
+        return SFEM_SUCCESS;
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_c_proteus_hex8_residual_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -850,6 +539,7 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_im
 } // namespace sfem
 
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -863,86 +553,48 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa(
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double C_ka1,
-    const double C_ka2,
-    const double K_0,
-    const double K_1,
-    const double K_2,
-    const double K_3,
-    const double K_4,
-    const double K_5,
-    const double K_6,
-    const double K_7,
-    const double K_8,
-    const double M_c,
-    const double P_r,
-    const double R,
-    const double S_res,
-    const double T,
-    const double Z,
-    const double dt,
-    const double m,
-    const double mu_c,
-    const double porosity,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t m,
+    const real_t mu_c,
+    const real_t porosity,
     const ptrdiff_t current_stride,
-    const double *const RSTR p_w,
-    const double *const RSTR p_c,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
     const ptrdiff_t previous_stride,
-    const double *const RSTR p_w_old,
-    const double *const RSTR p_c_old,
+    const void *const RSTR p_w_old,
+    const void *const RSTR p_c_old,
     const ptrdiff_t out_stride,
-    double *const RSTR p_w_out,
-    double *const RSTR p_c_out
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out
 ) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
-}
-
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float C_ka1,
-    const float C_ka2,
-    const float K_0,
-    const float K_1,
-    const float K_2,
-    const float K_3,
-    const float K_4,
-    const float K_5,
-    const float K_6,
-    const float K_7,
-    const float K_8,
-    const float M_c,
-    const float P_r,
-    const float R,
-    const float S_res,
-    const float T,
-    const float Z,
-    const float dt,
-    const float m,
-    const float mu_c,
-    const float porosity,
-    const ptrdiff_t current_stride,
-    const float *const RSTR p_w,
-    const float *const RSTR p_c,
-    const ptrdiff_t previous_stride,
-    const float *const RSTR p_w_old,
-    const float *const RSTR p_c_old,
-    const ptrdiff_t out_stride,
-    float *const RSTR p_w_out,
-    float *const RSTR p_c_out
-) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, (const double *)p_w, (const double *)p_c, previous_stride, (const double *)p_w_old, (const double *)p_c_old, out_stride, (double *)p_w_out, (double *)p_c_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, (const float *)p_w, (const float *)p_c, previous_stride, (const float *)p_w_old, (const float *)p_c_old, out_stride, (float *)p_w_out, (float *)p_c_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -1079,127 +731,99 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_im
 } // namespace sfem
 
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const double C_ka1,
-    const double C_ka2,
-    const double K_0,
-    const double K_1,
-    const double K_2,
-    const double K_3,
-    const double K_4,
-    const double K_5,
-    const double K_6,
-    const double K_7,
-    const double K_8,
-    const double M_c,
-    const double P_r,
-    const double R,
-    const double S_res,
-    const double T,
-    const double Z,
-    const double dt,
-    const double m,
-    const double mu_c,
-    const double porosity,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t m,
+    const real_t mu_c,
+    const real_t porosity,
     const ptrdiff_t current_stride,
-    const double *const RSTR p_w,
-    const double *const RSTR p_c,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
     const ptrdiff_t previous_stride,
-    const double *const RSTR p_w_old,
-    const double *const RSTR p_c_old,
+    const void *const RSTR p_w_old,
+    const void *const RSTR p_c_old,
     const ptrdiff_t out_stride,
-    double *const RSTR p_w_out,
-    double *const RSTR p_c_out
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out
 ) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_impl<double>(nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
-}
-
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const float C_ka1,
-    const float C_ka2,
-    const float K_0,
-    const float K_1,
-    const float K_2,
-    const float K_3,
-    const float K_4,
-    const float K_5,
-    const float K_6,
-    const float K_7,
-    const float K_8,
-    const float M_c,
-    const float P_r,
-    const float R,
-    const float S_res,
-    const float T,
-    const float Z,
-    const float dt,
-    const float m,
-    const float mu_c,
-    const float porosity,
-    const ptrdiff_t current_stride,
-    const float *const RSTR p_w,
-    const float *const RSTR p_c,
-    const ptrdiff_t previous_stride,
-    const float *const RSTR p_w_old,
-    const float *const RSTR p_c_old,
-    const ptrdiff_t out_stride,
-    float *const RSTR p_w_out,
-    float *const RSTR p_c_out
-) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_impl<float>(nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_impl<double>(nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, (const double *)p_w, (const double *)p_c, previous_stride, (const double *)p_w_old, (const double *)p_c_old, out_stride, (double *)p_w_out, (double *)p_c_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_impl<float>(nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, (const float *)p_w, (const float *)p_c, previous_stride, (const float *)p_w_old, (const float *)p_c_old, out_stride, (float *)p_w_out, (float *)p_c_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa", -1, (int)scalar_bytes);
 }
 
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_i_maos(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const double *const RSTR parameters,
-    const double *const RSTR current,
-    const double *const RSTR previous,
-    double *const RSTR output
+    const void *const RSTR parameters,
+    const void *const RSTR current,
+    const void *const RSTR previous,
+    void *const RSTR output
 ) {
-  return two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9], parameters[10], parameters[11], parameters[12], parameters[13], parameters[14], parameters[15], parameters[16], parameters[17], parameters[18], parameters[20], parameters[21], parameters[24], 2, current + 0, current + 1, 2, previous + 0, previous + 1, 2, output + 0, output + 1);
-}
-
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_residual_i_maos_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const float *const RSTR parameters,
-    const float *const RSTR current,
-    const float *const RSTR previous,
-    float *const RSTR output
-) {
-  return two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa_float(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9], parameters[10], parameters[11], parameters[12], parameters[13], parameters[14], parameters[15], parameters[16], parameters[17], parameters[18], parameters[20], parameters[21], parameters[24], 2, current + 0, current + 1, 2, previous + 0, previous + 1, 2, output + 0, output + 1);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa(scalar_bytes, nelements, nnodes, elements, points, ((const double *)parameters)[0], ((const double *)parameters)[1], ((const double *)parameters)[3], ((const double *)parameters)[4], ((const double *)parameters)[5], ((const double *)parameters)[6], ((const double *)parameters)[7], ((const double *)parameters)[8], ((const double *)parameters)[9], ((const double *)parameters)[10], ((const double *)parameters)[11], ((const double *)parameters)[12], ((const double *)parameters)[13], ((const double *)parameters)[14], ((const double *)parameters)[15], ((const double *)parameters)[16], ((const double *)parameters)[17], ((const double *)parameters)[18], ((const double *)parameters)[20], ((const double *)parameters)[21], ((const double *)parameters)[24], 2, (const double *)current + 0, (const double *)current + 1, 2, (const double *)previous + 0, (const double *)previous + 1, 2, (double *)output + 0, (double *)output + 1);
+    }
+    case (int)sizeof(float): {
+        return two_phase_flow_form_1_p_c_proteus_hex8_residual_i_msoa(scalar_bytes, nelements, nnodes, elements, points, ((const float *)parameters)[0], ((const float *)parameters)[1], ((const float *)parameters)[3], ((const float *)parameters)[4], ((const float *)parameters)[5], ((const float *)parameters)[6], ((const float *)parameters)[7], ((const float *)parameters)[8], ((const float *)parameters)[9], ((const float *)parameters)[10], ((const float *)parameters)[11], ((const float *)parameters)[12], ((const float *)parameters)[13], ((const float *)parameters)[14], ((const float *)parameters)[15], ((const float *)parameters)[16], ((const float *)parameters)[17], ((const float *)parameters)[18], ((const float *)parameters)[20], ((const float *)parameters)[21], ((const float *)parameters)[24], 2, (const float *)current + 0, (const float *)current + 1, 2, (const float *)previous + 0, (const float *)previous + 1, 2, (float *)output + 0, (float *)output + 1);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_c_proteus_hex8_residual_i_maos", -1, (int)scalar_bytes);
 }
 
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa(
+    const int scalar_bytes,
     const int ne,
     const ptrdiff_t geometry_stride,
-    const double *const RSTR determinant,
-    double *const RSTR output[16]
+    const void *const RSTR determinant,
+    void *const RSTR output[16]
 ) {
-  sfem::codegen::two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block<double, 27, 8, 16>(ne, geometry_stride, determinant, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), output);
-  return SFEM_SUCCESS;
-}
-
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa_float(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const float *const RSTR determinant,
-    float *const RSTR output[16]
-) {
-  sfem::codegen::two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block<float, 27, 8, 16>(ne, geometry_stride, determinant, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), output);
-  return SFEM_SUCCESS;
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        sfem::codegen::two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block<double, 27, 8, 16>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (double *const *)output);
+        return SFEM_SUCCESS;
+    }
+    case (int)sizeof(float): {
+        sfem::codegen::two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block<float, 27, 8, 16>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (float *const *)output);
+        return SFEM_SUCCESS;
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -1266,27 +890,26 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_
 } // namespace sfem
 
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const RSTR g_det0,
     const ptrdiff_t out_stride,
-    double *const RSTR p_w_out,
-    double *const RSTR p_c_out
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out
 ) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-}
-
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    float *const RSTR p_w_out,
-    float *const RSTR p_c_out
-) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_det0, out_stride, (double *)p_w_out, (double *)p_c_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_det0, out_stride, (float *)p_w_out, (float *)p_c_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -1378,47 +1001,46 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_
 } // namespace sfem
 
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
     const ptrdiff_t out_stride,
-    double *const RSTR p_w_out,
-    double *const RSTR p_c_out
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out
 ) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_impl<double>(nelements, nnodes, elements, points, out_stride, p_w_out, p_c_out);
-}
-
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const ptrdiff_t out_stride,
-    float *const RSTR p_w_out,
-    float *const RSTR p_c_out
-) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_impl<float>(nelements, nnodes, elements, points, out_stride, p_w_out, p_c_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_impl<double>(nelements, nnodes, elements, points, out_stride, (double *)p_w_out, (double *)p_c_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_impl<float>(nelements, nnodes, elements, points, out_stride, (float *)p_w_out, (float *)p_c_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa", -1, (int)scalar_bytes);
 }
 
 extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_maos(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const double *const RSTR parameters,
-    double *const RSTR output
+    const void *const RSTR parameters,
+    void *const RSTR output
 ) {
-  return two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa(nelements, nnodes, elements, points, 2, output + 0, output + 1);
-}
-
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_maos_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const float *const RSTR parameters,
-    float *const RSTR output
-) {
-  return two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa_float(nelements, nnodes, elements, points, 2, output + 0, output + 1);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, elements, points, 2, (double *)output + 0, (double *)output + 1);
+    }
+    case (int)sizeof(float): {
+        return two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, elements, points, 2, (float *)output + 0, (float *)output + 1);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_i_maos", -1, (int)scalar_bytes);
 }

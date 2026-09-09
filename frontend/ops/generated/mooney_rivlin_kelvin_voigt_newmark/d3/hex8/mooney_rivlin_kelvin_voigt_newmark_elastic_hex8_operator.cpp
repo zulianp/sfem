@@ -1,250 +1,136 @@
 #include "../../op/sfem_GeneratedMooneyRivlinKelvinVoigtNewmark_c_abi.hpp"
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double *const RSTR parameters,
-        const double *const RSTR current,
-        const double *const RSTR previous,
-        const double *const RSTR direction,
-        double *const RSTR output
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float *const RSTR parameters,
-        const float *const RSTR current,
-        const float *const RSTR previous,
-        const float *const RSTR direction,
-        float *const RSTR output
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        const void *const RSTR direction,
+        void *const RSTR output
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double eta_b,
-        const double eta_s,
-        const double newmark_velocity_alpha,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const RSTR u0,
-        const double *const RSTR u1,
-        const double *const RSTR u2,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
         const ptrdiff_t previous_stride,
-        const double *const RSTR u0_old,
-        const double *const RSTR u1_old,
-        const double *const RSTR u2_old,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
         const ptrdiff_t direction_stride,
-        const double *const RSTR u0_direction,
-        const double *const RSTR u1_direction,
-        const double *const RSTR u2_direction,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
         const ptrdiff_t out_stride,
-        double *const RSTR u0_out,
-        double *const RSTR u1_out,
-        double *const RSTR u2_out
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float eta_b,
-        const float eta_s,
-        const float newmark_velocity_alpha,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u0,
-        const float *const RSTR u1,
-        const float *const RSTR u2,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u0_old,
-        const float *const RSTR u1_old,
-        const float *const RSTR u2_old,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u0_direction,
-        const float *const RSTR u1_direction,
-        const float *const RSTR u2_direction,
-        const ptrdiff_t out_stride,
-        float *const RSTR u0_out,
-        float *const RSTR u1_out,
-        float *const RSTR u2_out
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double *const RSTR parameters,
-        const double *const RSTR current,
-        const double *const RSTR previous,
-        double *const RSTR output
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float *const RSTR parameters,
-        const float *const RSTR current,
-        const float *const RSTR previous,
-        float *const RSTR output
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        void *const RSTR output
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double eta_b,
-        const double eta_s,
-        const double newmark_velocity_alpha,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const RSTR u0,
-        const double *const RSTR u1,
-        const double *const RSTR u2,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
         const ptrdiff_t previous_stride,
-        const double *const RSTR u0_old,
-        const double *const RSTR u1_old,
-        const double *const RSTR u2_old,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
         const ptrdiff_t out_stride,
-        double *const RSTR u0_out,
-        double *const RSTR u1_out,
-        double *const RSTR u2_out
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float eta_b,
-        const float eta_s,
-        const float newmark_velocity_alpha,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u0,
-        const float *const RSTR u1,
-        const float *const RSTR u2,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u0_old,
-        const float *const RSTR u1_old,
-        const float *const RSTR u2_old,
-        const ptrdiff_t out_stride,
-        float *const RSTR u0_out,
-        float *const RSTR u1_out,
-        float *const RSTR u2_out
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -258,51 +144,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_m
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -316,43 +174,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -366,49 +200,22 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -422,61 +229,28 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double eta_b,
-        const double eta_s,
-        const double newmark_velocity_alpha,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const RSTR u0,
-        const double *const RSTR u1,
-        const double *const RSTR u2,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
         const ptrdiff_t previous_stride,
-        const double *const RSTR u0_old,
-        const double *const RSTR u1_old,
-        const double *const RSTR u2_old,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
         const ptrdiff_t direction_stride,
-        const double *const RSTR u0_direction,
-        const double *const RSTR u1_direction,
-        const double *const RSTR u2_direction,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
         const ptrdiff_t out_stride,
-        double *const RSTR u0_out,
-        double *const RSTR u1_out,
-        double *const RSTR u2_out
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float eta_b,
-        const float eta_s,
-        const float newmark_velocity_alpha,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u0,
-        const float *const RSTR u1,
-        const float *const RSTR u2,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u0_old,
-        const float *const RSTR u1_old,
-        const float *const RSTR u2_old,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u0_direction,
-        const float *const RSTR u1_direction,
-        const float *const RSTR u2_direction,
-        const ptrdiff_t out_stride,
-        float *const RSTR u0_out,
-        float *const RSTR u1_out,
-        float *const RSTR u2_out
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -490,53 +264,24 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double eta_b,
-        const double eta_s,
-        const double newmark_velocity_alpha,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const RSTR u0,
-        const double *const RSTR u1,
-        const double *const RSTR u2,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
         const ptrdiff_t previous_stride,
-        const double *const RSTR u0_old,
-        const double *const RSTR u1_old,
-        const double *const RSTR u2_old,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
         const ptrdiff_t out_stride,
-        double *const RSTR u0_out,
-        double *const RSTR u1_out,
-        double *const RSTR u2_out
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float eta_b,
-        const float eta_s,
-        const float newmark_velocity_alpha,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u0,
-        const float *const RSTR u1,
-        const float *const RSTR u2,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u0_old,
-        const float *const RSTR u1_old,
-        const float *const RSTR u2_old,
-        const ptrdiff_t out_stride,
-        float *const RSTR u0_out,
-        float *const RSTR u1_out,
-        float *const RSTR u2_out
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -548,49 +293,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -606,57 +325,25 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t *const RSTR ghost_reduce_ptr,
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
-        double *const RSTR ghost_buf,
+        void *const RSTR ghost_buf,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        float *const RSTR ghost_buf,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -668,41 +355,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -718,49 +383,21 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t *const RSTR ghost_reduce_ptr,
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
-        double *const RSTR ghost_buf,
+        void *const RSTR ghost_buf,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        float *const RSTR ghost_buf,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -772,47 +409,22 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -833,58 +445,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -900,7 +477,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const ptrdiff_t *const RSTR ghost_reduce_ptr,
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
-        double *const RSTR ghost_buf,
+        void *const RSTR ghost_buf,
         const geom_t *const RSTR g_adj0,
         const geom_t *const RSTR g_adj1,
         const geom_t *const RSTR g_adj2,
@@ -911,64 +488,23 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        float *const RSTR ghost_buf,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -989,50 +525,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1048,7 +553,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const ptrdiff_t *const RSTR ghost_reduce_ptr,
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
-        double *const RSTR ghost_buf,
+        void *const RSTR ghost_buf,
         const geom_t *const RSTR g_adj0,
         const geom_t *const RSTR g_adj1,
         const geom_t *const RSTR g_adj2,
@@ -1059,56 +564,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        float *const RSTR ghost_buf,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1129,54 +597,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
-);
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
 extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_soa_diagnostics(
         void
@@ -1189,24 +622,25 @@ extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_n
 );
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1218,57 +652,25 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1280,56 +682,28 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1341,51 +715,20 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_maos(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double *const RSTR parameters,
-        const double *const RSTR current,
-        const double *const RSTR previous,
-        const double *const RSTR direction,
-        double *const RSTR output
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        const void *const RSTR direction,
+        void *const RSTR output
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1397,57 +740,34 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_maos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float *const RSTR parameters,
-        const float *const RSTR current,
-        const float *const RSTR previous,
-        const float *const RSTR direction,
-        float *const RSTR output
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double eta_b,
-        const double eta_s,
-        const double newmark_velocity_alpha,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const RSTR u0,
-        const double *const RSTR u1,
-        const double *const RSTR u2,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
         const ptrdiff_t previous_stride,
-        const double *const RSTR u0_old,
-        const double *const RSTR u1_old,
-        const double *const RSTR u2_old,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
         const ptrdiff_t direction_stride,
-        const double *const RSTR u0_direction,
-        const double *const RSTR u1_direction,
-        const double *const RSTR u2_direction,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
         const ptrdiff_t out_stride,
-        double *const RSTR u0_out,
-        double *const RSTR u1_out,
-        double *const RSTR u2_out
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1459,56 +779,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float eta_b,
-        const float eta_s,
-        const float newmark_velocity_alpha,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u0,
-        const float *const RSTR u1,
-        const float *const RSTR u2,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u0_old,
-        const float *const RSTR u1_old,
-        const float *const RSTR u2_old,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u0_direction,
-        const float *const RSTR u1_direction,
-        const float *const RSTR u2_direction,
-        const ptrdiff_t out_stride,
-        float *const RSTR u0_out,
-        float *const RSTR u1_out,
-        float *const RSTR u2_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double *const RSTR parameters,
-        const double *const RSTR current,
-        const double *const RSTR previous,
-        double *const RSTR output
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR previous,
+        void *const RSTR output
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1520,52 +803,30 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float *const RSTR parameters,
-        const float *const RSTR current,
-        const float *const RSTR previous,
-        float *const RSTR output
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double eta_b,
-        const double eta_s,
-        const double newmark_velocity_alpha,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const RSTR u0,
-        const double *const RSTR u1,
-        const double *const RSTR u2,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
         const ptrdiff_t previous_stride,
-        const double *const RSTR u0_old,
-        const double *const RSTR u1_old,
-        const double *const RSTR u2_old,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
         const ptrdiff_t out_stride,
-        double *const RSTR u0_out,
-        double *const RSTR u1_out,
-        double *const RSTR u2_out
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1577,44 +838,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float eta_b,
-        const float eta_s,
-        const float newmark_velocity_alpha,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u0,
-        const float *const RSTR u1,
-        const float *const RSTR u2,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u0_old,
-        const float *const RSTR u1_old,
-        const float *const RSTR u2_old,
-        const ptrdiff_t out_stride,
-        float *const RSTR u0_out,
-        float *const RSTR u1_out,
-        float *const RSTR u2_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1628,20 +856,20 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa(
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1653,52 +881,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1712,16 +899,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_a_msoa(
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1733,48 +920,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_a_msoa(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1788,19 +938,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_a
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1812,51 +962,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1870,25 +980,25 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double eta_b,
-        const double eta_s,
-        const double newmark_velocity_alpha,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const RSTR u0,
-        const double *const RSTR u1,
-        const double *const RSTR u2,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
         const ptrdiff_t previous_stride,
-        const double *const RSTR u0_old,
-        const double *const RSTR u1_old,
-        const double *const RSTR u2_old,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
         const ptrdiff_t direction_stride,
-        const double *const RSTR u0_direction,
-        const double *const RSTR u1_direction,
-        const double *const RSTR u2_direction,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
         const ptrdiff_t out_stride,
-        double *const RSTR u0_out,
-        double *const RSTR u1_out,
-        double *const RSTR u2_out
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1900,57 +1010,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float eta_b,
-        const float eta_s,
-        const float newmark_velocity_alpha,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u0,
-        const float *const RSTR u1,
-        const float *const RSTR u2,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u0_old,
-        const float *const RSTR u1_old,
-        const float *const RSTR u2_old,
-        const ptrdiff_t direction_stride,
-        const float *const RSTR u0_direction,
-        const float *const RSTR u1_direction,
-        const float *const RSTR u2_direction,
-        const ptrdiff_t out_stride,
-        float *const RSTR u0_out,
-        float *const RSTR u1_out,
-        float *const RSTR u2_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1964,21 +1028,21 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_msoa(
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double eta_b,
-        const double eta_s,
-        const double newmark_velocity_alpha,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t newmark_velocity_alpha,
         const ptrdiff_t current_stride,
-        const double *const RSTR u0,
-        const double *const RSTR u1,
-        const double *const RSTR u2,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
         const ptrdiff_t previous_stride,
-        const double *const RSTR u0_old,
-        const double *const RSTR u1_old,
-        const double *const RSTR u2_old,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
         const ptrdiff_t out_stride,
-        double *const RSTR u0_out,
-        double *const RSTR u1_out,
-        double *const RSTR u2_out
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -1990,53 +1054,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_msoa(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float eta_b,
-        const float eta_s,
-        const float newmark_velocity_alpha,
-        const ptrdiff_t current_stride,
-        const float *const RSTR u0,
-        const float *const RSTR u1,
-        const float *const RSTR u2,
-        const ptrdiff_t previous_stride,
-        const float *const RSTR u0_old,
-        const float *const RSTR u1_old,
-        const float *const RSTR u2_old,
-        const ptrdiff_t out_stride,
-        float *const RSTR u0_out,
-        float *const RSTR u1_out,
-        float *const RSTR u2_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2048,20 +1070,20 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_i_ms
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2073,50 +1095,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_i_ms
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2132,22 +1115,22 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         const ptrdiff_t *const RSTR ghost_reduce_ptr,
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
-        double *const RSTR ghost_buf,
+        void *const RSTR ghost_buf,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2159,56 +1142,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        float *const RSTR ghost_buf,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2220,16 +1158,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_i
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2241,46 +1179,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2296,18 +1199,18 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         const ptrdiff_t *const RSTR ghost_reduce_ptr,
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
-        double *const RSTR ghost_buf,
+        void *const RSTR ghost_buf,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2319,52 +1222,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        float *const RSTR ghost_buf,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2376,19 +1238,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_p
         const ptrdiff_t *const RSTR ghost_ptr,
         const idx_t *const RSTR ghost_idx,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2400,49 +1262,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_p
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_i_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2463,20 +1287,20 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_a_ms
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2488,59 +1312,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_a_ms
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2556,7 +1332,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         const ptrdiff_t *const RSTR ghost_reduce_ptr,
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
-        double *const RSTR ghost_buf,
+        void *const RSTR ghost_buf,
         const geom_t *const RSTR g_adj0,
         const geom_t *const RSTR g_adj1,
         const geom_t *const RSTR g_adj2,
@@ -2567,20 +1343,20 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2592,65 +1368,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        float *const RSTR ghost_buf,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2671,16 +1393,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_a
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2692,55 +1414,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2756,7 +1434,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         const ptrdiff_t *const RSTR ghost_reduce_ptr,
         const ptrdiff_t *const RSTR ghost_reduce_idx,
         const idx_t *const RSTR ghost_reduce_dest,
-        double *const RSTR ghost_buf,
+        void *const RSTR ghost_buf,
         const geom_t *const RSTR g_adj0,
         const geom_t *const RSTR g_adj1,
         const geom_t *const RSTR g_adj2,
@@ -2767,16 +1445,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy,
-        double *const RSTR outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2788,61 +1466,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        float *const RSTR ghost_buf,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy,
-        float *const RSTR outz
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2863,19 +1491,19 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_p
         const geom_t *const RSTR g_adj7,
         const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
-        const double *const RSTR uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
-        const double *const RSTR hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -2887,55 +1515,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_p
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_a_msoa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const float *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const float *const RSTR hz,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_soa_diagnostics(

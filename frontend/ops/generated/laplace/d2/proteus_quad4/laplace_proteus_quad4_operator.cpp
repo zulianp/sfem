@@ -12,15 +12,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include "../../../packed_thread_scratch.hpp"
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
 
 namespace sfem {
 namespace codegen {
@@ -104,85 +95,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_objecti
   return &sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_quad4_objective_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_quad4_objective_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_quad4_objective_soa",
-      &sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_objective_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_quad4_objective_soa_float",
-      &sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_objective_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_quad4_objective_a_msoa",
-      &sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_objective_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_quad4_objective_a_msoa_float",
-      &sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_objective_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_quad4_objective_i_msoa",
-      &sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_objective_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_quad4_objective_i_msoa_float",
-      &sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_quad4_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -201,7 +118,6 @@ static SFEM_INLINE int laplace_proteus_quad4_objective_steps_i_msoa_impl(
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -305,37 +221,31 @@ static SFEM_INLINE int laplace_proteus_quad4_objective_steps_i_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_quad4_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
+        const void *const RSTR ux,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
+        const void *const RSTR hx,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
-  return sfem::codegen::laplace_proteus_quad4_objective_steps_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
-}
-
-extern "C" int laplace_proteus_quad4_objective_steps_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
-) {
-  return sfem::codegen::laplace_proteus_quad4_objective_steps_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_objective_steps_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_objective_steps_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_objective_steps_i_msoa", -1, (int)scalar_bytes);
 }
 
 
@@ -393,85 +303,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_gradien
   return &sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_quad4_gradient_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_quad4_gradient_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_quad4_gradient_soa",
-      &sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_gradient_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_quad4_gradient_soa_float",
-      &sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_gradient_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_quad4_gradient_a_msoa",
-      &sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_gradient_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_quad4_gradient_a_msoa_float",
-      &sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_gradient_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_quad4_gradient_i_msoa",
-      &sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_gradient_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_quad4_gradient_i_msoa_float",
-      &sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_quad4_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -487,7 +323,6 @@ static SFEM_INLINE int laplace_proteus_quad4_gradient_i_msoa_impl(
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -589,31 +424,28 @@ static SFEM_INLINE int laplace_proteus_quad4_gradient_i_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_quad4_gradient_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        double *const RSTR outx
+        void *const RSTR outx
 ) {
-  return sfem::codegen::laplace_proteus_quad4_gradient_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_quad4_gradient_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx
-) {
-  return sfem::codegen::laplace_proteus_quad4_gradient_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, u_stride, ux, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_gradient_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_gradient_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_gradient_i_msoa", -1, (int)scalar_bytes);
 }
 
 
@@ -671,85 +503,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_apply_s
   return &sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_quad4_apply_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_quad4_apply_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_quad4_apply_soa",
-      &sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_apply_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "laplace_proteus_quad4_apply_soa_float",
-      &sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_apply_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_quad4_apply_a_msoa",
-      &sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_apply_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "laplace_proteus_quad4_apply_a_msoa_float",
-      &sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_apply_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_quad4_apply_i_msoa",
-      &sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_apply_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "laplace_proteus_quad4_apply_i_msoa_float",
-      &sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_quad4_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -765,7 +523,6 @@ static SFEM_INLINE int laplace_proteus_quad4_apply_i_msoa_impl(
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -867,31 +624,28 @@ static SFEM_INLINE int laplace_proteus_quad4_apply_i_msoa_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_quad4_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const RSTR outx
+        void *const RSTR outx
 ) {
-  return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, kappa, h_stride, hx, out_stride, outx);
-}
-
-extern "C" int laplace_proteus_quad4_apply_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx
-) {
-  return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, kappa, h_stride, hx, out_stride, outx);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_apply_i_msoa", -1, (int)scalar_bytes);
 }
 
 
@@ -1082,53 +836,49 @@ static int laplace_proteus_quad4_hessian_i_msoa_assemble_impl(
 } // namespace sfem
 
 extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        double *const RSTR values
+        void *const RSTR values
 ) {
-  return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        float *const RSTR values
-) {
-  return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_hessian_crs_i_msoa", -1, (int)scalar_bytes);
 }
 
 extern "C" int laplace_proteus_quad4_hessian_bsr_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double kappa,
+        const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        double *const RSTR values
+        void *const RSTR values
 ) {
-  return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int laplace_proteus_quad4_hessian_bsr_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float kappa,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        float *const RSTR values
-) {
-  return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
 }

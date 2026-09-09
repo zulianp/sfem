@@ -97,17 +97,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_residual_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -134,17 +125,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_residual_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -319,17 +301,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_residual_block_contiguous(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -356,17 +329,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_residual_block_contiguous(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -541,17 +505,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_residual_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -578,17 +533,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_residual_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -763,17 +709,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_residual_block_contiguous
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -800,17 +737,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_residual_block_contiguous
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -991,17 +919,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_jacobian_action_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1017,17 +936,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_jacobian_action_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1043,17 +953,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_jacobian_action_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1069,17 +970,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_jacobian_action_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1324,17 +1216,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_jacobian_action_block_contiguo
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1350,17 +1233,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_jacobian_action_block_contiguo
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1376,17 +1250,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_jacobian_action_block_contiguo
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1402,17 +1267,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_jacobian_action_block_contiguo
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1657,17 +1513,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_jacobian_action_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1683,17 +1530,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_jacobian_action_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1709,17 +1547,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_jacobian_action_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1735,17 +1564,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_jacobian_action_block(
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1990,17 +1810,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_jacobian_action_block_con
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -2016,17 +1827,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_jacobian_action_block_con
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_w_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -2042,17 +1844,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_jacobian_action_block_con
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -2068,17 +1861,8 @@ static SFEM_INLINE void two_phase_flow_d3_simplex_tet4_jacobian_action_block_con
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       p_c_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {

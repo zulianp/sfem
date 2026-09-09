@@ -68,37 +68,13 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_ob
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         gu_ref0_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref1_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref2_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref3_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref4_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref5_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref6_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref7_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
@@ -305,37 +281,13 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_gr
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         gu_ref0_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref1_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref2_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref3_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref4_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref5_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref6_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref7_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
@@ -648,44 +600,20 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_ap
       for (int lane = 0; lane < ne; ++lane) {
         gu_ref0_values[lane] = s_t(0);
         grad_h_ref0_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref1_values[lane] = s_t(0);
         grad_h_ref1_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref2_values[lane] = s_t(0);
         grad_h_ref2_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref3_values[lane] = s_t(0);
         grad_h_ref3_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref4_values[lane] = s_t(0);
         grad_h_ref4_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref5_values[lane] = s_t(0);
         grad_h_ref5_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref6_values[lane] = s_t(0);
         grad_h_ref6_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref7_values[lane] = s_t(0);
         grad_h_ref7_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         gu_ref8_values[lane] = s_t(0);
         grad_h_ref8_values[lane] = s_t(0);
       }

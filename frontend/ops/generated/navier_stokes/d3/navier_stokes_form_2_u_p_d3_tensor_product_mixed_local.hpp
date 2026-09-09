@@ -105,18 +105,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
   static_assert(ipow(U_NS1, ND) == U_NS, "U_NS must be tensor-product compatible");
   static constexpr int P_NS1 = integer_root(P_NS, ND);
   static_assert(ipow(P_NS1, ND) == P_NS, "P_NS must be tensor-product compatible");
-  s_t direction_u0_value[NQ * VS];
-  const s_t *const direction_u0_streams[U_NS] = {direction[0], direction[1], direction[2], direction[3], direction[4], direction[5], direction[6], direction[7], direction[8], direction[9], direction[10], direction[11], direction[12], direction[13], direction[14], direction[15], direction[16], direction[17], direction[18], direction[19], direction[20], direction[21], direction[22], direction[23], direction[24], direction[25], direction[26]};
-  tensor_evaluate_value<s_t, NQ, U_NS, VS, ND, 1>(
-      ne, field_shape_1d[0], direction_u0_streams, direction_u0_value);
-  s_t direction_u1_value[NQ * VS];
-  const s_t *const direction_u1_streams[U_NS] = {direction[27], direction[28], direction[29], direction[30], direction[31], direction[32], direction[33], direction[34], direction[35], direction[36], direction[37], direction[38], direction[39], direction[40], direction[41], direction[42], direction[43], direction[44], direction[45], direction[46], direction[47], direction[48], direction[49], direction[50], direction[51], direction[52], direction[53]};
-  tensor_evaluate_value<s_t, NQ, U_NS, VS, ND, 1>(
-      ne, field_shape_1d[0], direction_u1_streams, direction_u1_value);
-  s_t direction_u2_value[NQ * VS];
-  const s_t *const direction_u2_streams[U_NS] = {direction[54], direction[55], direction[56], direction[57], direction[58], direction[59], direction[60], direction[61], direction[62], direction[63], direction[64], direction[65], direction[66], direction[67], direction[68], direction[69], direction[70], direction[71], direction[72], direction[73], direction[74], direction[75], direction[76], direction[77], direction[78], direction[79], direction[80]};
-  tensor_evaluate_value<s_t, NQ, U_NS, VS, ND, 1>(
-      ne, field_shape_1d[0], direction_u2_streams, direction_u2_value);
   s_t direction_p_value[NQ * VS];
   const s_t *const direction_p_streams[P_NS] = {direction[81], direction[82], direction[83], direction[84], direction[85], direction[86], direction[87], direction[88]};
   tensor_evaluate_value<s_t, NQ, P_NS, VS, ND, 1>(
@@ -147,9 +135,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_direction = direction_u0_value[q * VS + lane];
-      const s_t u1_direction = direction_u1_value[q * VS + lane];
-      const s_t u2_direction = direction_u2_value[q * VS + lane];
       const s_t p_direction = direction_p_value[q * VS + lane];
       const s_t residual_tmp0 = -p_direction;
       const s_t grad_coeff0_0 = residual_tmp0;
@@ -212,15 +197,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
   static_assert(ipow(U_NS1, ND) == U_NS, "U_NS must be tensor-product compatible");
   static constexpr int P_NS1 = integer_root(P_NS, ND);
   static_assert(ipow(P_NS1, ND) == P_NS, "P_NS must be tensor-product compatible");
-  s_t direction_u0_value[NQ * VS];
-  tensor_evaluate_value_contiguous<s_t, NQ, U_NS, VS, ND, 1>(
-      ne, field_shape_1d[0], direction + 0, direction_u0_value);
-  s_t direction_u1_value[NQ * VS];
-  tensor_evaluate_value_contiguous<s_t, NQ, U_NS, VS, ND, 1>(
-      ne, field_shape_1d[0], direction + 27, direction_u1_value);
-  s_t direction_u2_value[NQ * VS];
-  tensor_evaluate_value_contiguous<s_t, NQ, U_NS, VS, ND, 1>(
-      ne, field_shape_1d[0], direction + 54, direction_u2_value);
   s_t direction_p_value[NQ * VS];
   tensor_evaluate_value_contiguous<s_t, NQ, P_NS, VS, ND, 1>(
       ne, field_shape_1d[1], direction + 81, direction_p_value);
@@ -250,9 +226,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_direction = direction_u0_value[q * VS + lane];
-      const s_t u1_direction = direction_u1_value[q * VS + lane];
-      const s_t u2_direction = direction_u2_value[q * VS + lane];
       const s_t p_direction = direction_p_value[q * VS + lane];
       const s_t residual_tmp0 = -p_direction;
       const s_t grad_coeff0_0 = residual_tmp0;

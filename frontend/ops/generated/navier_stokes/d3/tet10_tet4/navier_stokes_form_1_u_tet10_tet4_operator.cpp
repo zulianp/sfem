@@ -7,12 +7,6 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
@@ -114,82 +108,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_tet10_
   return &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_esoa_diagnostics_data;
 }
 
-extern "C" double navier_stokes_form_1_u_tet10_tet4_residual_esoa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_esoa_diagnostics_data,
-      nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_residual_esoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "navier_stokes_form_1_u_tet10_tet4_residual_esoa",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_residual_esoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "navier_stokes_form_1_u_tet10_tet4_residual_esoa_float",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_residual_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "navier_stokes_form_1_u_tet10_tet4_residual_a_msoa",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_residual_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "navier_stokes_form_1_u_tet10_tet4_residual_a_msoa_float",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_residual_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "navier_stokes_form_1_u_tet10_tet4_residual_i_msoa",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_residual_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "navier_stokes_form_1_u_tet10_tet4_residual_i_msoa_float",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -242,82 +160,6 @@ static const KernelDiagnostics navier_stokes_form_1_u_tet10_tet4_jacobian_action
 
 extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics(void) {
   return &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics_data;
-}
-
-extern "C" double navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics_data,
-      nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_float",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_jacobian_action_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "navier_stokes_form_1_u_tet10_tet4_jacobian_action_a_msoa",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_jacobian_action_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "navier_stokes_form_1_u_tet10_tet4_jacobian_action_a_msoa_float",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_jacobian_action_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "navier_stokes_form_1_u_tet10_tet4_jacobian_action_i_msoa",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void navier_stokes_form_1_u_tet10_tet4_jacobian_action_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "navier_stokes_form_1_u_tet10_tet4_jacobian_action_i_msoa_float",
-      &sfem::codegen::navier_stokes_form_1_u_tet10_tet4_jacobian_action_esoa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
 }
 
 namespace sfem {
@@ -486,6 +328,7 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mi
 } // namespace sfem
 
 extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -499,58 +342,34 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_a_msoa(
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double convection_scale,
-    const double dt,
-    const double f0,
-    const double f1,
-    const double f2,
-    const double nu,
-    const double rho,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t f0,
+    const real_t f1,
+    const real_t f2,
+    const real_t nu,
+    const real_t rho,
     const ptrdiff_t current_stride,
-    const double *const RSTR u_data[3],
-    const double *const RSTR p_data,
+    const void *const RSTR u_data[3],
+    const void *const RSTR p_data,
     const ptrdiff_t previous_stride,
-    const double *const RSTR u_old_data[3],
-    const double *const RSTR p_old_data,
+    const void *const RSTR u_old_data[3],
+    const void *const RSTR p_old_data,
     const ptrdiff_t out_stride,
-    double *const RSTR u_out[3],
-    double *const RSTR p_out
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
 ) {
-  return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
-}
-
-extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_a_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float convection_scale,
-    const float dt,
-    const float f0,
-    const float f1,
-    const float f2,
-    const float nu,
-    const float rho,
-    const ptrdiff_t current_stride,
-    const float *const RSTR u_data[3],
-    const float *const RSTR p_data,
-    const ptrdiff_t previous_stride,
-    const float *const RSTR u_old_data[3],
-    const float *const RSTR p_old_data,
-    const ptrdiff_t out_stride,
-    float *const RSTR u_out[3],
-    float *const RSTR p_out
-) {
-  return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("navier_stokes_form_1_u_tet10_tet4_residual_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -737,53 +556,39 @@ static SFEM_INLINE int navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_
 } // namespace sfem
 
 extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const double convection_scale,
-    const double dt,
-    const double f0,
-    const double f1,
-    const double f2,
-    const double nu,
-    const double rho,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t f0,
+    const real_t f1,
+    const real_t f2,
+    const real_t nu,
+    const real_t rho,
     const ptrdiff_t current_stride,
-    const double *const RSTR u_data[3],
-    const double *const RSTR p_data,
+    const void *const RSTR u_data[3],
+    const void *const RSTR p_data,
     const ptrdiff_t previous_stride,
-    const double *const RSTR u_old_data[3],
-    const double *const RSTR p_old_data,
+    const void *const RSTR u_old_data[3],
+    const void *const RSTR p_old_data,
     const ptrdiff_t out_stride,
-    double *const RSTR u_out[3],
-    double *const RSTR p_out
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
 ) {
-  return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
-}
-
-extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_i_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const float convection_scale,
-    const float dt,
-    const float f0,
-    const float f1,
-    const float f2,
-    const float nu,
-    const float rho,
-    const ptrdiff_t current_stride,
-    const float *const RSTR u_data[3],
-    const float *const RSTR p_data,
-    const ptrdiff_t previous_stride,
-    const float *const RSTR u_old_data[3],
-    const float *const RSTR p_old_data,
-    const ptrdiff_t out_stride,
-    float *const RSTR u_out[3],
-    float *const RSTR p_out
-) {
-  return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, u_data, p_data, previous_stride, u_old_data, p_old_data, out_stride, u_out, p_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::navier_stokes_form_1_u_tet10_tet4_residual_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("navier_stokes_form_1_u_tet10_tet4_residual_i_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {

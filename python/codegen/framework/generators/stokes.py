@@ -26,6 +26,16 @@ def _default_out_dir():
     return generated_output_dir(__file__, "stokes", 4)
 
 
+#: The mesh kernels a Taylor-Hood Stokes operator set must publish between
+#: them, spelled as the entry point's own suffix.
+_MESH_KERNEL_TOKENS = (
+    "_residual_a_msoa",
+    "_residual_i_msoa",
+    "_jacobian_action_a_msoa",
+    "_jacobian_action_i_msoa",
+)
+
+
 def _operator_dim(path, contents):
     match = re.search(r"static constexpr int ND = ([0-9]+);", contents)
     if match is None:
@@ -105,6 +115,7 @@ def validate_m6_4(result):
     if not local_headers:
         raise RuntimeError("Stokes generation did not produce family-level local kernels")
 
+    published = set()
     for path in operator_sources:
         basename = os.path.basename(path)
         with open(path) as input_file:
@@ -125,20 +136,35 @@ def validate_m6_4(result):
                 "Stokes operator '%s' does not include a generated local kernel"
                 % basename
             )
-        for token in (
-            "_residual_a_msoa",
-            "_residual_i_msoa",
-            "_jacobian_action_a_msoa",
-            "_jacobian_action_i_msoa",
-        ):
-            if token not in contents:
-                raise RuntimeError("Stokes operator '%s' is missing '%s'" % (basename, token))
+        # Which mesh kernels an operator publishes follows from its form: a
+        # block whose residual contracts no test coefficient -- the (u, u)
+        # block's does not -- emits the local kernel and no mesh entry point
+        # for it.  So the tokens are required across the operator sources as a
+        # set, not of every source individually.
+        #
+        # This used to require all four of every source and passed anyway,
+        # because `_residual_a_msoa` matched the name of a `_print_rate`
+        # wrapper rather than of a kernel.  Those wrappers are gone, which is
+        # what exposed the check as vacuous.
+        published.update(
+            token
+            for token in _MESH_KERNEL_TOKENS
+            if 'extern "C" int %s%s(' % (basename[: -len("_operator.cpp")], token)
+            in contents
+        )
         for field_name in field_names:
             if "%s_out" % field_name not in contents:
                 raise RuntimeError(
                     "Stokes operator '%s' is missing output field '%s'"
                     % (basename, field_name)
                 )
+
+    missing = tuple(token for token in _MESH_KERNEL_TOKENS if token not in published)
+    if missing:
+        raise RuntimeError(
+            "Stokes generation published no mesh kernel named %s"
+            % ", ".join("'%s'" % token for token in missing)
+        )
 
 
 def main(argv=None):

@@ -7,18 +7,6 @@
 #include "../../../reference/quad_tet_q1.hpp"
 #include "../../../reference/tet4_q1.hpp"
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
 namespace sfem {
 namespace codegen {
 
@@ -142,37 +130,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_energy_ec
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         J00_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J01_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J02_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J10_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J11_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J12_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J20_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J21_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J22_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
@@ -182,37 +146,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_energy_ec
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
@@ -298,37 +238,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_energy_es
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         J00_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J01_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J02_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J10_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J11_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J12_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J20_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J21_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J22_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
@@ -338,37 +254,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_energy_es
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
@@ -519,37 +411,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         J00_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J01_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J02_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J10_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J11_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J12_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J20_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J21_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J22_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
@@ -559,37 +427,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
@@ -678,37 +522,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         J00_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J01_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J02_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J10_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J11_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J12_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J20_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J21_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J22_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
@@ -718,37 +538,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_gradient_
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
@@ -903,37 +699,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_hessian_e
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         J00_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J01_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J02_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J10_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J11_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J12_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J20_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J21_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J22_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
@@ -943,37 +715,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_hessian_e
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
@@ -1076,37 +824,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_hessian_e
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         J00_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J01_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J02_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J10_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J11_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J12_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J20_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J21_values[lane] = s_t(0);
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
         J22_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
@@ -1116,37 +840,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_hessian_e
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
           J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }

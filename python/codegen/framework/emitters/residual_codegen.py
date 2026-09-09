@@ -11,6 +11,10 @@ _BLOCK = PREFIXES["block"]
 _BLOCK_FMT = _BLOCK + "%s"
 _PACK_FMT = PREFIXES["pack"] + "%s"
 
+from codegen.framework.emitters.runtime_typed_abi import (
+    cast_arguments,
+    runtime_typed_entry_point_lines,
+)
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
@@ -90,7 +94,7 @@ from codegen.framework.plans.streams import (
     local_kernel_stream_plans,
     mesh_kernel_stream_plans,
 )
-from codegen.framework.plans.streams import field_stream_groups
+from codegen.framework.plans.streams import field_stream_groups, field_stream_usage
 from codegen.framework.symbolic.residual import (
     coupled_residual_weak_coefficients,
 )
@@ -155,7 +159,6 @@ from codegen.framework.emitters.cprinter import (
     _sfem_math_header_source,
 )
 from codegen.framework.emitters.energy_codegen import (
-    _sfem_soa_diagnostic_print_wrapper_lines,
     _sfem_soa_diagnostics_header,
     _sfem_packed_thread_scratch_header_source,
 )
@@ -185,6 +188,30 @@ def _template_scalar_axis():
     it stops being a loop over precisions.
     """
     return (("s_t", ""),)
+
+
+def _runtime_typed_entry_point(function, params, arguments, body):
+    """One `extern "C"` entry point over the template, typed at run time.
+
+    Stands where `for scalar_type, suffix in precision_axis():` stood at ten
+    sites in this emitter.  A body written in terms of `s_t` is the same text
+    for every precision and is emitted once as a template; publishing a symbol
+    per precision on top of it restated the whole parameter list a second time,
+    and made the dispatch declare and switch over both.  The entry point now
+    takes the scalar's width and selects the instantiation itself.
+
+    `params` speak `s_t` and `g_t`; `arguments` are the call's argument names,
+    matched to the parameters by name so each is cast back from `void *`.
+    `body(scalar_type, arguments)` spells the call.
+    """
+    prepared = [param.replace("g_t", "geom_t") for param in params]
+    return runtime_typed_entry_point_lines(
+        function,
+        prepared,
+        lambda scalar_type, _positional: body(
+            scalar_type, cast_arguments(prepared, arguments, scalar_type)
+        ),
+    )
 
 
 def _assert_geometry_plans_agree(emission_plan):
@@ -846,38 +873,29 @@ def _affine_mesh_public_wrapper_lines(
     dim,
 ):
     lines = []
-    for scalar_type, suffix in precision_axis():
-        typed_params = [
-            param.replace("g_t", "geom_t").replace("s_t", scalar_type)
-            for param in params
-        ]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append(
-                "    %s%s"
-                % (param, "," if index + 1 < len(typed_params) else "")
-            )
-        call_args = ["nelements", "nnodes", "elements"]
-        call_args.extend(
-            mesh_geometry_argument_names(
-                dependencies,
-                dim,
-                gradient_metric.metric_components
-                if uses_cached_affine_metric
-                else None,
-            )
+    call_args = ["nelements", "nnodes", "elements"]
+    call_args.extend(
+        mesh_geometry_argument_names(
+            dependencies,
+            dim,
+            gradient_metric.metric_components
+            if uses_cached_affine_metric
+            else None,
         )
-        call_args.extend(map(str, dependencies.parameters))
-        call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
-        lines.extend(
-            [
-                ") {",
+    )
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
                 "  return sfem::codegen::%s<%s, geom_t>(%s);"
-                % (impl, scalar_type, ", ".join(call_args)),
-                "}",
-                "",
-            ]
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     return lines
 
 
@@ -2347,12 +2365,17 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         reference_index = layout.reference_index(field_index)
         shape_name = layout.n_shape_constant(field)
         for group in groups:
-            if group.uses_value or group.uses_gradient:
+            # Per field: a sum-factorised sweep for a gradient the block never
+            # reads is the most expensive form this waste takes.
+            read = field_stream_usage(dependencies, field, group.name)
+            if not read.is_read:
+                continue
+            if read.uses_value or read.uses_gradient:
                 lines.append(
                     "  s_t %s_%s_value[NQ * VS];"
                     % (group.name, field.name)
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 lines.append(
                     "  s_t %s_%s_grad_ref[NQ * ND * VS];"
                     % (group.name, field.name)
@@ -2369,7 +2392,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                         _field_stream_initializer(layout, field_index, group.name),
                     )
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 lines.extend(
                     [
                         "  %s<s_t, NQ, %s, VS, ND, 1>("
@@ -2386,7 +2409,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                         ),
                     ]
                 )
-            elif group.uses_value:
+            elif read.uses_value:
                 lines.extend(
                     [
                         "  %s<s_t, NQ, %s, VS, ND, 1>("
@@ -2439,12 +2462,13 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     )
     for field_index, field in enumerate(system.fields):
         for group in groups:
-            if group.uses_value:
+            read = field_stream_usage(dependencies, field, group.name)
+            if read.uses_value:
                 lines.append(
                     "      const s_t %s%s = %s_%s_value[q * VS + lane];"
                     % (field.name, group.symbol_suffix, group.name, field.name)
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 for k in range(dim):
                     lines.append(
                         "      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref[(q * ND + %d) * VS + lane];"
@@ -2539,9 +2563,13 @@ def _mixed_local_field_evaluation_lines(
         offset = layout.offset(field_index)
         reference_index = layout.reference_index(field_index)
         for group in groups:
-            if group.uses_value:
+            # Per field, not per system: see `plans.streams.field_stream_usage`.
+            read = field_stream_usage(dependencies, field, group.name)
+            if not read.is_read:
+                continue
+            if read.uses_value:
                 lines.append("%ss_t %s%s = s_t(0);" % (indent, field.name, group.symbol_suffix))
-            if group.uses_gradient:
+            if read.uses_gradient:
                 for d in range(dim):
                     lines.append(
                         "%ss_t %s%s_grad_%d_ref = s_t(0);"
@@ -2554,7 +2582,7 @@ def _mixed_local_field_evaluation_lines(
                         "%sconst s_t %s = %s[%d][lane];"
                         % (indent, coeff_name, group.name, offset + trial)
                     )
-                    if group.uses_value:
+                    if read.uses_value:
                         lines.append(
                             "%s%s%s += %s * field_shape[%d][%s];"
                             % (
@@ -2566,7 +2594,7 @@ def _mixed_local_field_evaluation_lines(
                                 c_sum(c_product("q", n_shape_name), trial),
                             )
                         )
-                    if group.uses_gradient:
+                    if read.uses_gradient:
                         for d in range(dim):
                             lines.append(
                                 "%s%s%s_grad_%d_ref += %s * fgref[%s][%s];"
@@ -2586,12 +2614,12 @@ def _mixed_local_field_evaluation_lines(
                     "%s  const s_t coeff = %s[%d + trial][lane];"
                     % (indent, group.name, offset)
                 )
-                if group.uses_value:
+                if read.uses_value:
                     lines.append(
                         "%s  %s%s += coeff * field_shape[%d][q * %s + trial];"
                         % (indent, field.name, group.symbol_suffix, reference_index, n_shape_name)
                     )
-                if group.uses_gradient:
+                if read.uses_gradient:
                     for d in range(dim):
                         lines.append(
                             "%s  %s%s_grad_%d_ref += coeff * fgref[%s][q * %s + trial];"
@@ -2605,7 +2633,7 @@ def _mixed_local_field_evaluation_lines(
                             )
                         )
                 lines.append("%s}" % indent)
-            if group.uses_gradient:
+            if read.uses_gradient:
                 lines.extend(
                     _physical_gradient_lines(field.name + group.symbol_suffix, dim, indent)
                 )
@@ -2929,14 +2957,24 @@ def _simplex_local_body(
 
     # Staging buffers, one per quantity accumulated across trial functions.
     staging = []
+    # What each field contributes to each role, rather than what the system
+    # does.  See `plans.streams.field_stream_usage`: asking the system-wide
+    # question here staged, interpolated and transformed quantities the form
+    # never reads.
+    usage = {
+        (field.name, group.name): field_stream_usage(dependencies, field, group.name)
+        for field in system.fields
+        for group in groups
+    }
     for field in system.fields:
         for group in groups:
             stem = field.name + group.symbol_suffix
-            if group.uses_value:
+            read = usage[(field.name, group.name)]
+            if read.uses_value:
                 staging.append(
                     BufferDeclNode("s_t", "%s_values" % stem, ("VS",))
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 staging.extend(
                     BufferDeclNode(
                         "s_t", "%s_grad_%d_ref_values" % (stem, d), ("VS",)
@@ -2961,29 +2999,28 @@ def _simplex_local_body(
     for field_index, field in enumerate(system.fields):
         for group in groups:
             stem = field.name + group.symbol_suffix
-            if group.uses_value:
-                gather.append(
-                    _work_item_loop_node(
-                        [
-                            AssignmentNode(
-                                expr_ref("%s_values[lane]" % stem),
-                                expr_ref("s_t(0)"),
-                            )
-                        ]
-                    )
+            read = usage[(field.name, group.name)]
+            if not read.is_read:
+                continue
+            # One lane loop for every accumulator this field needs, not one
+            # loop each: the lane loop is the vectorised inner loop, so a
+            # loop per component emitted a `#pragma omp simd` region per
+            # component for stores that belong together.
+            zeroed = []
+            if read.uses_value:
+                zeroed.append("%s_values[lane]" % stem)
+            if read.uses_gradient:
+                zeroed.extend(
+                    "%s_grad_%d_ref_values[lane]" % (stem, d) for d in range(dim)
                 )
-            if group.uses_gradient:
-                gather.extend(
-                    _work_item_loop_node(
-                        [
-                            AssignmentNode(
-                                expr_ref("%s_grad_%d_ref_values[lane]" % (stem, d)),
-                                expr_ref("s_t(0)"),
-                            )
-                        ]
-                    )
-                    for d in range(dim)
+            gather.append(
+                _work_item_loop_node(
+                    [
+                        AssignmentNode(expr_ref(target), expr_ref("s_t(0)"))
+                        for target in zeroed
+                    ]
                 )
+            )
             trial_body = [
                 BufferDeclNode(
                     "const s_t",
@@ -2995,7 +3032,7 @@ def _simplex_local_body(
                     ),
                 )
             ]
-            if group.uses_value:
+            if read.uses_value:
                 trial_body.append(
                     ScatterNode(
                         expr_ref("%s_values[lane]" % stem),
@@ -3003,7 +3040,7 @@ def _simplex_local_body(
                         "+=",
                     )
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 trial_body.extend(
                     ScatterNode(
                         expr_ref("%s_grad_%d_ref_values[lane]" % (stem, d)),
@@ -3044,13 +3081,14 @@ def _simplex_local_body(
     for field in system.fields:
         for group in groups:
             stem = field.name + group.symbol_suffix
-            if group.uses_value:
+            read = usage[(field.name, group.name)]
+            if read.uses_value:
                 transform.append(
                     BufferDeclNode(
                         "const s_t", stem, (), expr_ref("%s_values[lane]" % stem)
                     )
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 transform.extend(
                     BufferDeclNode(
                         "const s_t",
@@ -3231,9 +3269,18 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
         for i in _adjugate_components(dependencies, dim)
     )
 
+    # Asked once, up front, rather than inside the loop: the answer is a
+    # property of the plan and the field, not of where emission happens to be.
+    reads_gradient = {
+        (field.name, group.name): field_stream_usage(
+            dependencies, field, group.name
+        ).uses_gradient
+        for field in system.fields
+        for group in groups
+    }
     for field_index, field in enumerate(system.fields):
         for group in groups:
-            if not group.uses_gradient:
+            if not reads_gradient[(field.name, group.name)]:
                 continue
             stem = field.name + group.symbol_suffix
             for d in range(dim):
@@ -3797,12 +3844,15 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
     groups = _dependency_stream_groups(dependencies)
     for field_index, field in enumerate(system.fields):
         for group in groups:
-            if group.uses_value:
+            read = field_stream_usage(dependencies, field, group.name)
+            if not read.is_read:
+                continue
+            if read.uses_value:
                 lines.append(
                     "%ss_t %s%s = s_t(0);"
                     % (indent, field.name, group.symbol_suffix)
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 for d in range(dim):
                     lines.append(
                         "%ss_t %s%s_grad_%d_ref = s_t(0);"
@@ -3813,12 +3863,12 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
                 "%s  const s_t coeff = %s[%s][lane];"
                 % (indent, group.name, c_sum(c_product("trial", "NC"), field_index))
             )
-            if group.uses_value:
+            if read.uses_value:
                 lines.append(
                     "%s  %s%s += coeff * shape[q * NS + trial];"
                     % (indent, field.name, group.symbol_suffix)
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 for d in range(dim):
                     lines.append(
                         "%s  %s%s_grad_%d_ref += coeff * %s[q * NS + trial];"
@@ -3831,7 +3881,7 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
                         )
                     )
             lines.append("%s}" % indent)
-            if group.uses_gradient:
+            if read.uses_gradient:
                 lines.extend(
                     _physical_gradient_lines(
                         field.name + group.symbol_suffix, dim, indent
@@ -3894,7 +3944,10 @@ def _tensor_field_alias_nodes(system, dependencies):
     for field_index, field in enumerate(system.fields):
         for group in groups:
             stem = field.name + group.symbol_suffix
-            if group.uses_value:
+            read = field_stream_usage(dependencies, field, group.name)
+            if not read.is_read:
+                continue
+            if read.uses_value:
                 nodes.append(
                     BufferDeclNode(
                         "const s_t",
@@ -3909,7 +3962,7 @@ def _tensor_field_alias_nodes(system, dependencies):
                         ),
                     )
                 )
-            if group.uses_gradient:
+            if read.uses_gradient:
                 nodes.extend(
                     BufferDeclNode(
                         "const s_t",
@@ -4131,15 +4184,6 @@ def _operator_source(
         "#endif",
         "#endif",
         "",
-        "#ifndef SFEM_SUCCESS",
-        "#define SFEM_SUCCESS 0",
-        "#endif",
-        "#ifndef SFEM_FAILURE",
-        "#define SFEM_FAILURE 1",
-        "#endif",
-        "#ifndef MIN",
-        "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
-        "#endif",
         "#ifdef _OPENMP",
         "#include <omp.h>",
         "#endif",
@@ -4184,7 +4228,8 @@ def _operator_source(
         gradient_metric = None
         function = "%s_%s_esoa" % (prefix, form)
         block = "%s_%s_block" % (local_prefix, form)
-        for scalar_type, suffix in precision_axis():
+        if True:
+            scalar_type = "s_t"
             params = [
                 "const int ne",
                 "const ptrdiff_t geometry_stride",
@@ -4209,12 +4254,6 @@ def _operator_source(
                 "%s *const RSTR output[%d]"
                 % (scalar_type, n_fields * n_shape)
             )
-            lines.append('extern "C" int %s%s(' % (function, suffix))
-            for index, param in enumerate(params):
-                lines.append(
-                    "    %s%s"
-                    % (param, "," if index + 1 < len(params) else "")
-                )
             call_args = ["ne", "geometry_stride"]
             pre_call_lines = []
             if gradient_metric is not None:
@@ -4254,15 +4293,22 @@ def _operator_source(
             # The plan already decided which streams this kernel takes and in
             # what order, for the signature.  The call reads the same plan
             # rather than re-deriving it, so the two cannot disagree.
-            def spell(stream):
-                if stream.role is DataStreamRole.REFERENCE:
-                    return quadrature_reference_accessor(
-                        rule, stream.name, scalar_type
-                    )
-                return stream.name
+            #
+            # Spelled per instantiation, not once: a reference table is reached
+            # through `ref_<key><scalar>::shape()`, so it needs the concrete
+            # scalar.  The parameter list is written in `s_t` and erased by the
+            # entry point; the call is not, and using the same name for both
+            # emitted `ref_line_p1_q2<s_t>` into an `extern "C"` body, where
+            # `s_t` does not exist.
+            def stream_arguments(concrete):
+                def spell(stream):
+                    if stream.role is DataStreamRole.REFERENCE:
+                        return quadrature_reference_accessor(
+                            rule, stream.name, concrete
+                        )
+                    return stream.name
 
-            call_args.extend(
-                _stream_call_arguments(
+                return _stream_call_arguments(
                     local_kernel_stream_plans(
                         dependencies,
                         dim=dim,
@@ -4276,24 +4322,35 @@ def _operator_source(
                     ),
                     spell,
                 )
-            )
-            lines.extend(
-                [
-                    ") {",
-                    *pre_call_lines,
+
+            def body(concrete, arguments, _pre=tuple(pre_call_lines),
+                     _leading=tuple(call_args)):
+                # Every argument goes through `cast_arguments`, including the
+                # stream names: it casts what names a parameter and passes
+                # anything else through, so the reference accessors -- already
+                # concrete expressions -- are left alone.
+                spelled = cast_arguments(
+                    params,
+                    tuple(_leading) + tuple(stream_arguments(concrete)),
+                    concrete,
+                )
+                return list(
+                    line.replace("s_t", concrete) for line in _pre
+                ) + [
                     "  sfem::codegen::%s<%s, %d, %d, %d>(%s);"
                     % (
                         block,
-                        scalar_type,
+                        concrete,
                         n_qp,
                         n_shape,
                         vector_size,
-                        ", ".join(call_args),
+                        ", ".join(spelled),
                     ),
                     "  return SFEM_SUCCESS;",
-                    "}",
-                    "",
                 ]
+
+            lines.extend(
+                _runtime_typed_entry_point(function, params, (), body)
             )
         lines.extend(
             _mesh_operator_source(
@@ -4366,12 +4423,6 @@ def _mixed_operator_source(
         '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
         "",
-        "#ifndef SFEM_SUCCESS",
-        "#define SFEM_SUCCESS 0",
-        "#endif",
-        "#ifndef MIN",
-        "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
-        "#endif",
         *restrict_prelude(""),
         *_inline_definition_lines(),
         "#ifndef SFEM_GENERATED_SCALAR_T",
@@ -4733,29 +4784,23 @@ def _mixed_affine_function(
     )
 
     function = "%s_%s_%s_a_msoa" % (prefix, element, form)
-    for scalar_type, suffix in precision_axis():
-        typed_params = [
-            param.replace("g_t", "geom_t").replace("s_t", scalar_type)
-            for param in params
-        ]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append("    %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
-        call_args = ["nelements", "nnodes", "elements"]
-        call_args.extend(mesh_geometry_argument_names(dependencies, dim))
-        call_args.extend(map(str, dependencies.parameters))
-        call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
-        call_args.append("out_stride")
-        call_args.extend("%s_out" % group.name for group in layout.groups)
-        lines.extend(
-            [
-                ") {",
+    call_args = ["nelements", "nnodes", "elements"]
+    call_args.extend(mesh_geometry_argument_names(dependencies, dim))
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
+    call_args.append("out_stride")
+    call_args.extend("%s_out" % group.name for group in layout.groups)
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
                 "  return sfem::codegen::%s<%s, geom_t>(%s);"
-                % (impl, scalar_type, ", ".join(call_args)),
-                "}",
-                "",
-            ]
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     return lines
 
 
@@ -4996,25 +5041,22 @@ def _mixed_isoparametric_function(
         ]
     )
     function = "%s_%s_%s_i_msoa" % (prefix, element, form)
-    for scalar_type, suffix in precision_axis():
-        typed_params = [param.replace("s_t", scalar_type) for param in params]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append("    %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
-        call_args = ["nelements", "nnodes", "elements", "points"]
-        call_args.extend(map(str, dependencies.parameters))
-        call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
-        call_args.append("out_stride")
-        call_args.extend("%s_out" % group.name for group in layout.groups)
-        lines.extend(
-            [
-                ") {",
+    call_args = ["nelements", "nnodes", "elements", "points"]
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
+    call_args.append("out_stride")
+    call_args.extend("%s_out" % group.name for group in layout.groups)
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
                 "  return sfem::codegen::%s<%s>(%s);"
-                % (impl, scalar_type, ", ".join(call_args)),
-                "}",
-                "",
-            ]
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     return lines
 
 
@@ -5277,50 +5319,12 @@ def _kernel_diagnostics_lines(
         'extern "C" const sfem::codegen::KernelDiagnostics *%s_diagnostics(void) {'
         % public_name,
         "  return &sfem::codegen::%s;" % variable_name,
-        "}",
-        "",
-        'extern "C" double %s_arithmetic_intensity(' % public_name,
-        "    const ptrdiff_t nelements,",
-        "    const size_t scalar_bytes,",
-        "    const size_t real_bytes,",
-        "    const size_t accumulator_bytes) {",
-        "  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(",
-        "      &sfem::codegen::%s," % variable_name,
-        "      nelements, scalar_bytes, real_bytes, accumulator_bytes);",
+        # Only the record is published.  See the note in
+        # `emitters/energy_codegen.py`: the intensity and print-rate helpers
+        # take the record and live in `kernel_diagnostics.hpp`, so wrapping
+        # each of them per kernel named a call the caller can already spell.
         "}",
     ]
-    function_names = [public_name]
-    if public_name.endswith("_esoa"):
-        function_names.extend(
-            (
-                (
-                    public_name.replace("_esoa", "_a_msoa"),
-                    "KernelDiagnostics_print_rate_affine_mesh",
-                ),
-                (
-                    public_name.replace(
-                        "_esoa", "_i_msoa"
-                    ),
-                    "KernelDiagnostics_print_rate_isoparametric_mesh",
-                ),
-            )
-        )
-    for function_name_entry in function_names:
-        if isinstance(function_name_entry, tuple):
-            function_name, print_rate_helper = function_name_entry
-        else:
-            function_name = function_name_entry
-            print_rate_helper = "KernelDiagnostics_print_rate"
-        for scalar_type in ("double", "float"):
-            lines.append("")
-            lines.extend(
-                _sfem_soa_diagnostic_print_wrapper_lines(
-                    function_name,
-                    variable_name,
-                    scalar_type,
-                    print_rate_helper,
-                )
-            )
     return lines
 
 
@@ -5669,38 +5673,29 @@ def _mesh_operator_source(
         ]
     )
     function = "%s_%s_a_msoa" % (prefix, form)
-    for scalar_type, suffix in precision_axis():
-        typed_params = [
-            param.replace("g_t", "geom_t").replace("s_t", scalar_type)
-            for param in params
-        ]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append(
-                "    %s%s"
-                % (param, "," if index + 1 < len(typed_params) else "")
-            )
-        call_args = ["nelements", "nnodes", "elements"]
-        call_args.extend(
-            mesh_geometry_argument_names(
-                dependencies,
-                dim,
-                gradient_metric.metric_components
-                if uses_cached_affine_metric
-                else None,
-            )
+    call_args = ["nelements", "nnodes", "elements"]
+    call_args.extend(
+        mesh_geometry_argument_names(
+            dependencies,
+            dim,
+            gradient_metric.metric_components
+            if uses_cached_affine_metric
+            else None,
         )
-        call_args.extend(map(str, dependencies.parameters))
-        call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
-        lines.extend(
-            [
-                ") {",
+    )
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
                 "  return sfem::codegen::%s<%s, geom_t>(%s);"
-                % (impl, scalar_type, ", ".join(call_args)),
-                "}",
-                "",
-            ]
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     if form == "jacobian_action":
         lines.extend(
             _scalar_packed_affine_jacobian_action_source(
@@ -5778,49 +5773,45 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
     function = "%s_%s_i_maos" % (prefix, form)
     n_fields = len(system.fields)
     lines = []
-    for scalar_type, suffix in precision_axis():
-        params = [
-            "const ptrdiff_t nelements",
-            "const ptrdiff_t nnodes",
-            "idx_t **const RSTR elements",
-            "const geom_t *const *const RSTR points",
-            "const %s *const RSTR parameters" % scalar_type,
-        ]
-        params.extend(
-            "const %s *const RSTR %s" % (scalar_type, role.name)
-            for role in live_field_roles(dependencies)
-        )
-        params.append("%s *const RSTR output" % scalar_type)
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(params):
-            lines.append(
-                "    %s%s" % (param, "," if index + 1 < len(params) else "")
-            )
-        call_args = ["nelements", "nnodes", "elements", "points"]
-        call_args.extend(
-            "parameters[%d]" % index
+    params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const RSTR elements",
+        "const geom_t *const *const RSTR points",
+        "const s_t *const RSTR parameters",
+    ]
+    params.extend(
+        "const s_t *const RSTR %s" % role.name
+        for role in live_field_roles(dependencies)
+    )
+    params.append("s_t *const RSTR output")
+    # The arguments are offsets into the interleaved buffers rather than the
+    # buffers themselves, so they are spelled per instantiation: pointer
+    # arithmetic needs the concrete element type, which `void *` does not
+    # carry.  The target is itself a runtime-typed entry point now, so the
+    # width is passed straight through rather than selecting a suffixed twin.
+    def _forward(scalar_type, _arguments):
+        arguments = ["nelements", "nnodes", "elements", "points"]
+        arguments.extend(
+            "((const %s *)parameters)[%d]" % (scalar_type, index)
             for index, parameter in enumerate(system.parameters)
             if parameter in dependencies.parameters
         )
         for role in live_field_roles(dependencies):
-            call_args.append(str(n_fields))
-            call_args.extend(
-                "%s + %d" % (role.name, index) for index in range(n_fields)
+            arguments.append(str(n_fields))
+            arguments.extend(
+                "(const %s *)%s + %d" % (scalar_type, role.name, index)
+                for index in range(n_fields)
             )
-        call_args.append(str(n_fields))
-        call_args.extend(
-            "output + %d" % index
-            for index in range(n_fields)
+        arguments.append(str(n_fields))
+        arguments.extend(
+            "(%s *)output + %d" % (scalar_type, index) for index in range(n_fields)
         )
-        lines.extend(
-            [
-                ") {",
-                "  return %s%s(%s);"
-                % (target, suffix, ", ".join(call_args)),
-                "}",
-                "",
-            ]
-        )
+        return [
+            "  return %s(scalar_bytes, %s);" % (target, ", ".join(arguments)),
+        ]
+
+    lines.extend(_runtime_typed_entry_point(function, params, (), _forward))
     return lines
 
 
@@ -7339,28 +7330,20 @@ def _isoparametric_mesh_operator_source(
         ]
     )
     function = "%s_%s_i_msoa" % (prefix, form)
-    for scalar_type, suffix in precision_axis():
-        typed_params = [
-            param.replace("s_t", scalar_type) for param in params
-        ]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append(
-                "    %s%s"
-                % (param, "," if index + 1 < len(typed_params) else "")
-            )
-        call_args = ["nelements", "nnodes", "elements", "points"]
-        call_args.extend(map(str, dependencies.parameters))
-        call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
-        lines.extend(
-            [
-                ") {",
+    call_args = ["nelements", "nnodes", "elements", "points"]
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
                 "  return sfem::codegen::%s<%s>(%s);"
-                % (impl, scalar_type, ", ".join(call_args)),
-                "}",
-                "",
-            ]
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     return lines
 
 
@@ -7746,50 +7729,47 @@ def _scalar_packed_jacobian_action_source(
                 "",
             ]
         )
-    for scalar_type, suffix in precision_axis():
-        typed_params = [param.replace("s_t", scalar_type) for param in params]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append("    %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
-        call_args = [
-            "n_packs",
-            "n_elements_per_pack",
-            "nelements",
-            "nnodes",
-            "max_nodes_per_pack",
-            "elements",
-            "owned_nodes_ptr",
-            "n_shared_nodes",
-            "ghost_ptr",
-            "ghost_idx",
-        ]
-        if two_pass:
-            call_args.extend(
-                [
-                    "n_ghost_entries",
-                    "n_ghost_reduce_rows",
-                    "ghost_reduce_ptr",
-                    "ghost_reduce_idx",
-                    "ghost_reduce_dest",
-                    "ghost_buf",
-                ]
-            )
-        call_args.append("points")
-        call_args.extend(map(str, dependencies.parameters))
+    call_args = [
+        "n_packs",
+        "n_elements_per_pack",
+        "nelements",
+        "nnodes",
+        "max_nodes_per_pack",
+        "elements",
+        "owned_nodes_ptr",
+        "n_shared_nodes",
+        "ghost_ptr",
+        "ghost_idx",
+    ]
+    if two_pass:
         call_args.extend(
-            _mesh_stream_arguments(
-                jacobian_action_dependencies(dependencies), system.fields
-            )
-        )
-        lines.extend(
             [
-                ") {",
-                "  return sfem::codegen::%s<%s>(%s);"
-                % (impl, scalar_type, ", ".join(call_args)),
-                "}",
-                "",
+                "n_ghost_entries",
+                "n_ghost_reduce_rows",
+                "ghost_reduce_ptr",
+                "ghost_reduce_idx",
+                "ghost_reduce_dest",
+                "ghost_buf",
             ]
         )
+    call_args.append("points")
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.extend(
+        _mesh_stream_arguments(
+            jacobian_action_dependencies(dependencies), system.fields
+        )
+    )
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
+                "  return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
+        )
+    )
     return lines
 
 
@@ -7937,26 +7917,40 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "",
         ]
     )
-    for scalar_type, suffix in precision_axis():
-        typed_params = [
-            param.replace("g_t", "geom_t").replace("s_t", scalar_type)
-            for param in params
-        ]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append("    %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
-        lines.extend(
-            [
-                ") {",
-                "  return sfem::codegen::%s<%s, geom_t>(" % (impl, scalar_type),
-                "      n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
-                "      elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
-                "      g_met0, g_met1, g_met2, g_met3, g_met4, g_met5,",
-                "      %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
-                "}",
-                "",
-            ]
+    call_args = [
+        "n_packs",
+        "n_elements_per_pack",
+        "nelements",
+        "nnodes",
+        "max_nodes_per_pack",
+        "elements",
+        "owned_nodes_ptr",
+        "n_shared_nodes",
+        "ghost_ptr",
+        "ghost_idx",
+        "g_met0",
+        "g_met1",
+        "g_met2",
+        "g_met3",
+        "g_met4",
+        "g_met5",
+        kappa_name,
+        "direction_stride",
+        "%s_direction" % field_name,
+        "out_stride",
+        "%s_out" % field_name,
+    ]
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
+                "  return sfem::codegen::%s<%s, geom_t>(%s);"
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     return lines
 
 
@@ -8141,22 +8135,17 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "",
         ]
     )
-    for scalar_type, suffix in precision_axis():
-        typed_params = [
-            param.replace("g_t", "geom_t").replace("s_t", scalar_type)
-            for param in params
-        ]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append("    %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
-        lines.extend(
-            [
-                ") {",
-                "  return sfem::codegen::%s<%s, geom_t>(%s);" % (impl, scalar_type, ", ".join(common_call_prefix)),
-                "}",
-                "",
-            ]
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            common_call_prefix,
+            lambda scalar_type, arguments: [
+                "  return sfem::codegen::%s<%s, geom_t>(%s);"
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     return lines
 
 
@@ -8355,19 +8344,17 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "",
         ]
     )
-    for scalar_type, suffix in precision_axis():
-        typed_params = [p.replace("g_t", "geom_t").replace("s_t", scalar_type) for p in params]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for i, param in enumerate(typed_params):
-            lines.append("    %s%s" % (param, "," if i + 1 < len(typed_params) else ""))
-        lines.extend(
-            [
-                ") {",
-                "  return sfem::codegen::%s<%s, geom_t>(%s);" % (impl, scalar_type, ", ".join(call_args)),
-                "}",
-                "",
-            ]
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
+                "  return sfem::codegen::%s<%s, geom_t>(%s);"
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     return lines
 
 
@@ -8807,50 +8794,44 @@ def _scalar_packed_affine_jacobian_action_source(
             "",
         ]
     )
-    for scalar_type, suffix in precision_axis():
-        typed_params = [
-            param.replace("g_t", "geom_t").replace("s_t", scalar_type)
-            for param in params
-        ]
-        lines.append('extern "C" int %s%s(' % (function, suffix))
-        for index, param in enumerate(typed_params):
-            lines.append("    %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
-        call_args = [
-            "n_packs",
-            "n_elements_per_pack",
-            "nelements",
-            "nnodes",
-            "max_nodes_per_pack",
-            "elements",
-            "owned_nodes_ptr",
-            "n_shared_nodes",
-            "ghost_ptr",
-            "ghost_idx",
-        ]
-        call_args.extend(
-            mesh_geometry_argument_names(
-                dependencies,
-                dim,
-                gradient_metric.metric_components
-                if uses_cached_affine_metric
-                else None,
-            )
+    call_args = [
+        "n_packs",
+        "n_elements_per_pack",
+        "nelements",
+        "nnodes",
+        "max_nodes_per_pack",
+        "elements",
+        "owned_nodes_ptr",
+        "n_shared_nodes",
+        "ghost_ptr",
+        "ghost_idx",
+    ]
+    call_args.extend(
+        mesh_geometry_argument_names(
+            dependencies,
+            dim,
+            gradient_metric.metric_components
+            if uses_cached_affine_metric
+            else None,
         )
-        call_args.extend(map(str, dependencies.parameters))
-        call_args.extend(
-            _mesh_stream_arguments(
-                jacobian_action_dependencies(dependencies), system.fields
-            )
+    )
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.extend(
+        _mesh_stream_arguments(
+            jacobian_action_dependencies(dependencies), system.fields
         )
-        lines.extend(
-            [
-                ") {",
+    )
+    lines.extend(
+        _runtime_typed_entry_point(
+            function,
+            params,
+            call_args,
+            lambda scalar_type, arguments: [
                 "  return sfem::codegen::%s<%s, geom_t>(%s);"
-                % (impl, scalar_type, ", ".join(call_args)),
-                "}",
-                "",
-            ]
+                % (impl, scalar_type, ", ".join(arguments)),
+            ],
         )
+    )
     return lines
 
 

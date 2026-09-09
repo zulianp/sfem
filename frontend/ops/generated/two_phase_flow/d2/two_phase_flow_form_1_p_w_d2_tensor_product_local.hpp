@@ -90,10 +90,6 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj3) / det;
       const s_t p_w_old = previous_value[q * VS + lane];
       const s_t p_c = current_value[(NQ + q) * VS + lane];
-      const s_t p_c_grad_0_ref = current_grad_ref[((NQ + q) * ND) * VS + lane];
-      const s_t p_c_grad_1_ref = current_grad_ref[((NQ + q) * ND + 1) * VS + lane];
-      const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj2) / det;
-      const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj3) / det;
       const s_t p_c_old = previous_value[(NQ + q) * VS + lane];
       const s_t residual_tmp0 = -p_wr;
       const s_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));
@@ -177,10 +173,6 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_tensor_product_residual_blo
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj3) / det;
       const s_t p_w_old = previous_value[q * VS + lane];
       const s_t p_c = current_value[(NQ + q) * VS + lane];
-      const s_t p_c_grad_0_ref = current_grad_ref[((NQ + q) * ND) * VS + lane];
-      const s_t p_c_grad_1_ref = current_grad_ref[((NQ + q) * ND + 1) * VS + lane];
-      const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj2) / det;
-      const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj3) / det;
       const s_t p_c_old = previous_value[(NQ + q) * VS + lane];
       const s_t residual_tmp0 = -p_wr;
       const s_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));

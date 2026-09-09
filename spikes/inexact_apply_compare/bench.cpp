@@ -17,7 +17,10 @@
 #include "kernel_math.hpp"
 #include MATERIAL_INEXACT_HEADER
 
+#include "generated_abi.inc"
+
 extern "C" int EXACT_APPLY(
+        const int,
         const ptrdiff_t, const ptrdiff_t, idx_t **const,
         const geom_t *const, const geom_t *const, const geom_t *const,
         const geom_t *const, const geom_t *const, const geom_t *const,
@@ -112,7 +115,7 @@ int main(int argc, char **argv) {
         std::vector<double> bx(m.nnodes,0), by(m.nnodes,0), bz(m.nnodes,0);
         auto run_exact = [&] {
             std::fill(ax.begin(),ax.end(),0.0); std::fill(ay.begin(),ay.end(),0.0); std::fill(az.begin(),az.end(),0.0);
-            EXACT_APPLY(m.nelements, m.nnodes, m.evp.data(),
+            EXACT_APPLY(SFEM_CODEGEN_F64, m.nelements, m.nnodes, m.evp.data(),
                 m.adj[0].data(),m.adj[1].data(),m.adj[2].data(),m.adj[3].data(),m.adj[4].data(),
                 m.adj[5].data(),m.adj[6].data(),m.adj[7].data(),m.adj[8].data(), m.det.data(),
                 lmbda, mu,

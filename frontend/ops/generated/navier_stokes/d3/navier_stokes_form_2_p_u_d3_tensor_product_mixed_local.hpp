@@ -120,11 +120,6 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobia
   const s_t *const direction_u2_streams[U_NS] = {direction[54], direction[55], direction[56], direction[57], direction[58], direction[59], direction[60], direction[61], direction[62], direction[63], direction[64], direction[65], direction[66], direction[67], direction[68], direction[69], direction[70], direction[71], direction[72], direction[73], direction[74], direction[75], direction[76], direction[77], direction[78], direction[79], direction[80]};
   tensor_evaluate<s_t, NQ, U_NS, VS, ND, 1>(
       ne, field_shape_1d[0], field_grad_1d[0], direction_u2_streams, direction_u2_value, direction_u2_grad_ref);
-  s_t direction_p_value[NQ * VS];
-  s_t direction_p_grad_ref[NQ * ND * VS];
-  const s_t *const direction_p_streams[P_NS] = {direction[81], direction[82], direction[83], direction[84], direction[85], direction[86], direction[87], direction[88]};
-  tensor_evaluate<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], field_grad_1d[1], direction_p_streams, direction_p_value, direction_p_grad_ref);
   s_t u0_value_coeff[NQ * VS];
   s_t u1_value_coeff[NQ * VS];
   s_t u2_value_coeff[NQ * VS];
@@ -165,12 +160,6 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobia
       const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
       const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
-      const s_t p_direction_grad_0_ref = direction_p_grad_ref[(q * ND + 0) * VS + lane];
-      const s_t p_direction_grad_1_ref = direction_p_grad_ref[(q * ND + 1) * VS + lane];
-      const s_t p_direction_grad_2_ref = direction_p_grad_ref[(q * ND + 2) * VS + lane];
-      const s_t p_direction_grad_0 = (p_direction_grad_0_ref * adj0 + p_direction_grad_1_ref * adj3 + p_direction_grad_2_ref * adj6) / det;
-      const s_t p_direction_grad_1 = (p_direction_grad_0_ref * adj1 + p_direction_grad_1_ref * adj4 + p_direction_grad_2_ref * adj7) / det;
-      const s_t p_direction_grad_2 = (p_direction_grad_0_ref * adj2 + p_direction_grad_1_ref * adj5 + p_direction_grad_2_ref * adj8) / det;
       const s_t value_coeff3 = u0_direction_grad_0 + u1_direction_grad_1 + u2_direction_grad_2;
       u0_value_coeff[q * VS + lane] = s_t(0);
       u1_value_coeff[q * VS + lane] = s_t(0);
@@ -229,10 +218,6 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobia
   s_t direction_u2_grad_ref[NQ * ND * VS];
   tensor_evaluate_contiguous<s_t, NQ, U_NS, VS, ND, 1>(
       ne, field_shape_1d[0], field_grad_1d[0], direction + 54, direction_u2_value, direction_u2_grad_ref);
-  s_t direction_p_value[NQ * VS];
-  s_t direction_p_grad_ref[NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, P_NS, VS, ND, 1>(
-      ne, field_shape_1d[1], field_grad_1d[1], direction + 81, direction_p_value, direction_p_grad_ref);
   s_t u0_value_coeff[NQ * VS];
   s_t u1_value_coeff[NQ * VS];
   s_t u2_value_coeff[NQ * VS];
@@ -273,12 +258,6 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobia
       const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
       const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
-      const s_t p_direction_grad_0_ref = direction_p_grad_ref[(q * ND + 0) * VS + lane];
-      const s_t p_direction_grad_1_ref = direction_p_grad_ref[(q * ND + 1) * VS + lane];
-      const s_t p_direction_grad_2_ref = direction_p_grad_ref[(q * ND + 2) * VS + lane];
-      const s_t p_direction_grad_0 = (p_direction_grad_0_ref * adj0 + p_direction_grad_1_ref * adj3 + p_direction_grad_2_ref * adj6) / det;
-      const s_t p_direction_grad_1 = (p_direction_grad_0_ref * adj1 + p_direction_grad_1_ref * adj4 + p_direction_grad_2_ref * adj7) / det;
-      const s_t p_direction_grad_2 = (p_direction_grad_0_ref * adj2 + p_direction_grad_1_ref * adj5 + p_direction_grad_2_ref * adj8) / det;
       const s_t value_coeff3 = u0_direction_grad_0 + u1_direction_grad_1 + u2_direction_grad_2;
       u0_value_coeff[q * VS + lane] = s_t(0);
       u1_value_coeff[q * VS + lane] = s_t(0);

@@ -41,6 +41,14 @@ class ResidualCodegenDependencies:
     direction_gradient: bool
     value_coefficients: tuple
     gradient_coefficients: tuple
+    #: The symbols the coefficients actually read, per role.  The booleans
+    #: above are `any(...)` over the fields; these keep the detail the
+    #: reduction throws away, so a caller can ask what *one* field
+    #: contributes rather than what the system does -- see
+    #: `plans.streams.field_stream_usage`, and the block form it exists for.
+    current_symbols: tuple = ()
+    previous_symbols: tuple = ()
+    direction_symbols: tuple = ()
 
     @property
     def uses_trial_gradients(self):
@@ -108,6 +116,24 @@ def residual_codegen_dependencies(system, coefficients, dependencies):
         gradient_coefficients=tuple(
             tuple(not _is_zero(expression) for expression in coefficient.gradient)
             for coefficient in coefficients
+        ),
+        current_symbols=tuple(
+            symbol
+            for field in system.fields
+            for symbol in field.current_symbols
+            if symbol in free_symbols
+        ),
+        previous_symbols=tuple(
+            symbol
+            for field in system.fields
+            for symbol in field.previous_symbols
+            if symbol in free_symbols
+        ),
+        direction_symbols=tuple(
+            symbol
+            for field in system.fields
+            for symbol in field.direction_symbols
+            if symbol in free_symbols
         ),
     )
 

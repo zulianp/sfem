@@ -7,18 +7,6 @@
 #include "../../../reference/line_p1_q2.hpp"
 #include "../../../reference/quad_line_q2.hpp"
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
 namespace sfem {
 namespace codegen {
 

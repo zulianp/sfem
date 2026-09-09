@@ -11,13 +11,19 @@
 #include <cmath>
 #include <cstdio>
 
+// A generated kernel takes the width, in bytes, of the scalar its buffers hold
+// and instantiates itself for that scalar; there is no `_float` twin any more.
+// These declarations are written by hand because the per-element entry points
+// have no generated header -- which is why the leading width matters here:
+// C linkage does not mangle the parameters, so a stale declaration links
+// cleanly and then calls with every argument one register out of place.
 extern "C" {
 int two_phase_flow_hex8_residual_i_maos(
-        ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *,
-        const real_t *, const real_t *, real_t *);
+        int, ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const void *,
+        const void *, const void *, void *);
 int two_phase_flow_hex8_jacobian_action_i_maos(
-        ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *,
-        const real_t *, const real_t *, real_t *);
+        int, ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const void *,
+        const void *, const void *, void *);
 }
 
 namespace {
@@ -69,10 +75,13 @@ int test_generated_two_phase_flow_operator() {
     const auto points = const_cast<const geom_t *const *>(mesh->points()->data());
     std::fill(residual_direct->data(), residual_direct->data() + ndofs, 0);
     std::fill(action_direct->data(), action_direct->data() + ndofs, 0);
+    const int scalar_bytes = (int)sizeof(real_t);
     two_phase_flow_hex8_residual_i_maos(
+            scalar_bytes,
             block->n_elements(), mesh->n_nodes(), block->elements()->data(), points,
             p.data(), current->data(), previous->data(), residual_direct->data());
     two_phase_flow_hex8_jacobian_action_i_maos(
+            scalar_bytes,
             block->n_elements(), mesh->n_nodes(), block->elements()->data(), points,
             p.data(), current->data(), direction->data(), action_direct->data());
 

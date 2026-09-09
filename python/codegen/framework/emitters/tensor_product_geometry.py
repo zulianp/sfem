@@ -1,4 +1,4 @@
-from codegen.framework.emitters.cprinter import c_group, c_product, c_sum
+from codegen.framework.emitters.cprinter import c_group, c_product, c_sum, kernel_status_macro_lines
 from codegen.framework.plans.conventions import restrict_prelude
 from codegen.framework.targets import current_target
 from codegen.framework.fem.tensor_product import (
@@ -118,6 +118,7 @@ def sfem_geometry_kernels_header_source(
             *inline_block,
             *restrict_prelude(restrict_definition or ""),
             "",
+            *kernel_status_macro_lines(),
             "namespace sfem {",
             "namespace codegen {",
             "",

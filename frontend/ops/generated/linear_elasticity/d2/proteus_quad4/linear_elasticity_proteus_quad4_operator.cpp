@@ -12,15 +12,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include "../../../packed_thread_scratch.hpp"
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
 
 namespace sfem {
 namespace codegen {
@@ -104,85 +95,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_proteus_qua
   return &sfem::codegen::linear_elasticity_proteus_quad4_objective_soa_diagnostics_data;
 }
 
-extern "C" double linear_elasticity_proteus_quad4_objective_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_proteus_quad4_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void linear_elasticity_proteus_quad4_objective_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "linear_elasticity_proteus_quad4_objective_soa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_objective_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "linear_elasticity_proteus_quad4_objective_soa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_objective_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_proteus_quad4_objective_a_msoa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_objective_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_proteus_quad4_objective_a_msoa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_objective_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_proteus_quad4_objective_i_msoa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_objective_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_proteus_quad4_objective_i_msoa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_objective_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -204,7 +121,6 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_objective_steps_i_msoa_im
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -308,43 +224,34 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_objective_steps_i_msoa_im
 } // namespace sfem
 
 extern "C" int linear_elasticity_proteus_quad4_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const int nsteps,
-        const double *const RSTR steps,
-        double *const RSTR value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-}
-
-extern "C" int linear_elasticity_proteus_quad4_objective_steps_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const int nsteps,
-        const float *const RSTR steps,
-        float *const RSTR value
-) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_objective_steps_i_msoa", -1, (int)scalar_bytes);
 }
 
 
@@ -402,85 +309,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_proteus_qua
   return &sfem::codegen::linear_elasticity_proteus_quad4_gradient_soa_diagnostics_data;
 }
 
-extern "C" double linear_elasticity_proteus_quad4_gradient_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_proteus_quad4_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void linear_elasticity_proteus_quad4_gradient_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "linear_elasticity_proteus_quad4_gradient_soa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_gradient_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "linear_elasticity_proteus_quad4_gradient_soa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_gradient_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_proteus_quad4_gradient_a_msoa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_gradient_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_proteus_quad4_gradient_a_msoa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_gradient_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_proteus_quad4_gradient_i_msoa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_gradient_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_proteus_quad4_gradient_i_msoa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_gradient_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_quad4_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -499,7 +332,6 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_gradient_i_msoa_impl(
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -601,37 +433,31 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_gradient_i_msoa_impl(
 } // namespace sfem
 
 extern "C" int linear_elasticity_proteus_quad4_gradient_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const RSTR ux,
-        const double *const RSTR uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy
+        void *const RSTR outx,
+        void *const RSTR outy
 ) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_gradient_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-}
-
-extern "C" int linear_elasticity_proteus_quad4_gradient_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const RSTR ux,
-        const float *const RSTR uy,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy
-) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_gradient_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_gradient_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_gradient_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_gradient_i_msoa", -1, (int)scalar_bytes);
 }
 
 
@@ -689,85 +515,11 @@ extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_proteus_qua
   return &sfem::codegen::linear_elasticity_proteus_quad4_apply_soa_diagnostics_data;
 }
 
-extern "C" double linear_elasticity_proteus_quad4_apply_soa_arithmetic_intensity(
-    const ptrdiff_t nelements,
-    const size_t scalar_bytes,
-    const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_proteus_quad4_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void linear_elasticity_proteus_quad4_apply_soa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "linear_elasticity_proteus_quad4_apply_soa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_apply_soa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate(
-      "linear_elasticity_proteus_quad4_apply_soa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_apply_a_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_proteus_quad4_apply_a_msoa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_apply_a_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_proteus_quad4_apply_a_msoa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_apply_i_msoa_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_proteus_quad4_apply_i_msoa",
-      &sfem::codegen::linear_elasticity_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void linear_elasticity_proteus_quad4_apply_i_msoa_float_print_rate(
-    const double elapsed,
-    const ptrdiff_t nelements,
-    const ptrdiff_t ndofs) {
-  sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_proteus_quad4_apply_i_msoa_float",
-      &sfem::codegen::linear_elasticity_proteus_quad4_apply_soa_diagnostics_data,
-      elapsed, nelements, ndofs,
-      sizeof(float), sizeof(float), sizeof(float));
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t>
+template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_quad4_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -786,7 +538,6 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_apply_i_msoa_impl(
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  static constexpr int VS = 16;
   (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
@@ -888,37 +639,31 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_apply_i_msoa_impl(
 } // namespace sfem
 
 extern "C" int linear_elasticity_proteus_quad4_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t h_stride,
-        const double *const RSTR hx,
-        const double *const RSTR hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const ptrdiff_t out_stride,
-        double *const RSTR outx,
-        double *const RSTR outy
+        void *const RSTR outx,
+        void *const RSTR outy
 ) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_apply_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
-}
-
-extern "C" int linear_elasticity_proteus_quad4_apply_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const RSTR hx,
-        const float *const RSTR hy,
-        const ptrdiff_t out_stride,
-        float *const RSTR outx,
-        float *const RSTR outy
-) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_apply_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_apply_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_apply_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_apply_i_msoa", -1, (int)scalar_bytes);
 }
 
 
@@ -1093,53 +838,49 @@ static int linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
 } // namespace sfem
 
 extern "C" int linear_elasticity_proteus_quad4_hessian_bsr_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        double *const RSTR values
+        void *const RSTR values
 ) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int linear_elasticity_proteus_quad4_hessian_bsr_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        float *const RSTR values
-) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
 }
 
 extern "C" int linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const double lmbda,
-        const double mu,
-        double *const RSTR values
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values
 ) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const float lmbda,
-        const float mu,
-        float *const RSTR values
-) {
-  return sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa", -1, (int)scalar_bytes);
 }

@@ -2,14 +2,41 @@
 #define SFEM_CODEGEN_KERNEL_DIAGNOSTICS_HPP
 
 #include <stddef.h>
-#include <stdio.h>
+#include <cstdio>
 
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
 
+#ifndef SFEM_SUCCESS
+#define SFEM_SUCCESS 0
+#endif
+
+#ifndef SFEM_FAILURE
+#define SFEM_FAILURE 1
+#endif
+
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
 namespace sfem {
 namespace codegen {
+
+//! Reports a dispatch that has no kernel for this combination.
+//!
+//! One function rather than the five-line `std::fprintf` every
+//! dispatch entry point used to carry: there were 248 copies of it,
+//! differing only in the name they print.
+static SFEM_INLINE int unsupported_dispatch(
+    const char *const name,
+    const int element_type,
+    const int real_type) {
+  std::fprintf(stderr,
+      "%s does not support element type %d with real type %d\n",
+      name, element_type, real_type);
+  return SFEM_FAILURE;
+}
 
 struct KernelDiagnostics {
   const char *kernel_name;

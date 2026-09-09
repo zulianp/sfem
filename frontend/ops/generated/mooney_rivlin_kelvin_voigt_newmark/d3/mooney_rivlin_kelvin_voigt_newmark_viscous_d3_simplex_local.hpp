@@ -83,13 +83,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -104,13 +98,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -125,13 +113,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -146,13 +128,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -167,13 +143,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -188,13 +158,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -398,13 +362,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -419,13 +377,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -440,13 +392,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -461,13 +407,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -482,13 +422,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -503,13 +437,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1049,13 +977,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1070,13 +992,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1091,13 +1007,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1112,13 +1022,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1133,13 +1037,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1154,13 +1052,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1175,13 +1067,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1196,13 +1082,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1217,13 +1097,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1686,13 +1560,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1707,13 +1575,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1728,13 +1590,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u0_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u0_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1749,13 +1605,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1770,13 +1620,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1791,13 +1635,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u1_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u1_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1812,13 +1650,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1833,13 +1665,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_old_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
@@ -1854,13 +1680,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       u2_direction_grad_0_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_direction_grad_1_ref_values[lane] = s_t(0);
-    }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
       u2_direction_grad_2_ref_values[lane] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {

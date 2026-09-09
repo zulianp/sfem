@@ -2,13 +2,6 @@
 
 #include <cstddef>
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-
 #include "../d2/proteus_quad4/laplace_proteus_quad4_element.hpp"
 #include "../d2/quad4/laplace_quad4_element.hpp"
 #include "../d2/tri3/laplace_tri3_element.hpp"

@@ -9,6 +9,7 @@ above the emission layer needs any of it.
 import re
 
 import sympy as sp
+from codegen.framework.plans.conventions import restrict_prelude
 from sympy.printing.c import C99CodePrinter
 
 
@@ -104,6 +105,33 @@ def _sfem_math_function_lines(inline_qualifier="SFEM_INLINE"):
     return lines
 
 
+#: The status codes and the one macro every generated kernel body uses.
+#:
+#: A generated tree must compile without `sfem_base.hpp`, so these guarded
+#: definitions have to exist somewhere in it.  They were emitted into the
+#: preamble of every operator, element and dispatch source -- 116 copies of
+#: three blocks.  Emitting them into the three shared headers instead costs
+#: three copies, and every generated file includes at least one of them:
+#: `kernel_math.hpp` and `kernel_diagnostics.hpp` directly, and the element
+#: headers through `geometry_kernels.hpp`.
+def kernel_status_macro_lines():
+    """The `SFEM_SUCCESS`, `SFEM_FAILURE` and `MIN` definitions, guarded."""
+    return [
+        "#ifndef SFEM_SUCCESS",
+        "#define SFEM_SUCCESS 0",
+        "#endif",
+        "",
+        "#ifndef SFEM_FAILURE",
+        "#define SFEM_FAILURE 1",
+        "#endif",
+        "",
+        "#ifndef MIN",
+        "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
+        "#endif",
+        "",
+    ]
+
+
 def _sfem_math_header_source(
     header_guard_suffix="HPP",
     inline_qualifier="SFEM_INLINE",
@@ -124,6 +152,14 @@ def _sfem_math_header_source(
                 "",
             ]
         )
+    # The qualifier, too: a generated header that spells `RSTR` in a signature
+    # has to be compilable on its own, and `<prefix>_inexact_apply_inline.hpp`
+    # includes this one and nothing else.  Including it first is what makes
+    # such a header self-contained; `restrict_prelude` defers to SFEM's own
+    # `SFEM_RESTRICT` when the real header is present.
+    lines.extend(restrict_prelude())
+    lines.append("")
+    lines.extend(kernel_status_macro_lines())
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
     lines.extend(_sfem_math_function_lines(inline_qualifier))
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])

@@ -1,15 +1,13 @@
 #include "sfem_GeneratedNeumannGeneral_c_abi.hpp"
-#include <cstdio>
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
 #ifndef SFEM_CODEGEN_PUBLIC_C_ABI
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
+
+static_assert((int)smesh::SMESH_FLOAT64 == (int)sizeof(double),
+              "the generated kernels select their scalar by width");
+static_assert((int)smesh::SMESH_FLOAT32 == (int)sizeof(float),
+              "the generated kernels select their scalar by width");
 
 extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_ss_soa(
     const ptrdiff_t nsides,

@@ -123,12 +123,6 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
       const s_t p_w = current_value[q * VS + lane];
-      const s_t p_w_grad_0_ref = current_grad_ref[(q * ND) * VS + lane];
-      const s_t p_w_grad_1_ref = current_grad_ref[(q * ND + 1) * VS + lane];
-      const s_t p_w_grad_2_ref = current_grad_ref[(q * ND + 2) * VS + lane];
-      const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
-      const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
-      const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
       const s_t p_w_direction = direction_value[q * VS + lane];
       const s_t p_c = current_value[(NQ + q) * VS + lane];
       const s_t p_c_grad_0_ref = current_grad_ref[((NQ + q) * ND) * VS + lane];
@@ -137,7 +131,6 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_direction = direction_value[(NQ + q) * VS + lane];
       const s_t residual_tmp0 = p_c - p_w;
       const s_t residual_tmp1 = pow(residual_tmp0/P_r, m);
       const s_t residual_tmp2 = residual_tmp1 + s_t(1);
@@ -239,12 +232,6 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
       const s_t p_w = current_value[q * VS + lane];
-      const s_t p_w_grad_0_ref = current_grad_ref[(q * ND) * VS + lane];
-      const s_t p_w_grad_1_ref = current_grad_ref[(q * ND + 1) * VS + lane];
-      const s_t p_w_grad_2_ref = current_grad_ref[(q * ND + 2) * VS + lane];
-      const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
-      const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
-      const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
       const s_t p_w_direction = direction_value[q * VS + lane];
       const s_t p_c = current_value[(NQ + q) * VS + lane];
       const s_t p_c_grad_0_ref = current_grad_ref[((NQ + q) * ND) * VS + lane];
@@ -253,7 +240,6 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_direction = direction_value[(NQ + q) * VS + lane];
       const s_t residual_tmp0 = p_c - p_w;
       const s_t residual_tmp1 = pow(residual_tmp0/P_r, m);
       const s_t residual_tmp2 = residual_tmp1 + s_t(1);

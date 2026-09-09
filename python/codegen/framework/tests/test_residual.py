@@ -899,7 +899,12 @@ class CoupledResidualSystemTest(unittest.TestCase):
             "coupled_diffusion_%s_%s_i_msoa"
             % (element.lower(), form),
         )
+        # A generated entry point takes the width of the scalar its
+        # buffers hold and instantiates itself for it; passing the wrong
+        # width is refused rather than miscomputed, which is what the
+        # `SFEM_FAILURE` from an omitted one means.
         args = [
+            ctypes.c_int(ctypes.sizeof(scalar)),
             ctypes.c_long(1),
             ctypes.c_long(n_shape),
             elements,
@@ -989,7 +994,12 @@ class CoupledResidualSystemTest(unittest.TestCase):
             "coupled_diffusion_%s_%s_a_msoa"
             % (element.lower(), form),
         )
+        # A generated entry point takes the width of the scalar its
+        # buffers hold and instantiates itself for it; passing the wrong
+        # width is refused rather than miscomputed, which is what the
+        # `SFEM_FAILURE` from an omitted one means.
         args = [
+            ctypes.c_int(ctypes.sizeof(scalar)),
             ctypes.c_long(1),
             ctypes.c_long(n_shape),
             elements,

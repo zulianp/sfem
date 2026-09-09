@@ -14,15 +14,6 @@
 #endif
 #endif
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -56,35 +47,31 @@ SFEM_INLINE const s_t *ageom_stream(
 } // namespace codegen
 } // namespace sfem
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_esoa(
+    const int scalar_bytes,
     const int ne,
     const ptrdiff_t geometry_stride,
-    const double *const RSTR determinant,
-    const double *const RSTR adjugate[9],
-    const double *const RSTR current[12],
-    const double *const RSTR previous[12],
-    const double eta_b,
-    const double eta_s,
-    const double newmark_velocity_alpha,
-    double *const RSTR output[12]
+    const void *const RSTR determinant,
+    const void *const RSTR adjugate[9],
+    const void *const RSTR current[12],
+    const void *const RSTR previous[12],
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t newmark_velocity_alpha,
+    void *const RSTR output[12]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block<double, 1, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet4_q1<double>::shape(), sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
-  return SFEM_SUCCESS;
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_esoa_float(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const float *const RSTR determinant,
-    const float *const RSTR adjugate[9],
-    const float *const RSTR current[12],
-    const float *const RSTR previous[12],
-    const float eta_b,
-    const float eta_s,
-    const float newmark_velocity_alpha,
-    float *const RSTR output[12]
-) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block<float, 1, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet4_q1<float>::shape(), sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), current, previous, eta_b, eta_s, newmark_velocity_alpha, output);
-  return SFEM_SUCCESS;
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block<double, 1, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q1<double>::shape(), sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, newmark_velocity_alpha, (double *const *)output);
+        return SFEM_SUCCESS;
+    }
+    case (int)sizeof(float): {
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_residual_block<float, 1, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q1<float>::shape(), sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, newmark_velocity_alpha, (float *const *)output);
+        return SFEM_SUCCESS;
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -197,6 +184,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_
 } // namespace sfem
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -210,90 +198,62 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa(
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double eta_b,
-    const double eta_s,
-    const double newmark_velocity_alpha,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t newmark_velocity_alpha,
     const ptrdiff_t current_stride,
-    const double *const RSTR u0,
-    const double *const RSTR u1,
-    const double *const RSTR u2,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const void *const RSTR u2,
     const ptrdiff_t previous_stride,
-    const double *const RSTR u0_old,
-    const double *const RSTR u1_old,
-    const double *const RSTR u2_old,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
+    const void *const RSTR u2_old,
     const ptrdiff_t out_stride,
-    double *const RSTR u0_out,
-    double *const RSTR u1_out,
-    double *const RSTR u2_out
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float eta_b,
-    const float eta_s,
-    const float newmark_velocity_alpha,
-    const ptrdiff_t current_stride,
-    const float *const RSTR u0,
-    const float *const RSTR u1,
-    const float *const RSTR u2,
-    const ptrdiff_t previous_stride,
-    const float *const RSTR u0_old,
-    const float *const RSTR u1_old,
-    const float *const RSTR u2_old,
-    const ptrdiff_t out_stride,
-    float *const RSTR u0_out,
-    float *const RSTR u1_out,
-    float *const RSTR u2_out
-) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa", -1, (int)scalar_bytes);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_esoa(
+    const int scalar_bytes,
     const int ne,
     const ptrdiff_t geometry_stride,
-    const double *const RSTR determinant,
-    const double *const RSTR adjugate[9],
-    const double *const RSTR current[12],
-    const double *const RSTR previous[12],
-    const double *const RSTR direction[12],
-    const double eta_b,
-    const double eta_s,
-    const double newmark_velocity_alpha,
-    double *const RSTR output[12]
+    const void *const RSTR determinant,
+    const void *const RSTR adjugate[9],
+    const void *const RSTR current[12],
+    const void *const RSTR previous[12],
+    const void *const RSTR direction[12],
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t newmark_velocity_alpha,
+    void *const RSTR output[12]
 ) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block<double, 1, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet4_q1<double>::shape(), sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
-  return SFEM_SUCCESS;
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_esoa_float(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const float *const RSTR determinant,
-    const float *const RSTR adjugate[9],
-    const float *const RSTR current[12],
-    const float *const RSTR previous[12],
-    const float *const RSTR direction[12],
-    const float eta_b,
-    const float eta_s,
-    const float newmark_velocity_alpha,
-    float *const RSTR output[12]
-) {
-  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block<float, 1, 4, 16>(ne, geometry_stride, determinant, adjugate, sfem::codegen::ref_tet4_q1<float>::shape(), sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), current, previous, direction, eta_b, eta_s, newmark_velocity_alpha, output);
-  return SFEM_SUCCESS;
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block<double, 1, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q1<double>::shape(), sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, newmark_velocity_alpha, (double *const *)output);
+        return SFEM_SUCCESS;
+    }
+    case (int)sizeof(float): {
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block<float, 1, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q1<float>::shape(), sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, newmark_velocity_alpha, (float *const *)output);
+        return SFEM_SUCCESS;
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -413,6 +373,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_
 } // namespace sfem
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -426,62 +387,35 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a
     const geom_t *const RSTR g_adj7,
     const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
-    const double eta_b,
-    const double eta_s,
-    const double newmark_velocity_alpha,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t newmark_velocity_alpha,
     const ptrdiff_t current_stride,
-    const double *const RSTR u0,
-    const double *const RSTR u1,
-    const double *const RSTR u2,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const void *const RSTR u2,
     const ptrdiff_t previous_stride,
-    const double *const RSTR u0_old,
-    const double *const RSTR u1_old,
-    const double *const RSTR u2_old,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
+    const void *const RSTR u2_old,
     const ptrdiff_t direction_stride,
-    const double *const RSTR u0_direction,
-    const double *const RSTR u1_direction,
-    const double *const RSTR u2_direction,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
     const ptrdiff_t out_stride,
-    double *const RSTR u0_out,
-    double *const RSTR u1_out,
-    double *const RSTR u2_out
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
-    const geom_t *const RSTR g_det0,
-    const float eta_b,
-    const float eta_s,
-    const float newmark_velocity_alpha,
-    const ptrdiff_t current_stride,
-    const float *const RSTR u0,
-    const float *const RSTR u1,
-    const float *const RSTR u2,
-    const ptrdiff_t previous_stride,
-    const float *const RSTR u0_old,
-    const float *const RSTR u1_old,
-    const float *const RSTR u2_old,
-    const ptrdiff_t direction_stride,
-    const float *const RSTR u0_direction,
-    const float *const RSTR u1_direction,
-    const float *const RSTR u2_direction,
-    const ptrdiff_t out_stride,
-    float *const RSTR u0_out,
-    float *const RSTR u1_out,
-    float *const RSTR u2_out
-) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa", -1, (int)scalar_bytes);
 }
