@@ -158,6 +158,22 @@ foreach(TEST_SOURCE ${CVFEM_TESTS})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()
 
+# ------------------------------------------------------------ verification report machinery
+#
+# The report generator draws the conclusions -- it fits the convergence rates, decides which
+# checks pass, and is the thing a reader will believe. A generator that quietly fits the
+# wrong slope is worse than no report, so its fitter, its log parser and its plotter are
+# tested like any other code here.
+#
+# Standard-library only and no build dependency, so this runs wherever a python3 does,
+# including inside the Alps uenv where numpy, matplotlib and markdown are all absent.
+find_program(CVFEM_REPORT_PYTHON NAMES python3 python)
+if(CVFEM_REPORT_PYTHON)
+    add_test(NAME cvfem_verify_report_selftest
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/python/cvfem_verify_report.py --selftest)
+endif()
+
 # ------------------------------------------------ generated headers match their generators
 #
 # The three headers under src/generated/ and src/cases/ are committed artifacts compiled as
