@@ -9,7 +9,19 @@ by eye and start looking like a discretisation defect.
     venv/bin/python spikes/cvfem/python/gen_mms_case.py \
         > spikes/cvfem/src/cases/cvfem_ns_mms_case.hpp
 """
+import argparse
+import sys
+from pathlib import Path
+
 import sympy as sp
+
+# The generated header is a committed artifact that nothing regenerated or diffed, so it
+# could drift from this script unnoticed. --check closes that: it regenerates in memory and
+# compares, writing nothing. The two SymPy synthesizers already work this way.
+_OUT = []
+def emit_out(text):
+    _OUT.append(text)
+
 
 x, y, z, rho, mu, Re = sp.symbols('x y z rho mu Re', real=True)
 
@@ -44,7 +56,7 @@ def emit(name, args, outs, exprs):
     return (f"    template <typename T>\n    inline void {name}({args}) {{\n"
             + "\n".join(body) + "\n    }\n")
 
-print("""#pragma once
+emit_out("""#pragma once
 
 // The manufactured solution of Farrell, Mitchell & Wechsung, SIAM J. Sci. Comput. 41(5),
 // A3073-A3096 (arXiv:1810.03315), equation 5.2, and the body force that drives it.
@@ -75,17 +87,53 @@ print("""#pragma once
 
 namespace cvfem_mms {
 """)
-print(emit("velocity",
+emit_out(emit("velocity",
            "const T x, const T y, const T /*z*/,\n"
            "                       T &ux, T &uy, T &uz",
            ["ux", "uy", "uz"], [u1, u2, u3]))
-print(emit("pressure",
+emit_out(emit("pressure",
            "const T x, const T y, const T /*z*/,\n"
            "                       const T Re, T &p",
            ["p"], [p]))
-print(emit("body_force",
+emit_out(emit("body_force",
            "const T x, const T y, const T /*z*/,\n"
            "                       const T rho, const T mu, const T Re,\n"
            "                       T &fx, T &fy, T &fz",
            ["fx", "fy", "fz"], [f[0], f[1], f[2]]))
-print("}  // namespace cvfem_mms")
+emit_out("}  // namespace cvfem_mms")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Emit the CVFEM MMS case header.")
+    ap.add_argument("--out", type=Path, default=None,
+                    help="write here instead of stdout")
+    ap.add_argument("--check", action="store_true",
+                    help="compare against the committed header and write nothing; "
+                         "exits non-zero if they differ")
+    args = ap.parse_args()
+
+    text = "\n".join(_OUT) + "\n"
+    default = Path(__file__).resolve().parent.parent / "src" / "cases" / "cvfem_ns_mms_case.hpp"
+
+    if args.check:
+        target = args.out or default
+        if not target.exists():
+            print(f"{target}: MISSING", file=sys.stderr)
+            return 1
+        if target.read_text() == text:
+            print(f"{target.name}: unchanged")
+            return 0
+        print(f"{target.name}: DIFFERS from the checked-in header", file=sys.stderr)
+        return 1
+
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text)
+        print(f"{args.out.name}: {text.count(chr(10))} lines", file=sys.stderr)
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

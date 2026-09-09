@@ -254,6 +254,22 @@ quadratic. Unconstrained outlet with `p_i·a` retained: diverges, `|dx|_inf` 108
 Unconstrained and unpinned: linear solve diverges outright — confirming the nullspace
 survives. Prescribing `(pI − τ)·n = 0` fixes the gauge and lets the pin come off.
 
-**Known limitation:** multigrid does not yet work for this case. `src/ss/cvfem_ss_galerkin.hpp` still
-calls the boundary term without the masks, so the coarse operator is inconsistent and the
-solve stalls at zero Krylov iterations.
+**Resolved since this was written.** The paragraph here used to record that multigrid did
+not work for this case because `src/ss/cvfem_ss_galerkin.hpp` called the boundary term
+without the masks. Both halves of that are now out of date. The Galerkin coarse operator
+passes both the face mask and the natural-outflow mask down through
+`sscvfem_micro_face_mask` (`src/ss/cvfem_ss_galerkin.hpp:315-322`), and the case solves:
+
+```
+highest Re SOLVED = 20 of 20 target  (AT TARGET)
+newton_converged: 1   16 Newton steps over 4 stages   7686 linear iterations   31.2 s
+sum of continuity residual 5.111215e-15  (sum |.| 4.156488e-14)
+```
+
+quadratic in every stage, with mass conserved to 5e-15 — which is the quantity this
+verification case is judged on. The missing masks were real but were not the last obstacle:
+what actually unblocked it was switching the Vanka sweep to the additive form at an open
+outlet. The multiplicative 8-colour sweep is the better smoother on a closed box (0.63 at
+omega = 1 against 0.883) and that ranking reverses once the outlet opens, because colour
+order and characteristic direction disagree where more than half the outlet faces are
+reversed. See the commit that records the Brandt regime diagnostic behind it.
