@@ -19,6 +19,28 @@ python3 python/cvfem_verify_report.py <rundir> \
 
 On Grace, `sbatch jobs/verify_report.sbatch` does both on the debug partition.
 
+`VERIFY_SOLVER` chooses how the linear systems are solved, and the report records which was
+used. `direct` (the default) is a dense LU of the fine Jacobian: exact, and O(n^2) memory
+and O(n^3) time, so it is a verification instrument rather than a solver -- it is the
+default only because it makes the reference numbers as sharp as the arithmetic allows.
+`fgmres` reaches the same conclusions with block-Jacobi and no factorisation:
+
+```sh
+VERIFY_SOLVER=fgmres scripts/verify_report.sh
+sbatch --export=ALL,VERIFY_SOLVER=fgmres jobs/verify_report.sbatch
+```
+
+Both give 6 of 6. The pump identity reads 0 to 2.7e-14 either way, and the step's continuity
+sum 9.9e-17 against 3.7e-12 -- both far inside the 1e-9 relative threshold.
+
+**The restart length is the parameter that matters, and the driver's default of 30 is far
+too short here.** It is right for a multigrid-preconditioned solve, which converges in about
+115 iterations; on the block-Jacobi-preconditioned step at Re=20, r=30 does not converge at
+all, r=120 leaves the continuity sum at 6e-11, and r=480 reaches 4e-12 in *fewer* iterations
+(19,000 against 43,000) because a longer restart minimises over a larger space. Tightening
+`SFEM_LSOLVE_RTOL` is not a substitute and at fixed restart makes the answer slightly worse:
+the restart truncation sets the accuracy floor, not the stopping tolerance.
+
 What it checks, and against what -- every one is an identity or a fitted rate against a
 threshold, never an eyeballed plot:
 
