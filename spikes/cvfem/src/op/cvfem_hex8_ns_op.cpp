@@ -453,6 +453,11 @@ namespace sfem {
         if (name == "cache_nodal_pgrad") {
             impl_->cache_pgrad = val;
             impl_->pgrad_for   = nullptr;  // nothing is cached yet
+        } else if (name == "blocks_exact_rc") {
+            // Whether apply_blocks is the exact restriction of the operator or its
+            // frozen-pressure-gradient approximation. Semi-structured only, which is also
+            // the only path apply_blocks has at all.
+            impl_->ss.blocks_exact_rc = val;
         }
     }
 
