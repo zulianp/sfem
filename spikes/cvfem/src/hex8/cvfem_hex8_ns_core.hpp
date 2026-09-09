@@ -366,6 +366,7 @@ inline void assemble_nodal_grad_strided(MeshData &d, const GeomKind geom_kind,
                                         const scalar_t *const SFEM_RESTRICT src, const int stride,
                                         std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
                                         std::vector<scalar_t> &ogz) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::nodal_grad_strided");
     ogx.assign((size_t)d.nnodes, scalar_t(0));
     ogy.assign((size_t)d.nnodes, scalar_t(0));
     ogz.assign((size_t)d.nnodes, scalar_t(0));
@@ -778,6 +779,7 @@ inline void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol
 // here covers the sumfact, isoparametric and packed sweeps at once instead of touching five
 // host kernels and five CUDA kernels for the same arithmetic.
 inline void apply_body_force(MeshData &d) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_node_volume");
     if (d.fx.empty()) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
 #pragma omp parallel for schedule(static)
@@ -818,6 +820,7 @@ inline BdfCoeffs bdf_coeffs(const MeshData &d) {
 // sub-control-surface flux, so one pass covers the sumfact, isoparametric and packed
 // sweeps at once rather than being threaded into five host kernels and five CUDA kernels.
 inline void apply_transient(MeshData &d, const scalar_t rho) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_transient");
     if (d.dt <= scalar_t(0)) return;
     if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
@@ -863,6 +866,7 @@ inline scalar_t transient_diag_weight(const MeshData &d, const scalar_t rho) {
 inline void apply_transient_action(MeshData &d, const scalar_t rho,
                                    const scalar_t *const SFEM_RESTRICT dir,
                                    scalar_t *const SFEM_RESTRICT jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_transient_action");
     const scalar_t a = transient_diag_weight(d, rho);
     if (a == scalar_t(0)) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
@@ -995,6 +999,7 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
 inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
                                              const scalar_t *const SFEM_RESTRICT dir,
                                              scalar_t *const SFEM_RESTRICT       jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action");
     // The Rhie-Chow correction differentiates through the nodal pressure-gradient
     // reconstruction, so the direction's own reconstructed gradient is needed. One extra
     // pass per Jacobian apply, the same shape as the one update() already does for p.
