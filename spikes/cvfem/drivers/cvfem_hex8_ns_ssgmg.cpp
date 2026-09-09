@@ -4425,6 +4425,44 @@ int main(int argc, char **argv) {
             for (int c = 0; c < 3; ++c) u_hist[(size_t)i * 3 + (size_t)c] = x[(size_t)i * 4 + (size_t)c];
         op->set_velocity_history(u_hist.data(), bdf_order >= 2 && tstep >= 1 ? u_hist2.data() : nullptr);
     }
+
+    // A transient run's whole point is the sequence, and the writer at the end of this file
+    // only ever sees the last state. SFEM_WRITE_STEPS writes each one into its own
+    // step_NNNN/ under the output folder, which python/create_xdmf.py turns into a temporal
+    // XDMF that ParaView animates.
+    //
+    // Off by default: it is one full field dump per step, and the runs that gave the
+    // verification numbers want none of it. The mesh is written once at the top rather than
+    // per step -- this is transpiration on a FIXED mesh, so there is exactly one geometry
+    // for every frame to share.
+    if (dt_step > real_t(0) && smesh::Env::read<int>("SFEM_WRITE_STEPS", 0)) {
+        char sub[64];
+        std::snprintf(sub, sizeof(sub), "step_%04d", tstep);
+        const smesh::Path step_dir = smesh::Path(out_folder) / sub;
+        smesh::create_directory(smesh::Path(out_folder));
+        smesh::create_directory(step_dir);
+        if (tstep == 0) {
+            if (fs->has_semi_structured_mesh())
+                smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path(out_folder) / "mesh");
+            else
+                mesh->write(smesh::Path(out_folder) / "mesh");
+        }
+        auto so = f->output();
+        so->enable_AoS_to_SoA(true);
+        so->set_output_dir(step_dir);
+        so->write("vel", x);
+        const char *const sext = sizeof(real_t) == 8 ? "float64" : "float32";
+        const std::string sfrom = std::string(step_dir.c_str()) + "/vel.3." + sext;
+        const std::string sto   = std::string(step_dir.c_str()) + "/p." + sext;
+        std::remove(sto.c_str());
+        (void)std::rename(sfrom.c_str(), sto.c_str());
+        // The time each frame is AT, so the XDMF can carry real times rather than indices.
+        FILE *tf = std::fopen((std::string(step_dir.c_str()) + "/time.txt").c_str(), "w");
+        if (tf) {
+            std::fprintf(tf, "%.17g\n", (double)((tstep + 1) * dt_step));
+            std::fclose(tf);
+        }
+    }
     }  // time step
 
 
