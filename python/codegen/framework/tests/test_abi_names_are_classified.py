@@ -66,7 +66,11 @@ class ClassificationIsTotalTest(unittest.TestCase):
 
     def test_the_tree_is_large_enough_for_this_to_mean_something(self):
         """A guard over an empty set passes for the wrong reason."""
-        self.assertGreater(len(self.names), 3000)
+        # The thresholds moved down when the tree stopped publishing a
+        # symbol per precision and a wrapper per diagnostics helper.  They
+        # are here so the checks cannot pass over an empty set, not as a
+        # claim about the right size, so they track what the tree has.
+        self.assertGreater(len(self.names), 1200)
 
     def test_every_published_name_is_classified(self):
         unclassified = sorted(n for n in self.names if conventions.classify_abi_name(n) is None)
@@ -95,7 +99,7 @@ class ClassificationIsTotalTest(unittest.TestCase):
         drifting into two tables that happen to agree today.
         """
         dispatchable = _published_names(dispatchable_only=True)
-        self.assertGreater(len(dispatchable), 1000)
+        self.assertGreater(len(dispatchable), 800)
         failed = []
         for name in sorted(dispatchable):
             kind, marker = conventions.classify_abi_name(name)
@@ -174,7 +178,7 @@ class QualifierSlotTest(unittest.TestCase):
         ]
 
     def test_every_mesh_name_has_a_verb_and_a_known_qualifier(self):
-        self.assertGreater(len(self.mesh), 1000)
+        self.assertGreater(len(self.mesh), 700)
         unparsed = []
         for name in sorted(self.mesh):
             try:

@@ -5,11 +5,17 @@ to do and a plan that decides it, and it is easy to claim the second while
 shipping the first.  The difference is observable: change the plan, and the
 generated kernel must change to match.
 
-These tests change the precision axis of the matrix-free apply variant matrix
-and assert the emitted source follows.  If the emitters ever go back to
-carrying their own literal, the kernels stop responding and these fail --
-which is what the byte-identity gate alone cannot tell you, because a plan that
-is merely consulted and a plan that is ignored produce identical output.
+These tests change the set of precisions a kernel is emitted for and assert the
+emitted source follows.  If the emitters ever go back to carrying their own
+literal, the kernels stop responding and these fail -- which is what the
+byte-identity gate alone cannot tell you, because a plan that is merely
+consulted and a plan that is ignored produce identical output.
+
+The axis used to be spelled as a symbol suffix: one `extern "C"` entry point
+per precision, `_float` for the narrow one.  A kernel now takes the width of
+the scalar its buffers hold and selects the instantiation itself, so the same
+property is observed one level in -- in the arms of that switch rather than in
+the symbol names.  `RUNTIME_SCALAR_TYPES` is the table it reads.
 """
 
 import unittest
@@ -21,7 +27,8 @@ from codegen.framework.emitters import residual_codegen
 from codegen.framework.emitters.residual_codegen import (
     generate_coupled_residual_sfem_files,
 )
-from codegen.framework.plans.apply_variants import precision_axis
+from codegen.framework.emitters import runtime_typed_abi
+from codegen.framework.emitters.runtime_typed_abi import RUNTIME_SCALAR_TYPES
 from codegen.framework.plans.emission import emission_plan_for_element
 from codegen.framework.plans.residual_model import residual_emission_model_from_system
 from codegen.framework.symbolic.residual import CoupledResidualSystem
@@ -63,56 +70,65 @@ def _operator_source(files):
 MSOA = dict(conventions.ABI_LAYOUT_SPELLING)["mesh_soa"]
 
 
+def _arm(scalar_type):
+    """How an entry point spells the arm that instantiates one scalar."""
+    return "case (int)sizeof(%s):" % scalar_type
+
+
 class ApplyVariantsDriveEmissionTest(unittest.TestCase):
     def test_the_default_axis_emits_both_precisions(self):
         source = _operator_source(_emit())
-        for scalar_type, suffix in precision_axis():
+        self.assertIn("_%s(" % MSOA, source)
+        for scalar_type in RUNTIME_SCALAR_TYPES:
             self.assertIn(
-                "_%s%s(" % (MSOA, suffix),
+                _arm(scalar_type),
                 source,
                 "the %s precision variant was not emitted" % (scalar_type,),
             )
 
     def test_removing_a_precision_removes_its_kernels(self):
-        """The clearest evidence the plan decides: drop float, lose the float kernels."""
+        """The clearest evidence the plan decides: drop float, lose the float arm."""
         with mock.patch.object(
-            residual_codegen, "precision_axis", lambda: (("double", ""),)
+            runtime_typed_abi, "RUNTIME_SCALAR_TYPES", ("double",)
         ):
             source = _operator_source(_emit())
-        self.assertIn("_%s(" % MSOA, source)
+        self.assertIn(_arm("double"), source)
         self.assertNotIn(
-            "_%s_float(" % MSOA,
+            _arm("float"),
             source,
             "float kernels were still emitted after the plan dropped that "
             "precision, so the emitter is not reading the plan",
         )
 
-    def test_renaming_a_precision_renames_its_kernels(self):
-        """The suffix in the emitted symbol comes from the plan, not a literal."""
+    def test_changing_a_precision_changes_the_instantiation(self):
+        """The scalar in the emitted call comes from the plan, not a literal."""
         with mock.patch.object(
-            residual_codegen,
-            "precision_axis",
-            lambda: (("double", ""), ("float", "_reduced")),
+            runtime_typed_abi, "RUNTIME_SCALAR_TYPES", ("double", "long double")
         ):
             source = _operator_source(_emit())
-        self.assertIn("_%s_reduced(" % MSOA, source)
-        self.assertNotIn("_%s_float(" % MSOA, source)
+        self.assertIn(_arm("long double"), source)
+        self.assertNotIn(_arm("float"), source)
 
-    def test_a_third_precision_produces_a_third_set_of_kernels(self):
+    def test_a_third_precision_produces_a_third_arm(self):
         """Adding a row to the variant matrix is a plan change, not an emitter change."""
         with mock.patch.object(
-            residual_codegen,
-            "precision_axis",
-            lambda: (("double", ""), ("float", "_float"), ("long double", "_extended")),
+            runtime_typed_abi,
+            "RUNTIME_SCALAR_TYPES",
+            ("double", "float", "long double"),
         ):
             source = _operator_source(_emit())
-        for suffix in ("", "_float", "_extended"):
-            self.assertIn("_%s%s(" % (MSOA, suffix), source)
+        for scalar_type in ("double", "float", "long double"):
+            self.assertIn(_arm(scalar_type), source)
         self.assertIn(
             "long double",
             source,
             "the added precision's scalar type never reached the emitted source",
         )
+
+    def test_no_kernel_publishes_a_symbol_per_precision(self):
+        """The axis is inside the entry point, not in its name."""
+        source = _operator_source(_emit())
+        self.assertNotIn("_%s_float(" % MSOA, source)
 
 
 if __name__ == "__main__":

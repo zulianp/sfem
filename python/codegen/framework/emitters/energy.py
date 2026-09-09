@@ -260,11 +260,18 @@ class OpenMPEnergySoASourceBuilder:
         )
         return ("  %s" % lines[0], "    %s" % lines[1])
 
-    def mesh_template_line(self, geometry_mode):
-        return (
-            "template <typename s_t, typename g_t>"
-            if geometry_mode == "isoparametric"
-            else "template <typename s_t, typename g_t>"
+    def mesh_template_line(self, geometry_mode, extra_template_params=()):
+        """The mesh kernel's template head.
+
+        `extra_template_params` carries the extents the body would otherwise
+        declare as `static constexpr` -- today the vector width.  It is a
+        parameter rather than a constant in the body because the width is a
+        tuning choice, and it carries no default because a caller must choose:
+        the generated entry point spells the number it wants at the point where
+        it names the concrete kernel.
+        """
+        return "template <typename s_t, typename g_t%s>" % "".join(
+            ", %s" % parameter for parameter in extra_template_params
         )
 
     def mesh_function_line(self, implementation_name):
@@ -392,11 +399,18 @@ class CUDAEnergySoASourceBuilder:
         )
         return ("  %s" % lines[0], "    %s" % lines[1])
 
-    def mesh_template_line(self, geometry_mode):
-        return (
-            "template <typename s_t, typename g_t>"
-            if geometry_mode == "isoparametric"
-            else "template <typename s_t, typename g_t>"
+    def mesh_template_line(self, geometry_mode, extra_template_params=()):
+        """The mesh kernel's template head.
+
+        `extra_template_params` carries the extents the body would otherwise
+        declare as `static constexpr` -- today the vector width.  It is a
+        parameter rather than a constant in the body because the width is a
+        tuning choice, and it carries no default because a caller must choose:
+        the generated entry point spells the number it wants at the point where
+        it names the concrete kernel.
+        """
+        return "template <typename s_t, typename g_t%s>" % "".join(
+            ", %s" % parameter for parameter in extra_template_params
         )
 
     def mesh_function_line(self, implementation_name):

@@ -16,7 +16,15 @@ LOWER="$(echo "$ELEMENT" | tr '[:upper:]' '[:lower:]')"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKTREE="$(cd "$HERE/../.." && pwd)"
 SFEM="${SFEM_MAIN_CHECKOUT:-$WORKTREE/../sfem}"
-PYTHON="${SFEM_PYTHON:-$SFEM/.venv/bin/python}"
+# Both spellings are in use across checkouts, so look rather than assume.
+PYTHON="${SFEM_PYTHON:-}"
+if [ -z "$PYTHON" ]; then
+    for candidate in "$SFEM/.venv/bin/python" "$SFEM/venv/bin/python" \
+                     "$WORKTREE/.venv/bin/python" "$WORKTREE/venv/bin/python"; do
+        [ -x "$candidate" ] && PYTHON="$candidate" && break
+    done
+fi
+: "${PYTHON:?set SFEM_PYTHON: no venv found beside the checkout}"
 BUILD="${SFEM_BUILD:-$SFEM/build}"
 WORK="${SFEM_SPIKE_WORK:-${TMPDIR:-/tmp}}/inexact_apply_split"
 LOG="$WORK/${MATERIAL}_${LOWER}.log"

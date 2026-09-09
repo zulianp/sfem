@@ -46,7 +46,10 @@
 // `half_t` comes from sfem_config.h: __fp16 on some targets, _Float16 on
 // others.  Declaring it here would conflict on whichever one it is not.
 
+#include "generated_abi.inc"
+
 extern "C" int EXACT_APPLY(
+        const int,
         const ptrdiff_t, const ptrdiff_t, idx_t **const,
         const geom_t *const, const geom_t *const, const geom_t *const,
         const geom_t *const, const geom_t *const, const geom_t *const,
@@ -165,7 +168,7 @@ int main(int argc, char **argv) {
         };
         auto run_exact = [&] {
             zero(ax,ay,az);
-            EXACT_APPLY(m.nelements, m.nnodes, m.evp.data(),
+            EXACT_APPLY(SFEM_CODEGEN_F64, m.nelements, m.nnodes, m.evp.data(),
                 m.adj[0].data(),m.adj[1].data(),m.adj[2].data(),m.adj[3].data(),m.adj[4].data(),
                 m.adj[5].data(),m.adj[6].data(),m.adj[7].data(),m.adj[8].data(), m.det.data(),
                 lmbda, mu,

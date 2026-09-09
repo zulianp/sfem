@@ -20,6 +20,10 @@ from codegen.framework.plans.affine_element_kernel import (
     p1_simplex_metric_apply_plan,
 )
 from codegen.framework.plans.geometry_variants import geometry_variant_plan
+from codegen.framework.emitters.runtime_typed_abi import (
+    cast_arguments,
+    runtime_typed_entry_point_lines,
+)
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.form_transformations import (
     metric_value_scale,
@@ -84,6 +88,7 @@ from codegen.framework.emitters.cprinter import (
     c_group,
     c_product,
     c_sum,
+    kernel_status_macro_lines,
     _component_name,
     parameter_list_lines,
     _cpp_argument_name,
@@ -2237,15 +2242,17 @@ def _append_sfem_soa_weak_form_lines(
     if writes_per_shape(form):
         for component in range(n_field_components * dim):
             lines.append("      s_t loperand%d_values[VS];" % component)
+    zeroed = []
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
-            lines.extend(_work_item_loop_lines(source_builder, "      "))
             if uses_current:
-                lines.append("        gu_ref%d_values[%s] = s_t(0);" % (idx, work_item))
+                zeroed.append("gu_ref%d_values" % idx)
             if uses_direction:
-                lines.append("        grad_h_ref%d_values[%s] = s_t(0);" % (idx, work_item))
-            lines.append("      }")
+                zeroed.append("grad_h_ref%d_values" % idx)
+    lines.extend(
+        _zero_lane_block_lines(source_builder, "      ", zeroed, work_item)
+    )
     lines.append("      for (int shape = 0; shape < NS; ++shape) {")
     for row in range(n_field_components):
         for col in range(dim):
@@ -2875,15 +2882,18 @@ def _sfem_soa_isoparametric_geometry_lines(
     for row in range(dim):
         for col in range(dim):
             lines.append("      s_t J%d%d_values[VS];" % (row, col))
-    for row in range(dim):
-        for col in range(dim):
-            lines.extend(_work_item_loop_lines(source_builder, "      "))
-            lines.extend(
-                [
-                    "        J%d%d_values[%s] = s_t(0);" % (row, col, work_item),
-                    "      }",
-                ]
-            )
+    lines.extend(
+        _zero_lane_block_lines(
+            source_builder,
+            "      ",
+            [
+                "J%d%d_values" % (row, col)
+                for row in range(dim)
+                for col in range(dim)
+            ],
+            work_item,
+        )
+    )
     lines.append("      for (int shape = 0; shape < NS; ++shape) {")
     if use_tensor_product_reference:
         lines.extend(_tensor_product_shape_index_lines(quadrature_rule, "        "))
@@ -2902,24 +2912,26 @@ def _sfem_soa_isoparametric_geometry_lines(
                 ),
             )
         )
-    for row in range(dim):
-        for col in range(dim):
-            lines.extend(
-                [
-                    *_work_item_loop_lines(source_builder, "        "),
-                    "          J%d%d_values[%s] += %s[%s][%s] * g%d;"
-                    % (
-                        row,
-                        col,
-                        work_item,
-                        coordinate_streams,
-                        c_sum(c_product("shape", dim), row),
-                        work_item,
-                        col,
-                    ),
-                    "        }",
-                ]
-            )
+    # One lane loop for the whole Jacobian, not one per component: the loop
+    # bound and the pragma are the same for all of them, and a three-
+    # dimensional element opened nine `#pragma omp simd` regions in a row for
+    # nine accumulations that belong together.  Same stores, one region.
+    lines.extend(_work_item_loop_lines(source_builder, "        "))
+    lines.extend(
+        "          J%d%d_values[%s] += %s[%s][%s] * g%d;"
+        % (
+            row,
+            col,
+            work_item,
+            coordinate_streams,
+            c_sum(c_product("shape", dim), row),
+            work_item,
+            col,
+        )
+        for row in range(dim)
+        for col in range(dim)
+    )
+    lines.append("        }")
     lines.append("      }")
     lines.extend(_work_item_loop_lines(source_builder, "      "))
     for row in range(dim):
@@ -3058,23 +3070,6 @@ def _sfem_soa_operator_source(
     ]
     if getattr(source_builder, "operator_extension", "cpp") == "cpp":
         lines.append('#include "packed_thread_scratch.hpp"')
-    lines.extend(
-        [
-            "",
-            "#ifndef SFEM_SUCCESS",
-            "#define SFEM_SUCCESS 0",
-            "#endif",
-            "",
-            "#ifndef SFEM_FAILURE",
-            "#define SFEM_FAILURE 1",
-            "#endif",
-            "",
-            "#ifndef MIN",
-            "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
-            "#endif",
-            "",
-        ]
-    )
     lines = [line for line in lines if line != ""]
     lines.append("")
     lines.extend(
@@ -3428,22 +3423,23 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
     )
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
-    for public_name, scalar_type in (
-        (function_name, "double"),
-        ("%s_float" % function_name, "float"),
-    ):
-        concrete_params = _sfem_soa_concrete_scalar_params(wrapper_params, scalar_type)
-        lines.append('extern "C" int %s(' % public_name)
-        lines.extend(parameter_list_lines(concrete_params))
-        lines.extend(
-            [
-                ") {",
+    lines.extend(
+        runtime_typed_entry_point_lines(
+            function_name,
+            wrapper_params,
+            lambda scalar_type, _positional: [
                 "  return sfem::codegen::%s<%s, geom_t>(%s);"
-                % (implementation_name, scalar_type, ", ".join(wrapper_args)),
-                "}",
-                "",
-            ]
+                % (
+                    implementation_name,
+                    scalar_type,
+                    ", ".join(
+                        cast_arguments(wrapper_params, wrapper_args, scalar_type)
+                    ),
+                ),
+            ],
+            parameter_lines=parameter_list_lines,
         )
+    )
     return lines
 
 
@@ -4408,6 +4404,26 @@ def _append_mesh_operator_stream_buffer_views(
         lines.append("    }")
 
 
+def _zero_lane_block_lines(source_builder, indent, targets, work_item):
+    """One lane loop that zeroes every target, instead of one loop per target.
+
+    The lane loop is the vectorised inner loop, so opening a fresh one per
+    component emitted a `#pragma omp simd` region per component for a set of
+    stores that belong in one.  A three-dimensional Jacobian produced nine of
+    them in a row, a two-dimensional one four, and the reference-gradient
+    accumulators three; across the tree there were 2173 such single-statement
+    loops.  The stores are the same, the loop and the pragma are paid once.
+    """
+    if not targets:
+        return []
+    lines = list(_work_item_loop_lines(source_builder, indent))
+    lines.extend(
+        "%s  %s[%s] = s_t(0);" % (indent, target, work_item) for target in targets
+    )
+    lines.append("%s}" % indent)
+    return lines
+
+
 def _append_mesh_operator_isoparametric_jacobian(
     compact_coordinate_buffers,
     dim,
@@ -4739,7 +4755,7 @@ def _sfem_soa_mesh_operator_function(
         "namespace sfem {",
         "namespace codegen {",
         "",
-        source_builder.mesh_template_line(geometry_mode),
+        source_builder.mesh_template_line(geometry_mode, ("int VS",)),
         source_builder.mesh_function_line(implementation_name),
     ]
     lines.extend(parameter_list_lines(impl_params))
@@ -4751,7 +4767,6 @@ def _sfem_soa_mesh_operator_function(
                 "  static constexpr int ND = %d;" % dim,
             "  static constexpr int NQ = %d;" % n_qp,
             "  static constexpr int NS = %d;" % n_nodes,
-            "  static constexpr int VS = %d;" % effective_vector_size,
             "  (void)nnodes;",
         ]
     )
@@ -5012,26 +5027,19 @@ def _sfem_soa_mesh_operator_function(
 
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
-    for public_name, scalar_type in (
-        (function_name, "double"),
-        ("%s_float" % function_name, "float"),
-    ):
-        concrete_params = _sfem_soa_concrete_scalar_params(wrapper_params, scalar_type)
-        lines.append('extern "C" int %s(' % public_name)
-        lines.extend(parameter_list_lines(concrete_params))
-        lines.extend(
-            [
-                ") {",
-            *source_builder.wrapper_call_lines(
+    lines.extend(
+        runtime_typed_entry_point_lines(
+            function_name,
+            wrapper_params,
+            lambda scalar_type, _positional: source_builder.wrapper_call_lines(
                 implementation_name,
                 scalar_type,
-                ", geom_t",
-                wrapper_args,
+                ", geom_t, %d" % effective_vector_size,
+                cast_arguments(wrapper_params, wrapper_args, scalar_type),
             ),
-            "}",
-                "",
-            ]
+            parameter_lines=parameter_list_lines,
         )
+    )
     # Iterated, not tested: the plan says which packed layouts this element
     # publishes, and an element that publishes none simply does not enter the
     # loop.  A branch here would be emission choosing what to emit.
@@ -5179,18 +5187,15 @@ def _packed_precision_forwarders(public_base, signature, impl_name):
             raise ValueError("could not read a parameter name from %r" % line)
         names.append(match.group(1))
 
-    lines = []
-    for scalar_type in ("double", "float"):
-        suffix = "" if scalar_type == "double" else "_float"
-        typed = [_re.sub(r"\bs_t\b", scalar_type, line) for line in signature]
-        lines.append('extern "C" int %s%s(' % (public_base, suffix))
-        lines.extend(typed)
-        lines.append(") {")
-        lines.append(
-            "  return %s<%s>(%s);" % (impl_name, scalar_type, ", ".join(names))
-        )
-        lines.extend(["}", ""])
-    return lines
+    params = [line.strip().rstrip(",") for line in signature]
+    return runtime_typed_entry_point_lines(
+        public_base,
+        params,
+        lambda scalar_type, arguments: [
+            "  return %s<%s>(%s);"
+            % (impl_name, scalar_type, ", ".join(arguments)),
+        ],
+    )
 
 
 def _sfem_soa_packed_apply_public_wrappers(
@@ -6052,7 +6057,7 @@ def _sfem_soa_mesh_objective_steps_function(
         "namespace sfem {",
         "namespace codegen {",
         "",
-        source_builder.mesh_template_line(geometry_mode),
+        source_builder.mesh_template_line(geometry_mode, ("int VS",)),
         source_builder.mesh_function_line(implementation_name),
     ]
     lines.extend(parameter_list_lines(impl_params))
@@ -6064,7 +6069,6 @@ def _sfem_soa_mesh_objective_steps_function(
                 "  static constexpr int ND = %d;" % dim,
             "  static constexpr int NQ = %d;" % n_qp,
             "  static constexpr int NS = %d;" % n_nodes,
-            "  static constexpr int VS = %d;" % vector_size,
             "  (void)nnodes;",
         ]
     )
@@ -6419,26 +6423,19 @@ def _sfem_soa_mesh_objective_steps_function(
         )
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
-    for public_name, scalar_type in (
-        (function_name, "double"),
-        ("%s_float" % function_name, "float"),
-    ):
-        concrete_params = _sfem_soa_concrete_scalar_params(wrapper_params, scalar_type)
-        lines.append('extern "C" int %s(' % public_name)
-        lines.extend(parameter_list_lines(concrete_params))
-        lines.extend(
-            [
-                ") {",
-                *source_builder.wrapper_call_lines(
-                    implementation_name,
-                    scalar_type,
-                    ", geom_t",
-                    wrapper_args,
-                ),
-                "}",
-                "",
-            ]
+    lines.extend(
+        runtime_typed_entry_point_lines(
+            function_name,
+            wrapper_params,
+            lambda scalar_type, _positional: source_builder.wrapper_call_lines(
+                implementation_name,
+                scalar_type,
+                ", geom_t, %d" % vector_size,
+                cast_arguments(wrapper_params, wrapper_args, scalar_type),
+            ),
+            parameter_lines=parameter_list_lines,
         )
+    )
     # The objective_steps packed wrappers are the other half of the packed
     # family, emitted from here rather than from the mesh operator, and they
     # follow the same plan.
@@ -8253,19 +8250,14 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
     two_pass,
 ):
     n_field_components = dim
-    lines = []
-    for scalar_type in ("double", "float"):
-        suffix = "" if scalar_type == "double" else "_float"
-        concrete_name = "%s%s" % (public_name, suffix)
-        params = _hessian_packed_crs_public_params(
-            dim,
-            scalar_type,
-            material_parameter_names,
-            uses_current,
-            two_pass,
-        )
-        lines.append('extern "C" int %s(' % concrete_name)
-        lines.extend(parameter_list_lines(params))
+    params = _hessian_packed_crs_public_params(
+        dim,
+        "s_t",
+        material_parameter_names,
+        uses_current,
+        two_pass,
+    )
+    if True:
         common_args = [
             "n_packs",
             "n_elements_per_pack",
@@ -8286,23 +8278,36 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
             fill_args.append("u_stride")
             fill_args.extend("u%s" % _component_name(d) for d in range(n_field_components))
         fill_args.extend(("packed_element_entries", "values"))
-        lines.append(") {")
-        if two_pass:
-            lines.append(
-                "  const int graph_status = sfem::codegen::%s_packed_discover_impl<%s, geom_t>(%s);"
-                % (
-                    function_base,
-                    scalar_type,
-                    ", ".join(common_args + ["rowptr", "colidx", "packed_element_entries"]),
-                )
-            )
-            lines.append("  if (graph_status != SFEM_SUCCESS) return graph_status;")
-        lines.append(
-            "  return sfem::codegen::%s_packed_fill_impl<%s, geom_t>(%s);"
-            % (function_base, scalar_type, ", ".join(fill_args))
+
+    def body(scalar_type, arguments):
+        discover_args = cast_arguments(
+            params,
+            common_args + ["rowptr", "colidx", "packed_element_entries"],
+            scalar_type,
         )
-        lines.extend(["}", ""])
-    return lines
+        spelled = []
+        if two_pass:
+            spelled.append(
+                "  const int graph_status = sfem::codegen::%s_packed_discover_impl<%s, geom_t>(%s);"
+                % (function_base, scalar_type, ", ".join(discover_args))
+            )
+            spelled.append("  if (graph_status != SFEM_SUCCESS) return graph_status;")
+        spelled.append(
+            "  return sfem::codegen::%s_packed_fill_impl<%s, geom_t>(%s);"
+            % (
+                function_base,
+                scalar_type,
+                ", ".join(cast_arguments(params, fill_args, scalar_type)),
+            )
+        )
+        return spelled
+
+    return runtime_typed_entry_point_lines(
+        public_name,
+        params,
+        body,
+        parameter_lines=parameter_list_lines,
+    )
 
 
 def _sfem_soa_hessian_matrix_public_wrapper(
@@ -8314,38 +8319,33 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     material_parameter_names,
     uses_current,
 ):
-    lines = []
-    for scalar_type in ("double", "float"):
-        suffix = "" if scalar_type == "double" else "_float"
-        concrete_name = "%s%s" % (public_name, suffix)
-        params = _hessian_matrix_public_params(
-            matrix_format,
-            dim,
-            scalar_type,
-            material_parameter_names,
-            uses_current,
-        )
-        lines.append('extern "C" int %s(' % concrete_name)
-        lines.extend(parameter_list_lines(params))
-        lines.append(") {")
-        lines.append(
+    params = _hessian_matrix_public_params(
+        matrix_format,
+        dim,
+        "s_t",
+        material_parameter_names,
+        uses_current,
+    )
+    impl_args = _hessian_matrix_impl_args(
+        matrix_format,
+        dim,
+        material_parameter_names,
+        uses_current,
+    )
+    return runtime_typed_entry_point_lines(
+        public_name,
+        params,
+        lambda scalar_type, _positional: [
             "  return sfem::codegen::%s<%s, geom_t, %d>(%s);"
             % (
                 implementation_name,
                 scalar_type,
                 format_tag,
-                ", ".join(
-                    _hessian_matrix_impl_args(
-                        matrix_format,
-                        dim,
-                        material_parameter_names,
-                        uses_current,
-                    )
-                ),
-            )
-        )
-        lines.extend(["}", ""])
-    return lines
+                ", ".join(cast_arguments(params, impl_args, scalar_type)),
+            ),
+        ],
+        parameter_lines=parameter_list_lines,
+    )
 
 
 def _hessian_matrix_public_params(
@@ -8630,7 +8630,7 @@ def _sfem_soa_diagnostics_header(
         "#define %s" % guard,
         "",
         "#include <stddef.h>",
-        "#include <stdio.h>",
+        "#include <cstdio>",
         "",
     ]
     if define_sfem_inline:
@@ -8642,9 +8642,25 @@ def _sfem_soa_diagnostics_header(
                 "",
             ]
         )
+    lines.extend(kernel_status_macro_lines())
     lines.extend([
         "namespace sfem {",
         "namespace codegen {",
+        "",
+        "//! Reports a dispatch that has no kernel for this combination.",
+        "//!",
+        "//! One function rather than the five-line `std::fprintf` every",
+        "//! dispatch entry point used to carry: there were 248 copies of it,",
+        "//! differing only in the name they print.",
+        "static %s int unsupported_dispatch(" % inline_qualifier,
+        "    const char *const name,",
+        "    const int element_type,",
+        "    const int real_type) {",
+        '  std::fprintf(stderr,',
+        '      "%s does not support element type %d with real type %d\\n",',
+        "      name, element_type, real_type);",
+        "  return SFEM_FAILURE;",
+        "}",
         "",
         "struct %s {" % struct_name,
         "  const char *kernel_name;",
@@ -8857,29 +8873,6 @@ def _sfem_soa_diagnostics_header(
     return lines
 
 
-def _sfem_soa_diagnostic_print_wrapper_lines(
-    function_name,
-    variable_name,
-    scalar_type,
-    print_rate_helper="KernelDiagnostics_print_rate",
-):
-    suffix = "" if scalar_type == "double" else "_float"
-    public_name = "%s%s_print_rate" % (function_name, suffix)
-    return [
-        'extern "C" void %s(' % public_name,
-        "    const double elapsed,",
-        "    const ptrdiff_t nelements,",
-        "    const ptrdiff_t ndofs) {",
-        "  sfem::codegen::%s(" % print_rate_helper,
-        '      "%s%s",' % (function_name, suffix),
-        "      &sfem::codegen::%s," % variable_name,
-        "      elapsed, nelements, ndofs,",
-        "      sizeof(%s), sizeof(%s), sizeof(%s));"
-        % (scalar_type, scalar_type, scalar_type),
-        "}",
-    ]
-
-
 def _element_flops_plan(
     form,
     prefix,
@@ -9073,57 +9066,17 @@ def _sfem_soa_diagnostics_lines(
         "} // namespace codegen",
         "} // namespace sfem",
         "",
+        # The record is the only thing a caller cannot compute for itself.
+        # `KernelDiagnostics_arithmetic_intensity` and the three
+        # `KernelDiagnostics_print_rate*` helpers take that record and are
+        # already in `kernel_diagnostics.hpp`, so a per-kernel wrapper around
+        # each of them published a name for a call the caller can spell.  There
+        # were 1136 print-rate wrappers and 264 intensity wrappers in the tree
+        # and nothing outside the generator referenced any of them.
         'extern "C" const sfem::codegen::%s *%s_diagnostics(void) {' % (struct_name, public_name),
         "  return &sfem::codegen::%s;" % variable_name,
         "}",
-        "",
-        'extern "C" double %s_arithmetic_intensity(' % public_name,
-        "    const ptrdiff_t nelements,",
-        "    const size_t scalar_bytes,",
-        "    const size_t real_bytes,",
-        "    const size_t accumulator_bytes) {",
-        "  return sfem::codegen::%s_arithmetic_intensity(&sfem::codegen::%s, nelements, scalar_bytes, real_bytes, accumulator_bytes);" % (struct_name, variable_name),
-        "}",
     ]
-    function_names = [public_name]
-    function_names.extend(
-        (
-            (
-                _sfem_soa_mesh_public_function_name(
-                    prefix,
-                    form.name,
-                    quadrature_rule,
-                    "affine",
-                ),
-                "KernelDiagnostics_print_rate_affine_mesh",
-            ),
-            (
-                _sfem_soa_mesh_public_function_name(
-                    prefix,
-                    form.name,
-                    quadrature_rule,
-                    "isoparametric",
-                ),
-                "KernelDiagnostics_print_rate_isoparametric_mesh",
-            ),
-        )
-    )
-    for function_name_entry in function_names:
-        if isinstance(function_name_entry, tuple):
-            function_name, print_rate_helper = function_name_entry
-        else:
-            function_name = function_name_entry
-            print_rate_helper = "KernelDiagnostics_print_rate"
-        for scalar_type in ("double", "float"):
-            lines.append("")
-            lines.extend(
-                _sfem_soa_diagnostic_print_wrapper_lines(
-                    function_name,
-                    variable_name,
-                    scalar_type,
-                    print_rate_helper,
-                )
-            )
     return lines
 
 
@@ -9303,18 +9256,6 @@ def _sfem_soa_element_api_header(
         *reference_include_lines(
             quadrature_rule, sfem_mesh_reference_data(quadrature_rule)
         ),
-        "",
-        "#ifndef SFEM_SUCCESS",
-        "#define SFEM_SUCCESS 0",
-        "#endif",
-        "",
-        "#ifndef SFEM_FAILURE",
-        "#define SFEM_FAILURE 1",
-        "#endif",
-        "",
-        "#ifndef MIN",
-        "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
-        "#endif",
         "",
         "namespace sfem {",
         "namespace codegen {",

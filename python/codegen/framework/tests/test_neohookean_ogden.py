@@ -41,7 +41,6 @@ from codegen.framework.fem.reference import (
     sfem_supported_element_types,
 )
 from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
-from codegen.framework.emitters.energy_codegen import _sfem_soa_diagnostic_print_wrapper_lines
 from codegen.framework.emitters.energy_codegen import _sfem_soa_diagnostics_header
 from codegen.framework.fem import sfem_fem_policy, sfem_tensor_hex_shape_index
 from codegen.framework.plans.scheduling import build_expression_graph
@@ -735,28 +734,23 @@ def assert_generated_lane_loops_vectorized(
 
 class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
     def test_diagnostic_print_rate_has_no_repeat_argument(self):
+        """The shared helper keeps its signature; no kernel wraps it.
+
+        `KernelDiagnostics_print_rate` and `_arithmetic_intensity` take the
+        record and are the way a caller reports a rate.  They used to be
+        wrapped once per kernel per precision -- 1136 and 264 `extern "C"`
+        functions across the tree, none of them referenced by anything -- so
+        what is pinned now is that the helper is still there and that the
+        wrappers are not.
+        """
         diagnostics_source = "\n".join(_sfem_soa_diagnostics_header())
-        wrapper_source = "\n".join(
-            _sfem_soa_diagnostic_print_wrapper_lines(
-                "generated_neohookean_ogden_tri3_apply_soa",
-                "generated_neohookean_ogden_tri3_apply_soa_diagnostics_data",
-                "double",
-            )
-        )
 
         self.assertIn(
             "static SFEM_INLINE void KernelDiagnostics_print_rate(",
             diagnostics_source,
         )
-        self.assertIn(
-            'extern "C" void generated_neohookean_ogden_tri3_apply_soa_print_rate',
-            wrapper_source,
-        )
-        self.assertIn("elapsed, nelements, ndofs,", wrapper_source)
         self.assertNotIn("const int repeat", diagnostics_source)
-        self.assertNotIn("const int repeat", wrapper_source)
         self.assertNotIn("seconds_per_call", diagnostics_source)
-        self.assertNotIn("elapsed, nelements, ndofs, repeat", wrapper_source)
 
     def test_sfem_element_specialization_api_covers_relevant_elements(self):
         required = (

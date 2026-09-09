@@ -1,3 +1,6 @@
+from codegen.framework.emitters.runtime_typed_abi import (
+    runtime_type_correspondence_lines,
+)
 from codegen.framework.plans.conventions import (
     diagnostics_tail,
     ABI_TRAVERSAL_UNIT,
@@ -4974,13 +4977,6 @@ def _element_api_dispatch_header(material, entries):
         "",
         "#include <cstddef>",
         "",
-        "#ifndef SFEM_SUCCESS",
-        "#define SFEM_SUCCESS 0",
-        "#endif",
-        "#ifndef SFEM_FAILURE",
-        "#define SFEM_FAILURE 1",
-        "#endif",
-        "",
     ]
     for header in sorted({entry["header"] for entry in entries}):
         lines.append('#include "../%s"' % header)
@@ -5187,18 +5183,12 @@ def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
 def _dispatch_source(c_abi_header, groups):
     lines = [
         '#include "%s"' % c_abi_header,
-        "#include <cstdio>",
         "",
-        "#ifndef SFEM_SUCCESS",
-        "#define SFEM_SUCCESS 0",
-        "#endif",
-        "#ifndef SFEM_FAILURE",
-        "#define SFEM_FAILURE 1",
-        "#endif",
         "#ifndef SFEM_CODEGEN_PUBLIC_C_ABI",
         "#define SFEM_CODEGEN_PUBLIC_C_ABI",
         "#endif",
         "",
+        *runtime_type_correspondence_lines(),
     ]
     private_declarations = []
     for group in groups:
@@ -5291,6 +5281,12 @@ def _dispatch_groups(material, elements, declarations):
         params = _c_abi_parameters(declaration)
         if not params:
             continue
+        # A kernel that takes the scalar's width is already runtime typed:
+        # there is no `_float` twin to merge with, and the dispatch publishes
+        # the enum in that slot rather than the width.
+        runtime_typed = params[0] == _KERNEL_WIDTH_PARAMETER
+        if runtime_typed:
+            params = [_RUNTIME_TYPE_PARAMETER] + list(params[1:])
         key = (dispatch_name, tuple(params))
         groups.setdefault(
             key,
@@ -5299,6 +5295,7 @@ def _dispatch_groups(material, elements, declarations):
                 "params": tuple(params),
                 "dim": dim,
                 "variants": [],
+                "runtime_typed": runtime_typed,
             },
         )["variants"].append(
             {
@@ -5464,6 +5461,13 @@ def _split_c_parameters(body):
 #: Spelled once, next to the code that emits it.
 _RUNTIME_TYPE_PARAMETER = "const enum smesh::PrimitiveType real_type"
 _RUNTIME_TYPE_ARGUMENT = "real_type"
+
+#: The parameter a generated kernel takes to name its scalar.  A width
+#: rather than the enum, because the operator sources include no smesh
+#: header and should not start to; `emitters/runtime_typed_abi.py` says
+#: why.  `smesh::PrimitiveType` numbers its scalars by width, so the
+#: dispatch publishes the enum in this slot and forwards it unchanged.
+_KERNEL_WIDTH_PARAMETER = "const int scalar_bytes"
 _RESOLVED_RUNTIME_TYPE = "resolved_real_type"
 
 
@@ -5499,6 +5503,153 @@ def _runtime_typed_argument(param, scalar_type):
     return "(%s%s *)%s" % (const, scalar_type, name)
 
 
+def _merged_pair_dispatch_function_lines(group):
+    """One entry point where there were two, taking the scalar type as a value.
+
+    This is the shape ``operators/tet4/cuda/cu_tet4_laplacian.cu`` uses: the
+    buffers cross as ``void *`` and a ``smesh::PrimitiveType`` says what they
+    hold, the body switches, casts, and calls the concrete implementation.
+    SFEM splits the two switches across two functions -- element type in
+    ``cu_laplacian_apply``, scalar type in the leaf -- and they are nested here
+    only because this layer emits a single dispatcher.
+
+    ``SMESH_DEFAULT`` is resolved through ``smesh::TypeToEnum<real_t>``, so it
+    means what it means in ``GPULaplacian``: the build's own ``real_t``, not a
+    fixed width.  It is a caller's default rather than a fallback, so it is
+    resolved once, up front, rather than repeated in every element case.
+    """
+    runtime = set(group["runtime_typed"])
+    params = ("const smesh::ElemType element_type",) + tuple(group["params"])
+    lines = ['SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"]]
+    lines.extend(parameter_list_lines(params))
+    lines.extend(
+        [
+            ") {",
+            "  const enum smesh::PrimitiveType %s =" % _RESOLVED_RUNTIME_TYPE,
+            "      (%s == smesh::SMESH_DEFAULT)" % _RUNTIME_TYPE_ARGUMENT,
+            "          ? smesh::TypeToEnum<real_t>::value()",
+            "          : %s;" % _RUNTIME_TYPE_ARGUMENT,
+            "  switch (element_type) {",
+        ]
+    )
+    cases = (("smesh::SMESH_FLOAT64", "double"), ("smesh::SMESH_FLOAT32", "float"))
+    for variant in group["variants"]:
+        lines.extend(
+            [
+                "    case smesh::%s: {" % variant["mesh_element"],
+                "      switch (%s) {" % _RESOLVED_RUNTIME_TYPE,
+            ]
+        )
+        for enum_value, scalar_type in cases:
+            args = [
+                _runtime_typed_argument(param, scalar_type)
+                if _c_parameter_name(param) in runtime
+                else _c_parameter_name(param)
+                for param in group["params"]
+                if param != _RUNTIME_TYPE_PARAMETER
+            ]
+            lines.extend(
+                [
+                    "        case %s:" % enum_value,
+                    "          return %s(%s);"
+                    % (variant["by_scalar_type"][scalar_type], ", ".join(args)),
+                ]
+            )
+        lines.extend(
+            [
+                "        default:",
+                "          break;",
+                "      }",
+                "      break;",
+                "    }",
+            ]
+        )
+    lines.extend(
+        [
+            "    default:",
+            "      break;",
+            "  }",
+            '  std::fprintf(stderr,',
+            '      "%s does not support element type %%d with real type %%d\\n",'
+            % group["name"],
+            "      (int)element_type,",
+            "      (int)%s);" % _RUNTIME_TYPE_ARGUMENT,
+            "  return SFEM_FAILURE;",
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
+def _runtime_typed_dispatch_function_lines(group):
+    """One entry point per operation, forwarding the scalar type to the kernel.
+
+    This used to be two nested switches -- element type, then scalar type --
+    with a leaf per combination naming one of a `(name, name_float)` pair.  The
+    generated kernels now take the scalar's width and select the instantiation
+    themselves, so the inner switch and the second symbol are both gone and
+    what is left is a switch over the element alone.  Across the shipped tree
+    that inner switch appeared 598 times, with 1196 leaves.
+
+    `SMESH_DEFAULT` is still resolved here, through `smesh::TypeToEnum<real_t>`
+    -- it is a caller's default rather than a fallback, so it is resolved once,
+    up front, and the resolved value is what the kernels are handed.
+    """
+    if any("by_scalar_type" in variant for variant in group["variants"]):
+        # A group merged from a `(name, name_float)` pair -- only the boundary
+        # emitter still produces those -- keeps the two-level switch, because
+        # its kernels have no way to be told which scalar they were handed.
+        return _merged_pair_dispatch_function_lines(group)
+    params = ("const smesh::ElemType element_type",) + tuple(group["params"])
+    # The kernels take the scalar's width where this signature takes the enum.
+    # `smesh::PrimitiveType` numbers its scalars by width, so the resolved
+    # value crosses unchanged; `_dispatch_source_prelude` asserts that, in this
+    # source, which is the only one that sees both spellings.
+    arguments = ["(int)%s" % _RESOLVED_RUNTIME_TYPE] + [
+        _c_parameter_name(param) for param in group["params"][1:]
+    ]
+    lines = ['SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"]]
+    lines.extend(parameter_list_lines(params))
+    lines.extend(
+        [
+            ") {",
+            "  const enum smesh::PrimitiveType %s =" % _RESOLVED_RUNTIME_TYPE,
+            "      (%s == smesh::SMESH_DEFAULT)" % _RUNTIME_TYPE_ARGUMENT,
+            "          ? smesh::TypeToEnum<real_t>::value()",
+            "          : %s;" % _RUNTIME_TYPE_ARGUMENT,
+            "  switch (element_type) {",
+        ]
+    )
+    for variant in group["variants"]:
+        lines.extend(
+            [
+                "    case smesh::%s:" % variant["mesh_element"],
+                "      return %s(%s);"
+                % (variant["function"], ", ".join(arguments)),
+            ]
+        )
+    lines.extend(
+        [
+            "    default:",
+            "      break;",
+            "  }",
+            "  return sfem::codegen::unsupported_dispatch(",
+            '      "%s", (int)element_type, (int)%s);'
+            % (group["name"], _RUNTIME_TYPE_ARGUMENT),
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+#: The generated kernels take the scalar's width and select their own
+#: instantiation, so nothing below publishes a `(name, name_float)` pair any
+#: more -- except `emitters/boundary_codegen.py`, which spells its entry points
+#: from whole-function templates and has not been converted.  The two functions
+#: below merge such a pair into one runtime-typed group, and are reached only by
+#: that emitter's output; a group whose kernels are already runtime typed has no
+#: twin to find and passes through untouched.
 def _merge_precision_pair(base, twin):
     """One runtime-typed group from a ``(double, float)`` pair of groups.
 
@@ -5601,85 +5752,6 @@ def _merge_precision_groups(groups):
     )
 
 
-def _runtime_typed_dispatch_function_lines(group):
-    """One entry point where there were two, taking the scalar type as a value.
-
-    This is the shape ``operators/tet4/cuda/cu_tet4_laplacian.cu`` uses: the
-    buffers cross as ``void *`` and a ``smesh::PrimitiveType`` says what they
-    hold, the body switches, casts, and calls the concrete implementation.
-    SFEM splits the two switches across two functions -- element type in
-    ``cu_laplacian_apply``, scalar type in the leaf -- and they are nested here
-    only because this layer emits a single dispatcher.
-
-    ``SMESH_DEFAULT`` is resolved through ``smesh::TypeToEnum<real_t>``, so it
-    means what it means in ``GPULaplacian``: the build's own ``real_t``, not a
-    fixed width.  It is a caller's default rather than a fallback, so it is
-    resolved once, up front, rather than repeated in every element case.
-    """
-    runtime = set(group["runtime_typed"])
-    params = ("const smesh::ElemType element_type",) + tuple(group["params"])
-    lines = ['SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"]]
-    lines.extend(parameter_list_lines(params))
-    lines.extend(
-        [
-            ") {",
-            "  const enum smesh::PrimitiveType %s =" % _RESOLVED_RUNTIME_TYPE,
-            "      (%s == smesh::SMESH_DEFAULT)" % _RUNTIME_TYPE_ARGUMENT,
-            "          ? smesh::TypeToEnum<real_t>::value()",
-            "          : %s;" % _RUNTIME_TYPE_ARGUMENT,
-            "  switch (element_type) {",
-        ]
-    )
-    cases = (("smesh::SMESH_FLOAT64", "double"), ("smesh::SMESH_FLOAT32", "float"))
-    for variant in group["variants"]:
-        lines.extend(
-            [
-                "    case smesh::%s: {" % variant["mesh_element"],
-                "      switch (%s) {" % _RESOLVED_RUNTIME_TYPE,
-            ]
-        )
-        for enum_value, scalar_type in cases:
-            args = [
-                _runtime_typed_argument(param, scalar_type)
-                if _c_parameter_name(param) in runtime
-                else _c_parameter_name(param)
-                for param in group["params"]
-                if param != _RUNTIME_TYPE_PARAMETER
-            ]
-            lines.extend(
-                [
-                    "        case %s:" % enum_value,
-                    "          return %s(%s);"
-                    % (variant["by_scalar_type"][scalar_type], ", ".join(args)),
-                ]
-            )
-        lines.extend(
-            [
-                "        default:",
-                "          break;",
-                "      }",
-                "      break;",
-                "    }",
-            ]
-        )
-    lines.extend(
-        [
-            "    default:",
-            "      break;",
-            "  }",
-            '  std::fprintf(stderr,',
-            '      "%s does not support element type %%d with real type %%d\\n",'
-            % group["name"],
-            "      (int)element_type,",
-            "      (int)%s);" % _RUNTIME_TYPE_ARGUMENT,
-            "  return SFEM_FAILURE;",
-            "}",
-            "",
-        ]
-    )
-    return lines
-
-
 def _dispatch_function_lines(group):
     if group.get("runtime_typed"):
         return _runtime_typed_dispatch_function_lines(group)
@@ -5705,9 +5777,8 @@ def _dispatch_function_lines(group):
     lines.extend(
         [
             "    default:",
-            '      std::fprintf(stderr, "%s does not support element type %%d\\n", (int)element_type);'
-            % group["name"],
-            "      return SFEM_FAILURE;",
+            "      return sfem::codegen::unsupported_dispatch(",
+            '          "%s", (int)element_type, -1);' % group["name"],
             "  }",
             "}",
             "",

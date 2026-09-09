@@ -20,7 +20,10 @@
 // A linear material's exact apply takes no state: its tangent does not depend
 // on one.  The projected kernel always takes a state, because it builds the
 // tangent from it, so the two signatures differ and the bench must know which.
+#include "generated_abi.inc"
+
 extern "C" int EXACT_APPLY(
+        const int,
         const ptrdiff_t, const ptrdiff_t, idx_t **const,
         const geom_t *const, const geom_t *const, const geom_t *const,
         const geom_t *const, const geom_t *const, const geom_t *const,
@@ -81,7 +84,7 @@ int main(int argc, char **argv) {
         std::vector<double> ax(nnodes,0), ay(nnodes,0), az(nnodes,0), bx(nnodes,0), by(nnodes,0), bz(nnodes,0);
         auto run_exact = [&] {
             std::fill(ax.begin(),ax.end(),0.0); std::fill(ay.begin(),ay.end(),0.0); std::fill(az.begin(),az.end(),0.0);
-            EXACT_APPLY(nelements, nnodes, evp.data(),
+            EXACT_APPLY(SFEM_CODEGEN_F64, nelements, nnodes, evp.data(),
                 adj[0].data(),adj[1].data(),adj[2].data(),adj[3].data(),adj[4].data(),
                 adj[5].data(),adj[6].data(),adj[7].data(),adj[8].data(), det.data(),
                 lmbda, mu,
