@@ -24,9 +24,17 @@
 //
 // Two conditions, each reducing to something already supported:
 //
-//   traction   (pI - tau).n = t on the faces nmask selects. t = 0 is the do-nothing
-//              outflow, bit for bit -- the term added vanishes and its square root is not
-//              even evaluated.
+//   traction   (pI - tau).n = t on the faces tmask selects, which must be a subset of
+//              nmask -- a traction condition IS the natural condition, with a value. t = 0,
+//              or a face in nmask but not tmask, is the do-nothing outflow bit for bit:
+//              the term added vanishes and its square root is not even evaluated.
+//
+//              tmask exists rather than the value simply applying to all of nmask because a
+//              single run routinely has both -- an outlet that is genuinely traction-free
+//              and a surface that is pushed -- and one scalar triple covering every natural
+//              face cannot express that. It would instead apply the pushed surface's
+//              traction to the outlet as well, silently. This mirrors the pmask/p_bar pair
+//              below: one per-face selector, one per-sideset constant.
 //   pressure   p = p_bar on the faces pmask selects, with the viscous traction still taken
 //              from the interior state. This is the closed-face flux with the nodal
 //              pressure replaced by a prescribed one, which is what a port held at a
@@ -37,7 +45,8 @@
 // saying so.
 template <typename scalar_t>
 struct Hex8BoundaryDataT {
-    scalar_t tx{0}, ty{0}, tz{0};  // prescribed traction on nmask faces
+    scalar_t tx{0}, ty{0}, tz{0};  // prescribed traction, on the faces tmask selects
+    int      tmask{0};             // faces carrying it; 0 means every natural face is free
     int      pmask{0};             // faces carrying a prescribed pressure
     scalar_t p_bar{0};             // and its value
 };
@@ -167,7 +176,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
     scalar_t grad_el[9];
     // Hoisted: the area magnitude a prescribed traction needs costs a square root per node
     // per face, and t = 0 is the overwhelmingly common case.
-    const int have_traction = bd.tx != scalar_t(0) || bd.ty != scalar_t(0) || bd.tz != scalar_t(0);
+    const int have_traction =
+            bd.tmask != 0 && (bd.tx != scalar_t(0) || bd.ty != scalar_t(0) || bd.tz != scalar_t(0));
     scalar_t A[3][3];
     if (!isoparam) {
         if (std::fabs(det) < scalar_t(1e-30)) return;
@@ -234,7 +244,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
                 // recirculating outlet is where it bites.
                 const scalar_t mup = mdot > scalar_t(0) ? mdot : scalar_t(0);
                 scalar_t dS = scalar_t(0);
-                if (have_traction) dS = std::sqrt(ax * ax + ay * ay + az * az);
+                if (have_traction && ((bd.tmask >> f) & 1)) dS = std::sqrt(ax * ax + ay * ay + az * az);
                 r[i * 4 + 0] += mup * ux[i] + bd.tx * dS;
                 r[i * 4 + 1] += mup * uy[i] + bd.ty * dS;
                 r[i * 4 + 2] += mup * uz[i] + bd.tz * dS;

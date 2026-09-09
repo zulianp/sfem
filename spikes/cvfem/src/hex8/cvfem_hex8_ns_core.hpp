@@ -119,6 +119,9 @@ struct MeshData {
     // cvfem_hex8_boundary_scs.hpp, which this header includes further down; hex8_bd()
     // assembles the struct once the type is in scope.
     std::vector<uint8_t> pressure_mask;
+    // Which natural faces carry bc_t*. Empty means none do, so every natural face is the
+    // traction-free do-nothing outflow -- see the tmask note in cvfem_hex8_boundary_scs.hpp.
+    std::vector<uint8_t> traction_mask;
     scalar_t             bc_tx{0}, bc_ty{0}, bc_tz{0};
     scalar_t             bc_p{0};
     // Faces carrying the do-nothing outflow. Empty/zero everywhere means no
@@ -148,6 +151,7 @@ static SFEM_INLINE Hex8BoundaryDataT<scalar_t> hex8_bd(const MeshData &d, const 
     bd.ty    = d.bc_ty;
     bd.tz    = d.bc_tz;
     bd.p_bar = d.bc_p;
+    bd.tmask = d.traction_mask.empty() ? 0 : (int)d.traction_mask[(size_t)e];
     bd.pmask = d.pressure_mask.empty() ? 0 : (int)d.pressure_mask[(size_t)e];
     return bd;
 }

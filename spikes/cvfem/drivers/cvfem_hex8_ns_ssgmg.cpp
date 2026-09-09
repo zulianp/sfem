@@ -2805,8 +2805,28 @@ int main(int argc, char **argv) {
     const bool want_natural_outlet =
             want_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet"
                       : smesh::Env::read_string("SFEM_OUTLET", "dirichlet") == "natural";
+    // A traction or pressure condition names one of these sidesets, so they have to exist
+    // whether or not the outlet is natural. Read here rather than where the operator is
+    // configured, several hundred lines below, because the sidesets are built now and a
+    // condition naming one that was never registered would fail for the wrong reason.
+    const std::string want_traction_sideset = smesh::Env::read_string("SFEM_TRACTION_SIDESET", "");
+    const std::string want_pressure_sideset = smesh::Env::read_string("SFEM_PRESSURE_SIDESET", "");
+    const bool        want_named_bc = !want_traction_sideset.empty() || !want_pressure_sideset.empty();
+    // A face carrying a traction or pressure condition must not also carry Dirichlet
+    // velocity data. It is the same invariant cvfem_ns_channel_case.hpp states for the
+    // boundary mask -- two channels deciding the same face -- and getting it wrong is
+    // silent in the worst way: the constraint wins, the condition is overridden, and the
+    // run prints that the port was applied while reporting the Dirichlet answer. Measured
+    // before this line existed, on 33,124 dofs: a port at p_bar = 1.5 on a Dirichlet-pinned
+    // outlet moved u_linf from 3.754076e-05 to 3.754095e-05, which is nothing at all.
+    //
+    // "outlet" is this driver's own name for the x = Lx plane, registered above from the
+    // same plane the `outlet` predicate tests, so matching on the name is the correct test
+    // here rather than a coincidence of naming.
+    const bool outlet_governed = want_natural_outlet || want_traction_sideset == "outlet" ||
+                                 want_pressure_sideset == "outlet";
     std::shared_ptr<smesh::Sideset> step_skin, step_outlet;
-    if (want_step || want_natural_outlet) {
+    if (want_step || want_natural_outlet || want_named_bc) {
         step_skin = smesh::skin_sideset(mesh);
         auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)Lx, 1e-6);
         if (!step_skin || outs.empty()) {
@@ -2954,6 +2974,31 @@ int main(int argc, char **argv) {
         // over-determined.
         op->natural_outflow_sideset = "outlet";
     }
+
+    // Value-carrying boundary conditions, named by sideset. Both are off unless named, so
+    // every existing case and every recorded number is untouched.
+    //
+    //   SFEM_TRACTION_SIDESET=<name> SFEM_TRACTION="tx ty tz"
+    //       (pI - tau).n = t there. Those faces become natural, so a zero t is a second
+    //       do-nothing outflow and a non-zero one is a surface being pushed -- which is
+    //       what a diaphragm looks like when it is driven by force rather than motion.
+    //   SFEM_PRESSURE_SIDESET=<name> SFEM_PRESSURE=<p>
+    //       p = p there, with the viscous traction still from the interior state: a port
+    //       held at a pressure.
+    //
+    // The sideset must already exist on the mesh under that name. Both need
+    // SFEM_BOUNDARY_MASK=1, and the operator refuses rather than proceeding without it.
+    op->traction_sideset = want_traction_sideset;
+    if (!op->traction_sideset.empty()) {
+        const std::string t = smesh::Env::read_string("SFEM_TRACTION", "0 0 0");
+        if (std::sscanf(t.c_str(), "%lf %lf %lf", &op->traction[0], &op->traction[1], &op->traction[2]) != 3) {
+            std::fprintf(stderr, "SFEM_TRACTION must be three numbers, got '%s'\n", t.c_str());
+            return EXIT_FAILURE;
+        }
+    }
+    op->pressure_sideset = want_pressure_sideset;
+    if (!op->pressure_sideset.empty())
+        op->pressure_value = smesh::Env::read<real_t>("SFEM_PRESSURE", real_t(0));
     if (op->initialize() != SFEM_SUCCESS) return EXIT_FAILURE;
     // The Newton loop below evaluates the residual immediately after every step and
     // before the linear solve, which is the condition this option asks for: the nodal
@@ -3094,7 +3139,7 @@ int main(int argc, char **argv) {
                     uvw_uy.push_back(uy);
                     uvw_uz.push_back(uz);
                 }
-            } else if (wall_y || inlet || (outlet && !want_natural_outlet)) {
+            } else if (wall_y || inlet || (outlet && !outlet_governed)) {
                 uvw_nodes.push_back((idx_t)i);
                 uvw_ux.push_back(ux);
                 uvw_uy.push_back(uy);
@@ -3232,10 +3277,16 @@ int main(int argc, char **argv) {
             ++n_p;
             if (!mask_get(k, cmask.data())) ++n_p_free;
         }
-        const bool outflow_fixes_it = !op->natural_outflow_sideset.empty();
+        // Ask the operator rather than testing one of the three conditions that can do it.
+        // A traction surface and a pressure port fix the level exactly as the do-nothing
+        // outflow does, and this test used to see only the outflow -- so naming a port
+        // would have left the zero-mean gauge on top of it and over-determined the system.
+        const bool outflow_fixes_it = op->fixes_pressure_level();
         gauge.set_active(n_p_free == n_p && !outflow_fixes_it);
         std::printf("pressure gauge: %s  (%td of %td pressure dofs free)\n",
                     gauge.active()      ? "zero mean"
+                    : !op->pressure_sideset.empty() ? "determined by the prescribed pressure"
+                    : !op->traction_sideset.empty() ? "determined by the traction surface"
                     : outflow_fixes_it  ? "determined by the do-nothing outflow"
                                         : "constrained (pin or Dirichlet)",
                     n_p_free, n_p);

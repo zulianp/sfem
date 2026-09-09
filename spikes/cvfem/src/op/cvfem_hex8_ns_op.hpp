@@ -90,6 +90,33 @@ namespace sfem {
         // Dirichlet set derived from the same object.
         std::string natural_outflow_sideset;
 
+        // Stage-A boundary conditions that carry a value, named the same way and before
+        // initialize() for the same reasons.
+        //
+        //   traction_sideset   (pI - tau).n = traction on those faces. A traction condition
+        //                      IS the natural condition with a value, so these faces are
+        //                      added to the natural set automatically rather than having to
+        //                      be named in both. traction = 0 is exactly a do-nothing
+        //                      outflow, which is why the two share a mechanism.
+        //   pressure_sideset   p = pressure_value there, with the viscous traction still
+        //                      taken from the interior state. This is a port held at a
+        //                      pressure.
+        //
+        // Both are HEX8 and flat-mesh only. The semi-structured and CUDA paths call the
+        // boundary kernels without the boundary-data argument, so naming a sideset there
+        // would be silently ignored; initialize() refuses instead.
+        std::string traction_sideset;
+        real_t      traction[3]{0, 0, 0};
+        std::string pressure_sideset;
+        real_t      pressure_value{0};
+
+        // Whether any configured boundary condition determines the pressure level, so the
+        // gauge must stand down. Every natural face drops p_i*a and so fixes it, and a
+        // prescribed pressure fixes it outright; with a gauge still imposed on top the
+        // system is over-determined, and without one when nothing fixes it, singular. Both
+        // fail quietly, which is why this is asked rather than assumed.
+        bool fixes_pressure_level() const;
+
         // Transient term. dt <= 0 -- the default -- means steady, and nothing is
         // evaluated, so every steady case and every recorded number is unaffected.
         //

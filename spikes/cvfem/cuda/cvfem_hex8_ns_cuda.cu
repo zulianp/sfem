@@ -1566,6 +1566,24 @@ extern "C" int cvfem_cuda_create(cvfem_cuda_ctx **out_ctx,
                                  const ptrdiff_t *ghost_reduce_idx,
                                  const int32_t *ghost_reduce_dest,
                                  const double *adj_flat, const double *det) {
+    // Box domains with closed faces only, and the refusal is here because nothing else
+    // would notice. Every boundary_scs_add_* call in this file passes neither face mask nor
+    // boundary data, so it takes the bounding-box coordinate fallback (fmask = -1) and no
+    // traction or prescribed pressure. On a domain with a re-entrant face that leaves those
+    // control volumes unclosed, and with a named condition it drops it entirely -- in both
+    // cases producing a converged, plausible, wrong answer rather than an error.
+    //
+    // SFEM_BOUNDARY_MASK=1 is exactly the caller saying "the coordinate test is not enough
+    // for this domain", so it is the right thing to key on.
+    if (const char *bm = std::getenv("SFEM_BOUNDARY_MASK"); bm && std::atoi(bm) != 0) {
+        std::fprintf(stderr,
+                     "cvfem_cuda_create: SFEM_BOUNDARY_MASK=1 is not supported on the CUDA "
+                     "path -- its boundary kernels take no face mask and no boundary data, "
+                     "so a non-box domain or a named traction/pressure condition would be "
+                     "silently ignored. Use the CPU path.\n");
+        return -1;
+    }
+
     cvfem_cuda_ctx *c = new cvfem_cuda_ctx();
     c->nnodes = nnodes; c->nelements = nelements;
     c->n_packs = n_packs; c->n_elements_per_pack = n_elements_per_pack;
