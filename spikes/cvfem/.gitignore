@@ -19,3 +19,6 @@ __pycache__/
 # Verification run directories: logs and solution fields, regenerable from a job id.
 # The report built from one is committed under docs/; the raw runs are not.
 verification_runs/
+
+# Visualisation bundles: raw fields and their XDMF, regenerable from a job id.
+viz/
