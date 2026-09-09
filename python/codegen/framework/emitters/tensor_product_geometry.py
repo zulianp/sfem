@@ -1,3 +1,4 @@
+from codegen.framework.emitters.cprinter import c_group, c_product, c_sum
 from codegen.framework.plans.conventions import restrict_prelude
 from codegen.framework.targets import current_target
 from codegen.framework.fem.tensor_product import (
@@ -523,8 +524,15 @@ def tensor_product_current_q_isoparametric_geometry_lines(
     for row in range(dim):
         for col in range(dim):
             lines.append(
-                "%sconst s_t J%d%d = %s[((%d * NQ + q) * ND + %d) * VS + %s];"
-                % (body_indent, row, col, gradient_name, row, col, work_item)
+                "%sconst s_t J%d%d = %s[%s * VS + %s];"
+                % (
+                    body_indent,
+                    row,
+                    col,
+                    gradient_name,
+                    c_group(c_sum(c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"), col)),
+                    work_item,
+                )
             )
     lines.extend(
         isoparametric_adjugate_lines(
@@ -643,8 +651,15 @@ def tensor_product_adjugate_determinant_lines(
         for row in range(dim):
             for col in range(dim):
                 lines.append(
-                    "%sconst s_t J%d%d = %s[((%d * NQ + q) * ND + %d) * VS + %s];"
-                    % (body_indent, row, col, gradient_name, row, col, work_item)
+                    "%sconst s_t J%d%d = %s[%s * VS + %s];"
+                    % (
+                        body_indent,
+                        row,
+                        col,
+                        gradient_name,
+                        c_group(c_sum(c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"), col)),
+                        work_item,
+                    )
                 )
         lines.extend(
             isoparametric_adjugate_lines(

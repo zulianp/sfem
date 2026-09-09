@@ -80,6 +80,9 @@ from codegen.framework.emitters.artifacts import (
     GeneratedKernelFile,
 )
 from codegen.framework.emitters.cprinter import (
+    c_group,
+    c_product,
+    c_sum,
     _component_name,
     parameter_list_lines,
     _cpp_argument_name,
@@ -1661,7 +1664,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
         lines.append("  s_t loperand_q[%s];" % block_extent)
 
     for row in range(n_field_components):
-        output_offset = "%d * NQ * %d * VS" % (row, dim)
+        output_offset = c_product(row, "NQ", dim, "VS")
         if uses_current:
             lines.append(
                 "  tensor_gradient<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, %s, %d, &gu_ref_q[%s]);"
@@ -1700,8 +1703,17 @@ def _append_sfem_soa_tensor_weak_form_lines(
             for col in range(dim):
                 component = row * dim + col
                 lines.append(
-                    "      gu_ref[%d] = gu_ref_q[((%d * NQ + q) * %d + %d) * VS + %s];"
-                    % (component, row, dim, col, work_item)
+                    "      gu_ref[%d] = gu_ref_q[%s * VS + %s];"
+                    % (
+                        component,
+                        c_group(
+                            c_sum(
+                                c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
+                                col,
+                            )
+                        ),
+                        work_item,
+                    )
                 )
     if uses_direction:
         lines.append("      s_t grad_h_ref[%d];" % (n_field_components * dim))
@@ -1709,8 +1721,17 @@ def _append_sfem_soa_tensor_weak_form_lines(
             for col in range(dim):
                 component = row * dim + col
                 lines.append(
-                    "      grad_h_ref[%d] = grad_h_ref_q[((%d * NQ + q) * %d + %d) * VS + %s];"
-                    % (component, row, dim, col, work_item)
+                    "      grad_h_ref[%d] = grad_h_ref_q[%s * VS + %s];"
+                    % (
+                        component,
+                        c_group(
+                            c_sum(
+                                c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
+                                col,
+                            )
+                        ),
+                        work_item,
+                    )
                 )
 
     def geometry_value(name, component):
@@ -1794,14 +1815,23 @@ def _append_sfem_soa_tensor_weak_form_lines(
     for row in range(n_field_components):
         for col in range(dim):
             lines.append(
-                "      loperand_q[((%d * NQ + q) * %d + %d) * VS + %s] = loperand[%d];"
-                % (row, dim, col, work_item, row * dim + col)
+                "      loperand_q[%s * VS + %s] = loperand[%d];"
+                % (
+                    c_group(
+                        c_sum(
+                            c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
+                            col,
+                        )
+                    ),
+                    work_item,
+                    row * dim + col,
+                )
             )
     lines.extend(["    }", "  }"])
     for row in range(n_field_components):
         lines.append(
-            "  tensor_test<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, &loperand_q[%d * NQ * %d * VS], %s, %d);"
-            % (dim, n_field_components, row, dim, out_streams, row)
+            "  tensor_test<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, &loperand_q[%s], %s, %d);"
+            % (dim, n_field_components, c_product(row, "NQ", dim, "VS"), out_streams, row)
         )
 
 
@@ -1855,8 +1885,8 @@ def _metric_plan_bindings(form, dim, source_builder, use_stream_arrays):
         )
     for shape, symbol in enumerate(dof_symbols(dim)):
         bindings[symbol] = sp.Symbol(
-            "%s%s_streams[%d * %d + 0][%s]"
-            % (stream_prefix, field, shape, n_field_components, work_item)
+            "%s%s_streams[%s][%s]"
+            % (stream_prefix, field, c_product(shape, n_field_components), work_item)
         )
     return bindings, n_field_components, work_item
 
@@ -1866,11 +1896,10 @@ def _metric_scatter_lines(dim, metric, plan, bindings, n_field_components,
     """A 1- or 2-form: one contribution per shape, scattered."""
     output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
     return [
-        "      %s[%d * %d + 0][%s] += %s;"
+        "      %s[%s][%s] += %s;"
         % (
             output_streams,
-            shape,
-            n_field_components,
+            c_product(shape, n_field_components),
             work_item,
             _sfem_ccode((metric.scale * expression).xreplace(bindings)),
         )
@@ -1968,12 +1997,10 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
 
     def field_value(field, row, shape):
         stream_prefix = "" if use_stream_arrays else "weak_"
-        return "%s%s_streams[%d * %d + %d][%s]" % (
+        return "%s%s_streams[%s][%s]" % (
             stream_prefix,
             field,
-            shape,
-            n_field_components,
-            row,
+            c_sum(c_product(shape, n_field_components), row),
             work_item,
         )
 
@@ -2107,12 +2134,10 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                 terms.append(_scaled_cpp_term(factor, "loperand%d" % (row * dim + col)))
             if terms:
                 lines.append(
-                    "      %s[%d * %d + %d][%s] %s %s;"
+                    "      %s[%s][%s] %s %s;"
                     % (
                         output_streams,
-                        shape,
-                        n_field_components,
-                        row,
+                        c_sum(c_product(shape, n_field_components), row),
                         work_item,
                         op,
                         _sum_cpp_terms(terms),
@@ -9452,7 +9477,7 @@ def _sfem_soa_element_api_alias_function_lines(
 ):
     n_field_components = dim if n_field_components is None else n_field_components
     lines = [
-        "template <typename s_t, int VS = %d>" % vector_size,
+        "template <typename s_t, int VS>",
         "static SFEM_INLINE int %s(" % name,
     ]
     lines.extend(parameter_list_lines(params))
@@ -9685,13 +9710,13 @@ def _sfem_soa_element_api_coords_tile_lines(
         )
         for d in range(dim):
             lines.append(
-                "    tensor_gradient_contiguous<s_t, NQ, NS, VS, %d>(ne, %s, %s, bcoordinate_data, %d, coordinate_grad_ref + %d * NQ * ND * VS);"
+                "    tensor_gradient_contiguous<s_t, NQ, NS, VS, %d>(ne, %s, %s, bcoordinate_data, %d, coordinate_grad_ref + %s);"
                 % (
                     dim,
                     quadrature_reference_accessor(quadrature_rule, "shape_1d"),
                     quadrature_reference_accessor(quadrature_rule, "grad_1d"),
                     d,
-                    d,
+                    c_product(d, "NQ", "ND", "VS"),
                 )
             )
         lines.append(
@@ -9766,7 +9791,7 @@ def _sfem_soa_element_api_operation_lines(
         params.append(output_param)
         lines.extend(
             [
-                "template <typename s_t, int VS = %d>" % vector_size,
+                "template <typename s_t, int VS>",
                 "static SFEM_INLINE int %s(" % name,
             ]
         )
@@ -9841,7 +9866,7 @@ def _sfem_soa_element_api_hessian_lines(
         params.append("s_t *const *const RSTR matrix_streams")
         lines.extend(
             [
-                "template <typename s_t, int VS = %d>" % vector_size,
+                "template <typename s_t, int VS>",
                 "static SFEM_INLINE int %s(" % name,
             ]
         )

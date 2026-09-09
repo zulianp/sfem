@@ -1434,7 +1434,7 @@ extern "C" int demo_tri3_apply_packed_a_msoa(ptrdiff_t n, idx_t **elements) { re
             self.assertIn("SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6}", le_hex8_header)
             self.assertIn("neohookean_ogden_hex8_hessian_esoa", nh_hex8_header)
             self.assertIn("q * nelements + evb + lane", le_header)
-            self.assertIn("template <typename s_t, int VS = 16, typename elem_type_t>", le_dispatch)
+            self.assertIn("template <typename s_t, int VS, typename elem_type_t>", le_dispatch)
             self.assertNotIn("smesh_mesh.hpp", le_dispatch)
             self.assertNotIn("smesh_elem_type.hpp", le_dispatch)
 
@@ -1478,10 +1478,10 @@ int main() {
   for (int i = 0; i < 144; ++i) {
     matrix_streams[i] = data[i];
   }
-  int status = sfem::codegen::linear_elasticity_tet4_energy_esoa<double>(N, coords, 1.0, 1.0, u_streams, values);
-  status |= sfem::codegen::linear_elasticity_tet4_gradient_esoa<double>(N, coords, 1.0, 1.0, u_streams, out_streams);
-  status |= sfem::codegen::linear_elasticity_tet4_hessian_esoa<double>(N, coords, 1.0, 1.0, matrix_streams);
-  status |= sfem::codegen::linear_elasticity_hessian_3d_esoa<double>(4, N, coords, 1.0, 1.0, matrix_streams);
+  int status = sfem::codegen::linear_elasticity_tet4_energy_esoa<double, 16>(N, coords, 1.0, 1.0, u_streams, values);
+  status |= sfem::codegen::linear_elasticity_tet4_gradient_esoa<double, 16>(N, coords, 1.0, 1.0, u_streams, out_streams);
+  status |= sfem::codegen::linear_elasticity_tet4_hessian_esoa<double, 16>(N, coords, 1.0, 1.0, matrix_streams);
+  status |= sfem::codegen::linear_elasticity_hessian_3d_esoa<double, 16>(4, N, coords, 1.0, 1.0, matrix_streams);
   return status;
 }
 '''
@@ -1500,8 +1500,8 @@ int main() {
   for (int i = 0; i < 144; ++i) {
     matrix_streams[i] = data[i];
   }
-  int status = sfem::codegen::neohookean_ogden_tet4_hessian_esoa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
-  status |= sfem::codegen::neohookean_ogden_hessian_3d_esoa<double>(4, N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  int status = sfem::codegen::neohookean_ogden_tet4_hessian_esoa<double, 16>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  status |= sfem::codegen::neohookean_ogden_hessian_3d_esoa<double, 16>(4, N, coords, 1.0, 1.0, u_streams, matrix_streams);
   return status;
 }
 '''
@@ -1520,8 +1520,8 @@ int main() {
   for (int i = 0; i < 576; ++i) {
     matrix_streams[i] = data[i];
   }
-  int status = sfem::codegen::neohookean_ogden_hex8_hessian_esoa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
-  status |= sfem::codegen::neohookean_ogden_hessian_3d_esoa<double>(8, N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  int status = sfem::codegen::neohookean_ogden_hex8_hessian_esoa<double, 16>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  status |= sfem::codegen::neohookean_ogden_hessian_3d_esoa<double, 16>(8, N, coords, 1.0, 1.0, u_streams, matrix_streams);
   return status;
 }
 '''
@@ -1538,8 +1538,8 @@ int main() {
   for (int i = 0; i < 576; ++i) {
     matrix_streams[i] = data[i];
   }
-  int status = sfem::codegen::linear_elasticity_hex8_hessian_esoa<double>(N, coords, 1.0, 1.0, matrix_streams);
-  status |= sfem::codegen::linear_elasticity_hessian_3d_esoa<double>(8, N, coords, 1.0, 1.0, matrix_streams);
+  int status = sfem::codegen::linear_elasticity_hex8_hessian_esoa<double, 16>(N, coords, 1.0, 1.0, matrix_streams);
+  status |= sfem::codegen::linear_elasticity_hessian_3d_esoa<double, 16>(8, N, coords, 1.0, 1.0, matrix_streams);
   return status;
 }
 '''
@@ -1595,19 +1595,19 @@ int main() {
             self.assertIn("_ref0_values", block)
 
         self.assertIn(
-            "const s_t gu_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+            "const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[3][lane];",
             tet4_objective,
         )
         self.assertIn(
-            "const s_t gu_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+            "const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[3][lane];",
             tet4_gradient,
         )
         self.assertIn(
-            "out_streams[0 * 3 + 0][lane] += -(loperand0) - loperand1 - loperand2;",
+            "out_streams[0][lane] += -(loperand0) - loperand1 - loperand2;",
             tet4_gradient,
         )
         self.assertIn(
-            "const s_t grad_h_ref0 = -(h_streams[0 * 3 + 0][lane]) + h_streams[1 * 3 + 0][lane];",
+            "const s_t grad_h_ref0 = -(h_streams[0][lane]) + h_streams[3][lane];",
             tet4_apply,
         )
         for block in (tet4_objective, tet4_gradient, tet4_apply):
@@ -4440,19 +4440,19 @@ int main() {
                 self.assertNotIn("grad_ref_x[q * NS + shape]", block)
 
             self.assertIn(
-                "const s_t gu_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+                "const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[3][lane];",
                 tet4_objective,
             )
             self.assertIn(
-                "const s_t gu_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];",
+                "const s_t gu_ref8 = -(u_streams[2][lane]) + u_streams[11][lane];",
                 tet4_gradient,
             )
             self.assertIn(
-                "const s_t grad_h_ref0 = -(h_streams[0 * 3 + 0][lane]) + h_streams[1 * 3 + 0][lane];",
+                "const s_t grad_h_ref0 = -(h_streams[0][lane]) + h_streams[3][lane];",
                 tet4_apply,
             )
             self.assertIn(
-                "const s_t grad_h_ref8 = -(h_streams[0 * 3 + 2][lane]) + h_streams[3 * 3 + 2][lane];",
+                "const s_t grad_h_ref8 = -(h_streams[2][lane]) + h_streams[11][lane];",
                 tet4_apply,
             )
 
@@ -4588,11 +4588,11 @@ int main() {
                 self.assertNotIn("for (int shape = 0; shape < NS; ++shape)", block)
                 self.assertNotIn("grad_ref_x[q * NS + shape]", block)
             self.assertIn(
-                "const s_t gu_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];",
+                "const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[2][lane];",
                 tri3_objective,
             )
             self.assertIn(
-                "const s_t grad_h_ref3 = -(h_streams[0 * 2 + 1][lane]) + h_streams[2 * 2 + 1][lane];",
+                "const s_t grad_h_ref3 = -(h_streams[1][lane]) + h_streams[5][lane];",
                 tri3_apply,
             )
 
