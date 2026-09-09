@@ -88,6 +88,13 @@ struct MeshData {
     std::vector<scalar_t> rx, ry, rz, rc;
     std::vector<scalar_t> pgx, pgy, pgz;
     std::vector<scalar_t> qgx, qgy, qgz;  // same reconstruction applied to the Jacobian direction
+
+    // The Rhie-Chow coefficient, hoisted out of the element loop -- twelve values per
+    // element, one per sub-control surface, rebuilt by cvfem_hex8_build_rc_coeff only when
+    // rho, mu, the scale or the mesh change. See Hex8RhieChowPack::coeff for why it is not
+    // computed where it is used.
+    std::vector<scalar_t> rc_coeff[CVFEM_HEX8_N_SCS];
+    scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
     // Optional body force, one value per node, and the control volume it is weighted by.
     // Left empty for every case that has no source term, in which case nothing is added and
     // the residual is bit-identical to what it was before this existed. Used by the
