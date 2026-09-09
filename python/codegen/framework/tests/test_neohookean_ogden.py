@@ -1101,8 +1101,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             local_source,
         )
         self.assertNotIn("generated_weak_neohookean_tri3_apply_soa_impl", operator_source)
-        self.assertIn("generated_weak_neohookean_tri3_apply_affine_mesh_soa_impl", operator_source)
-        self.assertIn("generated_weak_neohookean_tri3_apply_isoparametric_mesh_soa_impl", operator_source)
+        self.assertIn("generated_weak_neohookean_tri3_apply_a_msoa_impl", operator_source)
+        self.assertIn("generated_weak_neohookean_tri3_apply_i_msoa_impl", operator_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in generated_files:
@@ -1218,13 +1218,13 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         operator_source = {
             generated.path: generated.source for generated in generated_files
         }["generated_quad4_iso_objective_operator.cpp"]
-        self.assertNotIn("generated_quad4_iso_objective_quad4_objective_isoparametric_soa_impl", operator_source)
-        self.assertNotIn('extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_soa', operator_source)
+        self.assertNotIn("generated_quad4_iso_objective_quad4_objective_i_soa_impl", operator_source)
+        self.assertNotIn('extern "C" int generated_quad4_iso_objective_quad4_objective_i_soa', operator_source)
         section = operator_source.split(
-            "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_steps_isoparametric_mesh_soa_impl",
+            "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_steps_i_msoa_impl",
             1,
         )[1].split(
-            'extern "C" int generated_quad4_iso_objective_quad4_objective_steps_isoparametric_mesh_soa',
+            'extern "C" int generated_quad4_iso_objective_quad4_objective_steps_i_msoa',
             1,
         )[0]
         self.assertIn(
@@ -1280,8 +1280,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<s_t>::grad_1d()", operator_source)
         self.assertIn("generated_hex27_weak_neohookean_isoparametric_reference_data<s_t>::q_weight_1d()", operator_source)
         self.assertNotIn("generated_hex27_weak_neohookean_hex27_apply_soa_impl", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_affine_mesh_soa_impl", operator_source)
-        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_isoparametric_mesh_soa_impl", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_a_msoa_impl", operator_source)
+        self.assertIn("generated_hex27_weak_neohookean_hex27_apply_i_msoa_impl", operator_source)
         self.assertIn("static constexpr int NQ1 = 3;", local_source)
         self.assertIn("static constexpr int NS1 = 3;", local_source)
         self.assertIn("for (int q = 0; q < NQ; ++q)", local_source)
@@ -1349,7 +1349,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 operator_source,
             )
             self.assertIn(
-                "%s_%s_apply_affine_mesh_soa_impl"
+                "%s_%s_apply_a_msoa_impl"
                 % (
                     "generated_neohookean_ogden_%s" % element_type.lower(),
                     element_type.lower(),
@@ -1357,7 +1357,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                 operator_source,
             )
             self.assertIn(
-                "%s_%s_apply_isoparametric_mesh_soa_impl"
+                "%s_%s_apply_i_msoa_impl"
                 % (
                     "generated_neohookean_ogden_%s" % element_type.lower(),
                     element_type.lower(),
@@ -1513,7 +1513,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         source_by_path = {generated.path: generated.source for generated in generated_files}
         operator_source = source_by_path["%s_operator.cpp" % prefix]
         self.assertNotIn(
-            'extern "C" int %s_hex8_gradient_isoparametric_soa' % prefix,
+            'extern "C" int %s_hex8_gradient_i_soa' % prefix,
             operator_source,
         )
         self.assertNotIn("const real_t *const RSTR x0", operator_source)
@@ -1529,11 +1529,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn(
-            'extern "C" int %s_hex8_gradient_affine_mesh_soa' % prefix,
+            'extern "C" int %s_hex8_gradient_a_msoa' % prefix,
             operator_source,
         )
         self.assertIn(
-            'extern "C" int %s_hex8_gradient_isoparametric_mesh_soa' % prefix,
+            'extern "C" int %s_hex8_gradient_i_msoa' % prefix,
             operator_source,
         )
         self.assertIn("idx_t **const RSTR elements", operator_source)
@@ -1544,10 +1544,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         affine_mesh_source = operator_source.split(
-            "static SFEM_INLINE int %s_hex8_gradient_affine_mesh_soa_impl" % prefix,
+            "static SFEM_INLINE int %s_hex8_gradient_a_msoa_impl" % prefix,
             1,
         )[1].split(
-            "static SFEM_INLINE int %s_hex8_gradient_isoparametric_mesh_soa_impl"
+            "static SFEM_INLINE int %s_hex8_gradient_i_msoa_impl"
             % prefix,
             1,
         )[0]
@@ -1562,7 +1562,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         self.assertIn(
-            "template <typename s_t, typename g_t>\nstatic SFEM_INLINE int %s_hex8_gradient_affine_mesh_soa_impl"
+            "template <typename s_t, typename g_t>\nstatic SFEM_INLINE int %s_hex8_gradient_a_msoa_impl"
             % prefix,
             operator_source,
         )
@@ -1571,20 +1571,20 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             affine_mesh_source,
         )
         self.assertIn(
-            'extern "C" int %s_hex8_gradient_affine_mesh_soa_float' % prefix,
+            'extern "C" int %s_hex8_gradient_a_msoa_float' % prefix,
             operator_source,
         )
         self.assertIn(
-            "%s_hex8_gradient_affine_mesh_soa_impl<double, geom_t>" % prefix,
+            "%s_hex8_gradient_a_msoa_impl<double, geom_t>" % prefix,
             operator_source,
         )
         self.assertIn(
-            "%s_hex8_gradient_affine_mesh_soa_impl<float, geom_t>" % prefix,
+            "%s_hex8_gradient_a_msoa_impl<float, geom_t>" % prefix,
             operator_source,
         )
         self.assertIn("#pragma omp atomic update", operator_source)
         mesh_impl_signature = operator_source.split(
-            "static SFEM_INLINE int %s_hex8_gradient_isoparametric_mesh_soa_impl" % prefix,
+            "static SFEM_INLINE int %s_hex8_gradient_i_msoa_impl" % prefix,
             1,
         )[1].split(") {", 1)[0]
         self.assertNotIn("shape_1d", mesh_impl_signature)
@@ -1603,11 +1603,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             operator_source,
         )
         isoparametric_mesh_source = operator_source.split(
-            "static SFEM_INLINE int %s_hex8_gradient_isoparametric_mesh_soa_impl"
+            "static SFEM_INLINE int %s_hex8_gradient_i_msoa_impl"
             % prefix,
             1,
         )[1].split(
-            'extern "C" int %s_hex8_gradient_isoparametric_mesh_soa' % prefix,
+            'extern "C" int %s_hex8_gradient_i_msoa' % prefix,
             1,
         )[0]
         self.assertIn(
@@ -2173,11 +2173,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("KernelDiagnostics_print_rate", diagnostics_source)
         self.assertIn("#include <stdio.h>", diagnostics_source)
         self.assertIn(
-            'extern "C" void generated_neohookean_ogden_tri3_apply_affine_mesh_soa_print_rate',
+            'extern "C" void generated_neohookean_ogden_tri3_apply_a_msoa_print_rate',
             operator_source,
         )
         self.assertIn(
-            'extern "C" void generated_neohookean_ogden_tri3_apply_isoparametric_mesh_soa_float_print_rate',
+            'extern "C" void generated_neohookean_ogden_tri3_apply_i_msoa_float_print_rate',
             operator_source,
         )
         self.assertIn(
@@ -2193,8 +2193,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("elapsed, nelements, ndofs, repeat", operator_source)
         self.assertNotIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_soa_impl", operator_source)
         self.assertNotIn('extern "C" int generated_neohookean_ogden_tri3_apply_soa', operator_source)
-        self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_affine_mesh_soa_impl", operator_source)
-        self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_isoparametric_mesh_soa_impl", operator_source)
+        self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_a_msoa_impl", operator_source)
+        self.assertIn("static SFEM_INLINE int generated_neohookean_ogden_tri3_apply_i_msoa_impl", operator_source)
         self.assertNotIn("accumulator_t", operator_source)
         self.assertNotIn("accumulator_t", local_source)
         self.assertNotIn("typedef double s_t;", local_source)

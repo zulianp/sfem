@@ -126,10 +126,10 @@ def validate_m6_4(result):
                 % basename
             )
         for token in (
-            "_residual_affine_mesh_soa",
-            "_residual_isoparametric_mesh_soa",
-            "_jacobian_action_affine_mesh_soa",
-            "_jacobian_action_isoparametric_mesh_soa",
+            "_residual_a_msoa",
+            "_residual_i_msoa",
+            "_jacobian_action_a_msoa",
+            "_jacobian_action_i_msoa",
         ):
             if token not in contents:
                 raise RuntimeError("Stokes operator '%s' is missing '%s'" % (basename, token))

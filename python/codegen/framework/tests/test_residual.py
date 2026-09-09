@@ -330,7 +330,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             self.assertNotIn("grad_coeff_ref", residual_body)
             self.assertNotIn("test_grad", residual_body)
 
-            function = "value_only_%s_residual_element_soa" % element.lower()
+            function = "value_only_%s_residual_esoa" % element.lower()
             element_signature = operator.split('extern "C" int %s(' % function, 1)[1].split(") {", 1)[0]
             self.assertNotIn("adjugate", element_signature)
             self.assertNotIn("unused", element_signature)
@@ -417,8 +417,8 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     sources[os.path.relpath(path, tmpdir)] = source_file.read()
             combined = "\n".join(sources.values())
             self.assertIn("coupled_diffusion_tri3", combined)
-            self.assertIn("jacobian_action_element_soa", combined)
-            self.assertIn("jacobian_action_affine_mesh_soa", combined)
+            self.assertIn("jacobian_action_esoa", combined)
+            self.assertIn("jacobian_action_a_msoa", combined)
             self.assertNotIn("two_phase", combined)
             self.assertGreater(len(result.objects), 0)
 
@@ -473,32 +473,32 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 self.assertIn("#pragma omp simd", local_source)
                 self.assertNotIn("two_phase", local_source)
                 self.assertIn(
-                    "coupled_diffusion_%s_residual_element_soa_float"
+                    "coupled_diffusion_%s_residual_esoa_float"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_jacobian_action_element_soa"
+                    "coupled_diffusion_%s_jacobian_action_esoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_residual_affine_mesh_soa"
+                    "coupled_diffusion_%s_residual_a_msoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_jacobian_action_affine_mesh_soa"
+                    "coupled_diffusion_%s_jacobian_action_a_msoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_residual_isoparametric_mesh_soa"
+                    "coupled_diffusion_%s_residual_i_msoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_jacobian_action_isoparametric_mesh_soa"
+                    "coupled_diffusion_%s_jacobian_action_i_msoa"
                     % element.lower(),
                     operator_source,
                 )
@@ -527,7 +527,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 self.assertIn(" direction[", action_signature)
                 self.assertIn("#pragma omp atomic update", operator_source)
                 self.assertIn(
-                    "coupled_diffusion_%s_residual_element_soa_diagnostics"
+                    "coupled_diffusion_%s_residual_esoa_diagnostics"
                     % element.lower(),
                     operator_source,
                 )
@@ -537,7 +537,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_jacobian_action_element_soa_arithmetic_intensity"
+                    "coupled_diffusion_%s_jacobian_action_esoa_arithmetic_intensity"
                     % element.lower(),
                     operator_source,
                 )
@@ -547,13 +547,13 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 )
                 self.assertIn(
                     'extern "C" void '
-                    "coupled_diffusion_%s_residual_affine_mesh_soa_print_rate"
+                    "coupled_diffusion_%s_residual_a_msoa_print_rate"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
                     'extern "C" void '
-                    "coupled_diffusion_%s_jacobian_action_isoparametric_mesh_soa_float_print_rate"
+                    "coupled_diffusion_%s_jacobian_action_i_msoa_float_print_rate"
                     % element.lower(),
                     operator_source,
                 )
@@ -568,7 +568,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 )
                 residual_cost = build_residual_graph(system).cost
                 diagnostic_match = re.search(
-                    r"coupled_diffusion_%s_residual_element_soa_diagnostics_data = \{"
+                    r"coupled_diffusion_%s_residual_esoa_diagnostics_data = \{"
                     r".*?\"%s\",\s*%d,\s*\d+,\s*\d+,\s*16,\s*\d+,"
                     r"\s*(\d+),\s*(\d+),\s*(\d+),"
                     % (element.lower(), element, dim),
@@ -590,11 +590,11 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     for form in ("residual", "jacobian_action"):
                         marker = (
                             "static SFEM_INLINE int "
-                            "coupled_diffusion_%s_%s_isoparametric_mesh_soa_impl"
+                            "coupled_diffusion_%s_%s_i_msoa_impl"
                             % (element.lower(), form)
                         )
                         section = operator_source.split(marker, 1)[1].split(
-                            'extern "C" int coupled_diffusion_%s_%s_isoparametric_mesh_soa'
+                            'extern "C" int coupled_diffusion_%s_%s_i_msoa'
                             % (element.lower(), form),
                             1,
                         )[0]
@@ -684,11 +684,11 @@ class CoupledResidualSystemTest(unittest.TestCase):
         tensor_source = source_by_path["tensor_product_kernels.hpp"]
         marker = (
             "static SFEM_INLINE int "
-            "coupled_diffusion_hex27_residual_isoparametric_mesh_soa_impl"
+            "coupled_diffusion_hex27_residual_i_msoa_impl"
         )
         section = operator_source.split(marker, 1)[1].split(
             'extern "C" int '
-            "coupled_diffusion_hex27_residual_isoparametric_mesh_soa",
+            "coupled_diffusion_hex27_residual_i_msoa",
             1,
         )[0]
         self.assertIn(
@@ -885,7 +885,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
         output_storage = [(scalar * n_shape)(*([0.0] * n_shape)) for _ in range(2)]
         function = getattr(
             library,
-            "coupled_diffusion_%s_%s_isoparametric_mesh_soa"
+            "coupled_diffusion_%s_%s_i_msoa"
             % (element.lower(), form),
         )
         args = [
@@ -975,7 +975,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
         output_storage = [(scalar * n_shape)(*([0.0] * n_shape)) for _ in range(2)]
         function = getattr(
             library,
-            "coupled_diffusion_%s_%s_affine_mesh_soa"
+            "coupled_diffusion_%s_%s_a_msoa"
             % (element.lower(), form),
         )
         args = [

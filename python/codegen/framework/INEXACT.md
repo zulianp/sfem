@@ -50,9 +50,9 @@ wrappers in `..._inexact_apply_operator.cpp`.
 
 | Kernel | Reads | Template | Called |
 |---|---|---|---|
-| `..._inexact_apply_tangent_affine_mesh_soa` | state · geometry · material parameters → writes `Sbar` | `<scalar_t, jacobian_t, tangent_t>` | once per tangent |
-| `..._inexact_apply_stored_affine_mesh_soa` | `Sbar` · `h` → `out` | `<scalar_t, tangent_t>` | once per apply |
-| `..._inexact_apply_compressed_affine_mesh_soa` | `Sbar` · per-element scale · `h` → `out` | `<scalar_t, tangent_t, scale_t>` | once per apply |
+| `..._inexact_apply_tangent_a_msoa` | state · geometry · material parameters → writes `Sbar` | `<scalar_t, jacobian_t, tangent_t>` | once per tangent |
+| `..._inexact_apply_stored_a_msoa` | `Sbar` · `h` → `out` | `<scalar_t, tangent_t>` | once per apply |
+| `..._inexact_apply_compressed_a_msoa` | `Sbar` · per-element scale · `h` → `out` | `<scalar_t, tangent_t, scale_t>` | once per apply |
 
 **The apply kernels take no geometry, no state and no material parameters.** The material has been
 evaluated away into `Sbar`, and what remains is a contraction identical for every material. This is

@@ -64,6 +64,8 @@ which data layout each reads, all of which are structure rather than syntax.
 
 from dataclasses import dataclass
 
+from codegen.framework.plans.conventions import abi_mesh_fragment
+
 
 class MeshTraversal:
     STANDARD = "standard"
@@ -180,10 +182,20 @@ class ApplyVariant:
 
     @property
     def suffix(self):
-        """The name fragment this variant contributes, e.g. ``packed_affine_mesh_soa``."""
+        """The name fragment this variant contributes, e.g. ``packed_a_msoa``.
+
+        The geometry and layout are looked up rather than spelled: the enum
+        values stay the long words -- they are what the plan dump, the
+        diagnostics metadata and the `--geometry` flag carry -- while the *name*
+        follows `plans/conventions.py`.  Spelling them here is how this property
+        went on returning `packed_affine_mesh_soa` after the emitters had moved,
+        which `test_apply_variants` caught by comparing it against the symbols
+        actually generated.
+        """
         traversal = "" if self.traversal == MeshTraversal.STANDARD else "%s_" % self.traversal
         precision = "" if self.precision == Precision.SCALAR else "_float"
-        return "%s%s_mesh_%s%s" % (traversal, self.geometry, self.layout, precision)
+        fragment = abi_mesh_fragment(self.geometry, "mesh_%s" % self.layout)
+        return "%s%s%s" % (traversal, fragment, precision)
 
     def to_dict(self):
         return {

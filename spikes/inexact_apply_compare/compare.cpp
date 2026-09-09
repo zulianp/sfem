@@ -8,7 +8,7 @@
 #include "kernel_math.hpp"
 #include "linear_elasticity_tet4_inexact_apply_inline.hpp"
 
-extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_apply_a_msoa(
         const ptrdiff_t, const ptrdiff_t, idx_t **const,
         const geom_t *const, const geom_t *const, const geom_t *const,
         const geom_t *const, const geom_t *const, const geom_t *const,
@@ -67,12 +67,12 @@ int main() {
     std::vector<double> ax(nnodes,0), ay(nnodes,0), az(nnodes,0);
     std::vector<double> bx(nnodes,0), by(nnodes,0), bz(nnodes,0);
 
-    linear_elasticity_tet4_apply_affine_mesh_soa(nelements, nnodes, evp.data(),
+    linear_elasticity_tet4_apply_a_msoa(nelements, nnodes, evp.data(),
         adj[0].data(),adj[1].data(),adj[2].data(),adj[3].data(),adj[4].data(),
         adj[5].data(),adj[6].data(),adj[7].data(),adj[8].data(), det.data(),
         lmbda, mu, 1, hx.data(), hy.data(), hz.data(), 1, ax.data(), ay.data(), az.data());
 
-    sfem::codegen::linear_elasticity_tet4_apply_inexact_affine_mesh_soa_impl<double, geom_t>(
+    sfem::codegen::linear_elasticity_tet4_apply_inexact_a_msoa_impl<double, geom_t>(
         nelements, nnodes, evp.data(),
         adj[0].data(),adj[1].data(),adj[2].data(),adj[3].data(),adj[4].data(),
         adj[5].data(),adj[6].data(),adj[7].data(),adj[8].data(), det.data(),

@@ -6,11 +6,11 @@ The plan is `plans/inexact_apply.py`; this prints it.
 applied, so in a Krylov solve one tangent serves every apply of that Newton
 step.  The header carries that split:
 
-    <material>_<element>_inexact_apply_tangent_affine_mesh_soa
+    <material>_<element>_inexact_apply_tangent_a_msoa
         once per tangent: state, geometry and material in, `Sbar` out
 
-    <material>_<element>_inexact_apply_stored_affine_mesh_soa
-    <material>_<element>_inexact_apply_compressed_affine_mesh_soa
+    <material>_<element>_inexact_apply_stored_a_msoa
+    <material>_<element>_inexact_apply_compressed_a_msoa
         once per apply: `Sbar` and the vector in, nothing else
 
 The apply kernels take no geometry, no state and no material parameters at all
@@ -178,7 +178,7 @@ def _inexact_apply_kernel_source(
         _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous)
     )
     return (
-        "%s_inexact_apply_tangent_affine_mesh_soa" % prefix,
+        "%s_inexact_apply_tangent_a_msoa" % prefix,
         "\n".join(lines),
         "\n".join(operator_lines),
     )
@@ -337,7 +337,7 @@ def _tangent_lines(
         ]
     )
     return _function_lines(
-        "%s_inexact_apply_tangent_affine_mesh_soa" % prefix,
+        "%s_inexact_apply_tangent_a_msoa" % prefix,
         "template <typename s_t, typename g_t, typename tangent_t>",
         signature,
         body,
@@ -367,7 +367,7 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     signature.extend(_stream_arguments("h", component))
     signature.extend(_output_arguments(component))
     return _function_lines(
-        "%s_inexact_apply_stored_affine_mesh_soa" % prefix,
+        "%s_inexact_apply_stored_a_msoa" % prefix,
         "template <typename s_t, typename tangent_t>",
         signature,
         body,
@@ -404,7 +404,7 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     signature.extend(_stream_arguments("h", component))
     signature.extend(_output_arguments(component))
     return _function_lines(
-        "%s_inexact_apply_compressed_affine_mesh_soa" % prefix,
+        "%s_inexact_apply_compressed_a_msoa" % prefix,
         "template <typename s_t, typename tangent_t, typename scale_t>",
         signature,
         body,
@@ -492,7 +492,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
     lines = []
     for suffix, scalar in _ABI_SCALARS:
         # --- the partial assembly ---------------------------------------
-        name = "%s_inexact_apply_tangent_affine_mesh_soa%s" % (prefix, suffix)
+        name = "%s_inexact_apply_tangent_a_msoa%s" % (prefix, suffix)
         lines.append('extern "C" int %s(' % name)
         lines.append("    const ptrdiff_t nelements,")
         lines.append("    idx_t **const RSTR elements,")
@@ -506,7 +506,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
                 "    const ptrdiff_t tangent_component_stride,",
                 "    metric_tensor_t *const RSTR tangent",
                 ") {",
-                "  return sfem::codegen::%s_inexact_apply_tangent_affine_mesh_soa_impl<"
+                "  return sfem::codegen::%s_inexact_apply_tangent_a_msoa_impl<"
                 "%s, geom_t, metric_tensor_t>(" % (prefix, scalar),
                 "      %s," % geometry_call,
                 "      %s," % ", ".join(parameters),
@@ -519,7 +519,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         )
 
         # --- the apply, from a `metric_tensor_t` store --------------------
-        name = "%s_inexact_apply_stored_affine_mesh_soa%s" % (prefix, suffix)
+        name = "%s_inexact_apply_stored_a_msoa%s" % (prefix, suffix)
         lines.append('extern "C" int %s(' % name)
         lines.extend(
             [
@@ -536,7 +536,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         lines.extend(
             [
                 ") {",
-                "  return sfem::codegen::%s_inexact_apply_stored_affine_mesh_soa_impl<"
+                "  return sfem::codegen::%s_inexact_apply_stored_a_msoa_impl<"
                 "%s, metric_tensor_t>(" % (prefix, scalar),
                 "      nelements, elements,",
                 "      tangent_element_stride, tangent_component_stride, tangent,",
@@ -548,7 +548,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         )
 
         # --- the apply, from a compressed store ---------------------------
-        name = "%s_inexact_apply_compressed_affine_mesh_soa%s" % (prefix, suffix)
+        name = "%s_inexact_apply_compressed_a_msoa%s" % (prefix, suffix)
         lines.append('extern "C" int %s(' % name)
         lines.extend(
             [
@@ -566,7 +566,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
         lines.extend(
             [
                 ") {",
-                "  return sfem::codegen::%s_inexact_apply_compressed_affine_mesh_soa_impl<"
+                "  return sfem::codegen::%s_inexact_apply_compressed_a_msoa_impl<"
                 "%s, compressed_t, scaling_t>(" % (prefix, scalar),
                 "      nelements, elements,",
                 "      tangent_element_stride, tangent_component_stride, tangent, scaling,",

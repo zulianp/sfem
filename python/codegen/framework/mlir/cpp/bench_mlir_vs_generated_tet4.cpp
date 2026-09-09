@@ -13,7 +13,7 @@
 using idx_t = int32_t;
 using geom_t = float;
 
-extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_tet4_apply_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **elements,
@@ -331,7 +331,7 @@ int main(int argc, char **argv) {
                      node_to_element_map,
                      node_to_local_idx,
                      openmp_out);
-    linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float(nelements,
+    linear_elasticity_tet4_tet4_apply_a_msoa_float(nelements,
                                                             nnodes,
                                                             elements,
                                                             generated_adj[0].data(),
@@ -384,7 +384,7 @@ int main(int argc, char **argv) {
                                                    node_to_element_map.data(),
                                                    node_to_local_idx.data(),
                                                    mlir_out.data());
-        linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float(nelements,
+        linear_elasticity_tet4_tet4_apply_a_msoa_float(nelements,
                                                                 nnodes,
                                                                 elements,
                                                                 generated_adj[0].data(),
@@ -460,7 +460,7 @@ int main(int argc, char **argv) {
 
     const double t4 = seconds_now();
     for (int r = 0; r < repeat; ++r) {
-        linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float(nelements,
+        linear_elasticity_tet4_tet4_apply_a_msoa_float(nelements,
                                                                 nnodes,
                                                                 elements,
                                                                 generated_adj[0].data(),

@@ -259,7 +259,7 @@ namespace sfem {
             // used to be two symbols chosen by `if constexpr`; the generated C
             // ABI now carries the type as a `smesh::PrimitiveType` and takes the
             // buffers as `void *`, so the branch is gone rather than hidden.
-            return linear_elasticity_apply_2d_isoparametric_mesh_soa(smesh::QUAD4,
+            return linear_elasticity_apply_2d_i_msoa(smesh::QUAD4,
                                                                      smesh::TypeToEnum<Scalar>::value(),
                                                                      nmicro,
                                                                      nnodes,
@@ -290,7 +290,7 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
             const geom_t *const *pts = const_cast<const geom_t *const *>(points);
-            return linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(
+            return linear_elasticity_hessian_block_diag_sym_2d_i_msoa(
                     smesh::QUAD4,
                     smesh::TypeToEnum<Scalar>::value(),
                     nmicro,

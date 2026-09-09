@@ -12,10 +12,10 @@
 #include <cstdio>
 
 extern "C" {
-int two_phase_flow_hex8_residual_isoparametric_mesh_aos(
+int two_phase_flow_hex8_residual_i_maos(
         ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *,
         const real_t *, const real_t *, real_t *);
-int two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(
+int two_phase_flow_hex8_jacobian_action_i_maos(
         ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t *,
         const real_t *, const real_t *, real_t *);
 }
@@ -69,10 +69,10 @@ int test_generated_two_phase_flow_operator() {
     const auto points = const_cast<const geom_t *const *>(mesh->points()->data());
     std::fill(residual_direct->data(), residual_direct->data() + ndofs, 0);
     std::fill(action_direct->data(), action_direct->data() + ndofs, 0);
-    two_phase_flow_hex8_residual_isoparametric_mesh_aos(
+    two_phase_flow_hex8_residual_i_maos(
             block->n_elements(), mesh->n_nodes(), block->elements()->data(), points,
             p.data(), current->data(), previous->data(), residual_direct->data());
-    two_phase_flow_hex8_jacobian_action_isoparametric_mesh_aos(
+    two_phase_flow_hex8_jacobian_action_i_maos(
             block->n_elements(), mesh->n_nodes(), block->elements()->data(), points,
             p.data(), current->data(), direction->data(), action_direct->data());
 

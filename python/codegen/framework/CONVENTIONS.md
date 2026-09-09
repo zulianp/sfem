@@ -115,15 +115,35 @@ local / micro kernel (sfem::codegen)     <mat>_d<n>_<family>[_<elem>]_<verb>_blk
 internal template behind a C wrapper     <mesh kernel name>_impl
 ```
 
-| Slot | Alphabet |
-|---|---|
-| `<verb>` | `objective` · `objective_steps` · `gradient` · `apply` · `hessian_<fmt>` |
-| `<geom>` | `a` affine · `i` isoparametric |
-| `<qual>` | `pk` packed · `2p` two-pass · `aos` · `unit` |
-| level | `_msoa` mesh · `_esoa` element |
-| `<family>` | `spx` simplex · `tp` tensor-product |
-| `<mat>` | the material's declared `symbol` |
-| `<elem>` | SFEM element label, lowercased; `proteus_` → `p` |
+| Slot | Alphabet | In force |
+|---|---|---|
+| `<verb>` | `objective` · `objective_steps` · `gradient` · `apply` · `hessian_<fmt>` | partly — `residual` and `jacobian_action` still ship |
+| `<geom>` | `a` affine · `i` isoparametric · `ss` sideset | **yes** |
+| geometry representation | `met` cached metric | **yes** |
+| level | `_msoa` mesh SoA · `_maos` mesh AoS · `_esoa` element SoA | **yes** |
+| `<qual>` | `pk` packed · `2p` two-pass · `aos` · `unit` | no — `packed`, `two_pass` still spelled out |
+| `<family>` | `spx` simplex · `tp` tensor-product | no |
+| `<mat>` | the material's declared `symbol` | no |
+| `<elem>` | SFEM element label, lowercased; `proteus_` → `p` | no |
+
+The **In force** column is the difference between what is specified and what the generator
+emits today, and it is here so the two are never confused. Each row moves when its rename
+lands, not before.
+
+**The geometry and the level are one unit.** `a` and `i` are single letters, which everywhere
+else in this document is the material author's namespace. They are safe here only because a
+geometry token never stands alone: the name always carries `_<geom>[_<qual>]_<level>` as a
+whole, and that composite is the unit both the composer and the parser work in. Anything that
+matches on a bare `_a_` is a bug waiting for a material to declare a field called `a`.
+
+**The table is `plans/conventions.py`, and both directions read it.** The emitters compose
+these names; `package/op_wrappers.py` parses them back, because L7 is handed kernel sources as
+text and has no other source for what a kernel is. `abi_rename_pairs()` derives the rename from
+the same tables `dimension_markers()` derives the parser from, so the two halves cannot move
+separately — and `classify_abi_name()` sorts every published name into a category, with anything
+uncategorised a hard error at generation rather than a silent skip. That guard is not decoration:
+without it, a rename that moved only the emitters produced 2,023 names in the new form, 3,514 in
+the old, and an exit code of 0.
 
 **The verb is the kernel, not the mathematics.** `objective` is the 0-form (an energy, or a
 residual-based merit), `gradient` the 1-form (a gradient, or the negated residual), `apply` the
@@ -139,9 +159,14 @@ beside `op_name`, so the abbreviation is a specification fact rather than a tabl
 guesses from.
 
 ```
-mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float   109
-mrkvn_elastic_phex8_gradient_pk_2p_i_msoa_float                                                                  46
+was     mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float   109
+today   mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa_float                      93
+target  mrkvn_elastic_phex8_gradient_pk_2p_i_msoa_float                                                                   46
 ```
+
+The longest published name is the one worth quoting, because it is where every slot is
+occupied at once. The 16 characters between the first two lines are the geometry and the
+level; the remaining 47 are the four rows of the table that have not moved yet.
 
 ## Temporaries
 
@@ -220,8 +245,8 @@ Renaming these breaks something outside the generator. They are not style choice
 | public `extern "C"` entry points | called from hand-written `frontend/ops/sfem_LinearElasticity.cpp` and `frontend/tests/sfem_MatrixFromatsTest.cpp`; `package/op_wrappers.py` reconstructs them by name and **silently emits a different code path** when one is missing |
 | **C ABI parameter names** | `tools/reproducibility.py` seeds its test input from an FNV hash *of the parameter name string*. Renaming `kappa` changes the input data and therefore every recorded digest — indistinguishable from an arithmetic regression |
 | `sfem::codegen::` helpers in the shared headers | `operators/hex8/hex8_linear_elasticity.cpp` and `drivers/bench/neohookean_assemble.exe.cpp` call them |
-| `<material>_hessian_{2,3}d_element_soa` | `drivers/bench/neohookean_assemble.exe.cpp` |
-| `two_phase_flow_<elem>_*_element_soa_diagnostics` | reconstructed by token pasting in `drivers/simulations/generated_two_phase_flow.exe.cpp` |
+| `<material>_hessian_{2,3}d_esoa` | `drivers/bench/neohookean_assemble.exe.cpp` |
+| `two_phase_flow_<elem>_*_esoa_diagnostics` | reconstructed by token pasting in `drivers/simulations/generated_two_phase_flow.exe.cpp` |
 | Op class, factory keys, registration functions | resolved by string from drivers and env vars |
 | generated file paths | `tools/apply_bench.py` pins `<material>_<element>_operator.cpp` |
 

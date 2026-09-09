@@ -1,7 +1,9 @@
 from codegen.framework.plans.conventions import (
-    ABI_DIAGNOSTICS_TAIL,
-    ABI_GEOMETRY_TOKENS,
-    ABI_TRAVERSAL_TOKENS,
+    diagnostics_tail,
+    ABI_GEOMETRY_SPELLING,
+    abi_local_level,
+    abi_with_geometry_qualifier,
+    ABI_TRAVERSAL_SPELLING,
     classify_abi_name,
     dimension_markers,
     restrict_prelude,
@@ -663,8 +665,8 @@ def _inexact_definitions(
     apply_lines = []
     reachable = False
     for dim in (2, 3):
-        tangent_abi = "%s_inexact_apply_tangent_%dd_affine_mesh_soa" % (material.name, dim)
-        stored_abi = "%s_inexact_apply_stored_%dd_affine_mesh_soa" % (material.name, dim)
+        tangent_abi = "%s_inexact_apply_tangent_%dd_a_msoa" % (material.name, dim)
+        stored_abi = "%s_inexact_apply_stored_%dd_a_msoa" % (material.name, dim)
         if not _c_abi_function_exists(kernel_sources, tangent_abi, public_only=True):
             continue
         if not _c_abi_function_exists(kernel_sources, stored_abi, public_only=True):
@@ -894,7 +896,7 @@ def _hyperelastic_op(
             "domain.block->elements()->data(), %s%s"
             % (
                 _affine_geometry_offsets_for(
-                    kernel_sources, "%s_gradient_affine_mesh_soa" % stem, dim
+                    kernel_sources, "%s_gradient_a_msoa" % stem, dim
                 ),
                 gradient_args,
             )
@@ -913,7 +915,7 @@ def _hyperelastic_op(
             "domain.block->elements()->data(), %s%s"
             % (
                 _affine_geometry_offsets_for(
-                    kernel_sources, "%s_apply_affine_mesh_soa" % stem, dim
+                    kernel_sources, "%s_apply_a_msoa" % stem, dim
                 ),
                 apply_args,
             )
@@ -924,24 +926,24 @@ def _hyperelastic_op(
             % apply_args
         )
         gradient_affine_uses_aos = _c_abi_function_exists(
-            kernel_sources, "%s_gradient_affine_mesh_soa_aos_unit" % stem
+            kernel_sources, "%s_gradient_a_msoa_aos_unit" % stem
         )
         apply_affine_uses_aos = _c_abi_function_exists(
-            kernel_sources, "%s_apply_affine_mesh_soa_aos_unit" % stem
+            kernel_sources, "%s_apply_a_msoa_aos_unit" % stem
         )
         gradient_affine_aos_flags.append(gradient_affine_uses_aos)
         apply_affine_aos_flags.append(apply_affine_uses_aos)
         affine_metric_flags.extend(
             _affine_dispatch_uses_metric(kernel_sources, name)
             for name in (
-                "%s_gradient_affine_mesh_soa" % stem,
-                "%s_apply_affine_mesh_soa" % stem,
-                "%s_objective_affine_mesh_soa" % stem,
-                "%s_objective_steps_affine_mesh_soa" % stem,
-                "%s_gradient_%dd_affine_mesh_soa" % (material.name, dim),
-                "%s_apply_%dd_affine_mesh_soa" % (material.name, dim),
-                "%s_objective_%dd_affine_mesh_soa" % (material.name, dim),
-                "%s_objective_steps_%dd_affine_mesh_soa" % (material.name, dim),
+                "%s_gradient_a_msoa" % stem,
+                "%s_apply_a_msoa" % stem,
+                "%s_objective_a_msoa" % stem,
+                "%s_objective_steps_a_msoa" % stem,
+                "%s_gradient_%dd_a_msoa" % (material.name, dim),
+                "%s_apply_%dd_a_msoa" % (material.name, dim),
+                "%s_objective_%dd_a_msoa" % (material.name, dim),
+                "%s_objective_steps_%dd_a_msoa" % (material.name, dim),
             )
         )
         gradient_affine_args = ", ".join(
@@ -965,7 +967,7 @@ def _hyperelastic_op(
                 _dual_aos_unit_case(
                     element,
                     "gradient_uses_affine",
-                    "%s_gradient_affine_mesh_soa_aos_unit" % stem,
+                    "%s_gradient_a_msoa_aos_unit" % stem,
                     ", ".join(
                         _nonempty(
                             gradient_common_affine_aos_args,
@@ -974,9 +976,9 @@ def _hyperelastic_op(
                             *_energy_output_args(components),
                         )
                     ),
-                    "%s_gradient_affine_mesh_soa" % stem,
+                    "%s_gradient_a_msoa" % stem,
                     gradient_affine_args,
-                    "%s_gradient_isoparametric_mesh_soa" % stem,
+                    "%s_gradient_i_msoa" % stem,
                     gradient_isoparametric_args,
                 )
             )
@@ -985,9 +987,9 @@ def _hyperelastic_op(
                 _dual_case(
                     element,
                     "gradient_uses_affine",
-                    "%s_gradient_affine_mesh_soa" % stem,
+                    "%s_gradient_a_msoa" % stem,
                     gradient_affine_args,
-                    "%s_gradient_isoparametric_mesh_soa" % stem,
+                    "%s_gradient_i_msoa" % stem,
                     gradient_isoparametric_args,
                 )
             )
@@ -1016,7 +1018,7 @@ def _hyperelastic_op(
                 _dual_aos_unit_case(
                     element,
                     "apply_uses_affine",
-                    "%s_apply_affine_mesh_soa_aos_unit" % stem,
+                    "%s_apply_a_msoa_aos_unit" % stem,
                     ", ".join(
                         _nonempty(
                             apply_common_affine_aos_args,
@@ -1027,9 +1029,9 @@ def _hyperelastic_op(
                             *_energy_output_args(components),
                         )
                     ),
-                    "%s_apply_affine_mesh_soa" % stem,
+                    "%s_apply_a_msoa" % stem,
                     apply_affine_args,
-                    "%s_apply_isoparametric_mesh_soa" % stem,
+                    "%s_apply_i_msoa" % stem,
                     apply_isoparametric_args,
                 )
             )
@@ -1038,22 +1040,22 @@ def _hyperelastic_op(
                 _dual_case(
                     element,
                     "apply_uses_affine",
-                    "%s_apply_affine_mesh_soa" % stem,
+                    "%s_apply_a_msoa" % stem,
                     apply_affine_args,
-                    "%s_apply_isoparametric_mesh_soa" % stem,
+                    "%s_apply_i_msoa" % stem,
                     apply_isoparametric_args,
                 )
             )
         objective_cases.append(
             _dual_status_case(
                 element,
-                "%s_objective_affine_mesh_soa" % stem,
+                "%s_objective_a_msoa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
                     % (
                         _affine_geometry_offsets_for(
                             kernel_sources,
-                            "%s_objective_affine_mesh_soa" % stem,
+                            "%s_objective_a_msoa" % stem,
                             dim,
                         ),
                         objective_args,
@@ -1061,7 +1063,7 @@ def _hyperelastic_op(
                     *_energy_field_args(objective_dependencies, components, current="x"),
                     "impl_->element_values.get()",
                 )),
-                "%s_objective_isoparametric_mesh_soa" % stem,
+                "%s_objective_i_msoa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
                     % objective_args,
@@ -1073,13 +1075,13 @@ def _hyperelastic_op(
         objective_steps_cases.append(
             _dual_status_case(
                 element,
-                "%s_objective_steps_affine_mesh_soa" % stem,
+                "%s_objective_steps_a_msoa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
                     % (
                         _affine_geometry_offsets_for(
                             kernel_sources,
-                            "%s_objective_affine_mesh_soa" % stem,
+                            "%s_objective_a_msoa" % stem,
                             dim,
                         ),
                         objective_args,
@@ -1091,7 +1093,7 @@ def _hyperelastic_op(
                     "steps",
                     "impl_->element_values.get()",
                 )),
-                "%s_objective_steps_isoparametric_mesh_soa" % stem,
+                "%s_objective_steps_i_msoa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
                     % objective_args,
@@ -1112,7 +1114,7 @@ def _hyperelastic_op(
                 ),
             )
         )
-        hessian_crs_function = "%s_hessian_crs_isoparametric_mesh_soa" % stem
+        hessian_crs_function = "%s_hessian_crs_i_msoa" % stem
         if _c_abi_function_exists(kernel_sources, hessian_crs_function):
             hessian_crs_cases.append(
                 _case(
@@ -1128,7 +1130,7 @@ def _hyperelastic_op(
                     ),
                 )
             )
-        hessian_bsr_function = "%s_hessian_bsr_isoparametric_mesh_soa" % stem
+        hessian_bsr_function = "%s_hessian_bsr_i_msoa" % stem
         if _c_abi_function_exists(kernel_sources, hessian_bsr_function):
             hessian_bsr_cases.append(
                 _case(
@@ -1837,14 +1839,14 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         performance_cases["gradient"].append(
             _performance_case(
                 element,
-                ("%s_residual_element_soa_diagnostics" % stem,),
+                ("%s_residual_esoa_diagnostics" % stem,),
                 affine_flags=("residual_uses_affine",),
             )
         )
         performance_cases["apply"].append(
             _performance_case(
                 element,
-                ("%s_jacobian_action_element_soa_diagnostics" % stem,),
+                ("%s_jacobian_action_esoa_diagnostics" % stem,),
                 affine_flags=("jacobian_action_uses_affine",),
             )
         )
@@ -1854,7 +1856,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         if residual_dependencies.previous:
             residual_pointer_params.append("const real_t *")
         declarations.append(
-            "int %s_residual_isoparametric_mesh_aos("
+            "int %s_residual_i_maos("
             "ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, "
             "const real_t *, %sreal_t *);"
             % (stem, "".join("%s, " % param for param in residual_pointer_params))
@@ -1867,7 +1869,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         if action_dependencies.direction:
             action_pointer_params.append("const real_t *")
         declarations.append(
-            "int %s_jacobian_action_isoparametric_mesh_aos("
+            "int %s_jacobian_action_i_maos("
             "ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, "
             "const real_t *, %sreal_t *);"
             % (stem, "".join("%s, " % param for param in action_pointer_params))
@@ -1877,22 +1879,22 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             "domain.block->elements()->data(), points"
         )
         residual_affine_uses_metric = _c_abi_function_uses_cached_metric(
-            kernel_sources, "%s_residual_affine_mesh_soa" % stem
+            kernel_sources, "%s_residual_a_msoa" % stem
         )
         action_affine_uses_metric = _c_abi_function_uses_cached_metric(
-            kernel_sources, "%s_jacobian_action_affine_mesh_soa" % stem
+            kernel_sources, "%s_jacobian_action_a_msoa" % stem
         )
         residual_affine_uses_metric_aos = _c_abi_function_exists(
-            kernel_sources, "%s_residual_affine_mesh_soa_aos" % stem
+            kernel_sources, "%s_residual_a_msoa_aos" % stem
         )
         action_affine_uses_metric_aos = _c_abi_function_exists(
-            kernel_sources, "%s_jacobian_action_affine_mesh_soa_aos" % stem
+            kernel_sources, "%s_jacobian_action_a_msoa_aos" % stem
         )
         residual_affine_uses_metric_aos_unit = _c_abi_function_exists(
-            kernel_sources, "%s_residual_affine_mesh_soa_aos_unit" % stem
+            kernel_sources, "%s_residual_a_msoa_aos_unit" % stem
         )
         action_affine_uses_metric_aos_unit = _c_abi_function_exists(
-            kernel_sources, "%s_jacobian_action_affine_mesh_soa_aos_unit" % stem
+            kernel_sources, "%s_jacobian_action_a_msoa_aos_unit" % stem
         )
         residual_affine_metric_flags.append(residual_affine_uses_metric)
         action_affine_metric_flags.append(action_affine_uses_metric)
@@ -1991,9 +1993,9 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                 element,
                 "residual_uses_affine",
                 (
-                    "%s_residual_affine_mesh_soa_aos" % stem
+                    "%s_residual_a_msoa_aos" % stem
                     if residual_affine_uses_metric_aos
-                    else "%s_residual_affine_mesh_soa" % stem
+                    else "%s_residual_a_msoa" % stem
                 ),
                 ", ".join(
                     (
@@ -2003,12 +2005,12 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                         *residual_common_args,
                     )
                 ),
-                "%s_residual_isoparametric_mesh_soa" % stem,
+                "%s_residual_i_msoa" % stem,
                 ", ".join((common_isoparametric, *residual_common_args)),
                 block_size_by_dim[dim],
                 residual_setup,
                 affine_unit_function=(
-                    "%s_residual_affine_mesh_soa_aos_unit" % stem
+                    "%s_residual_a_msoa_aos_unit" % stem
                     if residual_affine_uses_metric_aos_unit
                     else None
                 ),
@@ -2089,9 +2091,9 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                 element,
                 "jacobian_action_uses_affine",
                 (
-                    "%s_jacobian_action_affine_mesh_soa_aos" % stem
+                    "%s_jacobian_action_a_msoa_aos" % stem
                     if action_affine_uses_metric_aos
-                    else "%s_jacobian_action_affine_mesh_soa" % stem
+                    else "%s_jacobian_action_a_msoa" % stem
                 ),
                 ", ".join(
                     (
@@ -2101,12 +2103,12 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                         *action_common_args,
                     )
                 ),
-                "%s_jacobian_action_isoparametric_mesh_soa" % stem,
+                "%s_jacobian_action_i_msoa" % stem,
                 ", ".join((common_isoparametric, *action_common_args)),
                 block_size_by_dim[dim],
                 action_setup,
                 affine_unit_function=(
-                    "%s_jacobian_action_affine_mesh_soa_aos_unit" % stem
+                    "%s_jacobian_action_a_msoa_aos_unit" % stem
                     if action_affine_uses_metric_aos_unit
                     else None
                 ),
@@ -2153,7 +2155,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             hessian_common_args.extend(
                 _residual_soa_field_argument_names(fields_by_dim[dim], "old_data", mixed_order)
             )
-        hessian_crs_function = "%s_hessian_crs_isoparametric_mesh_soa" % stem
+        hessian_crs_function = "%s_hessian_crs_i_msoa" % stem
         if _c_abi_function_exists(kernel_sources, hessian_crs_function):
             hessian_crs_cases.append(
                 _residual_soa_case(
@@ -2172,7 +2174,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                     hessian_setup,
                 )
             )
-        hessian_bsr_function = "%s_hessian_bsr_isoparametric_mesh_soa" % stem
+        hessian_bsr_function = "%s_hessian_bsr_i_msoa" % stem
         if _c_abi_function_exists(kernel_sources, hessian_bsr_function):
             hessian_bsr_cases.append(
                 _residual_soa_case(
@@ -2246,7 +2248,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     action_packed_affine_uses_metric_soa = any(
         _c_abi_function_uses_cached_metric(
             kernel_sources,
-            "%s_jacobian_action_packed_%dd_affine_mesh_soa" % (material.name, dim),
+            "%s_jacobian_action_packed_%dd_a_msoa" % (material.name, dim),
         )
         for dim in (2, 3)
     )
@@ -2254,7 +2256,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         material.name == "laplace"
         and _c_abi_function_exists(
             kernel_sources,
-            "laplace_tet4_jacobian_action_packed_affine_mesh_soa",
+            "laplace_tet4_jacobian_action_packed_a_msoa",
         )
     )
     laplace_proteus_hex8_packed_metric = (
@@ -2375,7 +2377,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     private_declarations = []
     if laplace_tet4_packed_affine_uses_metric_soa:
         private_declarations.append(
-            """int laplace_tet4_jacobian_action_packed_affine_mesh_soa(
+            """int laplace_tet4_jacobian_action_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2647,7 +2649,7 @@ namespace sfem {
     const bool needs_affine_metric =
         (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
         (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
-    const bool needs_affine_metric_soa =
+    const bool needs_a_met_soa =
         (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
         (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
     const bool needs_affine_metric_aos =
@@ -2657,7 +2659,7 @@ namespace sfem {
       const int status = cache_affine_geometry(impl_->space,
                                                      *impl_->domains,
                                                      needs_affine_jacobian,
-                                                     needs_affine_metric_soa,
+                                                     needs_a_met_soa,
                                                      needs_affine_metric_aos);
       if (status != SFEM_SUCCESS) return status;
     }
@@ -2823,7 +2825,7 @@ namespace sfem {
       const bool needs_affine_metric =
           (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
           (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
-      const bool needs_affine_metric_soa =
+      const bool needs_a_met_soa =
           (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
           (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
       const bool needs_affine_metric_aos =
@@ -2832,7 +2834,7 @@ namespace sfem {
       if (cache_affine_geometry(impl_->space,
                                       *impl_->domains,
                                       needs_affine_jacobian,
-                                      needs_affine_metric_soa,
+                                      needs_a_met_soa,
                                       needs_affine_metric_aos) != SFEM_SUCCESS) {
         SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
       }
@@ -3138,7 +3140,7 @@ def _boundary_residual_op(material, elements, c_abi_header=None, form_collection
         dim = _element_dim(element)
         fields = fields_by_dim[dim]
         block_size = block_size_by_dim[dim]
-        stem = "%s_%s_boundary_residual_%dd_sideset_soa" % (
+        stem = "%s_%s_boundary_residual_%dd_ss_soa" % (
             material.name,
             _boundary_surface_name(element),
             dim,
@@ -4295,7 +4297,7 @@ def _coupled_cases(
             diagnostics = ["%s_gradient_soa_diagnostics" % energy_stem]
             affine_flags = ["gradient_uses_affine"]
             if getattr(residual_equation, "diagnostics", True):
-                diagnostics.append("%s_residual_element_soa_diagnostics" % residual_stem)
+                diagnostics.append("%s_residual_esoa_diagnostics" % residual_stem)
                 affine_flags.append("residual_uses_affine")
             cases["performance"]["gradient"].append(
                 _performance_case(
@@ -4308,7 +4310,7 @@ def _coupled_cases(
             diagnostics = ["%s_apply_soa_diagnostics" % energy_stem]
             affine_flags = ["apply_uses_affine"]
             if getattr(residual_equation, "diagnostics", True):
-                diagnostics.append("%s_jacobian_action_element_soa_diagnostics" % residual_stem)
+                diagnostics.append("%s_jacobian_action_esoa_diagnostics" % residual_stem)
                 affine_flags.append("jacobian_action_uses_affine")
             cases["performance"]["apply"].append(
                 _performance_case(
@@ -4366,10 +4368,10 @@ def _coupled_cases(
                 energy_out,
             )
         )
-        energy_grad_affine = "%s_gradient_%dd_affine_mesh_soa(%s%s, %s)" % (
+        energy_grad_affine = "%s_gradient_%dd_a_msoa(%s%s, %s)" % (
             energy_dispatch_stem, dim, common_affine_dispatch, energy_params, energy_grad_args
         )
-        energy_grad_iso = "%s_gradient_%dd_isoparametric_mesh_soa(%s%s, %s)" % (
+        energy_grad_iso = "%s_gradient_%dd_i_msoa(%s%s, %s)" % (
             energy_dispatch_stem, dim, common_iso_dispatch, energy_params, energy_grad_args
         )
         residual_gradient_args = []
@@ -4388,10 +4390,10 @@ def _coupled_cases(
                 *residual_gradient_args,
             )
         )
-        residual_grad_affine = "%s_residual_%dd_affine_mesh_soa(%s, %s)" % (
+        residual_grad_affine = "%s_residual_%dd_a_msoa(%s, %s)" % (
             residual_dispatch_stem, dim, common_affine_dispatch, residual_args_common
         )
-        residual_grad_iso = "%s_residual_%dd_isoparametric_mesh_soa(%s, %s)" % (
+        residual_grad_iso = "%s_residual_%dd_i_msoa(%s, %s)" % (
             residual_dispatch_stem, dim, common_iso_dispatch, residual_args_common
         )
         if has_gradient:
@@ -4429,10 +4431,10 @@ def _coupled_cases(
                 energy_out,
             )
         )
-        energy_apply_affine = "%s_apply_%dd_affine_mesh_soa(%s%s, %s)" % (
+        energy_apply_affine = "%s_apply_%dd_a_msoa(%s%s, %s)" % (
             energy_dispatch_stem, dim, common_affine_dispatch, energy_apply_params, energy_apply_args
         )
-        energy_apply_iso = "%s_apply_%dd_isoparametric_mesh_soa(%s%s, %s)" % (
+        energy_apply_iso = "%s_apply_%dd_i_msoa(%s%s, %s)" % (
             energy_dispatch_stem, dim, common_iso_dispatch, energy_apply_params, energy_apply_args
         )
         residual_apply_args = []
@@ -4454,10 +4456,10 @@ def _coupled_cases(
                 *residual_apply_args,
             )
         )
-        residual_apply_affine = "%s_jacobian_action_%dd_affine_mesh_soa(%s, %s)" % (
+        residual_apply_affine = "%s_jacobian_action_%dd_a_msoa(%s, %s)" % (
             residual_dispatch_stem, dim, common_affine_dispatch, residual_apply_args_common
         )
-        residual_apply_iso = "%s_jacobian_action_%dd_isoparametric_mesh_soa(%s, %s)" % (
+        residual_apply_iso = "%s_jacobian_action_%dd_i_msoa(%s, %s)" % (
             residual_dispatch_stem, dim, common_iso_dispatch, residual_apply_args_common
         )
         if has_apply:
@@ -4494,10 +4496,10 @@ def _coupled_cases(
                 "impl_->element_values.get()",
             )
         )
-        energy_objective_affine = "%s_objective_%dd_affine_mesh_soa(%s%s, %s)" % (
+        energy_objective_affine = "%s_objective_%dd_a_msoa(%s%s, %s)" % (
             energy_dispatch_stem, dim, common_affine_dispatch, energy_objective_params, energy_objective_args
         )
-        energy_objective_iso = "%s_objective_%dd_isoparametric_mesh_soa(%s%s, %s)" % (
+        energy_objective_iso = "%s_objective_%dd_i_msoa(%s%s, %s)" % (
             energy_dispatch_stem, dim, common_iso_dispatch, energy_objective_params, energy_objective_args
         )
         if has_objective:
@@ -4531,12 +4533,12 @@ def _coupled_cases(
             )
         )
         energy_objective_steps_affine = (
-            "%s_objective_steps_%dd_affine_mesh_soa(%s%s, %s)"
+            "%s_objective_steps_%dd_a_msoa(%s%s, %s)"
             % (energy_dispatch_stem, dim, common_affine_dispatch,
                energy_objective_params, energy_objective_steps_args)
         )
         energy_objective_steps_iso = (
-            "%s_objective_steps_%dd_isoparametric_mesh_soa(%s%s, %s)"
+            "%s_objective_steps_%dd_i_msoa(%s%s, %s)"
             % (energy_dispatch_stem, dim, common_iso_dispatch,
                energy_objective_params, energy_objective_steps_args)
         )
@@ -4614,10 +4616,10 @@ def _geometry_variant_expression(kernel_sources, stem, operation, flag, affine_e
     only when there really are two things to choose between.
     """
     has_affine = _c_abi_function_defined(
-        kernel_sources, "%s_%s_affine_mesh_soa" % (stem, operation)
+        kernel_sources, "%s_%s_a_msoa" % (stem, operation)
     )
     has_isoparametric = _c_abi_function_defined(
-        kernel_sources, "%s_%s_isoparametric_mesh_soa" % (stem, operation)
+        kernel_sources, "%s_%s_i_msoa" % (stem, operation)
     )
     if has_affine and has_isoparametric:
         return "%s ? %s : %s" % (flag, affine_expr, iso_expr)
@@ -4627,9 +4629,9 @@ def _geometry_variant_expression(kernel_sources, stem, operation, flag, affine_e
 def _publishes_either_geometry(kernel_sources, stem, operation):
     """Whether a form publishes at least one geometry variant."""
     return _c_abi_function_defined(
-        kernel_sources, "%s_%s_affine_mesh_soa" % (stem, operation)
+        kernel_sources, "%s_%s_a_msoa" % (stem, operation)
     ) or _c_abi_function_defined(
-        kernel_sources, "%s_%s_isoparametric_mesh_soa" % (stem, operation)
+        kernel_sources, "%s_%s_i_msoa" % (stem, operation)
     )
 
 
@@ -4995,11 +4997,11 @@ def _element_api_dispatch_header(material, entries):
                 )
                 if not group:
                     continue
-                function_name = "%s_%s_%dd_element%s_soa" % (
+                function_name = "%s_%s_%dd_%s" % (
                     material.name,
                     operation,
                     dim,
-                    "_%s" % suffix if suffix else "",
+                    abi_local_level("%s_" % suffix if suffix else ""),
                 )
                 first_element_function = _element_api_function_name(
                     material.name,
@@ -5017,7 +5019,12 @@ def _element_api_dispatch_header(material, entries):
 
 def _element_api_function_name(material_name, label, operation, suffix):
     suffix_part = "_%s" % suffix if suffix else ""
-    return "%s_%s_%s_element%s_soa" % (material_name, label, operation, suffix_part)
+    return "%s_%s_%s_%s" % (
+        material_name,
+        label,
+        operation,
+        abi_local_level("%s_" % suffix_part.lstrip("_") if suffix_part else ""),
+    )
 
 
 def _element_api_function_params(source, function_name):
@@ -5239,18 +5246,27 @@ def _dispatch_source_kind(function_name):
     that moves the vocabulary moves the file split with it rather than dropping
     every dispatch into `_other`.
     """
-    present = {
-        token: "_%s_" % token in function_name
-        for token in ABI_TRAVERSAL_TOKENS + ABI_GEOMETRY_TOKENS
-    }
-    for traversal in ABI_TRAVERSAL_TOKENS:
-        if not present[traversal]:
+    # The *kind* keeps the long word -- it names a translation unit, and file
+    # names are outside the abbreviation -- while the *detection* uses the short
+    # token the name actually carries.  Holding both ends of that in one table is
+    # the point: reading the long word out of the name is what collapsed the
+    # affine and isoparametric units into one `_other_dispatch.cpp`.
+    def carries(short):
+        return "_%s_" % short in function_name
+
+    # Isoparametric before affine: the tokens are a single letter each, so a
+    # name is tested against the more specific geometry first.
+    geometry_order = sorted(
+        ABI_GEOMETRY_SPELLING, key=lambda pair: pair[0] != "isoparametric"
+    )
+    for traversal, short_traversal in ABI_TRAVERSAL_SPELLING:
+        if not carries(short_traversal):
             continue
-        for geometry in ("isoparametric", "affine"):
-            if present.get(geometry):
+        for geometry, short_geometry in geometry_order:
+            if carries(short_geometry):
                 return "%s_%s" % (traversal, geometry)
-    for geometry in ("isoparametric", "affine", "sideset"):
-        if present.get(geometry):
+    for geometry, short_geometry in geometry_order:
+        if carries(short_geometry):
             return geometry
     return "other"
 
@@ -5347,11 +5363,7 @@ def _geometry_qualified_dispatch_name(name, params):
     """
     if not any("g_met0" in parameter for parameter in params):
         return name
-    marker = "_mesh_"
-    index = name.rfind(marker)
-    if index < 0:
-        return "%s_metric" % name
-    return "%s_metric%s" % (name[:index], name[index:])
+    return abi_with_geometry_qualifier(name)
 
 
 def _dispatch_mapping(material_name, function_name, element_names):
@@ -5731,7 +5743,7 @@ def _diagnostic_dispatch_groups(material, elements, declarations):
         name = _c_abi_function_name(declaration)
         if (
             not name
-            or not name.endswith(ABI_DIAGNOSTICS_TAIL)
+            or diagnostics_tail(name) is None
             or "KernelDiagnostics *" not in declaration
         ):
             continue
@@ -5784,9 +5796,8 @@ def _diagnostic_dispatch_groups(material, elements, declarations):
 
 def _diagnostic_dispatch_mapping(material_name, function_name, element_names):
     prefix = "%s_" % material_name
-    if not function_name.startswith(prefix) or not function_name.endswith(
-        ABI_DIAGNOSTICS_TAIL
-    ):
+    tail = diagnostics_tail(function_name)
+    if not function_name.startswith(prefix) or tail is None:
         return None
     suffix = function_name[len(prefix) :]
     for element_name, (mesh_element, dim) in sorted(
@@ -5808,7 +5819,7 @@ def _diagnostic_dispatch_mapping(material_name, function_name, element_names):
         repeated_prefix = "%s_" % element_name
         if op_suffix.startswith(repeated_prefix):
             op_suffix = op_suffix[len(repeated_prefix) :]
-        marker = ABI_DIAGNOSTICS_TAIL
+        marker = tail
         if marker not in op_suffix:
             return _DISPATCH_NO_MARKER
         dispatch_suffix = op_suffix.replace(marker, "_%dd%s" % (dim, marker), 1)
@@ -6391,9 +6402,9 @@ _RUNTIME_OPERATION_MARKERS = (
 )
 
 _RUNTIME_VARIANT_SUFFIXES = (
-    ("affine", "_affine_mesh_soa"),
-    ("isoparametric", "_isoparametric_mesh_soa"),
-    ("sideset", "_sideset_soa"),
+    ("affine", "_a_msoa"),
+    ("isoparametric", "_i_msoa"),
+    ("sideset", "_ss_soa"),
 )
 
 _AFFINE_OPTION_ALIASES = {
@@ -6774,7 +6785,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
         )
     )
     return (
-        "int %s_objective_isoparametric_mesh_soa(%s%s, real_t *);"
+        "int %s_objective_i_msoa(%s%s, real_t *);"
         % (
             stem,
             isoparametric_common,
@@ -6785,7 +6796,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
                 current=True,
             ),
         ),
-        "int %s_gradient_isoparametric_mesh_soa(%s%s, ptrdiff_t%s);"
+        "int %s_gradient_i_msoa(%s%s, ptrdiff_t%s);"
         % (
             stem,
             isoparametric_common,
@@ -6797,7 +6808,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
             ),
             outputs,
         ),
-        "int %s_apply_isoparametric_mesh_soa(%s%s, ptrdiff_t%s);"
+        "int %s_apply_i_msoa(%s%s, ptrdiff_t%s);"
         % (
             stem,
             isoparametric_common,
@@ -6810,13 +6821,13 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
             ),
             outputs,
         ),
-        "int %s_objective_steps_isoparametric_mesh_soa(%s%s, ptrdiff_t, const real_t *, real_t *);"
+        "int %s_objective_steps_i_msoa(%s%s, ptrdiff_t, const real_t *, real_t *);"
         % (
             stem,
             isoparametric_common,
             objective_steps_field_decl,
         ),
-        "int %s_objective_affine_mesh_soa(%s%s, real_t *);"
+        "int %s_objective_a_msoa(%s%s, real_t *);"
         % (
             stem,
             affine_common,
@@ -6827,7 +6838,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
                 current=True,
             ),
         ),
-        "int %s_gradient_affine_mesh_soa(%s%s, ptrdiff_t%s);"
+        "int %s_gradient_a_msoa(%s%s, ptrdiff_t%s);"
         % (
             stem,
             affine_common,
@@ -6839,7 +6850,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
             ),
             outputs,
         ),
-        "int %s_gradient_affine_mesh_soa_aos_unit(%s%s, ptrdiff_t%s);"
+        "int %s_gradient_a_msoa_aos_unit(%s%s, ptrdiff_t%s);"
         % (
             stem,
             affine_aos_unit_common,
@@ -6851,7 +6862,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
             ),
             outputs,
         ),
-        "int %s_apply_affine_mesh_soa(%s%s, ptrdiff_t%s);"
+        "int %s_apply_a_msoa(%s%s, ptrdiff_t%s);"
         % (
             stem,
             affine_common,
@@ -6864,7 +6875,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
             ),
             outputs,
         ),
-        "int %s_apply_affine_mesh_soa_aos_unit(%s%s, ptrdiff_t%s);"
+        "int %s_apply_a_msoa_aos_unit(%s%s, ptrdiff_t%s);"
         % (
             stem,
             affine_aos_unit_common,
@@ -6877,7 +6888,7 @@ def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field
             ),
             outputs,
         ),
-        "int %s_objective_steps_affine_mesh_soa(%s%s, ptrdiff_t, const real_t *, real_t *);"
+        "int %s_objective_steps_a_msoa(%s%s, ptrdiff_t, const real_t *, real_t *);"
         % (
             stem,
             affine_common,
@@ -6912,7 +6923,7 @@ def _residual_hessian_dispatch_body(
         dependencies = action_dependencies_by_dim.get(dim)
         if dependencies is None:
             continue
-        function = "%s_%s_%dd_isoparametric_mesh_soa" % (
+        function = "%s_%s_%dd_i_msoa" % (
             material_name,
             operation,
             dim,
@@ -7083,20 +7094,20 @@ def _residual_apply_dispatch_body(
         storage_args = list(
             _dependency_storage_args(dependencies.parameters, parameter_index)
         )
-        affine_soa = "%s_%s_%dd_affine_mesh_soa" % (material_name, operation, dim)
-        affine_aos = "%s_%s_%dd_affine_mesh_soa_aos" % (material_name, operation, dim)
-        affine_aos_unit = "%s_%s_%dd_affine_mesh_soa_aos_unit" % (
+        affine_soa = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+        affine_aos = "%s_%s_%dd_a_msoa_aos" % (material_name, operation, dim)
+        affine_aos_unit = "%s_%s_%dd_a_msoa_aos_unit" % (
             material_name,
             operation,
             dim,
         )
-        isop = "%s_%s_%dd_isoparametric_mesh_soa" % (material_name, operation, dim)
-        packed_affine = "%s_%s_packed_%dd_affine_mesh_soa" % (
+        isop = "%s_%s_%dd_i_msoa" % (material_name, operation, dim)
+        packed_affine = "%s_%s_packed_%dd_a_msoa" % (
             material_name,
             operation,
             dim,
         )
-        packed = "%s_%s_packed_%dd_isoparametric_mesh_soa" % (
+        packed = "%s_%s_packed_%dd_i_msoa" % (
             material_name,
             operation,
             dim,
@@ -7131,7 +7142,7 @@ def _residual_apply_dispatch_body(
                     *(
                         [
                             "%s        if (domain.element_type == smesh::TET4) {" % indent,
-                            "%s          return laplace_tet4_jacobian_action_packed_affine_mesh_soa(%s);"
+                            "%s          return laplace_tet4_jacobian_action_packed_a_msoa(%s);"
                             % (
                                 indent,
                                 ", ".join(
@@ -7164,7 +7175,7 @@ def _residual_apply_dispatch_body(
                         and dim == 3
                         and _c_abi_function_exists(
                             kernel_sources,
-                            "laplace_tet4_jacobian_action_packed_affine_mesh_soa",
+                            "laplace_tet4_jacobian_action_packed_a_msoa",
                         )
                         else []
                     ),
@@ -7569,9 +7580,9 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
         components = _components((n_field_components_by_dim or {}).get(dim, dim))
         current_args = [str(arg) for arg in _energy_field_args(dependencies, components, current="x")]
         output_args = [str(arg) for arg in _energy_output_args(components)]
-        affine = "%s_gradient_%dd_affine_mesh_soa" % (material_name, dim)
-        affine_aos_unit = "%s_gradient_%dd_affine_mesh_soa_aos_unit" % (material_name, dim)
-        isop = "%s_gradient_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        affine = "%s_gradient_%dd_a_msoa" % (material_name, dim)
+        affine_aos_unit = "%s_gradient_%dd_a_msoa_aos_unit" % (material_name, dim)
+        isop = "%s_gradient_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append("%s  if (impl_->gradient_uses_affine) {" % indent)
         affine_aos_unit_elements = _c_abi_public_dispatch_case_elements(
@@ -7693,8 +7704,8 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
         components = _components((n_field_components_by_dim or {}).get(dim, dim))
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = [str(arg) for arg in _energy_field_args(dependencies, components, current="x")]
-        affine = "%s_objective_%dd_affine_mesh_soa" % (material_name, dim)
-        isop = "%s_objective_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        affine = "%s_objective_%dd_a_msoa" % (material_name, dim)
+        isop = "%s_objective_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append("%s  if (impl_->objective_uses_affine) {" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
@@ -7775,8 +7786,8 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = [str(arg) for arg in _energy_field_args(dependencies, components, current="x")]
         direction_args = [str(dim), _offsets("h", components)]
-        affine = "%s_objective_steps_%dd_affine_mesh_soa" % (material_name, dim)
-        isop = "%s_objective_steps_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        affine = "%s_objective_steps_%dd_a_msoa" % (material_name, dim)
+        isop = "%s_objective_steps_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append("%s  if (impl_->objective_uses_affine) {" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
@@ -7864,10 +7875,10 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         current_args = ([str(n_components)] + ["x + %d" % d for d in range(n_components)]) if uses_current else []
         direction_args = ([str(n_components)] + ["h + %d" % d for d in range(n_components)]) if uses_direction else []
         output_args = [str(n_components)] + ["out + %d" % d for d in range(n_components)]
-        affine = "%s_apply_%dd_affine_mesh_soa" % (material_name, dim)
-        isop = "%s_apply_%dd_isoparametric_mesh_soa" % (material_name, dim)
-        packed = "%s_apply_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
-        packed_affine = "%s_apply_packed_%dd_affine_mesh_soa" % (material_name, dim)
+        affine = "%s_apply_%dd_a_msoa" % (material_name, dim)
+        isop = "%s_apply_%dd_i_msoa" % (material_name, dim)
+        packed = "%s_apply_packed_%dd_i_msoa" % (material_name, dim)
+        packed_affine = "%s_apply_packed_%dd_a_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append("%s  if (impl_->apply_uses_affine) {" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
@@ -8028,7 +8039,7 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
         dependencies = gradient_dependencies_by_dim.get(dim)
         if dependencies is None:
             continue
-        function = "%s_gradient_packed_%dd_affine_mesh_soa" % (material_name, dim)
+        function = "%s_gradient_packed_%dd_a_msoa" % (material_name, dim)
         if not _c_abi_function_exists(kernel_sources, function, public_only=True):
             continue
         prefix = "if" if not emitted_affine else "else if"
@@ -8082,7 +8093,7 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
         dependencies = gradient_dependencies_by_dim.get(dim)
         if dependencies is None:
             continue
-        function = "%s_gradient_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        function = "%s_gradient_packed_%dd_i_msoa" % (material_name, dim)
         if not _c_abi_function_exists(kernel_sources, function, public_only=True):
             continue
         emitted = True
@@ -8142,7 +8153,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
         dependencies = apply_dependencies_by_dim.get(dim)
         if dependencies is None:
             continue
-        function = "%s_objective_steps_packed_%dd_affine_mesh_soa" % (material_name, dim)
+        function = "%s_objective_steps_packed_%dd_a_msoa" % (material_name, dim)
         if not _c_abi_function_exists(kernel_sources, function, public_only=True):
             continue
         prefix = "if" if not emitted_affine else "else if"
@@ -8210,7 +8221,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
         dependencies = apply_dependencies_by_dim.get(dim)
         if dependencies is None:
             continue
-        function = "%s_objective_steps_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
+        function = "%s_objective_steps_packed_%dd_i_msoa" % (material_name, dim)
         if not _c_abi_function_exists(kernel_sources, function, public_only=True):
             continue
         emitted = True
@@ -8275,7 +8286,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
     lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
     for dim in (2, 3):
         prefix = "if" if dim == 2 else "else if"
-        function = "%s_%s_%dd_isoparametric_mesh_soa" % (
+        function = "%s_%s_%dd_i_msoa" % (
             material_name,
             operation,
             dim,
@@ -8592,12 +8603,16 @@ def _offsets(name, components):
 
 
 def _metric_dispatch_name(name):
-    """The metric-geometry sibling of an affine dispatch name."""
-    marker = "_mesh_"
-    index = name.rfind(marker)
-    if index < 0:
-        return "%s_metric" % name
-    return "%s_metric%s" % (name[:index], name[index:])
+    """The metric-geometry sibling of an affine dispatch name.
+
+    The same splice as `_geometry_qualified_dispatch_name`, and it used to be
+    the same six lines written out a second time.  One copy was updated and the
+    other was not, so this composed a name no symbol had; the probe that guards
+    the call site returns False for a missing name and emits a different path,
+    and 23 lines of the laplace wrapper -- the whole two-pass packed branch and
+    its TET4 case -- vanished without a diagnostic.
+    """
+    return abi_with_geometry_qualifier(name)
 
 
 def _metric_dispatch_elements(kernel_sources, name):

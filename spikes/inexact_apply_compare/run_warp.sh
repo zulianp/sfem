@@ -25,9 +25,9 @@ echo "START $(date +%T) warp sweep $MATERIAL $ELEMENT n=$N" | tee "$LOG"
 $CXX -std=c++17 -O2 -DNDEBUG $TAKES_STATE -DELEMENT_${ELEMENT} ${WARP_EXTRA_FLAGS:-} \
     -DMATERIAL_LABEL="\"$MATERIAL\"" \
     -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${LOWER}_inexact_apply_inline.hpp\"" \
-    -DEXACT_APPLY=${MATERIAL}_${LOWER}_apply_affine_mesh_soa \
-    -DTANGENT_KERNEL=${MATERIAL}_${LOWER}_inexact_apply_tangent_affine_mesh_soa_impl \
-    -DSTORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_affine_mesh_soa_impl \
+    -DEXACT_APPLY=${MATERIAL}_${LOWER}_apply_a_msoa \
+    -DTANGENT_KERNEL=${MATERIAL}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
+    -DSTORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_a_msoa_impl \
     -o "$WORK/warp_${MATERIAL}_${LOWER}" "$HERE/warp_sweep.cpp" \
     "$GEN/${MATERIAL}_${LOWER}_operator.cpp" $EXTRA \
     -I "$HERE" -I "$GEN" -I "$WORK/gen/$MATERIAL" -I "$WORK/gen/$MATERIAL/d3" \

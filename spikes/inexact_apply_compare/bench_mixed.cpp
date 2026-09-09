@@ -32,14 +32,14 @@
 // `half_t` comes from sfem_config.h: __fp16 on some targets, _Float16 on
 // others.  Declaring it here would conflict on whichever one it is not.
 
-#define ELASTIC_TANGENT  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_tangent_affine_mesh_soa_impl
-#define ELASTIC_STORED   sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_stored_affine_mesh_soa_impl
-#define ELASTIC_COMPRESS sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_compressed_affine_mesh_soa_impl
-#define VISCOUS_TANGENT  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_tangent_affine_mesh_soa_impl
-#define VISCOUS_STORED   sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_stored_affine_mesh_soa_impl
-#define VISCOUS_COMPRESS sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_compressed_affine_mesh_soa_impl
+#define ELASTIC_TANGENT  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_tangent_a_msoa_impl
+#define ELASTIC_STORED   sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_stored_a_msoa_impl
+#define ELASTIC_COMPRESS sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_compressed_a_msoa_impl
+#define VISCOUS_TANGENT  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_tangent_a_msoa_impl
+#define VISCOUS_STORED   sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_stored_a_msoa_impl
+#define VISCOUS_COMPRESS sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_compressed_a_msoa_impl
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa(
     const ptrdiff_t, const ptrdiff_t, idx_t **const,
     const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
@@ -48,7 +48,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh
     const ptrdiff_t, const double *const, const double *const, const double *const,
     const ptrdiff_t, double *const, double *const, double *const);
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa(
     const ptrdiff_t, const ptrdiff_t, idx_t **const,
     const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
@@ -149,11 +149,11 @@ int main(int argc, char **argv) {
 
         // The exact action is the sum of the two units' exact kernels.
         auto run_exact = [&] {
-            mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh_soa(
+            mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa(
                 EC, N, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
                 lmbda, mu, 1, ux.data(),uy.data(),uz.data(), 1, hx.data(),hy.data(),hz.data(),
                 1, ax.data(),ay.data(),az.data());
-            mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_affine_mesh_soa(
+            mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa(
                 EC, N, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
                 eta_b, eta_s, alpha, 1, ux.data(),uy.data(),uz.data(),
                 1, zx.data(),zy.data(),zz.data(), 1, hx.data(),hy.data(),hz.data(),

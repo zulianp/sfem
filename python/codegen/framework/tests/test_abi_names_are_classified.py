@@ -170,19 +170,23 @@ class DeclineReasonsTest(unittest.TestCase):
         self.assertIs(
             op_wrappers._dispatch_mapping(
                 "poro",
-                "poro_form_2_p_p_tet4_jacobian_action_affine_mesh_soa",
+                "poro_form_2_p_p_tet4_jacobian_action_a_msoa",
                 self.ELEMENTS,
             ),
             op_wrappers._DISPATCH_NO_ELEMENT,
         )
 
     def test_a_missing_geometry_token_is_declined_as_a_broken_parse(self):
-        """The element is found, so the name parsed -- but it carries no marker,
-        which only happens when the grammar moved and this layer did not."""
+        """The element is found, so the name parsed -- but it carries no marker.
+
+        The name below is the *pre-rename* long form, which is exactly what a
+        half-finished rename leaves behind: emitters still spelling
+        `affine_mesh_soa` while this layer has moved to `a_msoa`.
+        """
         self.assertIs(
             op_wrappers._dispatch_mapping(
                 "poro",
-                "poro_tet10_apply_aff_mesh_soa",
+                "poro_tet10_apply_affine_mesh_soa",
                 self.ELEMENTS,
             ),
             op_wrappers._DISPATCH_NO_MARKER,
@@ -190,9 +194,9 @@ class DeclineReasonsTest(unittest.TestCase):
 
     def test_a_well_formed_name_maps(self):
         mapped = op_wrappers._dispatch_mapping(
-            "poro", "poro_tet10_apply_affine_mesh_soa", self.ELEMENTS
+            "poro", "poro_tet10_apply_a_msoa", self.ELEMENTS
         )
-        self.assertEqual(mapped[0], "poro_apply_3d_affine_mesh_soa")
+        self.assertEqual(mapped[0], "poro_apply_3d_a_msoa")
 
 
 if __name__ == "__main__":

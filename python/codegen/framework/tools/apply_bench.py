@@ -119,26 +119,26 @@ DRIVER = r"""
 #include "sfem_base.hpp"
 
 extern "C" {
-int @PREFIX@_jacobian_action_isoparametric_mesh_soa(
+int @PREFIX@_jacobian_action_i_msoa(
     const ptrdiff_t, const ptrdiff_t, idx_t **const, const geom_t *const *const,
     const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
-int @PREFIX@_jacobian_action_isoparametric_mesh_soa_float(
+int @PREFIX@_jacobian_action_i_msoa_float(
     const ptrdiff_t, const ptrdiff_t, idx_t **const, const geom_t *const *const,
     const float, const ptrdiff_t, const float *const, const ptrdiff_t, float *const);
-int @PREFIX@_jacobian_action_isoparametric_mesh_aos(
+int @PREFIX@_jacobian_action_i_maos(
     const ptrdiff_t, const ptrdiff_t, idx_t **const, const geom_t *const *const,
     const double *const, const double *const, double *const);
-int @PREFIX@_jacobian_action_isoparametric_mesh_aos_float(
+int @PREFIX@_jacobian_action_i_maos_float(
     const ptrdiff_t, const ptrdiff_t, idx_t **const, const geom_t *const *const,
     const float *const, const float *const, float *const);
-int @PREFIX@_jacobian_action_affine_mesh_soa(
+int @PREFIX@_jacobian_action_a_msoa(
     const ptrdiff_t, const ptrdiff_t, idx_t **const,
     const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const,
     const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
-int @PREFIX@_jacobian_action_packed_affine_mesh_soa(
+int @PREFIX@_jacobian_action_packed_a_msoa(
     const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t,
     uint16_t **const, const ptrdiff_t *const, const ptrdiff_t *const,
     const ptrdiff_t *const, const idx_t *const,
@@ -147,13 +147,13 @@ int @PREFIX@_jacobian_action_packed_affine_mesh_soa(
     const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const,
     const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
-int @PREFIX@_jacobian_action_packed_isoparametric_mesh_soa(
+int @PREFIX@_jacobian_action_packed_i_msoa(
     const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t,
     uint16_t **const, const ptrdiff_t *const, const ptrdiff_t *const,
     const ptrdiff_t *const, const idx_t *const,
     const geom_t *const *const,
     const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
-int @PREFIX@_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
+int @PREFIX@_jacobian_action_packed_two_pass_i_msoa(
     const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t,
     uint16_t **const, const ptrdiff_t *const, const ptrdiff_t *const,
     const ptrdiff_t *const, const idx_t *const,
@@ -161,7 +161,7 @@ int @PREFIX@_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
     const idx_t *const, double *const,
     const geom_t *const *const,
     const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
-int @PREFIX@_jacobian_action_affine_mesh_soa_float(
+int @PREFIX@_jacobian_action_a_msoa_float(
     const ptrdiff_t, const ptrdiff_t, idx_t **const,
     const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const, const geom_t *const, const geom_t *const,
@@ -441,7 +441,7 @@ int main(int argc, char **argv) {
                 (long long)m.nelements, (long long)m.nnodes, m.h);
 
     run_double("affine_mesh_soa", Tolerance::GEOMETRY, [&](std::vector<double> &o) {
-        return @PREFIX@_jacobian_action_affine_mesh_soa(
+        return @PREFIX@_jacobian_action_a_msoa(
             m.nelements, m.nnodes, m.element_ptrs.data(),
             m.adjugate[0].data(), m.adjugate[1].data(), m.adjugate[2].data(),
             m.adjugate[3].data(), m.adjugate[4].data(), m.adjugate[5].data(),
@@ -449,17 +449,17 @@ int main(int argc, char **argv) {
             m.determinant.data(), kappa, 1, x.data(), 1, o.data()); });
 
     run_double("isoparametric_mesh_soa", Tolerance::EXACT, [&](std::vector<double> &o) {
-        return @PREFIX@_jacobian_action_isoparametric_mesh_soa(
+        return @PREFIX@_jacobian_action_i_msoa(
             m.nelements, m.nnodes, m.element_ptrs.data(), m.point_ptrs.data(),
             kappa, 1, x.data(), 1, o.data()); });
 
     run_double("isoparametric_mesh_aos", Tolerance::EXACT, [&](std::vector<double> &o) {
-        return @PREFIX@_jacobian_action_isoparametric_mesh_aos(
+        return @PREFIX@_jacobian_action_i_maos(
             m.nelements, m.nnodes, m.element_ptrs.data(), m.point_ptrs.data(),
             parameters, x.data(), o.data()); });
 
     run_float("affine_mesh_soa_float", Tolerance::FLOAT, [&](std::vector<float> &o) {
-        return @PREFIX@_jacobian_action_affine_mesh_soa_float(
+        return @PREFIX@_jacobian_action_a_msoa_float(
             m.nelements, m.nnodes, m.element_ptrs.data(),
             m.adjugate[0].data(), m.adjugate[1].data(), m.adjugate[2].data(),
             m.adjugate[3].data(), m.adjugate[4].data(), m.adjugate[5].data(),
@@ -467,12 +467,12 @@ int main(int argc, char **argv) {
             m.determinant.data(), (float)kappa, 1, xf.data(), 1, o.data()); });
 
     run_float("isoparametric_mesh_soa_float", Tolerance::FLOAT, [&](std::vector<float> &o) {
-        return @PREFIX@_jacobian_action_isoparametric_mesh_soa_float(
+        return @PREFIX@_jacobian_action_i_msoa_float(
             m.nelements, m.nnodes, m.element_ptrs.data(), m.point_ptrs.data(),
             (float)kappa, 1, xf.data(), 1, o.data()); });
 
     run_float("isoparametric_mesh_aos_float", Tolerance::FLOAT, [&](std::vector<float> &o) {
-        return @PREFIX@_jacobian_action_isoparametric_mesh_aos_float(
+        return @PREFIX@_jacobian_action_i_maos_float(
             m.nelements, m.nnodes, m.element_ptrs.data(), m.point_ptrs.data(),
             parameters_f, xf.data(), o.data()); });
 
@@ -481,8 +481,8 @@ int main(int argc, char **argv) {
                 (long long)pk.n_packs, (long long)pk.n_elements_per_pack,
                 (long long)pk.max_nodes_per_pack);
 
-    run_double("packed_affine_mesh_soa", Tolerance::GEOMETRY, [&](std::vector<double> &o) {
-        return @PREFIX@_jacobian_action_packed_affine_mesh_soa(
+    run_double("packed_a_msoa", Tolerance::GEOMETRY, [&](std::vector<double> &o) {
+        return @PREFIX@_jacobian_action_packed_a_msoa(
             pk.n_packs, pk.n_elements_per_pack, m.nelements, m.nnodes, pk.max_nodes_per_pack,
             pk.element_ptrs.data(), pk.owned_nodes_ptr.data(), pk.n_shared_nodes.data(),
             pk.ghost_ptr.data(), pk.ghost_idx.data(),
@@ -491,16 +491,16 @@ int main(int argc, char **argv) {
             m.adjugate[6].data(), m.adjugate[7].data(), m.adjugate[8].data(),
             m.determinant.data(), kappa, 1, x.data(), 1, o.data()); });
 
-    run_double("packed_isoparametric_mesh_soa", Tolerance::ROUNDOFF, [&](std::vector<double> &o) {
-        return @PREFIX@_jacobian_action_packed_isoparametric_mesh_soa(
+    run_double("packed_i_msoa", Tolerance::ROUNDOFF, [&](std::vector<double> &o) {
+        return @PREFIX@_jacobian_action_packed_i_msoa(
             pk.n_packs, pk.n_elements_per_pack, m.nelements, m.nnodes, pk.max_nodes_per_pack,
             pk.element_ptrs.data(), pk.owned_nodes_ptr.data(), pk.n_shared_nodes.data(),
             pk.ghost_ptr.data(), pk.ghost_idx.data(),
             m.point_ptrs.data(), kappa, 1, x.data(), 1, o.data()); });
 
-    run_double("packed_two_pass_isoparametric_mesh_soa", Tolerance::ROUNDOFF, [&](std::vector<double> &o) {
+    run_double("packed_two_pass_i_msoa", Tolerance::ROUNDOFF, [&](std::vector<double> &o) {
         std::fill(pk.ghost_buf.begin(), pk.ghost_buf.end(), 0.0);
-        return @PREFIX@_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
+        return @PREFIX@_jacobian_action_packed_two_pass_i_msoa(
             pk.n_packs, pk.n_elements_per_pack, m.nelements, m.nnodes, pk.max_nodes_per_pack,
             pk.element_ptrs.data(), pk.owned_nodes_ptr.data(), pk.n_shared_nodes.data(),
             pk.ghost_ptr.data(), pk.ghost_idx.data(),

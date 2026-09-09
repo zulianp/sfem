@@ -69,9 +69,9 @@ class InexactApplyGenerationTest(unittest.TestCase):
         files = self._generate("linear_elasticity", "TET4", opt_in=True)
         source = files["d3/tet4/linear_elasticity_tet4_inexact_apply_inline.hpp"]
 
-        assembly = "linear_elasticity_tet4_inexact_apply_tangent_affine_mesh_soa_impl"
-        stored = "linear_elasticity_tet4_inexact_apply_stored_affine_mesh_soa_impl"
-        compressed = "linear_elasticity_tet4_inexact_apply_compressed_affine_mesh_soa_impl"
+        assembly = "linear_elasticity_tet4_inexact_apply_tangent_a_msoa_impl"
+        stored = "linear_elasticity_tet4_inexact_apply_stored_a_msoa_impl"
+        compressed = "linear_elasticity_tet4_inexact_apply_compressed_a_msoa_impl"
         for name in (assembly, stored, compressed):
             with self.subTest(kernel=name):
                 self.assertIn(name, source)
@@ -118,7 +118,7 @@ class InexactApplyGenerationTest(unittest.TestCase):
         """
         files = self._generate("linear_elasticity", "TET4", opt_in=True)
         source = files["d3/tet4/linear_elasticity_tet4_inexact_apply_inline.hpp"]
-        self.assertNotIn("apply_inexact_affine_mesh_soa", source)
+        self.assertNotIn("apply_inexact_a_msoa", source)
 
     @staticmethod
     def _generate(name, element, opt_in):
@@ -161,7 +161,7 @@ class InexactApplyAbiTest(InexactApplyGenerationTest):
         for kernel in ("tangent", "stored", "compressed"):
             for suffix in ("", "_float"):
                 name = ("linear_elasticity_tet4_inexact_apply_%s"
-                        "_affine_mesh_soa%s" % (kernel, suffix))
+                        "_a_msoa%s" % (kernel, suffix))
                 with self.subTest(kernel=kernel, precision=suffix or "double"):
                     self.assertIn('extern "C" int %s(' % name, source)
 
@@ -175,7 +175,7 @@ class InexactApplyAbiTest(InexactApplyGenerationTest):
     def test_the_apply_still_takes_no_geometry_or_state(self):
         """The ABI must not reintroduce what the split exists to remove."""
         source = self._operator_source()
-        start = source.index("linear_elasticity_tet4_inexact_apply_stored_affine_mesh_soa(")
+        start = source.index("linear_elasticity_tet4_inexact_apply_stored_a_msoa(")
         body = source[start:source.index("}", start)]
         for absent in ("g_jacobian", "u_stride", "mu", "lmbda"):
             with self.subTest(absent=absent):
