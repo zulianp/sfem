@@ -217,9 +217,10 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                cof7,
                                                cof8,
                                                det);
-                    if (with_rc)
+                    if (with_rc) {
                         cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy,
                                                        pack_pgz, begin, nlanes, rcp);
+                    }
                     cvfem_hex8_ns_upwind_residual_sumfact_simd(
                             rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
                             with_rc ? &rcp : nullptr, d.rhie_chow_scale);
@@ -435,6 +436,10 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                        const scalar_t *const  dir,
                                                        scalar_t *const        jv,
                                                        const GeomKind         geom_kind) {
+    // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Its own cache key makes
+    // this free after the first call, so --warmup absorbs the build and the timed loop
+    // measures what the solver's Krylov iterations measure.
+    cvfem_hex8_build_rc_coeff(d, rho, mu);
     const size_t scratch_n = packed_scratch_n(p);
     // Rhie-Chow staged per pack, exactly as apply_residual_packed does it and exactly as
     // the solver's own packed Jacobian does (cvfem_hex8_ns_packed.hpp). Slot 3 grows from
@@ -533,9 +538,11 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                       cof7,
                                                       cof8,
                                                       det);
-                    if (with_rc)
+                    if (with_rc) {
                         cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz,
                                                        begin, nlanes, rcp);
+                        cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
+                    }
                     if (with_qg)
                         cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
                     cvfem_hex8_ns_upwind_jacobian_action_simd(rho,

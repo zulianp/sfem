@@ -201,6 +201,13 @@ struct MeshData {
     // --rhie-chow-jac in the benchmark driver.
     std::vector<scalar_t> qgx, qgy, qgz;   // nodal gradient of the direction's pressure
 
+    // The Rhie-Chow coefficient, hoisted out of the element loop -- twelve values per
+    // element, one per sub-control surface, rebuilt by cvfem_hex8_build_rc_coeff only when
+    // rho, mu, the scale or the mesh change. See Hex8RhieChowPack::coeff for why it is not
+    // computed where it is used.
+    std::vector<scalar_t> rc_coeff[CVFEM_HEX8_N_SCS];
+    scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
+
     std::vector<uint8_t>  face_mask;       // per element, bits 0..5 = the six CVFEM faces
     scalar_t              Lx{0}, Ly{0}, Lz{0};
 };

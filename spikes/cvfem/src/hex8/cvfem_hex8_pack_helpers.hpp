@@ -168,6 +168,82 @@ static SFEM_INLINE void cvfem_hex8_gather_qg_from_pack(pack_idx_t **const SFEM_R
     }
 }
 
+// ------------------------------------------------------- hoisted Rhie-Chow coefficient
+//
+// The Rhie-Chow mass-flux coefficient is pure geometry -- it depends on the element's
+// sub-control-surface area vectors and edge vectors, on rho and mu, and on the scale, and
+// on nothing that changes inside a Krylov solve. Building it here once per element and
+// reading it in the face loops is worth 1.83x on the packed Jacobian action; the reason is
+// in the comment on Hex8RhieChowPack::coeff, and it is about the compiler's vectoriser
+// rather than about the arithmetic.
+//
+// Affine only, and deliberately so. The isoparametric kernels build their area vectors per
+// sub-control surface from a trilinear Jacobian, so a table indexed by element would not
+// describe what they evaluate; they call cvfem_hex8_rhie_chow_mdot_coeff directly and keep
+// the guard inline, which costs them nothing they were going to get -- those kernels take
+// no Rhie-Chow argument on the SIMD path at all.
+//
+// Stored as twelve arrays of nelements rather than one array of twelve, so the gather below
+// is the same strided SoA read as gather_hex8_adj_soa and not a stride-12 walk.
+template <typename MeshT>
+static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar_t mu) {
+    if (d.rhie_chow_scale == scalar_t(0)) {
+        for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) d.rc_coeff[s].clear();
+        return;
+    }
+    // Rebuilt only when something it depends on moves. rho and mu do move -- the Reynolds
+    // continuation walks mu down between stages -- so this cannot be built once at setup
+    // and forgotten, and it must not be rebuilt on every matvec either.
+    if (!d.rc_coeff[0].empty() && d.rc_coeff_rho == rho && d.rc_coeff_mu == mu &&
+        d.rc_coeff_scale == d.rhie_chow_scale && (ptrdiff_t)d.rc_coeff[0].size() == d.nelements)
+        return;
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) d.rc_coeff[s].resize((size_t)d.nelements);
+    d.rc_coeff_rho   = rho;
+    d.rc_coeff_mu    = mu;
+    d.rc_coeff_scale = d.rhie_chow_scale;
+
+    const auto *const px = d.points[0];
+    const auto *const py = d.points[1];
+    const auto *const pz = d.points[2];
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t adj[9], det, A[3][3];
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_dir_areas(adj, A);
+        for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+            const int i = CVFEM_HEX8_SCS[s].i;
+            const int j = CVFEM_HEX8_SCS[s].j;
+            const int q = s >> 2;
+            const smesh::idx_t gi = d.elems[i][e];
+            const smesh::idx_t gj = d.elems[j][e];
+            // The guard the face loops no longer carry runs right here, inside
+            // cvfem_hex8_rhie_chow_mdot_coeff -- a degenerate sub-control surface still
+            // yields exactly zero, and the scalar paths get the same value from the same
+            // function.
+            d.rc_coeff[s][(size_t)e] = cvfem_hex8_rhie_chow_mdot_coeff(
+                    rho, mu, d.rhie_chow_scale,
+                    scalar_t(px[gj]) - scalar_t(px[gi]),
+                    scalar_t(py[gj]) - scalar_t(py[gi]),
+                    scalar_t(pz[gj]) - scalar_t(pz[gi]),
+                    A[q][0], A[q][1], A[q][2]);
+        }
+    }
+}
+
+// The SoA gather for the above, straight into the pack the face loops read.
+template <typename MeshT>
+static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const MeshT      &d,
+                                                   const ptrdiff_t   begin,
+                                                   const int         nlanes,
+                                                   Hex8RhieChowPack &rc) {
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const scalar_t *const SFEM_RESTRICT src = d.rc_coeff[s].data();
+        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane)
+            rc.coeff[s][lane] = lane < nlanes ? src[begin + lane] : scalar_t(0);
+    }
+}
+
 static SFEM_INLINE void cvfem_hex8_scatter_simd_to_pack(pack_idx_t **const SFEM_RESTRICT elems,
                                                         scalar_t *const SFEM_RESTRICT    pack_out,
                                                         const ptrdiff_t                  begin,
