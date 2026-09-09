@@ -33,7 +33,7 @@ OUT=${OUT:-$SPIKE_ROOT/verification_runs/$(date +%Y%m%d-%H%M%S)}
 # group IDs, so ${GROUPS:-...} silently expands to a numeric GID and never to the
 # default. That is exactly what happened -- a job ran with "groups : 33203" and
 # selected nothing at all.
-VERIFY_GROUPS=${VERIFY_GROUPS:-"unit mms bc port step"}
+VERIFY_GROUPS=${VERIFY_GROUPS:-"unit mms bc port step pump"}
 # 4/8/16/32 reproduces the dof ladder docs/CVFEM_Verification_Farrell.md records
 # (500, 2916, 19652, 143748), so a rate measured here is comparable with the one there.
 MMS_LADDER=${MMS_LADDER:-"4 8 16 32"}
@@ -152,6 +152,23 @@ if want step; then
     # wanders and then diverges -- and multigrid is deliberately not used here.
     run step lshape "mass_exact=$MASS_EXACT" -- SFEM_CASE=step SFEM_BOUNDARY_MASK=1 \
         SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_MU=0.1 SFEM_GMG=0 SFEM_PRECOND=direct
+fi
+
+# ---- the diaphragm pump, across a cycle ----
+#
+# One run per instant rather than one run reporting many, because the identity is checked
+# at the END of a run: each takes the cycle a different distance and is measured there.
+# Peak, reversal and both zero crossings, which is where a sign error would hide.
+if want pump; then
+    # N=8, not larger: SFEM_PRECOND=direct is a dense LU of the fine Jacobian, which is
+    # cubic in the dof count, and the identity being checked is exact at any resolution --
+    # it is a statement about the boundary closure, not about accuracy. N=12 costs a
+    # 618 MB factorisation for the same answer.
+    run pump steady "" -- SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_GMG=0 SFEM_PRECOND=direct
+    for ns in 1 2 4 6 8; do
+        run pump "t$ns" "" -- SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_GMG=0 SFEM_PRECOND=direct \
+            SFEM_DT=0.125 SFEM_NSTEPS=$ns SFEM_PUMP_PERIOD=1 SFEM_BDF_ORDER=2
+    done
 fi
 
 # ---- assemble the manifest ----

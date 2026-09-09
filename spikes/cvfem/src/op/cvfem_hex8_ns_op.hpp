@@ -117,6 +117,16 @@ namespace sfem {
         // fail quietly, which is why this is asked rather than assumed.
         bool fixes_pressure_level() const;
 
+        // Net mass flux through a named sideset, positive leaving the domain, integrated on
+        // the boundary sub-control surfaces the operator itself uses. Flat HEX8 only.
+        //
+        // It exists so a conservation claim can be made about ONE surface rather than about
+        // the domain as a whole: summing the continuity residual says the discrete equations
+        // balance, which they do at convergence whatever the boundary conditions are, while
+        // this says how much went through a particular opening and can therefore be checked
+        // against something known -- the volume a prescribed normal velocity sweeps.
+        int sideset_mass_flux(const real_t *const x, const std::string &sideset, real_t &out);
+
         // Transient term. dt <= 0 -- the default -- means steady, and nothing is
         // evaluated, so every steady case and every recorded number is unaffected.
         //

@@ -544,6 +544,71 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int CVFEMNavierStokes::sideset_mass_flux(const real_t *const x, const std::string &sideset,
+                                             real_t &out) {
+        SFEM_TRACE_SCOPE("CVFEMNavierStokes::sideset_mass_flux");
+        out = 0;
+        if (!impl_->initialized) return SFEM_FAILURE;
+        if (impl_->semi_structured) {
+            SFEM_ERROR("CVFEMNavierStokes::sideset_mass_flux: flat HEX8 meshes only\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh  = impl_->space->mesh_ptr();
+        auto named = mesh->sidesets(sideset);
+        if (named.empty() || !named.front()) {
+            SFEM_ERROR("CVFEMNavierStokes::sideset_mass_flux: sideset '%s' not found\n", sideset.c_str());
+            return SFEM_FAILURE;
+        }
+        auto &d = impl_->d;
+        std::vector<uint8_t> mask;
+        if (compile_sideset_mask(named.front(), d.nelements, mask) < 0) {
+            SFEM_ERROR("CVFEMNavierStokes::sideset_mass_flux: malformed sideset '%s'\n", sideset.c_str());
+            return SFEM_FAILURE;
+        }
+
+        // Integrated by running the boundary kernel over just those faces and reading the
+        // continuity rows it writes, rather than by a quadrature of its own.
+        //
+        // That is the whole point. An independent rule in the caller measures the caller's
+        // idea of the geometry; this measures the operator's, which is the thing a
+        // conservation statement is about. docs/CVFEM_Verification_Farrell.md records a
+        // plane-integrated flux reporting a 17% imbalance on a case whose residual sum was
+        // 7e-14 -- the quadrature was wrong, not the scheme -- and this cannot repeat that
+        // because it is the same sub-control-surface areas the residual itself uses.
+        //
+        // nmask is deliberately 0 even where the surface carries the do-nothing outflow:
+        // the closed and natural branches write the SAME continuity row, the true flux, and
+        // asking for it here should not depend on which momentum treatment the face has.
+        const auto *const px = d.points[0];
+        const auto *const py = d.points[1];
+        const auto *const pz = d.points[2];
+        long double       q  = 0;
+#pragma omp parallel for reduction(+ : q)
+        for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+            const int fm = (int)mask[(size_t)e];
+            if (!fm) continue;
+            scalar_t xe[8], ye[8], ze[8], uxe[8], uye[8], uze[8], pe[8];
+            for (int a = 0; a < 8; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                xe[a]  = (scalar_t)px[g];
+                ye[a]  = (scalar_t)py[g];
+                ze[a]  = (scalar_t)pz[g];
+                uxe[a] = (scalar_t)x[(size_t)g * N_FIELDS + 0];
+                uye[a] = (scalar_t)x[(size_t)g * N_FIELDS + 1];
+                uze[a] = (scalar_t)x[(size_t)g * N_FIELDS + 2];
+                pe[a]  = (scalar_t)x[(size_t)g * N_FIELDS + 3];
+            }
+            scalar_t adj[9], det, re[CVFEM_HEX8_N_DOF];
+            cvfem_hex8_affine_adj(xe, ye, ze, adj, &det);
+            for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) re[k] = 0;
+            boundary_scs_add_residual((scalar_t)rho, (scalar_t)mu, 0, adj, det, d.Lx, d.Ly, d.Lz,
+                                      xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) q += (long double)re[a * N_FIELDS + 3];
+        }
+        out = (real_t)q;
+        return SFEM_SUCCESS;
+    }
+
     bool CVFEMNavierStokes::fixes_pressure_level() const {
         // Any natural face drops p_i * a from the momentum rows, which is precisely what
         // removes the constant-pressure nullspace; a prescribed pressure fixes the level
