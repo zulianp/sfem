@@ -57,6 +57,30 @@ NL_MAX_IT=${NL_MAX_IT:-40}
 # minimises over a larger space. Tightening SFEM_LSOLVE_RTOL does not substitute for it and
 # at fixed restart makes the answer slightly worse, which is the restart truncation setting
 # the floor rather than the stopping tolerance.
+# Flat HEX8 (1) or semi-structured macro-elements at this internal level.
+#
+# When it is raised, every case's cell count is DIVIDED by it, so the fine mesh is the same
+# mesh reached a different way and the two arms are directly comparable rather than merely
+# both plausible: flat N=8 and level 2 at N=4 are both a 9^3 lattice. Multigrid stays off
+# either way -- this is about the operators, not the solver.
+#
+# One thing does not divide: a boundary patch is selected on the MACRO mesh, because a
+# sideset stores (macro element, local face). So the pump's port has to be resolvable at the
+# macro level, and at 2 macro cells across it is not -- the run refuses rather than solving a
+# sealed chamber.
+VERIFY_LEVEL=${VERIFY_LEVEL:-1}
+# N/L, so the fine mesh is unchanged. Refuses rather than silently rounding, because a
+# rounded ladder is a different convergence study.
+lvl_n() {
+    if [ "$VERIFY_LEVEL" -le 1 ]; then echo "$1"; return; fi
+    if [ $(( $1 % VERIFY_LEVEL )) -ne 0 ]; then
+        echo "verify_report: N=$1 is not divisible by VERIFY_LEVEL=$VERIFY_LEVEL" >&2
+        exit 1
+    fi
+    echo $(( $1 / VERIFY_LEVEL ))
+}
+LEVEL_ENV="SFEM_ELEMENT_REFINE_LEVEL=$VERIFY_LEVEL"
+
 VERIFY_SOLVER=${VERIFY_SOLVER:-direct}
 VERIFY_RESTART=${VERIFY_RESTART:-480}
 case "$VERIFY_SOLVER" in
@@ -87,6 +111,7 @@ echo "    driver     : $DRIVER"
 echo "    output     : $OUT"
 echo "    groups     : $VERIFY_GROUPS"
 echo "    solver     : $VERIFY_SOLVER ($SOLVER_ENV)"
+echo "    level      : $VERIFY_LEVEL"
 echo "    p_exact(outlet) = $P_EXACT_OUTLET   exact step flux = $MASS_EXACT"
 
 want() { case " $VERIFY_GROUPS " in *" $1 "*) return 0;; *) return 1;; esac; }
@@ -137,22 +162,22 @@ if want mms; then
     # inactive there, so a first-order reading would mean a consistency error rather than
     # benign upwind diffusion. The manufactured pressure also mandates rho = 1, mu = 1/Re.
     for n in $MMS_LADDER; do
-        run mms "n$n" "" -- SFEM_CASE=mms SFEM_N=$n SFEM_ELEMENT_REFINE_LEVEL=1 \
+        run mms "n$n" "" -- SFEM_CASE=mms SFEM_N=$(lvl_n $n) $LEVEL_ENV \
             SFEM_MU=1 SFEM_RHO=1
     done
 fi
 
 # ---- the boundary conditions, judged against each other and against a closed form ----
 if want bc; then
-    run bc dirichlet "" -- SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=12 SFEM_ELEMENT_REFINE_LEVEL=1 \
+    run bc dirichlet "" -- SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=$(lvl_n 12) $LEVEL_ENV \
         SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet
     # This one does not converge -- the do-nothing outflow is not the exact Poiseuille
     # outlet -- so it is capped rather than left to grind out 5 continuation stages of 40
     # Newton steps, which cost 405 s for a result that is an identity against traction0 and
     # holds at any iteration count, provided both runs use the same one.
-    run bc natural "" -- SFEM_NL_MAX_IT=12 SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=12 SFEM_ELEMENT_REFINE_LEVEL=1 \
+    run bc natural "" -- SFEM_NL_MAX_IT=12 SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=$(lvl_n 12) $LEVEL_ENV \
         SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=natural
-    run bc traction0 "" -- SFEM_NL_MAX_IT=12 SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=12 SFEM_ELEMENT_REFINE_LEVEL=1 \
+    run bc traction0 "" -- SFEM_NL_MAX_IT=12 SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=$(lvl_n 12) $LEVEL_ENV \
         SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet \
         SFEM_TRACTION_SIDESET=outlet "SFEM_TRACTION=0 0 0"
 fi
@@ -161,7 +186,7 @@ fi
 if want port; then
     for pb in $PORT_SWEEP; do
         run port "p$pb" "p_exact_outlet=$P_EXACT_OUTLET" -- SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U \
-            SFEM_CASE=poiseuille SFEM_N=12 SFEM_ELEMENT_REFINE_LEVEL=1 \
+            SFEM_CASE=poiseuille SFEM_N=$(lvl_n 12) $LEVEL_ENV \
             SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet \
             SFEM_PRESSURE_SIDESET=outlet SFEM_PRESSURE=$pb
     done
@@ -177,7 +202,8 @@ if want step; then
     # this case -- it has nothing to say about the pressure coupling and the Krylov residual
     # wanders and then diverges -- and multigrid is deliberately not used here.
     run step lshape "mass_exact=$MASS_EXACT" -- SFEM_CASE=step SFEM_BOUNDARY_MASK=1 \
-        SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_MU=0.1 SFEM_GMG=0 $SOLVER_ENV
+        $LEVEL_ENV SFEM_MU=0.1 SFEM_GMG=0 $SOLVER_ENV \
+        SFEM_NX=$(lvl_n 40) SFEM_NY=$(lvl_n 8) SFEM_NZ=$(lvl_n 4)
 fi
 
 # ---- the diaphragm pump, across a cycle ----
@@ -190,16 +216,16 @@ if want pump; then
     # cubic in the dof count, and the identity being checked is exact at any resolution --
     # it is a statement about the boundary closure, not about accuracy. N=12 costs a
     # 618 MB factorisation for the same answer.
-    run pump steady "" -- SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV
+    run pump steady "" -- SFEM_CASE=pump SFEM_N=$(lvl_n 8) $LEVEL_ENV SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV
     for ns in 1 2 4 6 8; do
-        run pump "t$ns" "" -- SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV \
+        run pump "t$ns" "" -- SFEM_CASE=pump SFEM_N=$(lvl_n 8) $LEVEL_ENV SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV \
             SFEM_DT=0.125 SFEM_NSTEPS=$ns SFEM_PUMP_PERIOD=1 SFEM_BDF_ORDER=2
     done
 fi
 
 # ---- assemble the manifest ----
 # Exported so the heredoc below can read them; a shell variable is not in its environment.
-export SPIKE_ROOT CTEST_TOTAL CTEST_PASS CTEST_FAIL CTEST_FAILING VERIFY_SOLVER VERIFY_RESTART
+export SPIKE_ROOT CTEST_TOTAL CTEST_PASS CTEST_FAIL CTEST_FAILING VERIFY_SOLVER VERIFY_RESTART VERIFY_LEVEL
 python3 - "$OUT" "$TSV" <<'PYEOF'
 import json, os, subprocess, sys, platform
 out, tsv = sys.argv[1], sys.argv[2]
@@ -231,6 +257,7 @@ manifest = {
     "machine": os.environ.get("SLURM_JOB_NODELIST") or platform.node(),
     "threads": os.environ.get("OMP_NUM_THREADS", "unset"),
     "commit": sh("git -C %s rev-parse --short HEAD" % os.environ.get("SPIKE_ROOT", ".")),
+    "level": os.environ.get("VERIFY_LEVEL", "1"),
     "solver": (os.environ.get("VERIFY_SOLVER", "direct") +
                ("" if os.environ.get("VERIFY_SOLVER") != "fgmres"
                 else ", restart %s" % os.environ.get("VERIFY_RESTART", "?"))),

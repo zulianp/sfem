@@ -127,6 +127,12 @@ namespace sfem {
         // against something known -- the volume a prescribed normal velocity sweeps.
         int sideset_mass_flux(const real_t *const x, const std::string &sideset, real_t &out);
 
+    private:
+        int sideset_mass_flux_ss(const real_t *const x, const std::shared_ptr<smesh::Sideset> &ss,
+                                 real_t &out);
+
+    public:
+
         // Transient term. dt <= 0 -- the default -- means steady, and nothing is
         // evaluated, so every steady case and every recorded number is unaffected.
         //

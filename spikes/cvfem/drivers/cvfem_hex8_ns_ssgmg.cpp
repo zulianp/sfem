@@ -2835,6 +2835,8 @@ int main(int argc, char **argv) {
     const bool outlet_governed = want_natural_outlet || want_traction_sideset == "outlet" ||
                                  want_pressure_sideset == "outlet";
     std::shared_ptr<smesh::Sideset> step_skin, step_outlet;
+    // Kept so they survive to_semistructured, which builds a new Mesh and copies none.
+    std::shared_ptr<smesh::Sideset> pump_skin, pump_port, pump_diaphragm;
     if (!want_pump && (want_step || want_natural_outlet || want_named_bc)) {
         step_skin = smesh::skin_sideset(mesh);
         auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)Lx, 1e-6);
@@ -2881,6 +2883,9 @@ int main(int argc, char **argv) {
             std::fprintf(stderr, "pump: could not build the diaphragm sideset\n");
             return EXIT_FAILURE;
         }
+        pump_skin      = skin;
+        pump_port      = port.front();
+        pump_diaphragm = diaphragm.front();
         mesh->add_sideset("skin", skin);
         mesh->add_sideset("port", port.front());
         // Named only so the flux through it can be measured; no boundary condition reads it,
@@ -2920,6 +2925,15 @@ int main(int argc, char **argv) {
         if (mesh && step_skin) {
             mesh->add_sideset("skin", step_skin);
             mesh->add_sideset("outlet", step_outlet);
+        }
+        // The pump's, for the same reason. (parent, lfi) addresses the MACRO element, which
+        // the conversion leaves alone, so re-attaching is exact and not a re-derivation --
+        // and it is what lets one coordinate predicate keep governing a mesh whose nodes it
+        // was never evaluated on.
+        if (mesh && pump_port) {
+            mesh->add_sideset("skin", pump_skin);
+            mesh->add_sideset("port", pump_port);
+            mesh->add_sideset("diaphragm", pump_diaphragm);
         }
         if (!mesh) {
             std::fprintf(stderr, "to_semistructured failed for level %d\n", refine_level);
