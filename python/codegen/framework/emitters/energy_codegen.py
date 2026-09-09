@@ -20,6 +20,7 @@ from codegen.framework.plans.affine_element_kernel import (
     p1_simplex_metric_apply_plan,
 )
 from codegen.framework.plans.geometry_variants import geometry_variant_plan
+from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.form_transformations import (
     metric_value_scale,
 )
@@ -3095,6 +3096,8 @@ def _sfem_soa_operator_source(
                 array_inputs,
                 quadrature_rule,
                 basis_family,
+                affine_quadrature_rule,
+                local_prefix,
             )
         )
         lines.append("")
@@ -8877,82 +8880,57 @@ def _sfem_soa_diagnostic_print_wrapper_lines(
     ]
 
 
-def _tensor_product_field_gradient_flops(dim, n_qp_1d, n_shape_1d):
-    dim = int(dim)
-    q = int(n_qp_1d)
-    s = int(n_shape_1d)
-    if dim == 2:
-        return 4 * q * s * s + 6 * q * q * s
-    if dim == 3:
-        return 4 * q * s * s * s + 6 * q * q * s * s + 6 * q * q * q * s
-    return 0
+def _element_flops_plan(
+    form,
+    prefix,
+    dim,
+    n_nodes,
+    n_qp,
+    n_field_components,
+    quadrature_rule,
+    affine_quadrature_rule,
+    local_prefix,
+    material_flops_per_qp,
+):
+    """The element cost this kernel's loops imply, from `plans.flops`.
 
-
-def _tensor_product_test_gradient_flops(dim, n_qp_1d, n_shape_1d):
-    dim = int(dim)
-    q = int(n_qp_1d)
-    s = int(n_shape_1d)
-    if dim == 2:
-        return 6 * q * q * s + 5 * q * s * s
-    if dim == 3:
-        return 6 * q * q * q * s + 6 * q * q * s * s + 5 * q * s * s * s
-    return 0
-
-
-def _adjugate_and_determinant_flops_per_qp(dim):
-    dim = int(dim)
-    if dim == 2:
-        return 11
-    if dim == 3:
-        return 41
-    return 0
-
-
-def _physical_gradient_transform_flops_per_qp(dim):
-    dim = int(dim)
-    if dim <= 0:
-        return 0
-    return 1 + dim * dim * (2 * dim)
-
-
-def _weak_operand_transform_flops_per_qp(dim):
-    dim = int(dim)
-    if dim <= 0:
-        return 0
-    return dim * dim * (2 * dim)
-
-
-def _objective_weight_flops_per_qp():
-    return 3
-
-
-def _tensor_product_mesh_extra_flops_per_element(form, dim, n_qp, quadrature_rule, basis_family):
-    if str(basis_family) != "tensor_product":
-        return 0, 0
-    n_qp_1d = int(quadrature_rule.tensor_product_n_qp_1d)
-    n_shape_1d = int(quadrature_rule.tensor_product_n_shape_1d)
-    field_gradient = _tensor_product_field_gradient_flops(dim, n_qp_1d, n_shape_1d)
-    test_gradient = _tensor_product_test_gradient_flops(dim, n_qp_1d, n_shape_1d)
-    grad_transform = int(n_qp) * _physical_gradient_transform_flops_per_qp(dim)
-
-    form_name = str(getattr(form, "name", ""))
-    if form_name == "objective":
-        local_extra = dim * field_gradient + grad_transform + int(n_qp) * _objective_weight_flops_per_qp()
-    elif form_name in ("gradient", "apply"):
-        local_extra = (
-            dim * field_gradient
-            + grad_transform
-            + int(n_qp) * _weak_operand_transform_flops_per_qp(dim)
-            + dim * test_gradient
-        )
-    else:
-        local_extra = 0
-
-    geometry_extra = (
-        dim * field_gradient
-        + int(n_qp) * _adjugate_and_determinant_flops_per_qp(dim)
+    The emitter's job here is to say which kernel is being described -- which
+    element, which form, which rule, and whether the affine variant is the
+    closed-form simplex body -- and then to print the answer.  The arithmetic
+    that composes those facts into a number belongs to the plan layer, which
+    is where it now is.
+    """
+    affine_rule = affine_quadrature_rule or quadrature_rule
+    specialized_prefix = _constant_p1_specialized_local_prefix(
+        local_prefix, affine_rule
     )
-    return local_extra, local_extra + geometry_extra
+    metric = geometry_variant_plan(
+        form.weak_form,
+        affine_rule,
+        specialized=specialized_prefix is not None,
+    ).cached_metric
+    expanded_plan = expanded_simplex_metric_plan(
+        metric,
+        dim,
+        n_nodes,
+        affine_rule.n_qp if affine_rule is not None else n_qp,
+        n_field_components,
+        writes_per_shape(form),
+        _form_uses_current(form, default=True),
+        _form_uses_direction(form, default=form.has_direction),
+    )
+    return element_flops_plan(
+        getattr(form, "name", ""),
+        quadrature_rule.element_type,
+        dim,
+        n_qp,
+        n_nodes,
+        n_field_components,
+        quadrature_rule,
+        material_flops_per_qp,
+        expanded_plan=expanded_plan,
+        scale_is_unit=expanded_plan is not None and expanded_plan.scale == 1,
+    )
 
 
 def _sfem_soa_diagnostics_lines(
@@ -8965,6 +8943,8 @@ def _sfem_soa_diagnostics_lines(
     array_inputs,
     quadrature_rule,
     basis_family,
+    affine_quadrature_rule,
+    local_prefix,
 ):
     n_field_components = form_n_field_components(form, dim)
     public_name = _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
@@ -9028,13 +9008,20 @@ def _sfem_soa_diagnostics_lines(
     h_streams = dim * n_nodes if uses_direction else 0
     element_type = quadrature_rule.element_type
     quadrature_order = quadrature_rule.order
-    affine_extra_flops, isoparametric_extra_flops = _tensor_product_mesh_extra_flops_per_element(
+    flops = _element_flops_plan(
         form,
+        prefix,
         dim,
+        n_nodes,
         n_qp,
+        n_field_components,
         quadrature_rule,
-        basis_family,
+        affine_quadrature_rule,
+        local_prefix,
+        cost.flops,
     )
+    affine_extra_flops = flops.affine_mesh_flops_per_element
+    isoparametric_extra_flops = flops.isoparametric_mesh_flops_per_element
     lines = [
         "namespace sfem {",
         "namespace codegen {",
