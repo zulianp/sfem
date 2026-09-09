@@ -967,6 +967,14 @@ namespace sfem {
 
     std::shared_ptr<Op> CVFEMNavierStokes::clone() const { return clone_onto(impl_->space); }
 
+    real_t CVFEMNavierStokes::dt_for_clone() const {
+        return (real_t)(impl_->semi_structured ? impl_->ss.dt : impl_->d.dt);
+    }
+
+    int CVFEMNavierStokes::bdf_order_for_clone() const {
+        return impl_->semi_structured ? impl_->ss.bdf_order : impl_->d.bdf_order;
+    }
+
     void CVFEMNavierStokes::set_time_step(const real_t dt, const int bdf_order) {
         if (impl_->semi_structured) {
             impl_->ss.dt        = (scalar_t)dt;
@@ -1033,6 +1041,12 @@ namespace sfem {
         ret->upwind_eps      = upwind_eps;
         ret->geom            = geom;
         ret->pack_size       = pack_size;
+        // The timestep, so a coarse level is the same TRANSIENT operator and not a steady
+        // one. Only dt and the order: the history is fine-level data of fine-level length,
+        // and a coarse operator has no use for it -- it is applied to a correction, never
+        // asked for a residual -- which is exactly why transient_diag_weight no longer
+        // demands one.
+        ret->set_time_step(dt_for_clone(), bdf_order_for_clone());
         // The outflow setting must travel to the coarse levels. derefine_op re-runs
         // initialize() on the coarse space, which rebuilds the boundary and natural masks --
         // but only if it knows an outflow plane exists. Without this the coarse operator

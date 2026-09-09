@@ -1636,9 +1636,23 @@ inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t 
 // The weight the transient term puts on each velocity diagonal entry: rho V a0 / dt.
 inline scalar_t sscvfem_transient_diag_weight(const SSMeshData &d, const scalar_t rho) {
     if (d.dt <= scalar_t(0)) return scalar_t(0);
-    if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return scalar_t(0);
-    const bool two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
-    return (two ? scalar_t(1.5) : scalar_t(1)) * rho / d.dt;
+    // The history is NOT required. The derivative of the BDF term is rho a0 / dt whatever
+    // u^n and u^{n-1} hold -- they are data the residual differences, not part of the
+    // Jacobian. Requiring them here gave every coarse level in a hierarchy a STEADY
+    // Jacobian: clone_onto builds those and they never receive a history, being applied
+    // only to a correction. For a small timestep rho V a0 / dt is the dominant diagonal, so
+    // that is not a small coarse-grid inconsistency.
+    //
+    // With a history present the coefficient still comes from it, so a BDF2 run's FIRST
+    // step -- which has u^n but no u^{n-1} and correctly falls back to BDF1 -- keeps a
+    // Jacobian consistent with the residual it is the derivative of. Without one, the
+    // requested order is the best available and the factor of 1.5 is immaterial to a
+    // preconditioner anyway.
+    if ((ptrdiff_t)d.u_prev.size() == 3 * d.nnodes) {
+        const bool two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
+        return (two ? scalar_t(1.5) : scalar_t(1)) * rho / d.dt;
+    }
+    return (d.bdf_order >= 2 ? scalar_t(1.5) : scalar_t(1)) * rho / d.dt;
 }
 
 inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
