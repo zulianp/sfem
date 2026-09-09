@@ -154,6 +154,101 @@ def abi_geometry_name(local):
     return "g_%s" % local
 
 
+#: How a published C ABI name ends.
+#:
+#: `package/op_wrappers.py` does not compose these names -- the emitters do, and
+#: L7 sees them only as text in the sources it is handed.  So L7 *parses* them,
+#: and that parser is a second, unwritten copy of the grammar.  When only one
+#: copy moved during a rename the parser stopped recognising anything, every
+#: lookup returned "not a dispatch kernel", the wrapper emitted its fallback
+#: paths, and generation still reported success.
+#:
+#: The cure is not to delete the parser -- L7 has no other source for these
+#: names -- but to make it *total*.  Both halves read the tables below, and
+#: `classify_abi_name` puts every published name into a named category.  A name
+#: that fits none is a hard error rather than a silent skip, so a half-finished
+#: rename fails loudly at the first name it reaches.
+
+#: The geometry a mesh kernel is specialised for.
+ABI_GEOMETRY_TOKENS = ("affine", "isoparametric", "sideset")
+
+#: An optional qualifier between the geometry and the layout, naming the
+#: geometry *representation* the kernel takes rather than the geometry itself.
+ABI_GEOMETRY_QUALIFIERS = ("", "metric_")
+
+#: The mesh layout a kernel reads, longest first so a tail is never eaten by the
+#: shorter tail it contains.
+ABI_LAYOUT_TAILS = ("mesh_soa_aos_unit", "mesh_soa", "mesh_aos", "soa")
+
+#: Published names that are deliberately not dimension-generic mesh kernels, and
+#: what each one is instead.  Every entry here is a reason for `_dispatch_mapping`
+#: to decline a name; anything not covered is a defect.
+ABI_NON_MESH_TAILS = (
+    ("_diagnostics", "diagnostics"),
+    ("_arithmetic_intensity", "query"),
+    ("_print_rate", "query"),
+    ("_print_variant", "query"),
+    ("_variant_count", "query"),
+    ("_matrix_assembly_variant", "query"),
+    ("_boundary_residual_soa", "boundary"),
+    ("_element_soa", "local"),
+)
+
+
+#: The tail of a per-element diagnostics accessor, and of the dimension-generic
+#: one that dispatches to it.  `ABI_NON_MESH_TAILS` carries the broader
+#: `_diagnostics`, which also covers the per-block accessors two_phase_flow
+#: publishes; this is the narrower spelling the dispatch is built for.
+ABI_DIAGNOSTICS_TAIL = "_soa_diagnostics"
+
+#: The traversal a kernel name announces before its geometry token.
+ABI_TRAVERSAL_TOKENS = ("packed",)
+
+
+def dimension_markers():
+    """The fragments a dimension-generic dispatch name splices its `_<n>d` before.
+
+    Longest first: `_affine_mesh_soa` is a prefix of `_affine_mesh_soa_aos_unit`,
+    and matching the short one first would insert the dimension in the right
+    place but classify the kernel as the wrong variant.
+    """
+    markers = [
+        "_%s_%s%s" % (geometry, qualifier, tail)
+        for geometry in ABI_GEOMETRY_TOKENS
+        for qualifier in ABI_GEOMETRY_QUALIFIERS
+        for tail in ABI_LAYOUT_TAILS
+    ]
+    return tuple(sorted(markers, key=len, reverse=True))
+
+
+def classify_abi_name(name):
+    """`(kind, marker)` for a published C ABI function name, or `None`.
+
+    `kind` is `"mesh"` for a kernel that wants a dimension-generic dispatch --
+    `marker` is then the fragment the dimension goes in front of -- and one of
+    the `ABI_NON_MESH_TAILS` kinds otherwise, with `marker` `None`.  `None`
+    means the name matches nothing the framework knows how to publish, which is
+    a generator defect and never a reason to skip the name quietly.
+    """
+    stem = name[: -len("_float")] if name.endswith("_float") else name
+    # Tails first.  `laplace_hex8_apply_sideset_soa_print_rate` reports on a mesh
+    # kernel without being one, and it carries the marker that would otherwise
+    # claim it.
+    for tail, kind in ABI_NON_MESH_TAILS:
+        if stem.endswith(tail):
+            return (kind, None)
+    best = None
+    for marker in dimension_markers():
+        index = stem.find(marker)
+        if index < 0:
+            continue
+        if best is None or index < best[0]:
+            best = (index, marker)
+    if best is not None:
+        return ("mesh", best[1])
+    return None
+
+
 def compose(prefix, stream):
     """The one correct spelling of a composed name.
 
