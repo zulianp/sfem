@@ -40,6 +40,31 @@ MMS_LADDER=${MMS_LADDER:-"4 8 16 32"}
 PORT_SWEEP=${PORT_SWEEP:-"-0.16 -0.08 0 0.16 0.5 1.0 1.5 3.0"}
 NL_MAX_IT=${NL_MAX_IT:-40}
 
+# How the linear systems are solved. Every verified number should be reachable without a
+# dense factorisation, so this switches the whole matrix between the two and the report
+# records which was used.
+#
+#   direct  (default) dense LU of the fine Jacobian, by probing. Exact, and O(n^2) memory
+#           and O(n^3) time, so it is a verification instrument and not a solver. It is the
+#           default here because it makes the reference numbers as sharp as the arithmetic
+#           allows, not because it is how anyone would run.
+#   fgmres  flexible GMRES with block-Jacobi. Scales, and reproduces the same conclusions.
+#
+# The RESTART is the parameter that matters and 30 -- the driver's default, which is right
+# for a multigrid-preconditioned solve -- is far too short here. Measured on the step at
+# Re=20: r=30 does not converge at all, r=120 leaves the continuity sum at 6e-11, and r=480
+# reaches 4e-12 in FEWER iterations (19,000 against 43,000) because a longer restart
+# minimises over a larger space. Tightening SFEM_LSOLVE_RTOL does not substitute for it and
+# at fixed restart makes the answer slightly worse, which is the restart truncation setting
+# the floor rather than the stopping tolerance.
+VERIFY_SOLVER=${VERIFY_SOLVER:-direct}
+VERIFY_RESTART=${VERIFY_RESTART:-480}
+case "$VERIFY_SOLVER" in
+    direct) SOLVER_ENV="SFEM_PRECOND=direct" ;;
+    fgmres) SOLVER_ENV="SFEM_FGMRES=1 SFEM_FGMRES_RESTART=$VERIFY_RESTART SFEM_PRECOND=bjacobi" ;;
+    *) echo "verify_report: VERIFY_SOLVER must be direct or fgmres, got '$VERIFY_SOLVER'" >&2; exit 1 ;;
+esac
+
 if [ ! -x "$DRIVER" ]; then
     echo "verify_report: no driver at $DRIVER (set DRIVER= or build first)" >&2
     exit 1
@@ -61,6 +86,7 @@ echo "    spike root : $SPIKE_ROOT"
 echo "    driver     : $DRIVER"
 echo "    output     : $OUT"
 echo "    groups     : $VERIFY_GROUPS"
+echo "    solver     : $VERIFY_SOLVER ($SOLVER_ENV)"
 echo "    p_exact(outlet) = $P_EXACT_OUTLET   exact step flux = $MASS_EXACT"
 
 want() { case " $VERIFY_GROUPS " in *" $1 "*) return 0;; *) return 1;; esac; }
@@ -151,7 +177,7 @@ if want step; then
     # this case -- it has nothing to say about the pressure coupling and the Krylov residual
     # wanders and then diverges -- and multigrid is deliberately not used here.
     run step lshape "mass_exact=$MASS_EXACT" -- SFEM_CASE=step SFEM_BOUNDARY_MASK=1 \
-        SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_MU=0.1 SFEM_GMG=0 SFEM_PRECOND=direct
+        SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_MU=0.1 SFEM_GMG=0 $SOLVER_ENV
 fi
 
 # ---- the diaphragm pump, across a cycle ----
@@ -164,16 +190,16 @@ if want pump; then
     # cubic in the dof count, and the identity being checked is exact at any resolution --
     # it is a statement about the boundary closure, not about accuracy. N=12 costs a
     # 618 MB factorisation for the same answer.
-    run pump steady "" -- SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_GMG=0 SFEM_PRECOND=direct
+    run pump steady "" -- SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV
     for ns in 1 2 4 6 8; do
-        run pump "t$ns" "" -- SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_GMG=0 SFEM_PRECOND=direct \
+        run pump "t$ns" "" -- SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV \
             SFEM_DT=0.125 SFEM_NSTEPS=$ns SFEM_PUMP_PERIOD=1 SFEM_BDF_ORDER=2
     done
 fi
 
 # ---- assemble the manifest ----
 # Exported so the heredoc below can read them; a shell variable is not in its environment.
-export SPIKE_ROOT CTEST_TOTAL CTEST_PASS CTEST_FAIL CTEST_FAILING
+export SPIKE_ROOT CTEST_TOTAL CTEST_PASS CTEST_FAIL CTEST_FAILING VERIFY_SOLVER VERIFY_RESTART
 python3 - "$OUT" "$TSV" <<'PYEOF'
 import json, os, subprocess, sys, platform
 out, tsv = sys.argv[1], sys.argv[2]
@@ -205,6 +231,9 @@ manifest = {
     "machine": os.environ.get("SLURM_JOB_NODELIST") or platform.node(),
     "threads": os.environ.get("OMP_NUM_THREADS", "unset"),
     "commit": sh("git -C %s rev-parse --short HEAD" % os.environ.get("SPIKE_ROOT", ".")),
+    "solver": (os.environ.get("VERIFY_SOLVER", "direct") +
+               ("" if os.environ.get("VERIFY_SOLVER") != "fgmres"
+                else ", restart %s" % os.environ.get("VERIFY_RESTART", "?"))),
 }
 ct_total = int(os.environ.get("CTEST_TOTAL", "0") or 0)
 if ct_total:
