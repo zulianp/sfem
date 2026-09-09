@@ -36,7 +36,7 @@ for sym in "line search failed" "highest Re SOLVED"; do
 done
 echo "binary: $(date -r $BIN)  vanka syms: $(nm -C $BIN | grep -c make_diagonal_vanka)"
 
-export OMP_NUM_THREADS=72 OMP_PROC_BIND=close OMP_PLACES=cores OMP_WAIT_POLICY=passive
+export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores OMP_WAIT_POLICY=passive
 export SFEM_CASE=poiseuille SFEM_NX=3 SFEM_NY=1 SFEM_NZ=1
 export SFEM_ELEMENT_REFINE_LEVEL=16
 export SFEM_GMG=1 SFEM_GMG_GALERKIN=2 SFEM_GMG_EGAL=1

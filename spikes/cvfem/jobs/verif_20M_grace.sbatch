@@ -60,7 +60,7 @@ done
     echo "error: could not locate spikes/cvfem; sbatch from there or set CVFEM_DIR" >&2; exit 1; }
 cd "$SPIKE_ROOT"
 source ./scripts/alps_env.sh
-export OMP_NUM_THREADS=72 OMP_PROC_BIND=close OMP_PLACES=cores
+export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores
 
 run_case() {  # run_case <label> <env...>
   local label=$1; shift

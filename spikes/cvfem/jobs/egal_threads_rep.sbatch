@@ -53,14 +53,14 @@ BIN="./build_alps/cvfem_hex8_ns_ssgmg"
 OUT="$SCRATCH/egal_out_threads"
 mkdir -p "$OUT"
 
-export OMP_PROC_BIND=close
+export OMP_PROC_BIND=true
 export OMP_PLACES=cores
 
 for rep in 1 2 3; do
 for per in 20000 1000; do
     echo "### rep=${rep} SFEM_GMG_DOFS_PER_THREAD=${per}, 242500 dofs, 72 cores, 60 V-cycles ###"
     srun -u --ntasks=1 --cpus-per-task=72 --uenv="$UENV_IMAGE" --view="$UENV_VIEW" \
-        bash -lc "OMP_NUM_THREADS=72 OMP_PROC_BIND=close OMP_PLACES=cores \
+        bash -lc "OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                   SFEM_CASE=poiseuille SFEM_NX=12 SFEM_NY=3 SFEM_NZ=3 \
                   SFEM_ELEMENT_REFINE_LEVEL=8 SFEM_GMG=1 SFEM_GMG_GALERKIN=2 \
                   SFEM_GMG_EGAL=1 SFEM_NL_MAX_IT=1 SFEM_LSOLVE_MAX_IT=60 \

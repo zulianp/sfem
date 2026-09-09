@@ -31,7 +31,7 @@ if [ ! -f "$SPIKE_ROOT/CMakeLists.txt" ]; then
 fi
 
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-72}
-export OMP_PROC_BIND=close
+export OMP_PROC_BIND=true
 export OMP_PLACES=cores
 
 UENV_ARGS=$(grep '^uenv start' ~/init.sh | sed 's/^uenv start //')

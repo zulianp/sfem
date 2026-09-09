@@ -19,7 +19,7 @@ set -u
 BLK=$SCRATCH/cvfem_blk; B=$BLK/after/build_blk
 OUT=${OUT:-$SCRATCH/cvfem_tp/$SLURM_JOB_ID}
 mkdir -p "$OUT"
-export OMP_NUM_THREADS=72 OMP_PROC_BIND=close OMP_PLACES=cores
+export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores
 U=$(grep '^uenv start' ~/init.sh | sed 's/^uenv start //')
 echo "host $(hostname)  threads $OMP_NUM_THREADS  $(date)"
 echo "out  $OUT"

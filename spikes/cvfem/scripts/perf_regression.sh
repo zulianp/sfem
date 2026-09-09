@@ -151,7 +151,7 @@ echo "### host     : $(hostname)   $(date '+%Y-%m-%d %H:%M:%S')"
 measure() {  # binary tag_prefix key operation layout kernel n [extra options]
     local bin=$1 pfx=$2 key=$3 op=$4 layout=$5 kernel=$6 n=$7 extra=${8:-}
     # shellcheck disable=SC2046
-    OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=close OMP_PLACES=cores \
+    OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=true OMP_PLACES=cores \
         stdbuf -oL "$bin" --n "$n" --repeat 20 --warmup 3 \
             --layout "$layout" --kernel "$kernel" $(op_flag "$op") $extra \
             --csv "$CSV" --tag "${pfx}${key}" >/dev/null 2>&1 \
@@ -161,7 +161,7 @@ measure() {  # binary tag_prefix key operation layout kernel n [extra options]
 # The first invocation in an allocation is systematically off -- measured at 12% here -- so
 # one is thrown away before anything is recorded.
 echo "### discarding one warm-up invocation"
-OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=close OMP_PLACES=cores \
+OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=true OMP_PLACES=cores \
     "$BIN" --n 96 --repeat 3 --warmup 1 --layout packed --kernel sumfact >/dev/null 2>&1
 
 # Runs every configuration REPS times, or only the keys named in $1 (newline separated).
