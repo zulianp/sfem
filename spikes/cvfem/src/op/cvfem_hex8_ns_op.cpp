@@ -644,6 +644,32 @@ namespace sfem {
 
     std::shared_ptr<Op> CVFEMNavierStokes::clone() const { return clone_onto(impl_->space); }
 
+    void CVFEMNavierStokes::set_time_step(const real_t dt, const int bdf_order) {
+        if (impl_->semi_structured) {
+            impl_->ss.dt        = (scalar_t)dt;
+            impl_->ss.bdf_order = bdf_order;
+        } else {
+            impl_->d.dt        = (scalar_t)dt;
+            impl_->d.bdf_order = bdf_order;
+        }
+    }
+
+    void CVFEMNavierStokes::set_velocity_history(const real_t *prev, const real_t *prev2) {
+        const ptrdiff_t n = impl_->semi_structured ? impl_->ss.nnodes : impl_->d.nnodes;
+        auto assign = [&](auto &dst_prev, auto &dst_prev2) {
+            if (!prev) {
+                dst_prev.clear();
+                dst_prev2.clear();
+                return;
+            }
+            dst_prev.assign(prev, prev + 3 * n);
+            if (prev2) dst_prev2.assign(prev2, prev2 + 3 * n);
+            else dst_prev2.clear();
+        };
+        if (impl_->semi_structured) assign(impl_->ss.u_prev, impl_->ss.u_prev2);
+        else assign(impl_->d.u_prev, impl_->d.u_prev2);
+    }
+
     void CVFEMNavierStokes::set_body_force(const real_t *fx, const real_t *fy, const real_t *fz) {
         const ptrdiff_t n = impl_->semi_structured ? impl_->ss.nnodes : impl_->d.nnodes;
         auto assign = [&](auto &dst_x, auto &dst_y, auto &dst_z) {

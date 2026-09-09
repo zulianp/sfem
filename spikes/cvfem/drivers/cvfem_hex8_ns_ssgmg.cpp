@@ -192,6 +192,9 @@ private:
                      "  SFEM_RHO SFEM_MU SFEM_U   density, viscosity, velocity scale\n"
                      "  SFEM_GEOM            affine | isoparam (default affine)\n"
                      "  SFEM_NL_MAX_IT SFEM_NL_RTOL SFEM_NL_ATOL\n"
+                     "  SFEM_DT              timestep; <= 0 (default) is the steady solve\n"
+                     "  SFEM_NSTEPS          time steps to take (default 1)\n"
+                     "  SFEM_BDF_ORDER       1 or 2 (default 2; step 1 falls back to BDF1)\n"
                      "  SFEM_LSOLVE_RTOL SFEM_LSOLVE_ATOL SFEM_LSOLVE_MAX_IT\n"
                      "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
                      "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default); 0: assembled BSR\n"
@@ -2683,6 +2686,14 @@ int main(int argc, char **argv) {
     const real_t      U          = smesh::Env::read<real_t>("SFEM_U", 1);
     const std::string geom_name  = smesh::Env::read_string("SFEM_GEOM", "affine");
     const int         max_newton = smesh::Env::read<int>("SFEM_NL_MAX_IT", 40);
+    // Transient stepping. SFEM_DT <= 0 -- the default -- is the steady solve every existing
+    // case runs, and nothing below changes for it. With a timestep the whole continuation
+    // and Newton solve becomes one time step, repeated SFEM_NSTEPS times, with the velocity
+    // history shifted after each. BDF2 falls back to BDF1 on the first step, which has no
+    // second history level; that is the standard start-up.
+    const real_t      dt_step   = smesh::Env::read<real_t>("SFEM_DT", real_t(0));
+    const int         nsteps    = std::max(1, smesh::Env::read<int>("SFEM_NSTEPS", 1));
+    const int         bdf_order = smesh::Env::read<int>("SFEM_BDF_ORDER", 2);
     const real_t      nl_rtol    = smesh::Env::read<real_t>("SFEM_NL_RTOL", 1e-8);
     const real_t      nl_atol    = smesh::Env::read<real_t>("SFEM_NL_ATOL", 1e-12);
     // Step-size convergence. The residual tests above cannot fire once ||R|| has reached its
@@ -3430,6 +3441,28 @@ int main(int argc, char **argv) {
     // against the same reference.
     real_t r0 = 0;
 
+    // ---------------------------------------------------------------- time stepping
+    //
+    // One time step is a full continuation-and-Newton solve of the transient residual, so
+    // everything below -- the Reynolds ramp, the adaptive retry, the divergence detection --
+    // works unchanged inside a step. With SFEM_DT = 0 the loop runs exactly once and the
+    // operator has no time term, which is bit-for-bit the steady solve.
+    std::vector<real_t> u_hist, u_hist2;
+    if (dt_step > real_t(0)) {
+        op->set_time_step(dt_step, bdf_order);
+        u_hist.assign((size_t)nnodes * 3, real_t(0));
+        // The initial condition is whatever the state holds when stepping starts, so the
+        // first step is consistent with it rather than with an implied zero field.
+        for (ptrdiff_t i = 0; i < nnodes; ++i)
+            for (int c = 0; c < 3; ++c) u_hist[(size_t)i * 3 + (size_t)c] = x[(size_t)i * 4 + (size_t)c];
+        op->set_velocity_history(u_hist.data(), nullptr);
+        std::printf("transient: dt %g, %d steps, BDF%d\n", (double)dt_step, nsteps, bdf_order);
+    }
+
+    for (int tstep = 0; tstep < (dt_step > real_t(0) ? nsteps : 1); ++tstep) {
+    if (dt_step > real_t(0)) std::printf("=== step %d/%d  t = %g ===\n", tstep + 1, nsteps,
+                                         (double)((tstep + 1) * dt_step));
+
     for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
     const real_t rho_use = rho_schedule[stage];
     // The manufactured forcing is a function of rho, so it must track the continuation. The
@@ -4141,6 +4174,18 @@ int main(int argc, char **argv) {
         break;
     }
     }
+
+    // Shift the history: u^{n-1} <- u^n, u^n <- the state just solved for. Done after the
+    // step rather than before the next one so a run that stops early leaves the history
+    // consistent with the state it reports.
+    if (dt_step > real_t(0)) {
+        if (bdf_order >= 2) u_hist2 = u_hist;
+        for (ptrdiff_t i = 0; i < nnodes; ++i)
+            for (int c = 0; c < 3; ++c) u_hist[(size_t)i * 3 + (size_t)c] = x[(size_t)i * 4 + (size_t)c];
+        op->set_velocity_history(u_hist.data(), bdf_order >= 2 && tstep >= 1 ? u_hist2.data() : nullptr);
+    }
+    }  // time step
+
 
     // Report the Reynolds number actually reached, not just the one asked for.
     //
