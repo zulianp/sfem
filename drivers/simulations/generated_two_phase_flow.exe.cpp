@@ -14,8 +14,8 @@
 
 extern "C" {
 #define DECLARE_DIAGNOSTICS(element)                                                                                     \
-    const sfem::codegen::KernelDiagnostics *two_phase_flow_##element##_residual_element_soa_diagnostics(void); \
-    const sfem::codegen::KernelDiagnostics *two_phase_flow_##element##_jacobian_action_element_soa_diagnostics(void)
+    const sfem::codegen::KernelDiagnostics *two_phase_flow_##element##_residual_esoa_diagnostics(void); \
+    const sfem::codegen::KernelDiagnostics *two_phase_flow_##element##_jacobian_action_esoa_diagnostics(void)
 
 DECLARE_DIAGNOSTICS(tri3);
 DECLARE_DIAGNOSTICS(tet4);
@@ -86,17 +86,17 @@ namespace {
     const Diagnostics *kernel_diagnostics(const smesh::ElemType type, const bool jacobian) {
         switch (type) {
             case smesh::TRI3:
-                return jacobian ? two_phase_flow_tri3_jacobian_action_element_soa_diagnostics()
-                                : two_phase_flow_tri3_residual_element_soa_diagnostics();
+                return jacobian ? two_phase_flow_tri3_jacobian_action_esoa_diagnostics()
+                                : two_phase_flow_tri3_residual_esoa_diagnostics();
             case smesh::TET4:
-                return jacobian ? two_phase_flow_tet4_jacobian_action_element_soa_diagnostics()
-                                : two_phase_flow_tet4_residual_element_soa_diagnostics();
+                return jacobian ? two_phase_flow_tet4_jacobian_action_esoa_diagnostics()
+                                : two_phase_flow_tet4_residual_esoa_diagnostics();
             case smesh::QUAD4:
-                return jacobian ? two_phase_flow_quad4_jacobian_action_element_soa_diagnostics()
-                                : two_phase_flow_quad4_residual_element_soa_diagnostics();
+                return jacobian ? two_phase_flow_quad4_jacobian_action_esoa_diagnostics()
+                                : two_phase_flow_quad4_residual_esoa_diagnostics();
             case smesh::HEX8:
-                return jacobian ? two_phase_flow_hex8_jacobian_action_element_soa_diagnostics()
-                                : two_phase_flow_hex8_residual_element_soa_diagnostics();
+                return jacobian ? two_phase_flow_hex8_jacobian_action_esoa_diagnostics()
+                                : two_phase_flow_hex8_residual_esoa_diagnostics();
             default:
                 return nullptr;
         }

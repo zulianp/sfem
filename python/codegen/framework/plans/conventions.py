@@ -169,16 +169,147 @@ def abi_geometry_name(local):
 #: that fits none is a hard error rather than a silent skip, so a half-finished
 #: rename fails loudly at the first name it reaches.
 
-#: The geometry a mesh kernel is specialised for.
-ABI_GEOMETRY_TOKENS = ("affine", "isoparametric", "sideset")
+#: How each axis of a published name is spelled, long form to short.
+#:
+#: The long form stays the value of the enums in `plans/apply_variants.py`,
+#: because that is what plan dumps, diagnostics metadata and the `--geometry`
+#: flag carry, and what a person reads when asking what a kernel is.  Only the
+#: *name* is abbreviated, and only here: `abi_rename_pairs` derives the rename
+#: from these tables, and `dimension_markers` derives the parser from the same
+#: ones, so the two halves of the grammar cannot be moved separately.  That is
+#: the property the previous rename attempt lacked.
+#:
+#: `a` and `i` are single letters, which is the material author's namespace
+#: everywhere else in this file.  They are safe here because a geometry token
+#: never stands alone -- it is always `_<geom>_<layout>`, and the composite is
+#: the unit both the composer and the parser work in.
+ABI_GEOMETRY_SPELLING = (
+    ("affine", "a"),
+    ("isoparametric", "i"),
+    ("sideset", "ss"),
+)
 
 #: An optional qualifier between the geometry and the layout, naming the
 #: geometry *representation* the kernel takes rather than the geometry itself.
-ABI_GEOMETRY_QUALIFIERS = ("", "metric_")
+ABI_QUALIFIER_SPELLING = (
+    ("", ""),
+    ("metric_", "met_"),
+)
 
 #: The mesh layout a kernel reads, longest first so a tail is never eaten by the
 #: shorter tail it contains.
-ABI_LAYOUT_TAILS = ("mesh_soa_aos_unit", "mesh_soa", "mesh_aos", "soa")
+ABI_LAYOUT_SPELLING = (
+    ("mesh_soa_aos_unit", "msoa_aos_unit"),
+    ("mesh_soa", "msoa"),
+    ("mesh_aos", "maos"),
+    ("soa", "soa"),
+)
+
+#: The element-local kernels, which have no geometry token because they are
+#: handed geometry rather than reading a mesh.
+#:
+#: The rule is the same one the mesh side follows: the level letter prefixes the
+#: layout token -- `m` + `soa` is `msoa`, `e` + `soa` is `esoa` -- and a
+#: qualifier sits between them, so `element_coords_soa` becomes `ecoords_soa`.
+ABI_LEVEL_LETTER = "e"
+
+#: What may qualify an element-local level.  `coords` marks the kernel that takes
+#: coordinates directly rather than through a stream of them.
+ABI_LOCAL_QUALIFIERS = ("", "coords_", "geometry_")
+
+ABI_LOCAL_SPELLING = tuple(
+    ("element_%ssoa" % qualifier, "%s%ssoa" % (ABI_LEVEL_LETTER, qualifier))
+    for qualifier in ABI_LOCAL_QUALIFIERS
+)
+
+
+def abi_local_level(qualifier=""):
+    """The element-local level token, e.g. `esoa` or `ecoords_soa`.
+
+    Call this rather than spelling `_element_%ssoa`.  That literal splits the
+    level around its qualifier, so `element_soa` never appears contiguously in
+    the source and no text rewrite can reach it -- which is how eight element
+    API headers kept the long form through a rename that moved everything else.
+    """
+    return "%s%ssoa" % (ABI_LEVEL_LETTER, qualifier)
+
+ABI_GEOMETRY_TOKENS = tuple(short for _, short in ABI_GEOMETRY_SPELLING)
+ABI_GEOMETRY_QUALIFIERS = tuple(short for _, short in ABI_QUALIFIER_SPELLING)
+ABI_LAYOUT_TAILS = tuple(short for _, short in ABI_LAYOUT_SPELLING)
+
+
+def abi_mesh_fragment(geometry, layout="mesh_soa", qualifier=""):
+    """The `<geom>[_<qual>]_<layout>` fragment of a published mesh kernel name.
+
+    Call this wherever the geometry arrives as a value rather than as text --
+    `emitters/energy_codegen.py` splices it from `geometry_mode` -- so those
+    sites move with the table instead of quietly emitting the long form.
+    """
+    spelling = dict(ABI_GEOMETRY_SPELLING)
+    return "%s_%s%s" % (
+        spelling.get(str(geometry), str(geometry)),
+        dict(ABI_QUALIFIER_SPELLING)[qualifier],
+        dict(ABI_LAYOUT_SPELLING)[layout],
+    )
+
+
+def abi_with_geometry_qualifier(name, qualifier="metric_"):
+    """`name` with the geometry-representation qualifier spliced before its layout.
+
+    Two elements of one dimension can want different geometry -- an affine
+    simplex contracts through the symmetric metric where a hexahedron needs the
+    full adjugate -- and that is two entry points, not one.  Naming the geometry
+    keeps both; before it did, the second collided with the first and was dropped
+    silently, leaving the metric elements with no affine entry point and a
+    runtime `default:` as the only sign.
+
+    The splice point is the layout tail, taken from the table, because it used to
+    be the literal `_mesh_` and a rename left it matching nothing -- at which
+    point the qualifier was appended to the end instead and named a symbol that
+    does not exist.
+    """
+    short = dict(ABI_QUALIFIER_SPELLING)[qualifier]
+    for tail in ABI_LAYOUT_TAILS:
+        index = name.rfind("_%s" % tail)
+        if index >= 0:
+            return "%s_%s%s" % (name[:index], short, name[index + 1 :])
+    return "%s_%s" % (name, short.rstrip("_"))
+
+
+def abi_rename_pairs():
+    """`(long, short)` for every composite a published name can end with.
+
+    The composite is the unit, never the bare token: `affine` also names a
+    geometry *mode* in plan dumps, a `--geometry` value and a JSON field, and
+    rewriting it there is how a previous attempt broke `matrix_packed_passes`.
+    Anchoring each rewrite to `_<geom>[_<qual>]_<layout>` makes the name-shaped
+    occurrences the only ones that match.
+    """
+    pairs = []
+    for geometry, short_geometry in ABI_GEOMETRY_SPELLING:
+        for qualifier, short_qualifier in ABI_QUALIFIER_SPELLING:
+            for layout, short_layout in ABI_LAYOUT_SPELLING:
+                long_form = "_%s_%s%s" % (geometry, qualifier, layout)
+                short_form = "_%s_%s%s" % (short_geometry, short_qualifier, short_layout)
+                if long_form != short_form:
+                    pairs.append((long_form, short_form))
+    for local, short_local in ABI_LOCAL_SPELLING:
+        if local == short_local:
+            continue
+        # The dimension-generic accessor used to be spelled by splitting the
+        # level around the dimension -- `residual_element_3d_soa_diagnostics`.
+        # With the level a single token the dimension goes in front of the whole
+        # tail, `residual_3d_esoa_diagnostics`, which is what the mesh dispatch
+        # has always done.  Listed here so the shape change is part of the rename
+        # rather than an unexplained difference.
+        head, _, layout = local.partition("_")
+        for dim in (2, 3):
+            pairs.append(
+                ("_%s_%dd_%s_diagnostics" % (head, dim, layout),
+                 "_%dd_%s_diagnostics" % (dim, short_local)),
+            )
+        pairs.append(("_%s" % local, "_%s" % short_local))
+    return tuple(sorted(pairs, key=lambda pair: len(pair[0]), reverse=True))
 
 #: Published names that are deliberately not dimension-generic mesh kernels, and
 #: what each one is instead.  Every entry here is a reason for `_dispatch_mapping`
@@ -191,18 +322,45 @@ ABI_NON_MESH_TAILS = (
     ("_variant_count", "query"),
     ("_matrix_assembly_variant", "query"),
     ("_boundary_residual_soa", "boundary"),
-    ("_element_soa", "local"),
+) + tuple(("_%s" % short, "local") for _, short in ABI_LOCAL_SPELLING)
+
+
+#: The tails a diagnostics accessor can end with, longest first.
+#:
+#: There are two because there are two levels.  A material whose kernels read a
+#: mesh publishes `<mat>_<elem>_<verb>_soa_diagnostics`; one whose kernels are
+#: handed elements publishes `<mat>_<elem>_<verb>_esoa_diagnostics`.  Pinning
+#: only the first is how the `_element_soa` rename first went wrong: the
+#: `endswith` pre-filter in `_diagnostic_dispatch_groups` stopped matching, every
+#: navier_stokes accessor was skipped before it could reach the guard, no
+#: dimension-generic accessor was emitted, and the wrapper's one-argument call
+#: bound to the zero-argument per-element symbol.  The arity check caught it;
+#: deriving these from the layout table is what stops it happening again.
+#:
+#: `ABI_NON_MESH_TAILS` carries the broader `_diagnostics`, which also covers the
+#: per-block accessors two_phase_flow publishes; these are the narrower spellings
+#: the dimension-generic dispatch is built for.
+ABI_DIAGNOSTICS_TAILS = tuple(
+    sorted(
+        {"_%s_diagnostics" % tail for tail in ABI_LAYOUT_TAILS}
+        | {"_%s_diagnostics" % short for _, short in ABI_LOCAL_SPELLING},
+        key=len,
+        reverse=True,
+    )
 )
 
 
-#: The tail of a per-element diagnostics accessor, and of the dimension-generic
-#: one that dispatches to it.  `ABI_NON_MESH_TAILS` carries the broader
-#: `_diagnostics`, which also covers the per-block accessors two_phase_flow
-#: publishes; this is the narrower spelling the dispatch is built for.
-ABI_DIAGNOSTICS_TAIL = "_soa_diagnostics"
+def diagnostics_tail(name):
+    """The diagnostics tail `name` ends with, or `None`."""
+    for tail in ABI_DIAGNOSTICS_TAILS:
+        if name.endswith(tail):
+            return tail
+    return None
 
-#: The traversal a kernel name announces before its geometry token.
-ABI_TRAVERSAL_TOKENS = ("packed",)
+#: The traversal a kernel name announces before its geometry token.  Unabbreviated
+#: for now: it is 0.08% of the tree and `packed` is the word every driver flag,
+#: plan field and benchmark column already uses.
+ABI_TRAVERSAL_SPELLING = (("packed", "packed"),)
 
 
 def dimension_markers():

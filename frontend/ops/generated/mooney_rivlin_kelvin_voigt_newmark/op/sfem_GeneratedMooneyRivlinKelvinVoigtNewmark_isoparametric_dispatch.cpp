@@ -11,7 +11,7 @@
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -28,7 +28,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_is
         double *const RSTR outx,
         double *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -45,7 +45,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_is
         float *const RSTR outx,
         float *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -62,7 +62,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparamet
         double *const RSTR outx,
         double *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -79,7 +79,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparamet
         float *const RSTR outx,
         float *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -99,7 +99,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametr
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -119,7 +119,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametr
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -139,7 +139,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_iso
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -159,7 +159,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_iso
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -179,7 +179,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_isoparamet
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -199,7 +199,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_isoparamet
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -213,7 +213,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient
         double *const RSTR outx,
         double *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -227,7 +227,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient
         float *const RSTR outx,
         float *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -241,7 +241,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isopara
         double *const RSTR outx,
         double *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -255,7 +255,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isopara
         float *const RSTR outx,
         float *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -271,7 +271,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparam
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -287,7 +287,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparam
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -303,7 +303,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -319,7 +319,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -335,7 +335,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_isopara
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -351,7 +351,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_isopara
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -368,7 +368,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objectiv
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -385,7 +385,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objectiv
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -402,7 +402,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -419,7 +419,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -438,7 +438,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -457,7 +457,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -476,7 +476,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -495,7 +495,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -514,7 +514,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -533,7 +533,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -544,7 +544,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
     const double *const RSTR direction,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -555,7 +555,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
     const float *const RSTR direction,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -566,7 +566,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
     const double *const RSTR direction,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -577,7 +577,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
     const float *const RSTR direction,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -598,7 +598,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
     double *const RSTR u0_out,
     double *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -619,7 +619,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
     float *const RSTR u0_out,
     float *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -640,7 +640,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
     double *const RSTR u0_out,
     double *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -661,7 +661,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
     float *const RSTR u0_out,
     float *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -672,7 +672,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
     const double *const RSTR direction,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -683,7 +683,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
     const float *const RSTR direction,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -694,7 +694,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     const double *const RSTR direction,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -705,7 +705,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     const float *const RSTR direction,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -716,7 +716,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_
     const double *const RSTR direction,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -727,7 +727,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_
     const float *const RSTR direction,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -752,7 +752,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
     double *const RSTR u1_out,
     double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -777,7 +777,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
     float *const RSTR u1_out,
     float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -802,7 +802,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     double *const RSTR u1_out,
     double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -827,7 +827,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     float *const RSTR u1_out,
     float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -852,7 +852,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_
     double *const RSTR u1_out,
     double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -877,7 +877,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_
     float *const RSTR u1_out,
     float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -887,7 +887,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
     const double *const RSTR previous,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -897,7 +897,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
     const float *const RSTR previous,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -907,7 +907,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isopara
     const double *const RSTR previous,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -917,7 +917,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isopara
     const float *const RSTR previous,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -935,7 +935,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
     double *const RSTR u0_out,
     double *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -953,7 +953,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
     float *const RSTR u0_out,
     float *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -971,7 +971,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isopara
     double *const RSTR u0_out,
     double *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -989,7 +989,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isopara
     float *const RSTR u0_out,
     float *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -999,7 +999,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparam
     const double *const RSTR previous,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1009,7 +1009,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparam
     const float *const RSTR previous,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1019,7 +1019,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     const double *const RSTR previous,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1029,7 +1029,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     const float *const RSTR previous,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1039,7 +1039,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isopara
     const double *const RSTR previous,
     double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1049,7 +1049,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isopara
     const float *const RSTR previous,
     float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1070,7 +1070,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparam
     double *const RSTR u1_out,
     double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1091,7 +1091,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparam
     float *const RSTR u1_out,
     float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1112,7 +1112,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     double *const RSTR u1_out,
     double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1133,7 +1133,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     float *const RSTR u1_out,
     float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1154,7 +1154,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isopara
     double *const RSTR u1_out,
     double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1176,7 +1176,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isopara
     float *const RSTR u2_out
 );
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1203,9 +1203,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
         default:
           break;
       }
@@ -1214,9 +1214,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
         default:
           break;
       }
@@ -1226,13 +1226,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1262,9 +1262,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1273,9 +1273,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1284,9 +1284,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1296,13 +1296,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1326,9 +1326,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
         default:
           break;
       }
@@ -1337,9 +1337,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
         default:
           break;
       }
@@ -1349,13 +1349,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1381,9 +1381,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1392,9 +1392,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1403,9 +1403,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1415,13 +1415,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1448,9 +1448,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1459,9 +1459,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1471,13 +1471,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1506,9 +1506,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1517,9 +1517,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1528,9 +1528,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_i_msoa(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+          return mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_i_msoa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1540,13 +1540,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_elas
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_aos(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1567,9 +1567,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
         default:
           break;
       }
@@ -1578,9 +1578,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
         default:
           break;
       }
@@ -1590,13 +1590,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_aos does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_i_maos does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1627,9 +1627,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
         default:
           break;
       }
@@ -1638,9 +1638,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
         default:
           break;
       }
@@ -1650,13 +1650,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_aos(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1677,9 +1677,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
         default:
           break;
       }
@@ -1688,9 +1688,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
         default:
           break;
       }
@@ -1699,9 +1699,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (const double *)direction, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (const float *)direction, (float *)output);
         default:
           break;
       }
@@ -1711,13 +1711,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_aos does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_maos does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1752,9 +1752,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
         default:
           break;
       }
@@ -1763,9 +1763,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
         default:
           break;
       }
@@ -1774,9 +1774,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
         default:
           break;
       }
@@ -1786,13 +1786,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_aos(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1812,9 +1812,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
         default:
           break;
       }
@@ -1823,9 +1823,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
         default:
           break;
       }
@@ -1835,13 +1835,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_aos does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_i_maos does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1869,9 +1869,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
         default:
           break;
       }
@@ -1880,9 +1880,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
         default:
           break;
       }
@@ -1892,13 +1892,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_aos(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1918,9 +1918,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
         default:
           break;
       }
@@ -1929,9 +1929,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
         default:
           break;
       }
@@ -1940,9 +1940,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_aos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_i_maos(nelements, nnodes, elements, points, (const double *)parameters, (const double *)current, (const double *)previous, (double *)output);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_aos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_i_maos_float(nelements, nnodes, elements, points, (const float *)parameters, (const float *)current, (const float *)previous, (float *)output);
         default:
           break;
       }
@@ -1952,13 +1952,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_aos does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_maos does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1989,9 +1989,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
         default:
           break;
       }
@@ -2000,9 +2000,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
         default:
           break;
       }
@@ -2011,9 +2011,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_i_msoa(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         case smesh::SMESH_FLOAT32:
-          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_i_msoa_float(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
         default:
           break;
       }
@@ -2023,7 +2023,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_newmark_visc
       break;
   }
   std::fprintf(stderr,
-      "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;

@@ -61,10 +61,10 @@ $CXX -std=c++17 -O3 -march=native -DNDEBUG $TAKES_STATE \
     -DELEMENT_${ELEMENT} \
     -DMATERIAL_LABEL="\"$MATERIAL\"" \
     -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${LOWER}_inexact_apply_inline.hpp\"" \
-    -DEXACT_APPLY=${MATERIAL}_${LOWER}_apply_affine_mesh_soa \
-    -DTANGENT_KERNEL=${MATERIAL}_${LOWER}_inexact_apply_tangent_affine_mesh_soa_impl \
-    -DSTORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_affine_mesh_soa_impl \
-    -DCOMPRESSED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_compressed_affine_mesh_soa_impl \
+    -DEXACT_APPLY=${MATERIAL}_${LOWER}_apply_a_msoa \
+    -DTANGENT_KERNEL=${MATERIAL}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
+    -DSTORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_a_msoa_impl \
+    -DCOMPRESSED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_compressed_a_msoa_impl \
     -o "$WORK/bench_split_${MATERIAL}_${LOWER}" \
     "$HERE/bench_split.cpp" "$GEN/${MATERIAL}_${LOWER}_operator.cpp" $EXTRA_TU \
     -I "$GEN" -I "$WORK/gen/$MATERIAL" -I "$WORK/gen/$MATERIAL/d3" \

@@ -186,45 +186,45 @@ extern "C" void neohookean_ogden_tet10_objective_soa_float_print_rate(
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void neohookean_ogden_tet10_objective_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_objective_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "neohookean_ogden_tet10_objective_affine_mesh_soa",
+      "neohookean_ogden_tet10_objective_a_msoa",
       &sfem::codegen::neohookean_ogden_tet10_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void neohookean_ogden_tet10_objective_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_objective_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "neohookean_ogden_tet10_objective_affine_mesh_soa_float",
+      "neohookean_ogden_tet10_objective_a_msoa_float",
       &sfem::codegen::neohookean_ogden_tet10_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void neohookean_ogden_tet10_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_objective_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "neohookean_ogden_tet10_objective_isoparametric_mesh_soa",
+      "neohookean_ogden_tet10_objective_i_msoa",
       &sfem::codegen::neohookean_ogden_tet10_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void neohookean_ogden_tet10_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_objective_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "neohookean_ogden_tet10_objective_isoparametric_mesh_soa_float",
+      "neohookean_ogden_tet10_objective_i_msoa_float",
       &sfem::codegen::neohookean_ogden_tet10_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -235,7 +235,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -368,7 +368,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_affine_mesh_soa_im
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int neohookean_ogden_tet10_objective_steps_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_objective_steps_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -396,10 +396,10 @@ extern "C" int neohookean_ogden_tet10_objective_steps_affine_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+  return sfem::codegen::neohookean_ogden_tet10_objective_steps_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_tet10_objective_steps_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_objective_steps_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -427,13 +427,13 @@ extern "C" int neohookean_ogden_tet10_objective_steps_affine_mesh_soa_float(
         const float *const RSTR steps,
         float *const RSTR value
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+  return sfem::codegen::neohookean_ogden_tet10_objective_steps_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_objective_steps_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -592,7 +592,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_objective_steps_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -759,7 +759,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -983,7 +983,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_isoparametric_mesh
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int neohookean_ogden_tet10_objective_steps_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1002,10 +1002,10 @@ extern "C" int neohookean_ogden_tet10_objective_steps_isoparametric_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+  return sfem::codegen::neohookean_ogden_tet10_objective_steps_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_tet10_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1024,13 +1024,13 @@ extern "C" int neohookean_ogden_tet10_objective_steps_isoparametric_mesh_soa_flo
         const float *const RSTR steps,
         float *const RSTR value
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+  return sfem::codegen::neohookean_ogden_tet10_objective_steps_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_objective_steps_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1292,7 +1292,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_objective_steps_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1642,45 +1642,45 @@ extern "C" void neohookean_ogden_tet10_gradient_soa_float_print_rate(
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void neohookean_ogden_tet10_gradient_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_gradient_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "neohookean_ogden_tet10_gradient_affine_mesh_soa",
+      "neohookean_ogden_tet10_gradient_a_msoa",
       &sfem::codegen::neohookean_ogden_tet10_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void neohookean_ogden_tet10_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_gradient_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "neohookean_ogden_tet10_gradient_affine_mesh_soa_float",
+      "neohookean_ogden_tet10_gradient_a_msoa_float",
       &sfem::codegen::neohookean_ogden_tet10_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_gradient_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "neohookean_ogden_tet10_gradient_isoparametric_mesh_soa",
+      "neohookean_ogden_tet10_gradient_i_msoa",
       &sfem::codegen::neohookean_ogden_tet10_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_gradient_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_float",
+      "neohookean_ogden_tet10_gradient_i_msoa_float",
       &sfem::codegen::neohookean_ogden_tet10_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -1691,7 +1691,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int neohookean_ogden_tet10_gradient_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1819,7 +1819,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_affine_mesh_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int neohookean_ogden_tet10_gradient_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_gradient_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1844,10 +1844,10 @@ extern "C" int neohookean_ogden_tet10_gradient_affine_mesh_soa(
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  return sfem::codegen::neohookean_ogden_tet10_gradient_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_tet10_gradient_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_gradient_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1872,13 +1872,13 @@ extern "C" int neohookean_ogden_tet10_gradient_affine_mesh_soa_float(
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  return sfem::codegen::neohookean_ogden_tet10_gradient_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_gradient_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2048,7 +2048,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_gradient_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2218,7 +2218,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_affine_mesh_soa_float(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2405,7 +2405,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2600,7 +2600,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2819,7 +2819,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_im
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int neohookean_ogden_tet10_gradient_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2835,10 +2835,10 @@ extern "C" int neohookean_ogden_tet10_gradient_isoparametric_mesh_soa(
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  return sfem::codegen::neohookean_ogden_tet10_gradient_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2854,13 +2854,13 @@ extern "C" int neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_float(
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  return sfem::codegen::neohookean_ogden_tet10_gradient_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_gradient_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -3125,7 +3125,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_gradient_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -3390,7 +3390,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa_flo
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -3672,7 +3672,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -4042,45 +4042,45 @@ extern "C" void neohookean_ogden_tet10_apply_soa_float_print_rate(
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void neohookean_ogden_tet10_apply_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_apply_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "neohookean_ogden_tet10_apply_affine_mesh_soa",
+      "neohookean_ogden_tet10_apply_a_msoa",
       &sfem::codegen::neohookean_ogden_tet10_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void neohookean_ogden_tet10_apply_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_apply_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "neohookean_ogden_tet10_apply_affine_mesh_soa_float",
+      "neohookean_ogden_tet10_apply_a_msoa_float",
       &sfem::codegen::neohookean_ogden_tet10_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void neohookean_ogden_tet10_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_tet10_apply_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "neohookean_ogden_tet10_apply_isoparametric_mesh_soa",
+      "neohookean_ogden_tet10_apply_i_msoa",
       &sfem::codegen::neohookean_ogden_tet10_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void neohookean_ogden_tet10_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_tet10_apply_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "neohookean_ogden_tet10_apply_isoparametric_mesh_soa_float",
+      "neohookean_ogden_tet10_apply_i_msoa_float",
       &sfem::codegen::neohookean_ogden_tet10_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -4091,7 +4091,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int neohookean_ogden_tet10_apply_affine_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -4230,7 +4230,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_affine_mesh_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int neohookean_ogden_tet10_apply_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_apply_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -4259,10 +4259,10 @@ extern "C" int neohookean_ogden_tet10_apply_affine_mesh_soa(
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  return sfem::codegen::neohookean_ogden_tet10_apply_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_tet10_apply_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_apply_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -4291,13 +4291,13 @@ extern "C" int neohookean_ogden_tet10_apply_affine_mesh_soa_float(
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  return sfem::codegen::neohookean_ogden_tet10_apply_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_apply_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -4483,7 +4483,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_apply_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -4669,7 +4669,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_affine_mesh_soa_float(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -4872,7 +4872,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -5083,7 +5083,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int neohookean_ogden_tet10_apply_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int neohookean_ogden_tet10_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -5313,7 +5313,7 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_isoparametric_mesh_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int neohookean_ogden_tet10_apply_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -5333,10 +5333,10 @@ extern "C" int neohookean_ogden_tet10_apply_isoparametric_mesh_soa(
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  return sfem::codegen::neohookean_ogden_tet10_apply_i_msoa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_tet10_apply_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -5356,13 +5356,13 @@ extern "C" int neohookean_ogden_tet10_apply_isoparametric_mesh_soa_float(
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  return sfem::codegen::neohookean_ogden_tet10_apply_i_msoa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_apply_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -5643,7 +5643,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_apply_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -5924,7 +5924,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float(
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -6222,7 +6222,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
   return SFEM_SUCCESS;
 }
 
-extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -6527,7 +6527,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_find_cols(
+static SFEM_INLINE void neohookean_ogden_tet10_hessian_i_msoa_find_cols(
     const idx_t *const RSTR targets,
     const idx_t *const RSTR row,
     const int lenrow,
@@ -6545,7 +6545,7 @@ static SFEM_INLINE void neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_fi
 }
 
 template <typename s_t>
-static SFEM_INLINE void neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(
+static SFEM_INLINE void neohookean_ogden_tet10_hessian_i_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
@@ -6560,7 +6560,7 @@ static SFEM_INLINE void neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_sc
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
-    neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
+    neohookean_ogden_tet10_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
@@ -6581,7 +6581,7 @@ static SFEM_INLINE void neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_sc
 }
 
 template <typename s_t, typename g_t, int FORMAT>
-static int neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
+static int neohookean_ogden_tet10_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -6790,7 +6790,7 @@ static int neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
     }
 
     if constexpr (FORMAT == 1) {
-      neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+      neohookean_ogden_tet10_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
     } else {
       unsupported_matrix_format |= 1;
     }
@@ -6802,7 +6802,7 @@ static int neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int neohookean_ogden_tet10_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -6817,10 +6817,10 @@ extern "C" int neohookean_ogden_tet10_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  return sfem::codegen::neohookean_ogden_tet10_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
 
-extern "C" int neohookean_ogden_tet10_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -6835,5 +6835,5 @@ extern "C" int neohookean_ogden_tet10_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 ) {
-  return sfem::codegen::neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  return sfem::codegen::neohookean_ogden_tet10_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }

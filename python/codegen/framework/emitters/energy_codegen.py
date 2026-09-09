@@ -1,6 +1,12 @@
 import sympy as sp
 
-from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name, restrict_prelude
+from codegen.framework.plans.conventions import (
+    PREFIXES,
+    abi_geometry_name,
+    abi_local_level,
+    abi_mesh_fragment,
+    restrict_prelude,
+)
 
 #: The staged-buffer and per-thread-scratch prefixes, from the one
 #: table that owns them.  Spelling either here again is what made the
@@ -7549,15 +7555,16 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
 
 def _sfem_soa_hessian_matrix_public_function_base(prefix, quadrature_rule, geometry_mode):
     element = quadrature_rule.element_type.lower()
+    # The geometry arrives as a value here, so the fragment is looked up rather
+    # than spelled -- otherwise this site keeps emitting the long form after the
+    # table moves, and the two halves of a name disagree.
+    fragment = abi_mesh_fragment(geometry_mode)
     if _sfem_soa_prefix_has_element_suffix(prefix, element):
-        return "%s_hessian_%s_mesh_soa" % (
-            prefix,
-            geometry_mode,
-        )
-    return "%s_%s_hessian_%s_mesh_soa" % (
+        return "%s_hessian_%s" % (prefix, fragment)
+    return "%s_%s_hessian_%s" % (
         prefix,
         element,
-        geometry_mode,
+        fragment,
     )
 
 
@@ -9317,11 +9324,11 @@ def _sfem_soa_element_api_alias_header(
         public = "energy" if operation == "objective" else "gradient"
         output_param = "s_t *const RSTR values" if public == "energy" else "s_t *const *const RSTR out_streams"
         for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
-            name = "%s_%s_element_%ssoa" % (prefix, public, ("%s_" % suffix) if suffix else "")
-            target_name = "%s_%s_element_%ssoa" % (
+            name = "%s_%s_%s" % (prefix, public, abi_local_level(("%s_" % suffix) if suffix else ""))
+            target_name = "%s_%s_%s" % (
                 alias["target_prefix"],
                 public,
-                ("%s_" % suffix) if suffix else "",
+                abi_local_level(("%s_" % suffix) if suffix else ""),
             )
             params = _sfem_soa_element_api_common_params(form, dim, include_coords)
             params.append(output_param)
@@ -9342,8 +9349,8 @@ def _sfem_soa_element_api_alias_header(
     apply_form = forms_by_name.get("apply")
     if apply_form is not None and apply_form.weak_form is not None:
         for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
-            name = "%s_hessian_element_%ssoa" % (prefix, ("%s_" % suffix) if suffix else "")
-            target_name = "%s_hessian_element_%ssoa" % (alias["target_prefix"], ("%s_" % suffix) if suffix else "")
+            name = "%s_hessian_%s" % (prefix, abi_local_level(("%s_" % suffix) if suffix else ""))
+            target_name = "%s_hessian_%s" % (alias["target_prefix"], abi_local_level(("%s_" % suffix) if suffix else ""))
             params = _sfem_soa_element_api_common_params(apply_form, dim, include_coords)
             params.append("s_t *const *const RSTR matrix_streams")
             lines.extend(
@@ -9689,7 +9696,7 @@ def _sfem_soa_element_api_operation_lines(
     output_param = "s_t *const RSTR values" if public == "energy" else "s_t *const *const RSTR out_streams"
     lines = []
     for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
-        name = "%s_%s_element_%ssoa" % (prefix, public, ("%s_" % suffix) if suffix else "")
+        name = "%s_%s_%s" % (prefix, public, abi_local_level(("%s_" % suffix) if suffix else ""))
         params = _sfem_soa_element_api_common_params(form, dim, include_coords)
         params.append(output_param)
         lines.extend(
@@ -9764,7 +9771,7 @@ def _sfem_soa_element_api_hessian_lines(
     n_field_components = form_n_field_components(form, dim)
     lines = []
     for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
-        name = "%s_hessian_element_%ssoa" % (prefix, ("%s_" % suffix) if suffix else "")
+        name = "%s_hessian_%s" % (prefix, abi_local_level(("%s_" % suffix) if suffix else ""))
         params = _sfem_soa_element_api_common_params(form, dim, include_coords)
         params.append("s_t *const *const RSTR matrix_streams")
         lines.extend(
@@ -9936,8 +9943,8 @@ def _sfem_soa_public_function_name(prefix, form_name, quadrature_rule):
 def _sfem_soa_isoparametric_public_function_name(prefix, form_name, quadrature_rule):
     element = quadrature_rule.element_type.lower()
     if _sfem_soa_prefix_has_element_suffix(prefix, element):
-        return "%s_%s_isoparametric_soa" % (prefix, form_name)
-    return "%s_%s_%s_isoparametric_soa" % (
+        return "%s_%s_i_soa" % (prefix, form_name)
+    return "%s_%s_%s_i_soa" % (
         prefix,
         element,
         form_name,
@@ -9946,13 +9953,14 @@ def _sfem_soa_isoparametric_public_function_name(prefix, form_name, quadrature_r
 
 def _sfem_soa_mesh_public_function_name(prefix, form_name, quadrature_rule, geometry_mode):
     element = quadrature_rule.element_type.lower()
+    fragment = abi_mesh_fragment(geometry_mode)
     if _sfem_soa_prefix_has_element_suffix(prefix, element):
-        return "%s_%s_%s_mesh_soa" % (prefix, form_name, geometry_mode)
-    return "%s_%s_%s_%s_mesh_soa" % (
+        return "%s_%s_%s" % (prefix, form_name, fragment)
+    return "%s_%s_%s_%s" % (
         prefix,
         element,
         form_name,
-        geometry_mode,
+        fragment,
     )
 
 

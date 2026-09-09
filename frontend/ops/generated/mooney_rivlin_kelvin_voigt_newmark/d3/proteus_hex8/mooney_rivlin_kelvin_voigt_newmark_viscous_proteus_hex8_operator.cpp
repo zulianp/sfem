@@ -93,7 +93,7 @@ struct mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_isoparametric_ref
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_element_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_esoa(
     const int ne,
     const ptrdiff_t geometry_stride,
     const double *const RSTR determinant,
@@ -109,7 +109,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
   return SFEM_SUCCESS;
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_element_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_esoa_float(
     const int ne,
     const ptrdiff_t geometry_stride,
     const float *const RSTR determinant,
@@ -129,7 +129,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -232,7 +232,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -262,10 +262,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     double *const RSTR u1_out,
     double *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -295,14 +295,14 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     float *const RSTR u1_out,
     float *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -416,7 +416,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -437,10 +437,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     double *const RSTR u1_out,
     double *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -461,10 +461,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     float *const RSTR u1_out,
     float *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -474,10 +474,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     const double *const RSTR previous,
     double *const RSTR output
 ) {
-  return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], 3, current + 0, current + 1, current + 2, 3, previous + 0, previous + 1, previous + 2, 3, output + 0, output + 1, output + 2);
+  return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], 3, current + 0, current + 1, current + 2, 3, previous + 0, previous + 1, previous + 2, 3, output + 0, output + 1, output + 2);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -487,10 +487,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
     const float *const RSTR previous,
     float *const RSTR output
 ) {
-  return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], 3, current + 0, current + 1, current + 2, 3, previous + 0, previous + 1, previous + 2, 3, output + 0, output + 1, output + 2);
+  return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_float(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], 3, current + 0, current + 1, current + 2, 3, previous + 0, previous + 1, previous + 2, 3, output + 0, output + 1, output + 2);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_element_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_esoa(
     const int ne,
     const ptrdiff_t geometry_stride,
     const double *const RSTR determinant,
@@ -507,7 +507,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
   return SFEM_SUCCESS;
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_element_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_esoa_float(
     const int ne,
     const ptrdiff_t geometry_stride,
     const float *const RSTR determinant,
@@ -528,7 +528,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -638,7 +638,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -672,10 +672,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     double *const RSTR u1_out,
     double *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -709,14 +709,14 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     float *const RSTR u1_out,
     float *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -837,7 +837,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -862,10 +862,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     double *const RSTR u1_out,
     double *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -890,10 +890,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     float *const RSTR u1_out,
     float *const RSTR u2_out
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -904,10 +904,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     const double *const RSTR direction,
     double *const RSTR output
 ) {
-  return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], 3, current + 0, current + 1, current + 2, 3, previous + 0, previous + 1, previous + 2, 3, direction + 0, direction + 1, direction + 2, 3, output + 0, output + 1, output + 2);
+  return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], 3, current + 0, current + 1, current + 2, 3, previous + 0, previous + 1, previous + 2, 3, direction + 0, direction + 1, direction + 2, 3, output + 0, output + 1, output + 2);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -918,5 +918,5 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
     const float *const RSTR direction,
     float *const RSTR output
 ) {
-  return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], 3, current + 0, current + 1, current + 2, 3, previous + 0, previous + 1, previous + 2, 3, direction + 0, direction + 1, direction + 2, 3, output + 0, output + 1, output + 2);
+  return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_float(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], 3, current + 0, current + 1, current + 2, 3, previous + 0, previous + 1, previous + 2, 3, direction + 0, direction + 1, direction + 2, 3, output + 0, output + 1, output + 2);
 }

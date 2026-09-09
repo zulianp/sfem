@@ -178,45 +178,45 @@ extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_soa_fl
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_affine_mesh_soa_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_affine_mesh_soa",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_a_msoa",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_affine_mesh_soa_float_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_affine_mesh_soa_float",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_a_msoa_float",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_isoparametric_mesh_soa",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_i_msoa",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_isoparametric_mesh_soa_float",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_i_msoa_float",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -227,7 +227,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -335,7 +335,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -356,10 +356,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a
         const double *const RSTR steps,
         double *const RSTR value
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -380,7 +380,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a
         const float *const RSTR steps,
         float *const RSTR value
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 
@@ -468,45 +468,45 @@ extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_soa_flo
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_float",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa_float",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_isoparametric_mesh_soa",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_i_msoa",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_isoparametric_mesh_soa_float",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_i_msoa_float",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -517,7 +517,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -620,7 +620,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -638,10 +638,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_m
         double *const RSTR outx,
         double *const RSTR outy
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -659,7 +659,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_m
         float *const RSTR outx,
         float *const RSTR outy
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 
@@ -747,45 +747,45 @@ extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_soa_float_
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_float_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_float",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa_float",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_isoparametric_mesh_soa",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_i_msoa",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_isoparametric_mesh_soa_float",
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_i_msoa_float",
       &sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -796,7 +796,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -909,7 +909,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_aff
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -930,10 +930,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh
         double *const RSTR outx,
         double *const RSTR outy
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -954,5 +954,5 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh
         float *const RSTR outx,
         float *const RSTR outy
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }

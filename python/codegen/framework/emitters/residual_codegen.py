@@ -1683,13 +1683,13 @@ def generate_coupled_residual_sfem_files(
         )
     if diagnostics_plan is not None:
         expected_diagnostics = [
-            "%s_residual_element_soa" % element_prefix,
+            "%s_residual_esoa" % element_prefix,
         ]
         expected_diagnostics.extend(
             "%s_%s" % (element_prefix, jacobian_block_plan(block).name)
             for block in system.jacobian_blocks()
         )
-        expected_diagnostics.append("%s_jacobian_action_element_soa" % element_prefix)
+        expected_diagnostics.append("%s_jacobian_action_esoa" % element_prefix)
         validate_diagnostics_plan_names(diagnostics_plan, expected_diagnostics)
     local_name = local_kernel.header if local_name is None else str(local_name)
     operator_name = mesh_kernel.source if operator_name is None else str(operator_name)
@@ -1808,8 +1808,8 @@ def generate_mixed_residual_sfem_files(
         validate_diagnostics_plan_names(
             diagnostics_plan,
             (
-                "%s_residual_element_soa" % element_prefix,
-                "%s_jacobian_action_element_soa" % element_prefix,
+                "%s_residual_esoa" % element_prefix,
+                "%s_jacobian_action_esoa" % element_prefix,
             ),
         )
     local_name = local_kernel.header if local_name is None else str(local_name)
@@ -4121,7 +4121,7 @@ def _operator_source(
         dependencies = form_dependencies[form]
         coefficients = residual_coeffs if form == "residual" else action_coeffs
         gradient_metric = None
-        function = "%s_%s_element_soa" % (prefix, form)
+        function = "%s_%s_esoa" % (prefix, form)
         block = "%s_%s_block" % (local_prefix, form)
         for scalar_type, suffix in precision_axis():
             params = [
@@ -4680,7 +4680,7 @@ def _mixed_affine_function(
         ]
     )
 
-    function = "%s_%s_%s_affine_mesh_soa" % (prefix, element, form)
+    function = "%s_%s_%s_a_msoa" % (prefix, element, form)
     for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("g_t", "geom_t").replace("s_t", scalar_type)
@@ -4945,7 +4945,7 @@ def _mixed_isoparametric_function(
             "",
         ]
     )
-    function = "%s_%s_%s_isoparametric_mesh_soa" % (prefix, element, form)
+    function = "%s_%s_%s_i_msoa" % (prefix, element, form)
     for scalar_type, suffix in precision_axis():
         typed_params = [param.replace("s_t", scalar_type) for param in params]
         lines.append('extern "C" int %s%s(' % (function, suffix))
@@ -5009,7 +5009,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
     rule = specialization.quadrature_rule
     diagnostics = [
         (
-            "%s_residual_element_soa" % prefix,
+            "%s_residual_esoa" % prefix,
             residual_diagnostic_cost(system),
             system.residual_dependencies(),
         )
@@ -5027,7 +5027,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
         )
     diagnostics.append(
         (
-            "%s_jacobian_action_element_soa" % prefix,
+            "%s_jacobian_action_esoa" % prefix,
             jacobian_action_diagnostic_cost(system),
             system.jacobian_action_dependencies(),
         )
@@ -5060,7 +5060,7 @@ def _mixed_residual_diagnostics_lines(
 ):
     diagnostics = (
         (
-            "%s_%s_residual_element_soa" % (prefix, element),
+            "%s_%s_residual_esoa" % (prefix, element),
             residual_diagnostic_cost(system),
             residual_codegen_dependencies(
                 system,
@@ -5069,7 +5069,7 @@ def _mixed_residual_diagnostics_lines(
             ),
         ),
         (
-            "%s_%s_jacobian_action_element_soa" % (prefix, element),
+            "%s_%s_jacobian_action_esoa" % (prefix, element),
             jacobian_action_diagnostic_cost(system),
             residual_codegen_dependencies(
                 system,
@@ -5217,16 +5217,16 @@ def _kernel_diagnostics_lines(
         "}",
     ]
     function_names = [public_name]
-    if public_name.endswith("_element_soa"):
+    if public_name.endswith("_esoa"):
         function_names.extend(
             (
                 (
-                    public_name.replace("_element_soa", "_affine_mesh_soa"),
+                    public_name.replace("_esoa", "_a_msoa"),
                     "KernelDiagnostics_print_rate_affine_mesh",
                 ),
                 (
                     public_name.replace(
-                        "_element_soa", "_isoparametric_mesh_soa"
+                        "_esoa", "_i_msoa"
                     ),
                     "KernelDiagnostics_print_rate_isoparametric_mesh",
                 ),
@@ -5298,7 +5298,7 @@ def _mesh_operator_source(
         n_fields,
         shape_order,
     )
-    impl = "%s_%s_affine_mesh_soa_impl" % (prefix, form)
+    impl = "%s_%s_a_msoa_impl" % (prefix, form)
     block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
     block = "%s_%s_block" % (block_prefix, form)
     lines = [
@@ -5358,7 +5358,7 @@ def _mesh_operator_source(
                 "",
             ]
         )
-        function = "%s_%s_affine_mesh_soa" % (prefix, form)
+        function = "%s_%s_a_msoa" % (prefix, form)
         lines.extend(
             _affine_mesh_public_wrapper_lines(
                 function,
@@ -5595,7 +5595,7 @@ def _mesh_operator_source(
             "",
         ]
     )
-    function = "%s_%s_affine_mesh_soa" % (prefix, form)
+    function = "%s_%s_a_msoa" % (prefix, form)
     for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("g_t", "geom_t").replace("s_t", scalar_type)
@@ -5701,8 +5701,8 @@ def _mesh_operator_source(
 
 
 def _aos_dispatch_source(system, prefix, form, dependencies):
-    target = "%s_%s_isoparametric_mesh_soa" % (prefix, form)
-    function = "%s_%s_isoparametric_mesh_aos" % (prefix, form)
+    target = "%s_%s_i_msoa" % (prefix, form)
+    function = "%s_%s_i_maos" % (prefix, form)
     n_fields = len(system.fields)
     lines = []
     for scalar_type, suffix in precision_axis():
@@ -6301,7 +6301,7 @@ def _scalar_crs_matrix_assembly_source(
         if tensor_product_geometry
         else ([], "elements")
     )
-    function_base = "%s_hessian_crs_isoparametric_mesh_soa" % prefix
+    function_base = "%s_hessian_crs_i_msoa" % prefix
     impl = "%s_impl" % function_base
     block = "%s_jacobian_action_block" % local_prefix
     params = [
@@ -7041,7 +7041,7 @@ def _isoparametric_mesh_operator_source(
         n_fields,
         shape_order,
     )
-    impl = "%s_%s_isoparametric_mesh_soa_impl" % (prefix, form)
+    impl = "%s_%s_i_msoa_impl" % (prefix, form)
     block = "%s_%s_block" % (local_prefix, form)
     params = [
         "const ptrdiff_t nelements",
@@ -7265,7 +7265,7 @@ def _isoparametric_mesh_operator_source(
             "",
         ]
     )
-    function = "%s_%s_isoparametric_mesh_soa" % (prefix, form)
+    function = "%s_%s_i_msoa" % (prefix, form)
     for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("s_t", scalar_type) for param in params
@@ -7323,7 +7323,7 @@ def _scalar_packed_jacobian_action_source(
         n_fields,
         shape_order,
     )
-    packed_token = "jacobian_action_packed_two_pass_isoparametric_mesh_soa" if two_pass else "jacobian_action_packed_isoparametric_mesh_soa"
+    packed_token = "jacobian_action_packed_two_pass_i_msoa" if two_pass else "jacobian_action_packed_i_msoa"
     function = "%s_%s" % (prefix, packed_token)
     impl = "%s_impl" % function
     block = "%s_jacobian_action_block" % local_prefix
@@ -8349,7 +8349,7 @@ def _scalar_packed_affine_jacobian_action_source(
         n_fields,
         shape_order,
     )
-    packed_token = "jacobian_action_packed_two_pass_affine_mesh_soa" if two_pass else "jacobian_action_packed_affine_mesh_soa"
+    packed_token = "jacobian_action_packed_two_pass_a_msoa" if two_pass else "jacobian_action_packed_a_msoa"
     function = "%s_%s" % (prefix, packed_token)
     impl = "%s_impl" % function
     block_prefix = specialized_prefix if gradient_metric is not None else local_prefix

@@ -104,8 +104,8 @@ struct two_phase_flow_form_1_p_c_tri3_isoparametric_reference_data {
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data = {
-  "two_phase_flow_form_1_p_c_tri3_residual_element_soa",
+static const KernelDiagnostics two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data = {
+  "two_phase_flow_form_1_p_c_tri3_residual_esoa",
   "TRI3",
   2,
   6,
@@ -151,82 +151,82 @@ static const KernelDiagnostics two_phase_flow_form_1_p_c_tri3_residual_element_s
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics(void) {
-  return &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics(void) {
+  return &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data;
 }
 
-extern "C" double two_phase_flow_form_1_p_c_tri3_residual_element_soa_arithmetic_intensity(
+extern "C" double two_phase_flow_form_1_p_c_tri3_residual_esoa_arithmetic_intensity(
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
     const size_t real_bytes,
     const size_t accumulator_bytes) {
   return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data,
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data,
       nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_residual_element_soa_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_residual_esoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_tri3_residual_element_soa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_residual_esoa",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_residual_element_soa_float_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_residual_esoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_tri3_residual_element_soa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_residual_esoa_float",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_residual_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_residual_a_msoa",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_float_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_residual_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_residual_a_msoa_float",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_residual_isoparametric_mesh_soa_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_residual_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "two_phase_flow_form_1_p_c_tri3_residual_isoparametric_mesh_soa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_residual_i_msoa",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_residual_isoparametric_mesh_soa_float_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_residual_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "two_phase_flow_form_1_p_c_tri3_residual_isoparametric_mesh_soa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_residual_i_msoa_float",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
@@ -578,8 +578,8 @@ extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_p_c_p_c_float_print_rate
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data = {
-  "two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa",
+static const KernelDiagnostics two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data = {
+  "two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa",
   "TRI3",
   2,
   6,
@@ -625,87 +625,87 @@ static const KernelDiagnostics two_phase_flow_form_1_p_c_tri3_jacobian_action_el
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics(void) {
-  return &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics(void) {
+  return &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" double two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_arithmetic_intensity(
+extern "C" double two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_arithmetic_intensity(
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
     const size_t real_bytes,
     const size_t accumulator_bytes) {
   return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data,
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data,
       nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_float_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate(
-      "two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_float",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_float_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa_float",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_isoparametric_mesh_soa_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "two_phase_flow_form_1_p_c_tri3_jacobian_action_isoparametric_mesh_soa",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_jacobian_action_i_msoa",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_isoparametric_mesh_soa_float_print_rate(
+extern "C" void two_phase_flow_form_1_p_c_tri3_jacobian_action_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "two_phase_flow_form_1_p_c_tri3_jacobian_action_isoparametric_mesh_soa_float",
-      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_diagnostics_data,
+      "two_phase_flow_form_1_p_c_tri3_jacobian_action_i_msoa_float",
+      &sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" int two_phase_flow_form_1_p_c_tri3_residual_element_soa(
+extern "C" int two_phase_flow_form_1_p_c_tri3_residual_esoa(
     const int ne,
     const ptrdiff_t geometry_stride,
     const double *const RSTR determinant,
@@ -734,7 +734,7 @@ extern "C" int two_phase_flow_form_1_p_c_tri3_residual_element_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int two_phase_flow_form_1_p_c_tri3_residual_element_soa_float(
+extern "C" int two_phase_flow_form_1_p_c_tri3_residual_esoa_float(
     const int ne,
     const ptrdiff_t geometry_stride,
     const float *const RSTR determinant,
@@ -767,7 +767,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_impl(
+static SFEM_INLINE int two_phase_flow_form_1_p_c_tri3_residual_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -876,7 +876,7 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_i
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa(
+extern "C" int two_phase_flow_form_1_p_c_tri3_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -911,10 +911,10 @@ extern "C" int two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa(
     double *const RSTR p_w_out,
     double *const RSTR p_c_out
 ) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+  return sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_float(
+extern "C" int two_phase_flow_form_1_p_c_tri3_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -949,10 +949,10 @@ extern "C" int two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_float(
     float *const RSTR p_w_out,
     float *const RSTR p_c_out
 ) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
+  return sfem::codegen::two_phase_flow_form_1_p_c_tri3_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa(
+extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa(
     const int ne,
     const ptrdiff_t geometry_stride,
     const double *const RSTR determinant,
@@ -962,7 +962,7 @@ extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_element_soa_float(
+extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_esoa_float(
     const int ne,
     const ptrdiff_t geometry_stride,
     const float *const RSTR determinant,
@@ -976,7 +976,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_impl(
+static SFEM_INLINE int two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1038,7 +1038,7 @@ static SFEM_INLINE int two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mes
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa(
+extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1047,10 +1047,10 @@ extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa(
     double *const RSTR p_w_out,
     double *const RSTR p_c_out
 ) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
+  return sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_float(
+extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1059,5 +1059,5 @@ extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_fl
     float *const RSTR p_w_out,
     float *const RSTR p_c_out
 ) {
-  return sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
+  return sfem::codegen::two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
 }

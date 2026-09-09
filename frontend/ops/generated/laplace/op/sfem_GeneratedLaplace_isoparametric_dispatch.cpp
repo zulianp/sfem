@@ -11,7 +11,7 @@
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -22,7 +22,7 @@ extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -33,7 +33,7 @@ extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_quad4_apply_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -44,7 +44,7 @@ extern "C" int laplace_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -55,7 +55,7 @@ extern "C" int laplace_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_hex8_apply_isoparametric_mesh_soa(
+extern "C" int laplace_hex8_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -66,7 +66,7 @@ extern "C" int laplace_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int laplace_hex8_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -77,7 +77,7 @@ extern "C" int laplace_hex8_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_apply_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -88,7 +88,7 @@ extern "C" int laplace_proteus_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -99,7 +99,7 @@ extern "C" int laplace_proteus_hex8_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_tet10_apply_isoparametric_mesh_soa(
+extern "C" int laplace_tet10_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -110,7 +110,7 @@ extern "C" int laplace_tet10_apply_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_tet10_apply_isoparametric_mesh_soa_float(
+extern "C" int laplace_tet10_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -121,7 +121,7 @@ extern "C" int laplace_tet10_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -132,7 +132,7 @@ extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -143,7 +143,7 @@ extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -154,7 +154,7 @@ extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -165,7 +165,7 @@ extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int laplace_hex8_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -176,7 +176,7 @@ extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int laplace_hex8_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -187,7 +187,7 @@ extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -198,7 +198,7 @@ extern "C" int laplace_proteus_hex8_gradient_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -209,7 +209,7 @@ extern "C" int laplace_proteus_hex8_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa(
+extern "C" int laplace_tet10_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -220,7 +220,7 @@ extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa_float(
+extern "C" int laplace_tet10_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -231,7 +231,7 @@ extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -241,7 +241,7 @@ extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -251,7 +251,7 @@ extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -261,7 +261,7 @@ extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -271,7 +271,7 @@ extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_tri3_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_tri3_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -281,7 +281,7 @@ extern "C" int laplace_tri3_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_tri3_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_tri3_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -291,7 +291,7 @@ extern "C" int laplace_tri3_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_hex8_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -301,7 +301,7 @@ extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_hex8_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -311,7 +311,7 @@ extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -321,7 +321,7 @@ extern "C" int laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -331,7 +331,7 @@ extern "C" int laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_tet10_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -341,7 +341,7 @@ extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_tet10_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -351,7 +351,7 @@ extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_tet4_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_tet4_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -361,7 +361,7 @@ extern "C" int laplace_tet4_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_tet4_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_tet4_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -371,7 +371,7 @@ extern "C" int laplace_tet4_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -381,7 +381,7 @@ extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -391,7 +391,7 @@ extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -401,7 +401,7 @@ extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -411,7 +411,7 @@ extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_tri3_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_tri3_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -421,7 +421,7 @@ extern "C" int laplace_tri3_hessian_crs_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_tri3_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_tri3_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -431,7 +431,7 @@ extern "C" int laplace_tri3_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_hex8_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -441,7 +441,7 @@ extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_hex8_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -451,7 +451,7 @@ extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -461,7 +461,7 @@ extern "C" int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -471,7 +471,7 @@ extern "C" int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_tet10_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -481,7 +481,7 @@ extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_tet10_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -491,7 +491,7 @@ extern "C" int laplace_tet10_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_tet4_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -501,7 +501,7 @@ extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_tet4_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -511,7 +511,7 @@ extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -525,7 +525,7 @@ extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -539,7 +539,7 @@ extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa_floa
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -553,7 +553,7 @@ extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -567,7 +567,7 @@ extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa_float(
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa(
+extern "C" int laplace_hex8_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -581,7 +581,7 @@ extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int laplace_hex8_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -595,7 +595,7 @@ extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa_float(
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int laplace_proteus_hex8_objective_steps_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -609,7 +609,7 @@ extern "C" int laplace_proteus_hex8_objective_steps_isoparametric_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int laplace_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -623,7 +623,7 @@ extern "C" int laplace_proteus_hex8_objective_steps_isoparametric_mesh_soa_float
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa(
+extern "C" int laplace_tet10_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -637,7 +637,7 @@ extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int laplace_tet10_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -652,7 +652,7 @@ extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa_float(
         float *const RSTR value
 );
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -673,9 +673,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_proteus_quad4_apply_i_msoa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_proteus_quad4_apply_i_msoa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -684,9 +684,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_quad4_apply_i_msoa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_quad4_apply_i_msoa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -696,13 +696,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa
       break;
   }
   std::fprintf(stderr,
-      "laplace_apply_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_apply_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -723,9 +723,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_isoparametric_mesh_soa
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_hex8_apply_i_msoa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_hex8_apply_i_msoa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -734,9 +734,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_isoparametric_mesh_soa
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_proteus_hex8_apply_i_msoa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_proteus_hex8_apply_i_msoa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -745,9 +745,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_isoparametric_mesh_soa
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_tet10_apply_i_msoa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_tet10_apply_i_msoa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -757,13 +757,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_isoparametric_mesh_soa
       break;
   }
   std::fprintf(stderr,
-      "laplace_apply_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_apply_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -784,9 +784,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_isoparametric_mesh_
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_proteus_quad4_gradient_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_proteus_quad4_gradient_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -795,9 +795,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_isoparametric_mesh_
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_quad4_gradient_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_quad4_gradient_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -807,13 +807,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_isoparametric_mesh_
       break;
   }
   std::fprintf(stderr,
-      "laplace_gradient_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_gradient_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -834,9 +834,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_isoparametric_mesh_
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_hex8_gradient_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_hex8_gradient_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -845,9 +845,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_isoparametric_mesh_
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_proteus_hex8_gradient_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_proteus_hex8_gradient_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -856,9 +856,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_isoparametric_mesh_
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_tet10_gradient_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_tet10_gradient_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -868,13 +868,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_isoparametric_mesh_
       break;
   }
   std::fprintf(stderr,
-      "laplace_gradient_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_gradient_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -894,9 +894,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_isoparametric_me
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_proteus_quad4_hessian_bsr_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_proteus_quad4_hessian_bsr_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -905,9 +905,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_isoparametric_me
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_quad4_hessian_bsr_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_quad4_hessian_bsr_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -916,9 +916,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_isoparametric_me
     case smesh::TRI3: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tri3_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_tri3_hessian_bsr_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_tri3_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_tri3_hessian_bsr_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -928,13 +928,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_isoparametric_me
       break;
   }
   std::fprintf(stderr,
-      "laplace_hessian_bsr_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_hessian_bsr_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -954,9 +954,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_isoparametric_me
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_hex8_hessian_bsr_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_hex8_hessian_bsr_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -965,9 +965,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_isoparametric_me
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_proteus_hex8_hessian_bsr_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_proteus_hex8_hessian_bsr_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -976,9 +976,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_isoparametric_me
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_tet10_hessian_bsr_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_tet10_hessian_bsr_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -987,9 +987,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_isoparametric_me
     case smesh::TET4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_tet4_hessian_bsr_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_tet4_hessian_bsr_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -999,13 +999,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_isoparametric_me
       break;
   }
   std::fprintf(stderr,
-      "laplace_hessian_bsr_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_hessian_bsr_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1025,9 +1025,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_isoparametric_me
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_proteus_quad4_hessian_crs_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_proteus_quad4_hessian_crs_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -1036,9 +1036,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_isoparametric_me
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_quad4_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_quad4_hessian_crs_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_quad4_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_quad4_hessian_crs_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -1047,9 +1047,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_isoparametric_me
     case smesh::TRI3: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tri3_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_tri3_hessian_crs_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_tri3_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_tri3_hessian_crs_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -1059,13 +1059,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_isoparametric_me
       break;
   }
   std::fprintf(stderr,
-      "laplace_hessian_crs_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_hessian_crs_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1085,9 +1085,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_me
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_hex8_hessian_crs_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_hex8_hessian_crs_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -1096,9 +1096,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_me
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_proteus_hex8_hessian_crs_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_proteus_hex8_hessian_crs_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -1107,9 +1107,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_me
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_tet10_hessian_crs_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_tet10_hessian_crs_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -1118,9 +1118,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_me
     case smesh::TET4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet4_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
+          return laplace_tet4_hessian_crs_i_msoa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet4_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
+          return laplace_tet4_hessian_crs_i_msoa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
         default:
           break;
       }
@@ -1130,13 +1130,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_me
       break;
   }
   std::fprintf(stderr,
-      "laplace_hessian_crs_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_hessian_crs_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1160,9 +1160,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_isoparametri
     case smesh::PROTEUS_QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_proteus_quad4_objective_steps_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_proteus_quad4_objective_steps_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1171,9 +1171,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_isoparametri
     case smesh::QUAD4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_quad4_objective_steps_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_quad4_objective_steps_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1183,13 +1183,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_isoparametri
       break;
   }
   std::fprintf(stderr,
-      "laplace_objective_steps_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_objective_steps_2d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1213,9 +1213,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_isoparametri
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_hex8_objective_steps_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_hex8_objective_steps_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1224,9 +1224,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_isoparametri
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_proteus_hex8_objective_steps_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_proteus_hex8_objective_steps_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1235,9 +1235,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_isoparametri
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_tet10_objective_steps_i_msoa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_tet10_objective_steps_i_msoa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1247,7 +1247,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_isoparametri
       break;
   }
   std::fprintf(stderr,
-      "laplace_objective_steps_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_objective_steps_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;

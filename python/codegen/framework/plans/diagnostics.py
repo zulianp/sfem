@@ -230,7 +230,7 @@ def _residual_diagnostics_entries(
     if residual_plan is not None:
         entries.append(
             _entry_from_expression_plan(
-                "%s_residual_element_soa" % operator_prefix,
+                "%s_residual_esoa" % operator_prefix,
                 residual_plan,
                 mesh_signature,
                 local_by_order,
@@ -254,7 +254,7 @@ def _residual_diagnostics_entries(
     if action_plan is not None:
         entries.append(
             _entry_from_expression_plan(
-                "%s_jacobian_action_element_soa" % operator_prefix,
+                "%s_jacobian_action_esoa" % operator_prefix,
                 action_plan,
                 mesh_signature,
                 local_by_order,

@@ -25,7 +25,7 @@ from codegen.framework.package.op_wrappers import (
 
 
 METRIC_KERNEL = '''
-extern "C" int demo_gradient_3d_affine_mesh_soa(
+extern "C" int demo_gradient_3d_a_msoa(
     const smesh::ElemType element_type,
     const geom_t *const RSTR g_met0,
     const geom_t *const RSTR g_met5
@@ -33,7 +33,7 @@ extern "C" int demo_gradient_3d_affine_mesh_soa(
 '''
 
 ADJUGATE_KERNEL = '''
-extern "C" int demo_apply_3d_affine_mesh_soa(
+extern "C" int demo_apply_3d_a_msoa(
     const smesh::ElemType element_type,
     const geom_t *const RSTR g_adj0,
     const geom_t *const RSTR g_det0
@@ -43,7 +43,7 @@ extern "C" int demo_apply_3d_affine_mesh_soa(
 # An element kernel is declared in its own header without `extern "C"`; it has
 # to answer here too, because the per-element call sites ask about it.
 ELEMENT_KERNEL = '''
-int demo_tet4_gradient_affine_mesh_soa(
+int demo_tet4_gradient_a_msoa(
     const ptrdiff_t nelements,
     const geom_t *const RSTR g_met0
 );
@@ -59,19 +59,19 @@ SOURCES = {
 class AffineGeometryFollowsTheKernelTest(unittest.TestCase):
     def test_metric_kernel_is_handed_the_metric(self):
         self.assertTrue(
-            _affine_dispatch_uses_metric(SOURCES, "demo_gradient_3d_affine_mesh_soa")
+            _affine_dispatch_uses_metric(SOURCES, "demo_gradient_3d_a_msoa")
         )
         self.assertEqual(
-            _affine_geometry_call_args(SOURCES, "demo_gradient_3d_affine_mesh_soa", 3),
+            _affine_geometry_call_args(SOURCES, "demo_gradient_3d_a_msoa", 3),
             tuple("geom_metric[%d]" % index for index in range(6)),
         )
 
     def test_adjugate_kernel_is_handed_the_adjugate_and_determinant(self):
         self.assertFalse(
-            _affine_dispatch_uses_metric(SOURCES, "demo_apply_3d_affine_mesh_soa")
+            _affine_dispatch_uses_metric(SOURCES, "demo_apply_3d_a_msoa")
         )
         self.assertEqual(
-            _affine_geometry_call_args(SOURCES, "demo_apply_3d_affine_mesh_soa", 3),
+            _affine_geometry_call_args(SOURCES, "demo_apply_3d_a_msoa", 3),
             tuple(["adjugate[%d]" % index for index in range(9)] + ["determinant"]),
         )
 
@@ -79,7 +79,7 @@ class AffineGeometryFollowsTheKernelTest(unittest.TestCase):
         self.assertEqual(
             len(
                 _affine_geometry_call_args(
-                    SOURCES, "demo_gradient_3d_affine_mesh_soa", 2
+                    SOURCES, "demo_gradient_3d_a_msoa", 2
                 )
             ),
             3,
@@ -87,38 +87,38 @@ class AffineGeometryFollowsTheKernelTest(unittest.TestCase):
 
     def test_an_element_kernel_answers_without_extern_c(self):
         self.assertTrue(
-            _affine_dispatch_uses_metric(SOURCES, "demo_tet4_gradient_affine_mesh_soa")
+            _affine_dispatch_uses_metric(SOURCES, "demo_tet4_gradient_a_msoa")
         )
 
     def test_an_undeclared_kernel_falls_back_to_the_general_geometry(self):
         self.assertFalse(_affine_dispatch_uses_metric(SOURCES, "demo_absent"))
 
     def test_a_call_site_is_not_mistaken_for_a_declaration(self):
-        caller = {"d.cpp": "return demo_gradient_3d_affine_mesh_soa(a, b, c);"}
+        caller = {"d.cpp": "return demo_gradient_3d_a_msoa(a, b, c);"}
         self.assertIsNone(
             __import__(
                 "codegen.framework.package.op_wrappers", fromlist=["x"]
-            )._affine_dispatch_parameters(caller, "demo_gradient_3d_affine_mesh_soa")
+            )._affine_dispatch_parameters(caller, "demo_gradient_3d_a_msoa")
         )
 
     def test_colliding_dispatch_signatures_are_named_apart(self):
         metric = ("const geom_t *const RSTR g_met0",)
         adjugate = ("const geom_t *const RSTR g_adj0",)
         self.assertEqual(
-            _geometry_qualified_dispatch_name("demo_gradient_3d_affine_mesh_soa", metric),
-            "demo_gradient_3d_affine_metric_mesh_soa",
+            _geometry_qualified_dispatch_name("demo_gradient_3d_a_msoa", metric),
+            "demo_gradient_3d_a_met_msoa",
         )
         # The adjugate keeps the plain name: it is the shape every element can
         # be handed, so it is the one a caller finds without asking.
         self.assertEqual(
-            _geometry_qualified_dispatch_name("demo_gradient_3d_affine_mesh_soa", adjugate),
-            "demo_gradient_3d_affine_mesh_soa",
+            _geometry_qualified_dispatch_name("demo_gradient_3d_a_msoa", adjugate),
+            "demo_gradient_3d_a_msoa",
         )
 
     def test_the_metric_sibling_is_derivable_from_the_plain_name(self):
         self.assertEqual(
-            _metric_dispatch_name("demo_gradient_3d_affine_mesh_soa"),
-            "demo_gradient_3d_affine_metric_mesh_soa",
+            _metric_dispatch_name("demo_gradient_3d_a_msoa"),
+            "demo_gradient_3d_a_met_msoa",
         )
 
 

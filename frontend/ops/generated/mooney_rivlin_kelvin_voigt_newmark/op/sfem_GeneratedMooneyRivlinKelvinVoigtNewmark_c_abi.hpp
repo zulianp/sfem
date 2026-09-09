@@ -33,7 +33,7 @@ typedef double geom_t;
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -57,7 +57,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_affine_mesh_s
         void *const RSTR outy
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -80,7 +80,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -112,7 +112,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_affine_mesh_s
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -138,7 +138,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_isoparametric
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -177,7 +177,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_affine
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -207,7 +207,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_isopar
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -252,7 +252,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -288,7 +288,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -309,7 +309,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_affine_mes
         void *const RSTR outy
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -329,7 +329,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparamet
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -357,7 +357,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_affine_mes
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -379,7 +379,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_isoparamet
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -414,7 +414,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_aff
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -440,7 +440,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_iso
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -481,7 +481,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pa
         void *const RSTR outz
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -519,7 +519,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_ne
 extern "C" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_objective_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -543,7 +543,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_aff
         void *const RSTR value
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -563,7 +563,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_iso
         void *const RSTR value
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -594,7 +594,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_aff
         void *const RSTR value
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -616,7 +616,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_iso
         void *const RSTR value
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -654,7 +654,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed
         void *const RSTR value
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -683,7 +683,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed
         void *const RSTR value
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -711,7 +711,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_aff
         void *const RSTR u1_out
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -725,7 +725,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_iso
         void *const RSTR output
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -749,7 +749,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_iso
         void *const RSTR u1_out
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -786,7 +786,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_aff
         void *const RSTR u2_out
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -800,7 +800,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_iso
         void *const RSTR output
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -828,7 +828,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_iso
         void *const RSTR u2_out
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -853,7 +853,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_affine_mes
         void *const RSTR u1_out
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -866,7 +866,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparamet
         void *const RSTR output
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -887,7 +887,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparamet
         void *const RSTR u1_out
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -920,7 +920,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_affine_mes
         void *const RSTR u2_out
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -933,7 +933,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparamet
         void *const RSTR output
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,

@@ -187,45 +187,45 @@ extern "C" void linear_elasticity_tet4_objective_soa_float_print_rate(
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet4_objective_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet4_objective_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_tet4_objective_affine_mesh_soa",
+      "linear_elasticity_tet4_objective_a_msoa",
       &sfem::codegen::linear_elasticity_tet4_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet4_objective_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_tet4_objective_affine_mesh_soa_float",
+      "linear_elasticity_tet4_objective_a_msoa_float",
       &sfem::codegen::linear_elasticity_tet4_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet4_objective_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_tet4_objective_isoparametric_mesh_soa",
+      "linear_elasticity_tet4_objective_i_msoa",
       &sfem::codegen::linear_elasticity_tet4_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet4_objective_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_tet4_objective_isoparametric_mesh_soa_float",
+      "linear_elasticity_tet4_objective_i_msoa_float",
       &sfem::codegen::linear_elasticity_tet4_objective_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -236,7 +236,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int linear_elasticity_tet4_objective_steps_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet4_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -366,7 +366,7 @@ static SFEM_INLINE int linear_elasticity_tet4_objective_steps_affine_mesh_soa_im
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet4_objective_steps_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_objective_steps_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -394,10 +394,10 @@ extern "C" int linear_elasticity_tet4_objective_steps_affine_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 ) {
-  return sfem::codegen::linear_elasticity_tet4_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+  return sfem::codegen::linear_elasticity_tet4_objective_steps_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_tet4_objective_steps_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_objective_steps_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -425,13 +425,13 @@ extern "C" int linear_elasticity_tet4_objective_steps_affine_mesh_soa_float(
         const float *const RSTR steps,
         float *const RSTR value
 ) {
-  return sfem::codegen::linear_elasticity_tet4_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+  return sfem::codegen::linear_elasticity_tet4_objective_steps_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet4_objective_steps_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_objective_steps_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -590,7 +590,7 @@ extern "C" int linear_elasticity_tet4_objective_steps_packed_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet4_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_objective_steps_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -837,45 +837,45 @@ extern "C" void linear_elasticity_tet4_gradient_soa_float_print_rate(
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet4_gradient_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet4_gradient_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_tet4_gradient_affine_mesh_soa",
+      "linear_elasticity_tet4_gradient_a_msoa",
       &sfem::codegen::linear_elasticity_tet4_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet4_gradient_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_tet4_gradient_affine_mesh_soa_float",
+      "linear_elasticity_tet4_gradient_a_msoa_float",
       &sfem::codegen::linear_elasticity_tet4_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet4_gradient_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_tet4_gradient_isoparametric_mesh_soa",
+      "linear_elasticity_tet4_gradient_i_msoa",
       &sfem::codegen::linear_elasticity_tet4_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet4_gradient_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_tet4_gradient_isoparametric_mesh_soa_float",
+      "linear_elasticity_tet4_gradient_i_msoa_float",
       &sfem::codegen::linear_elasticity_tet4_gradient_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -886,7 +886,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int linear_elasticity_tet4_gradient_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet4_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1011,7 +1011,7 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_affine_mesh_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_gradient_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1036,10 +1036,10 @@ extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa(
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_tet4_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  return sfem::codegen::linear_elasticity_tet4_gradient_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_gradient_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1064,13 +1064,13 @@ extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_float(
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_tet4_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  return sfem::codegen::linear_elasticity_tet4_gradient_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet4_gradient_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_gradient_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1240,7 +1240,7 @@ extern "C" int linear_elasticity_tet4_gradient_packed_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet4_gradient_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_gradient_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1410,7 +1410,7 @@ extern "C" int linear_elasticity_tet4_gradient_packed_affine_mesh_soa_float(
   return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet4_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_gradient_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1597,7 +1597,7 @@ extern "C" int linear_elasticity_tet4_gradient_packed_two_pass_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet4_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_gradient_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1792,7 +1792,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_impl(
+static SFEM_INLINE int linear_elasticity_tet4_gradient_a_msoa_aos_unit_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1915,7 +1915,7 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit(
+extern "C" int linear_elasticity_tet4_gradient_a_msoa_aos_unit(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1932,10 +1932,10 @@ extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit(
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_impl<double, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  return sfem::codegen::linear_elasticity_tet4_gradient_a_msoa_aos_unit_impl<double, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_float(
+extern "C" int linear_elasticity_tet4_gradient_a_msoa_aos_unit_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1952,7 +1952,7 @@ extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_float(
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_impl<float, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  return sfem::codegen::linear_elasticity_tet4_gradient_a_msoa_aos_unit_impl<float, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 
@@ -2040,45 +2040,45 @@ extern "C" void linear_elasticity_tet4_apply_soa_float_print_rate(
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet4_apply_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet4_apply_a_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_tet4_apply_affine_mesh_soa",
+      "linear_elasticity_tet4_apply_a_msoa",
       &sfem::codegen::linear_elasticity_tet4_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet4_apply_a_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-      "linear_elasticity_tet4_apply_affine_mesh_soa_float",
+      "linear_elasticity_tet4_apply_a_msoa_float",
       &sfem::codegen::linear_elasticity_tet4_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet4_apply_i_msoa_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_tet4_apply_isoparametric_mesh_soa",
+      "linear_elasticity_tet4_apply_i_msoa",
       &sfem::codegen::linear_elasticity_tet4_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet4_apply_i_msoa_float_print_rate(
     const double elapsed,
     const ptrdiff_t nelements,
     const ptrdiff_t ndofs) {
   sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-      "linear_elasticity_tet4_apply_isoparametric_mesh_soa_float",
+      "linear_elasticity_tet4_apply_i_msoa_float",
       &sfem::codegen::linear_elasticity_tet4_apply_soa_diagnostics_data,
       elapsed, nelements, ndofs,
       sizeof(float), sizeof(float), sizeof(float));
@@ -2089,7 +2089,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int linear_elasticity_tet4_apply_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet4_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2214,7 +2214,7 @@ static SFEM_INLINE int linear_elasticity_tet4_apply_affine_mesh_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_apply_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2239,10 +2239,10 @@ extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa(
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_tet4_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  return sfem::codegen::linear_elasticity_tet4_apply_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_apply_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2267,13 +2267,13 @@ extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_float(
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_tet4_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  return sfem::codegen::linear_elasticity_tet4_apply_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet4_apply_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_apply_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2443,7 +2443,7 @@ extern "C" int linear_elasticity_tet4_apply_packed_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet4_apply_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_apply_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2613,7 +2613,7 @@ extern "C" int linear_elasticity_tet4_apply_packed_affine_mesh_soa_float(
   return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet4_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_tet4_apply_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2800,7 +2800,7 @@ extern "C" int linear_elasticity_tet4_apply_packed_two_pass_affine_mesh_soa(
   return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet4_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_apply_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -2995,7 +2995,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_impl(
+static SFEM_INLINE int linear_elasticity_tet4_apply_a_msoa_aos_unit_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -3118,7 +3118,7 @@ static SFEM_INLINE int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_imp
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit(
+extern "C" int linear_elasticity_tet4_apply_a_msoa_aos_unit(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -3135,10 +3135,10 @@ extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit(
         double *const RSTR outy,
         double *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_impl<double, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  return sfem::codegen::linear_elasticity_tet4_apply_a_msoa_aos_unit_impl<double, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_float(
+extern "C" int linear_elasticity_tet4_apply_a_msoa_aos_unit_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -3155,14 +3155,14 @@ extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_float(
         float *const RSTR outy,
         float *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_impl<float, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  return sfem::codegen::linear_elasticity_tet4_apply_a_msoa_aos_unit_impl<float, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void linear_elasticity_tet4_hessian_isoparametric_mesh_soa_find_cols(
+static SFEM_INLINE void linear_elasticity_tet4_hessian_i_msoa_find_cols(
     const idx_t *const RSTR targets,
     const idx_t *const RSTR row,
     const int lenrow,
@@ -3180,7 +3180,7 @@ static SFEM_INLINE void linear_elasticity_tet4_hessian_isoparametric_mesh_soa_fi
 }
 
 template <typename s_t>
-static SFEM_INLINE void linear_elasticity_tet4_hessian_isoparametric_mesh_soa_scatter_bsr(
+static SFEM_INLINE void linear_elasticity_tet4_hessian_i_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
@@ -3195,7 +3195,7 @@ static SFEM_INLINE void linear_elasticity_tet4_hessian_isoparametric_mesh_soa_sc
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
-    linear_elasticity_tet4_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
+    linear_elasticity_tet4_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
@@ -3216,7 +3216,7 @@ static SFEM_INLINE void linear_elasticity_tet4_hessian_isoparametric_mesh_soa_sc
 }
 
 template <typename s_t>
-static SFEM_INLINE void linear_elasticity_tet4_hessian_isoparametric_mesh_soa_scatter_block_diag_sym(
+static SFEM_INLINE void linear_elasticity_tet4_hessian_i_msoa_scatter_block_diag_sym(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     s_t *const RSTR values) {
@@ -3239,7 +3239,7 @@ static SFEM_INLINE void linear_elasticity_tet4_hessian_isoparametric_mesh_soa_sc
 }
 
 template <typename s_t, typename g_t, int FORMAT>
-static int linear_elasticity_tet4_hessian_isoparametric_mesh_soa_assemble_impl(
+static int linear_elasticity_tet4_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -3417,9 +3417,9 @@ static int linear_elasticity_tet4_hessian_isoparametric_mesh_soa_assemble_impl(
     linear_elasticity_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, element_matrix);
 
     if constexpr (FORMAT == 1) {
-      linear_elasticity_tet4_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+      linear_elasticity_tet4_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
     } else if constexpr (FORMAT == 6) {
-      linear_elasticity_tet4_hessian_isoparametric_mesh_soa_scatter_block_diag_sym(ev, element_matrix, values);
+      linear_elasticity_tet4_hessian_i_msoa_scatter_block_diag_sym(ev, element_matrix, values);
     } else {
       unsupported_matrix_format |= 1;
     }
@@ -3431,7 +3431,7 @@ static int linear_elasticity_tet4_hessian_isoparametric_mesh_soa_assemble_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet4_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -3442,10 +3442,10 @@ extern "C" int linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 ) {
-  return sfem::codegen::linear_elasticity_tet4_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  return sfem::codegen::linear_elasticity_tet4_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
 
-extern "C" int linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -3456,10 +3456,10 @@ extern "C" int linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 ) {
-  return sfem::codegen::linear_elasticity_tet4_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  return sfem::codegen::linear_elasticity_tet4_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
 
-extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -3468,10 +3468,10 @@ extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_isoparametric_mesh_
         const double mu,
         double *const RSTR values
 ) {
-  return sfem::codegen::linear_elasticity_tet4_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  return sfem::codegen::linear_elasticity_tet4_hessian_i_msoa_assemble_impl<double, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
 
-extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -3480,5 +3480,5 @@ extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_isoparametric_mesh_
         const float mu,
         float *const RSTR values
 ) {
-  return sfem::codegen::linear_elasticity_tet4_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  return sfem::codegen::linear_elasticity_tet4_hessian_i_msoa_assemble_impl<float, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }

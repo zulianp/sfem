@@ -11,7 +11,7 @@
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int neohookean_ogden_hex8_apply_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex8_apply_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -38,7 +38,7 @@ extern "C" int neohookean_ogden_hex8_apply_packed_isoparametric_mesh_soa(
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_hex8_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex8_apply_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -65,7 +65,7 @@ extern "C" int neohookean_ogden_hex8_apply_packed_isoparametric_mesh_soa_float(
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_proteus_hex8_apply_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex8_apply_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -92,7 +92,7 @@ extern "C" int neohookean_ogden_proteus_hex8_apply_packed_isoparametric_mesh_soa
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_proteus_hex8_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex8_apply_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -119,7 +119,7 @@ extern "C" int neohookean_ogden_proteus_hex8_apply_packed_isoparametric_mesh_soa
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_apply_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -146,7 +146,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa(
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_apply_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -173,7 +173,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float(
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_hex8_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex8_apply_packed_two_pass_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -206,7 +206,7 @@ extern "C" int neohookean_ogden_hex8_apply_packed_two_pass_isoparametric_mesh_so
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex8_apply_packed_two_pass_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -239,7 +239,7 @@ extern "C" int neohookean_ogden_hex8_apply_packed_two_pass_isoparametric_mesh_so
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex8_apply_packed_two_pass_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -272,7 +272,7 @@ extern "C" int neohookean_ogden_proteus_hex8_apply_packed_two_pass_isoparametric
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex8_apply_packed_two_pass_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -305,7 +305,7 @@ extern "C" int neohookean_ogden_proteus_hex8_apply_packed_two_pass_isoparametric
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -338,7 +338,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -371,7 +371,7 @@ extern "C" int neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_s
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_hex8_gradient_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex8_gradient_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -394,7 +394,7 @@ extern "C" int neohookean_ogden_hex8_gradient_packed_isoparametric_mesh_soa(
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_hex8_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex8_gradient_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -417,7 +417,7 @@ extern "C" int neohookean_ogden_hex8_gradient_packed_isoparametric_mesh_soa_floa
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -440,7 +440,7 @@ extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_isoparametric_mesh_
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -463,7 +463,7 @@ extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_isoparametric_mesh_
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_gradient_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -486,7 +486,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa(
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_gradient_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -509,7 +509,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa_flo
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex8_gradient_packed_two_pass_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -538,7 +538,7 @@ extern "C" int neohookean_ogden_hex8_gradient_packed_two_pass_isoparametric_mesh
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex8_gradient_packed_two_pass_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -567,7 +567,7 @@ extern "C" int neohookean_ogden_hex8_gradient_packed_two_pass_isoparametric_mesh
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_two_pass_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -596,7 +596,7 @@ extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_two_pass_isoparamet
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_two_pass_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -625,7 +625,7 @@ extern "C" int neohookean_ogden_proteus_hex8_gradient_packed_two_pass_isoparamet
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -654,7 +654,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
     double *const RSTR outy,
     double *const RSTR outz
 );
-extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -683,7 +683,7 @@ extern "C" int neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mes
     float *const RSTR outy,
     float *const RSTR outz
 );
-extern "C" int neohookean_ogden_hex8_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex8_objective_steps_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -709,7 +709,7 @@ extern "C" int neohookean_ogden_hex8_objective_steps_packed_isoparametric_mesh_s
     const double *const RSTR steps,
     double *const RSTR value
 );
-extern "C" int neohookean_ogden_hex8_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex8_objective_steps_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -735,7 +735,7 @@ extern "C" int neohookean_ogden_hex8_objective_steps_packed_isoparametric_mesh_s
     const float *const RSTR steps,
     float *const RSTR value
 );
-extern "C" int neohookean_ogden_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex8_objective_steps_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -761,7 +761,7 @@ extern "C" int neohookean_ogden_proteus_hex8_objective_steps_packed_isoparametri
     const double *const RSTR steps,
     double *const RSTR value
 );
-extern "C" int neohookean_ogden_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex8_objective_steps_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -787,7 +787,7 @@ extern "C" int neohookean_ogden_proteus_hex8_objective_steps_packed_isoparametri
     const float *const RSTR steps,
     float *const RSTR value
 );
-extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_tet10_objective_steps_packed_i_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -813,7 +813,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
     const double *const RSTR steps,
     double *const RSTR value
 );
-extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_tet10_objective_steps_packed_i_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -840,7 +840,7 @@ extern "C" int neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_
     float *const RSTR value
 );
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -877,9 +877,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_3d_isopar
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_hex8_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_hex8_apply_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_hex8_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_hex8_apply_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -888,9 +888,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_3d_isopar
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_proteus_hex8_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_proteus_hex8_apply_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_proteus_hex8_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_proteus_hex8_apply_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -899,9 +899,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_3d_isopar
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_tet10_apply_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_tet10_apply_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -911,13 +911,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_3d_isopar
       break;
   }
   std::fprintf(stderr,
-      "neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "neohookean_ogden_apply_packed_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_two_pass_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -960,9 +960,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_two_pass_
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_hex8_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_hex8_apply_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_hex8_apply_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -971,9 +971,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_two_pass_
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_proteus_hex8_apply_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_proteus_hex8_apply_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -982,9 +982,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_two_pass_
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_tet10_apply_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_tet10_apply_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -994,13 +994,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_apply_packed_two_pass_
       break;
   }
   std::fprintf(stderr,
-      "neohookean_ogden_apply_packed_two_pass_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "neohookean_ogden_apply_packed_two_pass_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1033,9 +1033,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_3d_iso
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_hex8_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_hex8_gradient_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_hex8_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_hex8_gradient_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1044,9 +1044,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_3d_iso
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_proteus_hex8_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_proteus_hex8_gradient_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_proteus_hex8_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_proteus_hex8_gradient_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1055,9 +1055,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_3d_iso
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_tet10_gradient_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_tet10_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_tet10_gradient_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1067,13 +1067,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_3d_iso
       break;
   }
   std::fprintf(stderr,
-      "neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "neohookean_ogden_gradient_packed_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_two_pass_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1112,9 +1112,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_two_pa
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_hex8_gradient_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_hex8_gradient_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1123,9 +1123,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_two_pa
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_proteus_hex8_gradient_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_proteus_hex8_gradient_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1134,9 +1134,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_two_pa
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+          return neohookean_ogden_tet10_gradient_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+          return neohookean_ogden_tet10_gradient_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         default:
           break;
       }
@@ -1146,13 +1146,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_packed_two_pa
       break;
   }
   std::fprintf(stderr,
-      "neohookean_ogden_gradient_packed_two_pass_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "neohookean_ogden_gradient_packed_two_pass_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_objective_steps_packed_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_objective_steps_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1188,9 +1188,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_objective_steps_packed
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_hex8_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+          return neohookean_ogden_hex8_objective_steps_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_hex8_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+          return neohookean_ogden_hex8_objective_steps_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1199,9 +1199,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_objective_steps_packed
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+          return neohookean_ogden_proteus_hex8_objective_steps_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+          return neohookean_ogden_proteus_hex8_objective_steps_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1210,9 +1210,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_objective_steps_packed
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+          return neohookean_ogden_tet10_objective_steps_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return neohookean_ogden_tet10_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+          return neohookean_ogden_tet10_objective_steps_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1222,7 +1222,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_objective_steps_packed
       break;
   }
   std::fprintf(stderr,
-      "neohookean_ogden_objective_steps_packed_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+      "neohookean_ogden_objective_steps_packed_3d_i_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;

@@ -50,11 +50,11 @@ resolution, and it is not done.
 once into a store, then applied. The generated header carries three entry points
 per element —
 
-    <material>_<element>_inexact_apply_tangent_affine_mesh_soa
+    <material>_<element>_inexact_apply_tangent_a_msoa
         geometry, state and parameters in, `Sbar` out.  Once per tangent.
 
-    <material>_<element>_inexact_apply_stored_affine_mesh_soa
-    <material>_<element>_inexact_apply_compressed_affine_mesh_soa
+    <material>_<element>_inexact_apply_stored_a_msoa
+    <material>_<element>_inexact_apply_compressed_a_msoa
         `Sbar` and the vector.  No geometry, no state, no material parameters.
 
 `Sbar` is 45 numbers per element in three dimensions, the same packing the

@@ -25,6 +25,7 @@ from codegen.framework.plans.apply_variants import precision_axis
 from codegen.framework.plans.emission import emission_plan_for_element
 from codegen.framework.plans.residual_model import residual_emission_model_from_system
 from codegen.framework.symbolic.residual import CoupledResidualSystem
+from codegen.framework.plans import conventions
 
 
 def _diffusion_system(dim=2):
@@ -56,12 +57,18 @@ def _operator_source(files):
     raise AssertionError("no mesh operator source was emitted")
 
 
+#: The mesh-SoA level fragment, from the table rather than pinned here.
+#: These tests are about the precision axis; the level is incidental, and
+#: spelling it would make every one of them fail on an unrelated rename.
+MSOA = dict(conventions.ABI_LAYOUT_SPELLING)["mesh_soa"]
+
+
 class ApplyVariantsDriveEmissionTest(unittest.TestCase):
     def test_the_default_axis_emits_both_precisions(self):
         source = _operator_source(_emit())
         for scalar_type, suffix in precision_axis():
             self.assertIn(
-                "_mesh_soa%s(" % suffix,
+                "_%s%s(" % (MSOA, suffix),
                 source,
                 "the %s precision variant was not emitted" % (scalar_type,),
             )
@@ -72,9 +79,9 @@ class ApplyVariantsDriveEmissionTest(unittest.TestCase):
             residual_codegen, "precision_axis", lambda: (("double", ""),)
         ):
             source = _operator_source(_emit())
-        self.assertIn("_mesh_soa(", source)
+        self.assertIn("_%s(" % MSOA, source)
         self.assertNotIn(
-            "_mesh_soa_float(",
+            "_%s_float(" % MSOA,
             source,
             "float kernels were still emitted after the plan dropped that "
             "precision, so the emitter is not reading the plan",
@@ -88,8 +95,8 @@ class ApplyVariantsDriveEmissionTest(unittest.TestCase):
             lambda: (("double", ""), ("float", "_reduced")),
         ):
             source = _operator_source(_emit())
-        self.assertIn("_mesh_soa_reduced(", source)
-        self.assertNotIn("_mesh_soa_float(", source)
+        self.assertIn("_%s_reduced(" % MSOA, source)
+        self.assertNotIn("_%s_float(" % MSOA, source)
 
     def test_a_third_precision_produces_a_third_set_of_kernels(self):
         """Adding a row to the variant matrix is a plan change, not an emitter change."""
@@ -100,7 +107,7 @@ class ApplyVariantsDriveEmissionTest(unittest.TestCase):
         ):
             source = _operator_source(_emit())
         for suffix in ("", "_float", "_extended"):
-            self.assertIn("_mesh_soa%s(" % suffix, source)
+            self.assertIn("_%s%s(" % (MSOA, suffix), source)
         self.assertIn(
             "long double",
             source,

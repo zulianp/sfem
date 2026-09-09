@@ -1,108 +1,108 @@
 {
   "c_abi": [
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
-      "name": "linear_elasticity_apply_2d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_apply_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "linear_elasticity_apply_2d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
-      "name": "linear_elasticity_apply_2d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_apply_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "linear_elasticity_apply_2d_i_msoa"
     },
     {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *linear_elasticity_apply_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "linear_elasticity_apply_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_apply_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_apply_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_apply_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_3d_affine_mesh_soa_aos_unit(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj_aos,\n        const geom_t *const RSTR g_det0,\n        const real_t mu,\n        const real_t lmbda,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_apply_3d_affine_mesh_soa_aos_unit"
+      "declaration": "extern \"C\" int linear_elasticity_apply_3d_a_msoa_aos_unit(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj_aos,\n        const geom_t *const RSTR g_det0,\n        const real_t mu,\n        const real_t lmbda,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_apply_3d_a_msoa_aos_unit"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_apply_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_apply_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_apply_3d_i_msoa"
     },
     {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *linear_elasticity_apply_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "linear_elasticity_apply_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_packed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_apply_packed_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_apply_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_apply_packed_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_apply_packed_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_apply_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_apply_packed_3d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_packed_two_pass_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_apply_packed_two_pass_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_apply_packed_two_pass_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_apply_packed_two_pass_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_apply_packed_two_pass_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_apply_packed_two_pass_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_apply_packed_two_pass_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_apply_packed_two_pass_3d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
-      "name": "linear_elasticity_gradient_2d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "linear_elasticity_gradient_2d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
-      "name": "linear_elasticity_gradient_2d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "linear_elasticity_gradient_2d_i_msoa"
     },
     {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *linear_elasticity_gradient_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "linear_elasticity_gradient_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_gradient_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_gradient_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj_aos,\n        const geom_t *const RSTR g_det0,\n        const real_t mu,\n        const real_t lmbda,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_3d_a_msoa_aos_unit(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj_aos,\n        const geom_t *const RSTR g_det0,\n        const real_t mu,\n        const real_t lmbda,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_gradient_3d_a_msoa_aos_unit"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_gradient_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_gradient_3d_i_msoa"
     },
     {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *linear_elasticity_gradient_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "linear_elasticity_gradient_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_packed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_gradient_packed_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_gradient_packed_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_gradient_packed_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_gradient_packed_3d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_packed_two_pass_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_gradient_packed_two_pass_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_packed_two_pass_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_gradient_packed_two_pass_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_gradient_packed_two_pass_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_gradient_packed_two_pass_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_gradient_packed_two_pass_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_gradient_packed_two_pass_3d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        void *const RSTR values\n);",
-      "name": "linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_hessian_block_diag_sym_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        void *const RSTR values\n);",
+      "name": "linear_elasticity_hessian_block_diag_sym_2d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        void *const RSTR values\n);",
-      "name": "linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_hessian_block_diag_sym_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        void *const RSTR values\n);",
+      "name": "linear_elasticity_hessian_block_diag_sym_3d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
-      "name": "linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_hessian_bsr_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "linear_elasticity_hessian_bsr_2d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
-      "name": "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_hessian_bsr_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "linear_elasticity_hessian_bsr_3d_i_msoa"
     },
     {
       "declaration": "extern \"C\" void linear_elasticity_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
@@ -117,28 +117,28 @@
       "name": "linear_elasticity_hex8_matrix_assembly_variant_count"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_compressed_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        const compressed_t *const RSTR tangent,\n        const scaling_t *const RSTR scaling,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
-      "name": "linear_elasticity_inexact_apply_compressed_2d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_compressed_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        const compressed_t *const RSTR tangent,\n        const scaling_t *const RSTR scaling,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "linear_elasticity_inexact_apply_compressed_2d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_compressed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        const compressed_t *const RSTR tangent,\n        const scaling_t *const RSTR scaling,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_inexact_apply_compressed_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_compressed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        const compressed_t *const RSTR tangent,\n        const scaling_t *const RSTR scaling,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_inexact_apply_compressed_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_stored_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        const metric_tensor_t *const RSTR tangent,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
-      "name": "linear_elasticity_inexact_apply_stored_2d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_stored_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        const metric_tensor_t *const RSTR tangent,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "linear_elasticity_inexact_apply_stored_2d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_stored_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        const metric_tensor_t *const RSTR tangent,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
-      "name": "linear_elasticity_inexact_apply_stored_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_stored_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        const metric_tensor_t *const RSTR tangent,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "linear_elasticity_inexact_apply_stored_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_tangent_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        metric_tensor_t *const RSTR tangent\n);",
-      "name": "linear_elasticity_inexact_apply_tangent_2d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_tangent_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        metric_tensor_t *const RSTR tangent\n);",
+      "name": "linear_elasticity_inexact_apply_tangent_2d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_tangent_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        metric_tensor_t *const RSTR tangent\n);",
-      "name": "linear_elasticity_inexact_apply_tangent_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_inexact_apply_tangent_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t tangent_element_stride,\n        const ptrdiff_t tangent_component_stride,\n        metric_tensor_t *const RSTR tangent\n);",
+      "name": "linear_elasticity_inexact_apply_tangent_3d_a_msoa"
     },
     {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *linear_elasticity_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
@@ -149,28 +149,28 @@
       "name": "linear_elasticity_objective_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_objective_steps_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
-      "name": "linear_elasticity_objective_steps_2d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_objective_steps_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "linear_elasticity_objective_steps_2d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_objective_steps_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
-      "name": "linear_elasticity_objective_steps_2d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_objective_steps_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "linear_elasticity_objective_steps_2d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_objective_steps_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
-      "name": "linear_elasticity_objective_steps_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_objective_steps_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "linear_elasticity_objective_steps_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_objective_steps_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
-      "name": "linear_elasticity_objective_steps_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_objective_steps_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "linear_elasticity_objective_steps_3d_i_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_objective_steps_packed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
-      "name": "linear_elasticity_objective_steps_packed_3d_affine_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_objective_steps_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "linear_elasticity_objective_steps_packed_3d_a_msoa"
     },
     {
-      "declaration": "extern \"C\" int linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
-      "name": "linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa"
+      "declaration": "extern \"C\" int linear_elasticity_objective_steps_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "linear_elasticity_objective_steps_packed_3d_i_msoa"
     },
     {
       "declaration": "extern \"C\" void linear_elasticity_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
@@ -363,85 +363,85 @@
       "name": "apply",
       "variants": [
         {
-          "function": "linear_elasticity_apply_2d_affine_mesh_soa",
+          "function": "linear_elasticity_apply_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_apply_3d_affine_mesh_soa",
+          "function": "linear_elasticity_apply_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_apply_packed_3d_affine_mesh_soa",
+          "function": "linear_elasticity_apply_packed_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_apply_packed_two_pass_3d_affine_mesh_soa",
+          "function": "linear_elasticity_apply_packed_two_pass_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_inexact_apply_compressed_2d_affine_mesh_soa",
+          "function": "linear_elasticity_inexact_apply_compressed_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity_inexact",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_inexact_apply_compressed_3d_affine_mesh_soa",
+          "function": "linear_elasticity_inexact_apply_compressed_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity_inexact",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_inexact_apply_stored_2d_affine_mesh_soa",
+          "function": "linear_elasticity_inexact_apply_stored_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity_inexact",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_inexact_apply_stored_3d_affine_mesh_soa",
+          "function": "linear_elasticity_inexact_apply_stored_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity_inexact",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_inexact_apply_tangent_2d_affine_mesh_soa",
+          "function": "linear_elasticity_inexact_apply_tangent_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity_inexact",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_inexact_apply_tangent_3d_affine_mesh_soa",
+          "function": "linear_elasticity_inexact_apply_tangent_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity_inexact",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_apply_2d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_apply_2d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_apply_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_apply_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_apply_packed_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_apply_packed_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_apply_packed_two_pass_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_apply_packed_two_pass_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
@@ -452,49 +452,49 @@
       "name": "gradient",
       "variants": [
         {
-          "function": "linear_elasticity_gradient_2d_affine_mesh_soa",
+          "function": "linear_elasticity_gradient_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_gradient_3d_affine_mesh_soa",
+          "function": "linear_elasticity_gradient_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_gradient_packed_3d_affine_mesh_soa",
+          "function": "linear_elasticity_gradient_packed_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_gradient_packed_two_pass_3d_affine_mesh_soa",
+          "function": "linear_elasticity_gradient_packed_two_pass_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_gradient_2d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_gradient_2d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_gradient_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_gradient_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_gradient_packed_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_gradient_packed_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_gradient_packed_two_pass_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_gradient_packed_two_pass_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
@@ -505,13 +505,13 @@
       "name": "hessian_block_diag_sym",
       "variants": [
         {
-          "function": "linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_hessian_block_diag_sym_2d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_hessian_block_diag_sym_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
@@ -522,13 +522,13 @@
       "name": "hessian_bsr",
       "variants": [
         {
-          "function": "linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_hessian_bsr_2d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_hessian_bsr_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
@@ -539,37 +539,37 @@
       "name": "objective_steps",
       "variants": [
         {
-          "function": "linear_elasticity_objective_steps_2d_affine_mesh_soa",
+          "function": "linear_elasticity_objective_steps_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_objective_steps_3d_affine_mesh_soa",
+          "function": "linear_elasticity_objective_steps_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_objective_steps_packed_3d_affine_mesh_soa",
+          "function": "linear_elasticity_objective_steps_packed_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "affine"
         },
         {
-          "function": "linear_elasticity_objective_steps_2d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_objective_steps_2d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_objective_steps_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_objective_steps_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"
         },
         {
-          "function": "linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa",
+          "function": "linear_elasticity_objective_steps_packed_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "linear_elasticity",
           "variant": "isoparametric"

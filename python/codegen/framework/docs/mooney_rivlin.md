@@ -60,7 +60,7 @@ The exported C ABI functions follow the standard generated naming pattern, for
 example for `HEX8`:
 
 ```text
-mooney_rivlin_hex8_hex8_objective_isoparametric_mesh_soa
-mooney_rivlin_hex8_hex8_gradient_isoparametric_mesh_soa
-mooney_rivlin_hex8_hex8_apply_isoparametric_mesh_soa
+mooney_rivlin_hex8_hex8_objective_i_msoa
+mooney_rivlin_hex8_hex8_gradient_i_msoa
+mooney_rivlin_hex8_hex8_apply_i_msoa
 ```

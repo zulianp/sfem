@@ -1,6 +1,6 @@
 #include "../../op/sfem_GeneratedMooneyRivlinKelvinVoigtNewmark_c_abi.hpp"
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -20,7 +20,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_iso
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -40,7 +40,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_iso
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -56,7 +56,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -72,7 +72,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -91,7 +91,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -110,7 +110,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -121,7 +121,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
         const double *const RSTR direction,
         double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -132,7 +132,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
         const float *const RSTR direction,
         float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -157,7 +157,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
         double *const RSTR u1_out,
         double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -182,7 +182,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
         float *const RSTR u1_out,
         float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -192,7 +192,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
         const double *const RSTR previous,
         double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -202,7 +202,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
         const float *const RSTR previous,
         float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -223,7 +223,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
         double *const RSTR u1_out,
         double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -244,7 +244,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
         float *const RSTR u1_out,
         float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -273,7 +273,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_aff
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -302,7 +302,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_aff
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -327,7 +327,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -352,7 +352,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -380,7 +380,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -408,7 +408,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -442,7 +442,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
         double *const RSTR u1_out,
         double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -476,7 +476,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
         float *const RSTR u1_out,
         float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -506,7 +506,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
         double *const RSTR u1_out,
         double *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -536,7 +536,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_
         float *const RSTR u1_out,
         float *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -563,7 +563,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -590,7 +590,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -623,7 +623,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -656,7 +656,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -679,7 +679,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -702,7 +702,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -731,7 +731,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -760,7 +760,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -786,7 +786,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -812,7 +812,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -848,7 +848,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -884,7 +884,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -926,7 +926,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -968,7 +968,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1000,7 +1000,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1032,7 +1032,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1070,7 +1070,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         double *const RSTR outy,
         double *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1108,7 +1108,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_
         float *const RSTR outy,
         float *const RSTR outz
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1143,7 +1143,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1188,7 +1188,7 @@ extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_n
         void
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1218,10 +1218,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametr
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1251,10 +1251,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_isoparametr
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1280,10 +1280,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparam
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1309,10 +1309,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_isoparam
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1341,10 +1341,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1373,10 +1373,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_maos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1397,10 +1397,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_maos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1421,10 +1421,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1459,10 +1459,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1497,10 +1497,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1520,10 +1520,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparam
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_maos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1543,10 +1543,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparam
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_aos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_maos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1577,10 +1577,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparam
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1611,10 +1611,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_isoparam
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1653,10 +1653,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_affine_mesh
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1695,10 +1695,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_affine_mesh
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1733,10 +1733,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_affine_m
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1771,10 +1771,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_affine_m
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1812,10 +1812,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1853,10 +1853,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1900,10 +1900,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1947,10 +1947,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1990,10 +1990,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_affine_m
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2033,10 +2033,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_affine_m
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2073,10 +2073,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_isop
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2113,10 +2113,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_isop
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2159,10 +2159,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2205,10 +2205,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2241,10 +2241,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2277,10 +2277,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_i
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2319,10 +2319,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2361,10 +2361,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_i_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2400,10 +2400,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_p
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_i_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2439,10 +2439,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_p
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_i_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2488,10 +2488,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_affi
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2537,10 +2537,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_affi
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2592,10 +2592,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_pass_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2647,10 +2647,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_packed_two_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2692,10 +2692,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2737,10 +2737,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_a
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2788,10 +2788,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_two_pass_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2839,10 +2839,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_packed_t
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_a_msoa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2887,10 +2887,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_p
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_packed_a_msoa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2935,7 +2935,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_p
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_soa_diagnostics(

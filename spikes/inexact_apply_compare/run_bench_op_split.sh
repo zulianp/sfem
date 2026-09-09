@@ -45,9 +45,9 @@ LINK_LINE=$(sed -n '1p' "$BUILD/CMakeFiles/bench_op.dir/link.txt" \
     -DELEMENT_${ELEMENT} \
     -DMATERIAL_LABEL="\"$MATERIAL\"" \
     -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${LOWER}_inexact_apply_inline.hpp\"" \
-    -DTANGENT_KERNEL=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_tangent_affine_mesh_soa_impl \
-    -DSTORED_APPLY=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_stored_affine_mesh_soa_impl \
-    -DCOMPRESSED_APPLY=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_compressed_affine_mesh_soa_impl \
+    -DTANGENT_KERNEL=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
+    -DSTORED_APPLY=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_stored_a_msoa_impl \
+    -DCOMPRESSED_APPLY=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_compressed_a_msoa_impl \
     -I "$GEN/d3/$LOWER" -I "$GEN" -I "$GEN/d3" \
     $CXX_INCLUDES \
     -o "$BIN" "$HERE/bench_op_split.exe.cpp" $LINK_LINE )

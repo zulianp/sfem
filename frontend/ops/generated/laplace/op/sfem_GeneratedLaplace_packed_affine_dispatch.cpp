@@ -11,7 +11,7 @@
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int laplace_hex8_apply_packed_affine_mesh_soa(
+extern "C" int laplace_hex8_apply_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -38,7 +38,7 @@ extern "C" int laplace_hex8_apply_packed_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_hex8_apply_packed_affine_mesh_soa_float(
+extern "C" int laplace_hex8_apply_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -65,7 +65,7 @@ extern "C" int laplace_hex8_apply_packed_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_apply_packed_affine_mesh_soa(
+extern "C" int laplace_proteus_hex8_apply_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -92,7 +92,7 @@ extern "C" int laplace_proteus_hex8_apply_packed_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_apply_packed_affine_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_apply_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -119,7 +119,7 @@ extern "C" int laplace_proteus_hex8_apply_packed_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
+extern "C" int laplace_tet10_apply_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -146,7 +146,7 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
+extern "C" int laplace_tet10_apply_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -173,7 +173,7 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_tet4_apply_packed_affine_mesh_soa(
+extern "C" int laplace_tet4_apply_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -196,7 +196,7 @@ extern "C" int laplace_tet4_apply_packed_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_tet4_apply_packed_affine_mesh_soa_float(
+extern "C" int laplace_tet4_apply_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -219,7 +219,7 @@ extern "C" int laplace_tet4_apply_packed_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_hex8_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int laplace_hex8_apply_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -252,7 +252,7 @@ extern "C" int laplace_hex8_apply_packed_two_pass_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_hex8_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int laplace_hex8_apply_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -285,7 +285,7 @@ extern "C" int laplace_hex8_apply_packed_two_pass_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -318,7 +318,7 @@ extern "C" int laplace_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -351,7 +351,7 @@ extern "C" int laplace_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int laplace_tet10_apply_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -384,7 +384,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int laplace_tet10_apply_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -417,7 +417,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_tet4_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int laplace_tet4_apply_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -446,7 +446,7 @@ extern "C" int laplace_tet4_apply_packed_two_pass_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_tet4_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int laplace_tet4_apply_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -475,7 +475,7 @@ extern "C" int laplace_tet4_apply_packed_two_pass_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_hex8_gradient_packed_affine_mesh_soa(
+extern "C" int laplace_hex8_gradient_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -502,7 +502,7 @@ extern "C" int laplace_hex8_gradient_packed_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_hex8_gradient_packed_affine_mesh_soa_float(
+extern "C" int laplace_hex8_gradient_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -529,7 +529,7 @@ extern "C" int laplace_hex8_gradient_packed_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_gradient_packed_affine_mesh_soa(
+extern "C" int laplace_proteus_hex8_gradient_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -556,7 +556,7 @@ extern "C" int laplace_proteus_hex8_gradient_packed_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_gradient_packed_affine_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_gradient_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -583,7 +583,7 @@ extern "C" int laplace_proteus_hex8_gradient_packed_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
+extern "C" int laplace_tet10_gradient_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -610,7 +610,7 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
+extern "C" int laplace_tet10_gradient_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -637,7 +637,7 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_tet4_gradient_packed_affine_mesh_soa(
+extern "C" int laplace_tet4_gradient_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -660,7 +660,7 @@ extern "C" int laplace_tet4_gradient_packed_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_tet4_gradient_packed_affine_mesh_soa_float(
+extern "C" int laplace_tet4_gradient_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -683,7 +683,7 @@ extern "C" int laplace_tet4_gradient_packed_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_hex8_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int laplace_hex8_gradient_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -716,7 +716,7 @@ extern "C" int laplace_hex8_gradient_packed_two_pass_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int laplace_hex8_gradient_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -749,7 +749,7 @@ extern "C" int laplace_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -782,7 +782,7 @@ extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -815,7 +815,7 @@ extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_flo
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int laplace_tet10_gradient_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -848,7 +848,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int laplace_tet10_gradient_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -881,7 +881,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_tet4_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int laplace_tet4_gradient_packed_two_pass_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -910,7 +910,7 @@ extern "C" int laplace_tet4_gradient_packed_two_pass_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR outx
 );
-extern "C" int laplace_tet4_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int laplace_tet4_gradient_packed_two_pass_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -939,7 +939,7 @@ extern "C" int laplace_tet4_gradient_packed_two_pass_affine_mesh_soa_float(
     const ptrdiff_t out_stride,
     float *const RSTR outx
 );
-extern "C" int laplace_hex8_objective_steps_packed_affine_mesh_soa(
+extern "C" int laplace_hex8_objective_steps_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -969,7 +969,7 @@ extern "C" int laplace_hex8_objective_steps_packed_affine_mesh_soa(
     const double *const RSTR steps,
     double *const RSTR value
 );
-extern "C" int laplace_hex8_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int laplace_hex8_objective_steps_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -999,7 +999,7 @@ extern "C" int laplace_hex8_objective_steps_packed_affine_mesh_soa_float(
     const float *const RSTR steps,
     float *const RSTR value
 );
-extern "C" int laplace_proteus_hex8_objective_steps_packed_affine_mesh_soa(
+extern "C" int laplace_proteus_hex8_objective_steps_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1029,7 +1029,7 @@ extern "C" int laplace_proteus_hex8_objective_steps_packed_affine_mesh_soa(
     const double *const RSTR steps,
     double *const RSTR value
 );
-extern "C" int laplace_proteus_hex8_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_objective_steps_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1059,7 +1059,7 @@ extern "C" int laplace_proteus_hex8_objective_steps_packed_affine_mesh_soa_float
     const float *const RSTR steps,
     float *const RSTR value
 );
-extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa(
+extern "C" int laplace_tet10_objective_steps_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1089,7 +1089,7 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa(
     const double *const RSTR steps,
     double *const RSTR value
 );
-extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int laplace_tet10_objective_steps_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1119,7 +1119,7 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa_float(
     const float *const RSTR steps,
     float *const RSTR value
 );
-extern "C" int laplace_tet4_objective_steps_packed_affine_mesh_soa(
+extern "C" int laplace_tet4_objective_steps_packed_a_msoa(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1145,7 +1145,7 @@ extern "C" int laplace_tet4_objective_steps_packed_affine_mesh_soa(
     const double *const RSTR steps,
     double *const RSTR value
 );
-extern "C" int laplace_tet4_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int laplace_tet4_objective_steps_packed_a_msoa_float(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
@@ -1172,7 +1172,7 @@ extern "C" int laplace_tet4_objective_steps_packed_affine_mesh_soa_float(
     float *const RSTR value
 );
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1209,9 +1209,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_affine_mesh_soa
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_hex8_apply_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_hex8_apply_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1220,9 +1220,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_affine_mesh_soa
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_proteus_hex8_apply_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_proteus_hex8_apply_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1231,9 +1231,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_affine_mesh_soa
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_tet10_apply_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_tet10_apply_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1243,13 +1243,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_affine_mesh_soa
       break;
   }
   std::fprintf(stderr,
-      "laplace_apply_packed_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_apply_packed_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_affine_metric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1282,9 +1282,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_affine_metric_m
     case smesh::TET4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet4_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_tet4_apply_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet4_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_tet4_apply_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1294,13 +1294,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_3d_affine_metric_m
       break;
   }
   std::fprintf(stderr,
-      "laplace_apply_packed_3d_affine_metric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_apply_packed_3d_a_met_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1343,9 +1343,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_affine
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_hex8_apply_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_hex8_apply_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1354,9 +1354,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_affine
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_proteus_hex8_apply_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_proteus_hex8_apply_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1365,9 +1365,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_affine
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_tet10_apply_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_tet10_apply_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1377,13 +1377,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_affine
       break;
   }
   std::fprintf(stderr,
-      "laplace_apply_packed_two_pass_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_apply_packed_two_pass_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_affine_metric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1422,9 +1422,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_affine
     case smesh::TET4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet4_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+          return laplace_tet4_apply_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet4_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+          return laplace_tet4_apply_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1434,13 +1434,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_packed_two_pass_3d_affine
       break;
   }
   std::fprintf(stderr,
-      "laplace_apply_packed_two_pass_3d_affine_metric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_apply_packed_two_pass_3d_a_met_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1477,9 +1477,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_affine_mesh_
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_hex8_gradient_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_hex8_gradient_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1488,9 +1488,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_affine_mesh_
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_proteus_hex8_gradient_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_proteus_hex8_gradient_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1499,9 +1499,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_affine_mesh_
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_tet10_gradient_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_tet10_gradient_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1511,13 +1511,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_affine_mesh_
       break;
   }
   std::fprintf(stderr,
-      "laplace_gradient_packed_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_gradient_packed_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_affine_metric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1550,9 +1550,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_affine_metri
     case smesh::TET4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet4_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_tet4_gradient_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet4_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_tet4_gradient_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1562,13 +1562,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_3d_affine_metri
       break;
   }
   std::fprintf(stderr,
-      "laplace_gradient_packed_3d_affine_metric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_gradient_packed_3d_a_met_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1611,9 +1611,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_aff
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_hex8_gradient_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_hex8_gradient_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1622,9 +1622,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_aff
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_proteus_hex8_gradient_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1633,9 +1633,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_aff
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_tet10_gradient_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_tet10_gradient_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1645,13 +1645,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_aff
       break;
   }
   std::fprintf(stderr,
-      "laplace_gradient_packed_two_pass_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_gradient_packed_two_pass_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_affine_metric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1690,9 +1690,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_aff
     case smesh::TET4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet4_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+          return laplace_tet4_gradient_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet4_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+          return laplace_tet4_gradient_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         default:
           break;
       }
@@ -1702,13 +1702,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_packed_two_pass_3d_aff
       break;
   }
   std::fprintf(stderr,
-      "laplace_gradient_packed_two_pass_3d_affine_metric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_gradient_packed_two_pass_3d_a_met_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1748,9 +1748,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_affin
     case smesh::HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_hex8_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_hex8_objective_steps_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_hex8_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_hex8_objective_steps_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1759,9 +1759,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_affin
     case smesh::PROTEUS_HEX8: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_proteus_hex8_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_proteus_hex8_objective_steps_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_proteus_hex8_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_proteus_hex8_objective_steps_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1770,9 +1770,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_affin
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet10_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_tet10_objective_steps_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet10_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_tet10_objective_steps_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1782,13 +1782,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_affin
       break;
   }
   std::fprintf(stderr,
-      "laplace_objective_steps_packed_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_objective_steps_packed_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_affine_metric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -1824,9 +1824,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_affin
     case smesh::TET4: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return laplace_tet4_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+          return laplace_tet4_objective_steps_packed_a_msoa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         case smesh::SMESH_FLOAT32:
-          return laplace_tet4_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+          return laplace_tet4_objective_steps_packed_a_msoa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         default:
           break;
       }
@@ -1836,7 +1836,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_packed_3d_affin
       break;
   }
   std::fprintf(stderr,
-      "laplace_objective_steps_packed_3d_affine_metric_mesh_soa does not support element type %d with real type %d\n",
+      "laplace_objective_steps_packed_3d_a_met_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;

@@ -33,7 +33,7 @@ typedef double geom_t;
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int neumann_general_edgeshell2_boundary_residual_2d_sideset_soa(
+extern "C" int neumann_general_edgeshell2_boundary_residual_2d_ss_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
@@ -53,7 +53,7 @@ extern "C" int neumann_general_edgeshell2_boundary_residual_2d_sideset_soa(
         real_t *const RSTR out1
 );
 
-extern "C" int neumann_general_proteus_quadshell4_boundary_residual_3d_sideset_soa(
+extern "C" int neumann_general_proteus_quadshell4_boundary_residual_3d_ss_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
@@ -80,7 +80,7 @@ extern "C" int neumann_general_proteus_quadshell4_boundary_residual_3d_sideset_s
         real_t *const RSTR out2
 );
 
-extern "C" int neumann_general_quadshell4_boundary_residual_3d_sideset_soa(
+extern "C" int neumann_general_quadshell4_boundary_residual_3d_ss_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
@@ -107,7 +107,7 @@ extern "C" int neumann_general_quadshell4_boundary_residual_3d_sideset_soa(
         real_t *const RSTR out2
 );
 
-extern "C" int neumann_general_trishell3_boundary_residual_3d_sideset_soa(
+extern "C" int neumann_general_trishell3_boundary_residual_3d_ss_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
@@ -134,7 +134,7 @@ extern "C" int neumann_general_trishell3_boundary_residual_3d_sideset_soa(
         real_t *const RSTR out2
 );
 
-extern "C" int neumann_general_trishell6_boundary_residual_3d_sideset_soa(
+extern "C" int neumann_general_trishell6_boundary_residual_3d_ss_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,

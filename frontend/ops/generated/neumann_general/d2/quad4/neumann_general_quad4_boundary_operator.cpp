@@ -1,6 +1,6 @@
 #include "../../op/sfem_GeneratedNeumannGeneral_c_abi.hpp"
 
-extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(
+extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_ss_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -17,7 +17,7 @@ extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sidese
         real_t *const RSTR out0,
         real_t *const RSTR out1
 );
-extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(
+extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_ss_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -35,7 +35,7 @@ extern "C" int neumann_general_proteus_quad4_edgeshell2_boundary_residual_sidese
         float *const RSTR out1
 );
 
-extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(
+extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_ss_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -58,10 +58,10 @@ extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa(
         elements[3],
         elements[2]
     };
-    return neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(nsides, nnodes, proteus_elements, parent, side_idx, points, t0, t0_010, t0_100, t1, t1_010, t1_100, out_stride, out0, out1);
+    return neumann_general_proteus_quad4_edgeshell2_boundary_residual_ss_soa(nsides, nnodes, proteus_elements, parent, side_idx, points, t0, t0_010, t0_100, t1, t1_010, t1_100, out_stride, out0, out1);
 }
 
-extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa_float(
+extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_ss_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -84,5 +84,5 @@ extern "C" int neumann_general_quad4_edgeshell2_boundary_residual_sideset_soa_fl
         elements[3],
         elements[2]
     };
-    return neumann_general_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(nsides, nnodes, proteus_elements, parent, side_idx, points, t0, t0_010, t0_100, t1, t1_010, t1_100, out_stride, out0, out1);
+    return neumann_general_proteus_quad4_edgeshell2_boundary_residual_ss_soa_float(nsides, nnodes, proteus_elements, parent, side_idx, points, t0, t0_010, t0_100, t1, t1_010, t1_100, out_stride, out0, out1);
 }

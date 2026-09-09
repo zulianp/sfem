@@ -606,14 +606,14 @@ namespace sfem {
           if (dim == 3) {
             if (domain.element_type == smesh::TET4) {
               if (impl_->use_packed_two_pass) {
-                return laplace_gradient_packed_two_pass_3d_affine_metric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+                return laplace_gradient_packed_two_pass_3d_a_met_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
               }
-              return laplace_gradient_packed_3d_affine_metric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+              return laplace_gradient_packed_3d_a_met_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
             }
             if (impl_->use_packed_two_pass) {
-              return laplace_gradient_packed_two_pass_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+              return laplace_gradient_packed_two_pass_3d_a_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
             }
-            return laplace_gradient_packed_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+            return laplace_gradient_packed_3d_a_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
           }
         }
       }
@@ -632,27 +632,27 @@ namespace sfem {
           const int dim = mesh->spatial_dimension();
           if (dim == 3) {
             if (impl_->use_packed_two_pass) {
-              return laplace_gradient_packed_two_pass_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+              return laplace_gradient_packed_two_pass_3d_i_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
             }
-            return laplace_gradient_packed_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+            return laplace_gradient_packed_3d_i_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
           }
         }
       }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (impl_->gradient_uses_affine) {
-          return laplace_gradient_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+          return laplace_gradient_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
         }
-        return laplace_gradient_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+        return laplace_gradient_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
       }
       else if (dim == 3) {
         if (impl_->gradient_uses_affine) {
           if (domain.element_type == smesh::TET4) {
-            return laplace_gradient_3d_affine_metric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+            return laplace_gradient_3d_a_met_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
           }
-          return laplace_gradient_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+          return laplace_gradient_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
         }
-        return laplace_gradient_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+        return laplace_gradient_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
       }
       SFEM_ERROR("laplace gradient does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
@@ -701,9 +701,9 @@ namespace sfem {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (impl_->apply_uses_affine) {
-          return laplace_apply_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+          return laplace_apply_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
         }
-        return laplace_apply_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+        return laplace_apply_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
       }
       else if (dim == 3) {
         if (impl_->apply_uses_affine) {
@@ -721,20 +721,20 @@ namespace sfem {
               auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
               if (domain.element_type == smesh::TET4) {
                 if (impl_->use_packed_two_pass) {
-                  return laplace_apply_packed_two_pass_3d_affine_metric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+                  return laplace_apply_packed_two_pass_3d_a_met_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
                 }
-                return laplace_apply_packed_3d_affine_metric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+                return laplace_apply_packed_3d_a_met_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
               }
               if (impl_->use_packed_two_pass) {
-                return laplace_apply_packed_two_pass_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+                return laplace_apply_packed_two_pass_3d_a_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
               }
-              return laplace_apply_packed_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+              return laplace_apply_packed_3d_a_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
             }
           }
           if (domain.element_type == smesh::TET4) {
-            return laplace_apply_3d_affine_metric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+            return laplace_apply_3d_a_met_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
           }
-          return laplace_apply_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+          return laplace_apply_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
         }
         if (impl_->space->has_packed_mesh()) {
           auto packed = impl_->space->packed_mesh();
@@ -749,12 +749,12 @@ namespace sfem {
             auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
             auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
             if (impl_->use_packed_two_pass) {
-              return laplace_apply_packed_two_pass_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+              return laplace_apply_packed_two_pass_3d_i_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
             }
-            return laplace_apply_packed_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+            return laplace_apply_packed_3d_i_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
           }
         }
-        return laplace_apply_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+        return laplace_apply_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
       }
       SFEM_ERROR("laplace apply does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
@@ -833,7 +833,7 @@ namespace sfem {
           auto ghost_idx = packed->ghost_idx(packed_block);
           const int dim = mesh->spatial_dimension();
           if (dim == 3) {
-            status = laplace_objective_steps_packed_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, h + 0, nsteps, steps, impl_->element_values.get());
+            status = laplace_objective_steps_packed_3d_a_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, h + 0, nsteps, steps, impl_->element_values.get());
           }
         }
       }
@@ -848,7 +848,7 @@ namespace sfem {
           auto ghost_idx = packed->ghost_idx(packed_block);
           const int dim = mesh->spatial_dimension();
           if (dim == 3) {
-            status = laplace_objective_steps_packed_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, h + 0, nsteps, steps, impl_->element_values.get());
+            status = laplace_objective_steps_packed_3d_i_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, h + 0, nsteps, steps, impl_->element_values.get());
           }
         }
       }
@@ -856,20 +856,20 @@ namespace sfem {
         const int dim = mesh->spatial_dimension();
         if (dim == 2) {
           if (impl_->objective_uses_affine) {
-            status = laplace_objective_steps_2d_affine_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, steps, impl_->element_values.get());
+            status = laplace_objective_steps_2d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, steps, impl_->element_values.get());
           } else {
-            status = laplace_objective_steps_2d_isoparametric_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, steps, impl_->element_values.get());
+            status = laplace_objective_steps_2d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, steps, impl_->element_values.get());
           }
         }
         else if (dim == 3) {
           if (impl_->objective_uses_affine) {
             if (domain.element_type == smesh::TET4) {
-              status = laplace_objective_steps_3d_affine_metric_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 3, h + 0, nsteps, steps, impl_->element_values.get());
+              status = laplace_objective_steps_3d_a_met_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 3, h + 0, nsteps, steps, impl_->element_values.get());
             } else {
-              status = laplace_objective_steps_3d_affine_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 3, h + 0, nsteps, steps, impl_->element_values.get());
+              status = laplace_objective_steps_3d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 3, h + 0, nsteps, steps, impl_->element_values.get());
             }
           } else {
-            status = laplace_objective_steps_3d_isoparametric_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 3, h + 0, nsteps, steps, impl_->element_values.get());
+            status = laplace_objective_steps_3d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 3, h + 0, nsteps, steps, impl_->element_values.get());
           }
         }
         if (dim != 2 && dim != 3) {
@@ -901,10 +901,10 @@ namespace sfem {
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
-        return laplace_hessian_crs_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
+        return laplace_hessian_crs_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
       }
       else if (dim == 3) {
-        return laplace_hessian_crs_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
+        return laplace_hessian_crs_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
       }
       SFEM_ERROR("laplace hessian_crs does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
@@ -922,10 +922,10 @@ namespace sfem {
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
-        return laplace_hessian_bsr_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
+        return laplace_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
       }
       else if (dim == 3) {
-        return laplace_hessian_bsr_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
+        return laplace_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
       }
       SFEM_ERROR("laplace hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

@@ -4,7 +4,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, typename tangent_t>
-static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl(
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
@@ -69,7 +69,7 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_affine_mesh
 }
 
 template <typename s_t, typename tangent_t>
-static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_stored_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_stored_a_msoa_impl(
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
     const ptrdiff_t tangent_element_stride,
@@ -202,7 +202,7 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_stored_affine_mesh_
 }
 
 template <typename s_t, typename tangent_t, typename scale_t>
-static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_compressed_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_compressed_a_msoa_impl(
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
     const ptrdiff_t tangent_element_stride,

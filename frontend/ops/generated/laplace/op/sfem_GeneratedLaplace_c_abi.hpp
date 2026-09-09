@@ -34,7 +34,7 @@ typedef double geom_t;
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int laplace_apply_2d_affine_mesh_soa(
+extern "C" int laplace_apply_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -50,7 +50,7 @@ extern "C" int laplace_apply_2d_affine_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_apply_2d_isoparametric_mesh_soa(
+extern "C" int laplace_apply_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -67,7 +67,26 @@ extern "C" int laplace_apply_2d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_apply_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int laplace_apply_3d_affine_mesh_soa(
+extern "C" int laplace_apply_3d_a_met_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+
+extern "C" int laplace_apply_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -90,26 +109,7 @@ extern "C" int laplace_apply_3d_affine_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_apply_3d_affine_metric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_met0,
-        const geom_t *const RSTR g_met1,
-        const geom_t *const RSTR g_met2,
-        const geom_t *const RSTR g_met3,
-        const geom_t *const RSTR g_met4,
-        const geom_t *const RSTR g_met5,
-        const real_t kappa,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx
-);
-
-extern "C" int laplace_apply_3d_isoparametric_mesh_soa(
+extern "C" int laplace_apply_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -126,37 +126,7 @@ extern "C" int laplace_apply_3d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_apply_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int laplace_apply_packed_3d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const real_t kappa,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx
-);
-
-extern "C" int laplace_apply_packed_3d_affine_metric_mesh_soa(
+extern "C" int laplace_apply_packed_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -182,7 +152,37 @@ extern "C" int laplace_apply_packed_3d_affine_metric_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_apply_packed_3d_isoparametric_mesh_soa(
+extern "C" int laplace_apply_packed_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+
+extern "C" int laplace_apply_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -203,43 +203,7 @@ extern "C" int laplace_apply_packed_3d_isoparametric_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_apply_packed_two_pass_3d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        void *const RSTR ghost_buf,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const real_t kappa,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx
-);
-
-extern "C" int laplace_apply_packed_two_pass_3d_affine_metric_mesh_soa(
+extern "C" int laplace_apply_packed_two_pass_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -271,7 +235,43 @@ extern "C" int laplace_apply_packed_two_pass_3d_affine_metric_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_apply_packed_two_pass_3d_isoparametric_mesh_soa(
+extern "C" int laplace_apply_packed_two_pass_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+
+extern "C" int laplace_apply_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -298,7 +298,7 @@ extern "C" int laplace_apply_packed_two_pass_3d_isoparametric_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_gradient_2d_affine_mesh_soa(
+extern "C" int laplace_gradient_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -314,7 +314,7 @@ extern "C" int laplace_gradient_2d_affine_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_gradient_2d_isoparametric_mesh_soa(
+extern "C" int laplace_gradient_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -331,7 +331,26 @@ extern "C" int laplace_gradient_2d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_gradient_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int laplace_gradient_3d_affine_mesh_soa(
+extern "C" int laplace_gradient_3d_a_met_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+
+extern "C" int laplace_gradient_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -354,26 +373,7 @@ extern "C" int laplace_gradient_3d_affine_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_gradient_3d_affine_metric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_met0,
-        const geom_t *const RSTR g_met1,
-        const geom_t *const RSTR g_met2,
-        const geom_t *const RSTR g_met3,
-        const geom_t *const RSTR g_met4,
-        const geom_t *const RSTR g_met5,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx
-);
-
-extern "C" int laplace_gradient_3d_isoparametric_mesh_soa(
+extern "C" int laplace_gradient_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -390,37 +390,7 @@ extern "C" int laplace_gradient_3d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_gradient_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int laplace_gradient_packed_3d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx
-);
-
-extern "C" int laplace_gradient_packed_3d_affine_metric_mesh_soa(
+extern "C" int laplace_gradient_packed_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -446,7 +416,37 @@ extern "C" int laplace_gradient_packed_3d_affine_metric_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_gradient_packed_3d_isoparametric_mesh_soa(
+extern "C" int laplace_gradient_packed_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+
+extern "C" int laplace_gradient_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -467,43 +467,7 @@ extern "C" int laplace_gradient_packed_3d_isoparametric_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_gradient_packed_two_pass_3d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const RSTR ghost_reduce_ptr,
-        const ptrdiff_t *const RSTR ghost_reduce_idx,
-        const idx_t *const RSTR ghost_reduce_dest,
-        void *const RSTR ghost_buf,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx
-);
-
-extern "C" int laplace_gradient_packed_two_pass_3d_affine_metric_mesh_soa(
+extern "C" int laplace_gradient_packed_two_pass_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -535,7 +499,43 @@ extern "C" int laplace_gradient_packed_two_pass_3d_affine_metric_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_gradient_packed_two_pass_3d_isoparametric_mesh_soa(
+extern "C" int laplace_gradient_packed_two_pass_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+
+extern "C" int laplace_gradient_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -562,7 +562,7 @@ extern "C" int laplace_gradient_packed_two_pass_3d_isoparametric_mesh_soa(
         void *const RSTR outx
 );
 
-extern "C" int laplace_hessian_bsr_2d_isoparametric_mesh_soa(
+extern "C" int laplace_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -575,7 +575,7 @@ extern "C" int laplace_hessian_bsr_2d_isoparametric_mesh_soa(
         void *const RSTR values
 );
 
-extern "C" int laplace_hessian_bsr_3d_isoparametric_mesh_soa(
+extern "C" int laplace_hessian_bsr_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -588,7 +588,7 @@ extern "C" int laplace_hessian_bsr_3d_isoparametric_mesh_soa(
         void *const RSTR values
 );
 
-extern "C" int laplace_hessian_crs_2d_isoparametric_mesh_soa(
+extern "C" int laplace_hessian_crs_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -601,7 +601,7 @@ extern "C" int laplace_hessian_crs_2d_isoparametric_mesh_soa(
         void *const RSTR values
 );
 
-extern "C" int laplace_hessian_crs_3d_isoparametric_mesh_soa(
+extern "C" int laplace_hessian_crs_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -626,7 +626,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_objective_2d_soa_diag
 extern "C" const sfem::codegen::KernelDiagnostics *laplace_objective_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int laplace_objective_steps_2d_affine_mesh_soa(
+extern "C" int laplace_objective_steps_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -645,7 +645,7 @@ extern "C" int laplace_objective_steps_2d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int laplace_objective_steps_2d_isoparametric_mesh_soa(
+extern "C" int laplace_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -662,7 +662,29 @@ extern "C" int laplace_objective_steps_2d_isoparametric_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int laplace_objective_steps_3d_affine_mesh_soa(
+extern "C" int laplace_objective_steps_3d_a_met_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+);
+
+extern "C" int laplace_objective_steps_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -688,29 +710,7 @@ extern "C" int laplace_objective_steps_3d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int laplace_objective_steps_3d_affine_metric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_met0,
-        const geom_t *const RSTR g_met1,
-        const geom_t *const RSTR g_met2,
-        const geom_t *const RSTR g_met3,
-        const geom_t *const RSTR g_met4,
-        const geom_t *const RSTR g_met5,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const int nsteps,
-        const void *const RSTR steps,
-        void *const RSTR value
-);
-
-extern "C" int laplace_objective_steps_3d_isoparametric_mesh_soa(
+extern "C" int laplace_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -727,7 +727,36 @@ extern "C" int laplace_objective_steps_3d_isoparametric_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int laplace_objective_steps_packed_3d_affine_mesh_soa(
+extern "C" int laplace_objective_steps_packed_3d_a_met_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+);
+
+extern "C" int laplace_objective_steps_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -760,36 +789,7 @@ extern "C" int laplace_objective_steps_packed_3d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int laplace_objective_steps_packed_3d_affine_metric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const RSTR elements,
-        const ptrdiff_t *const RSTR owned_nodes_ptr,
-        const ptrdiff_t *const RSTR n_shared_nodes,
-        const ptrdiff_t *const RSTR ghost_ptr,
-        const idx_t *const RSTR ghost_idx,
-        const geom_t *const RSTR g_met0,
-        const geom_t *const RSTR g_met1,
-        const geom_t *const RSTR g_met2,
-        const geom_t *const RSTR g_met3,
-        const geom_t *const RSTR g_met4,
-        const geom_t *const RSTR g_met5,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const int nsteps,
-        const void *const RSTR steps,
-        void *const RSTR value
-);
-
-extern "C" int laplace_objective_steps_packed_3d_isoparametric_mesh_soa(
+extern "C" int laplace_objective_steps_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,

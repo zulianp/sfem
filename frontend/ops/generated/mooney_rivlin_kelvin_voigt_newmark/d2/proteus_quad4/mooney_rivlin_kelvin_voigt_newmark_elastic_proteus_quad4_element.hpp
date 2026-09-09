@@ -38,7 +38,7 @@ struct mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_re
 };
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_energy_element_geometry_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
         const s_t *const RSTR det,
@@ -85,7 +85,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 }
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_energy_element_coords_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
         const s_t lmbda,
@@ -133,7 +133,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 }
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_energy_element_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
         const s_t lmbda,
@@ -182,7 +182,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_element_geometry_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
         const s_t *const RSTR det,
@@ -232,7 +232,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 }
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_element_coords_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
         const s_t lmbda,
@@ -283,7 +283,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 }
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_element_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
         const s_t lmbda,
@@ -335,7 +335,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_hessian_element_geometry_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
         const s_t *const RSTR det,
@@ -399,7 +399,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 }
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_hessian_element_coords_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
         const s_t lmbda,
@@ -464,7 +464,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 }
 
 template <typename s_t, int VS = 16>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_hessian_element_soa(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
         const s_t lmbda,

@@ -11,7 +11,7 @@
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int navier_stokes_form_1_p_tri6_tri3_residual_affine_mesh_soa(
+extern "C" int navier_stokes_form_1_p_tri6_tri3_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -27,7 +27,7 @@ extern "C" int navier_stokes_form_1_p_tri6_tri3_residual_affine_mesh_soa(
     double *const RSTR u_out[2],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_p_tri6_tri3_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_1_p_tri6_tri3_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -43,7 +43,7 @@ extern "C" int navier_stokes_form_1_p_tri6_tri3_residual_affine_mesh_soa_float(
     float *const RSTR u_out[2],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_soa(
+extern "C" int navier_stokes_form_1_p_hex27_hex8_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -64,7 +64,7 @@ extern "C" int navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_soa(
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_1_p_hex27_hex8_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -85,7 +85,7 @@ extern "C" int navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_soa_float(
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_p_tet10_tet4_residual_affine_mesh_soa(
+extern "C" int navier_stokes_form_1_p_tet10_tet4_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -106,7 +106,7 @@ extern "C" int navier_stokes_form_1_p_tet10_tet4_residual_affine_mesh_soa(
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_p_tet10_tet4_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_1_p_tet10_tet4_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -127,7 +127,7 @@ extern "C" int navier_stokes_form_1_p_tet10_tet4_residual_affine_mesh_soa_float(
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_u_tri6_tri3_residual_affine_mesh_soa(
+extern "C" int navier_stokes_form_1_u_tri6_tri3_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -152,7 +152,7 @@ extern "C" int navier_stokes_form_1_u_tri6_tri3_residual_affine_mesh_soa(
     double *const RSTR u_out[2],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_u_tri6_tri3_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_1_u_tri6_tri3_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -177,7 +177,7 @@ extern "C" int navier_stokes_form_1_u_tri6_tri3_residual_affine_mesh_soa_float(
     float *const RSTR u_out[2],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_u_hex27_hex8_residual_affine_mesh_soa(
+extern "C" int navier_stokes_form_1_u_hex27_hex8_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -208,7 +208,7 @@ extern "C" int navier_stokes_form_1_u_hex27_hex8_residual_affine_mesh_soa(
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_u_hex27_hex8_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_1_u_hex27_hex8_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -239,7 +239,7 @@ extern "C" int navier_stokes_form_1_u_hex27_hex8_residual_affine_mesh_soa_float(
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa(
+extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -270,7 +270,7 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa(
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -301,7 +301,7 @@ extern "C" int navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa_float(
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -317,7 +317,7 @@ extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_so
     double *const RSTR u_out[2],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -333,7 +333,7 @@ extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_so
     float *const RSTR u_out[2],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -354,7 +354,7 @@ extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_s
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -375,7 +375,7 @@ extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_s
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -396,7 +396,7 @@ extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_affine_mesh_s
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -417,7 +417,7 @@ extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_affine_mesh_s
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -433,7 +433,7 @@ extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_so
     double *const RSTR u_out[2],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -449,7 +449,7 @@ extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_so
     float *const RSTR u_out[2],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -470,7 +470,7 @@ extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_affine_mesh_s
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -491,7 +491,7 @@ extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_affine_mesh_s
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -512,7 +512,7 @@ extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_s
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -533,7 +533,7 @@ extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_s
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -553,7 +553,7 @@ extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR u_out[2]
 );
-extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -573,7 +573,7 @@ extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa_flo
     const ptrdiff_t out_stride,
     float *const RSTR u_out[2]
 );
-extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -598,7 +598,7 @@ extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR u_out[3]
 );
-extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -623,7 +623,7 @@ extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_affine_mesh_soa_fl
     const ptrdiff_t out_stride,
     float *const RSTR u_out[3]
 );
-extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -648,7 +648,7 @@ extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_soa(
     const ptrdiff_t out_stride,
     double *const RSTR u_out[3]
 );
-extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -673,7 +673,7 @@ extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_soa_fl
     const ptrdiff_t out_stride,
     float *const RSTR u_out[3]
 );
-extern "C" int navier_stokes_tri6_tri3_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_tri6_tri3_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -696,7 +696,7 @@ extern "C" int navier_stokes_tri6_tri3_jacobian_action_affine_mesh_soa(
     double *const RSTR u_out[2],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_tri6_tri3_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_tri6_tri3_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -719,7 +719,7 @@ extern "C" int navier_stokes_tri6_tri3_jacobian_action_affine_mesh_soa_float(
     float *const RSTR u_out[2],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_hex27_hex8_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -747,7 +747,7 @@ extern "C" int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_soa(
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_hex27_hex8_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -775,7 +775,7 @@ extern "C" int navier_stokes_hex27_hex8_jacobian_action_affine_mesh_soa_float(
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_soa(
+extern "C" int navier_stokes_tet10_tet4_jacobian_action_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -803,7 +803,7 @@ extern "C" int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_soa(
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_soa_float(
+extern "C" int navier_stokes_tet10_tet4_jacobian_action_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -831,7 +831,7 @@ extern "C" int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_soa_float(
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_tri6_tri3_residual_affine_mesh_soa(
+extern "C" int navier_stokes_tri6_tri3_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -856,7 +856,7 @@ extern "C" int navier_stokes_tri6_tri3_residual_affine_mesh_soa(
     double *const RSTR u_out[2],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_tri6_tri3_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_tri6_tri3_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -881,7 +881,7 @@ extern "C" int navier_stokes_tri6_tri3_residual_affine_mesh_soa_float(
     float *const RSTR u_out[2],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_hex27_hex8_residual_affine_mesh_soa(
+extern "C" int navier_stokes_hex27_hex8_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -912,7 +912,7 @@ extern "C" int navier_stokes_hex27_hex8_residual_affine_mesh_soa(
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_hex27_hex8_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_hex27_hex8_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -943,7 +943,7 @@ extern "C" int navier_stokes_hex27_hex8_residual_affine_mesh_soa_float(
     float *const RSTR u_out[3],
     float *const RSTR p_out
 );
-extern "C" int navier_stokes_tet10_tet4_residual_affine_mesh_soa(
+extern "C" int navier_stokes_tet10_tet4_residual_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -974,7 +974,7 @@ extern "C" int navier_stokes_tet10_tet4_residual_affine_mesh_soa(
     double *const RSTR u_out[3],
     double *const RSTR p_out
 );
-extern "C" int navier_stokes_tet10_tet4_residual_affine_mesh_soa_float(
+extern "C" int navier_stokes_tet10_tet4_residual_a_msoa_float(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1006,7 +1006,7 @@ extern "C" int navier_stokes_tet10_tet4_residual_affine_mesh_soa_float(
     float *const RSTR p_out
 );
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_2d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1032,9 +1032,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_2d_affi
     case smesh::TRI6: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_1_p_tri6_tri3_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_1_p_tri6_tri3_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_1_p_tri6_tri3_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_1_p_tri6_tri3_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1044,13 +1044,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_2d_affi
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_1_p_residual_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_1_p_residual_2d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1081,9 +1081,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_3d_affi
     case smesh::HEX27: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_1_p_hex27_hex8_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_1_p_hex27_hex8_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1092,9 +1092,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_3d_affi
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_1_p_tet10_tet4_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_1_p_tet10_tet4_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_1_p_tet10_tet4_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_1_p_tet10_tet4_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1104,13 +1104,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_p_residual_3d_affi
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_1_p_residual_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_1_p_residual_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_2d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1145,9 +1145,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_2d_affi
     case smesh::TRI6: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_1_u_tri6_tri3_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_1_u_tri6_tri3_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_1_u_tri6_tri3_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_1_u_tri6_tri3_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1157,13 +1157,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_2d_affi
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_1_u_residual_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_1_u_residual_2d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1204,9 +1204,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_3d_affi
     case smesh::HEX27: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_1_u_hex27_hex8_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_1_u_hex27_hex8_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_1_u_hex27_hex8_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_1_u_hex27_hex8_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1215,9 +1215,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_3d_affi
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_1_u_tet10_tet4_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_1_u_tet10_tet4_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_1_u_tet10_tet4_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1227,13 +1227,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_1_u_residual_3d_affi
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_1_u_residual_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_1_u_residual_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1259,9 +1259,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
     case smesh::TRI6: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1271,13 +1271,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_2_p_u_jacobian_action_2d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1308,9 +1308,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
     case smesh::HEX27: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1319,9 +1319,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1331,13 +1331,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_2_p_u_jacobian_action_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_2_p_u_jacobian_action_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1363,9 +1363,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
     case smesh::TRI6: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1375,13 +1375,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_2_u_p_jacobian_action_2d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1412,9 +1412,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
     case smesh::HEX27: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1423,9 +1423,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1435,13 +1435,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_2_u_p_jacobian_action_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_2_u_p_jacobian_action_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1471,9 +1471,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
     case smesh::TRI6: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
+          return navier_stokes_form_2_u_u_tri6_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
+          return navier_stokes_form_2_u_u_tri6_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
         default:
           break;
       }
@@ -1483,13 +1483,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_2_u_u_jacobian_action_2d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1524,9 +1524,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
     case smesh::HEX27: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_u_u_hex27_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
+          return navier_stokes_form_2_u_u_hex27_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_u_u_hex27_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
+          return navier_stokes_form_2_u_u_hex27_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
         default:
           break;
       }
@@ -1535,9 +1535,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
+          return navier_stokes_form_2_u_u_tet10_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, direction_stride, (const double *const *)u_direction_data, out_stride, (double *const *)u_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
+          return navier_stokes_form_2_u_u_tet10_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, direction_stride, (const float *const *)u_direction_data, out_stride, (float *const *)u_out);
         default:
           break;
       }
@@ -1547,13 +1547,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_form_2_u_u_jacobian_action_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_form_2_u_u_jacobian_action_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1586,9 +1586,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_affine
     case smesh::TRI6: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_tri6_tri3_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_tri6_tri3_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_tri6_tri3_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_tri6_tri3_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1598,13 +1598,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_affine
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_jacobian_action_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_jacobian_action_2d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1642,9 +1642,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_affine
     case smesh::HEX27: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_hex27_hex8_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_hex27_hex8_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_hex27_hex8_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_hex27_hex8_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1653,9 +1653,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_affine
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_tet10_tet4_jacobian_action_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_tet10_tet4_jacobian_action_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_tet10_tet4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_tet10_tet4_jacobian_action_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1665,13 +1665,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_affine
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_jacobian_action_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_jacobian_action_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_2d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1706,9 +1706,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_2d_affine_mesh_s
     case smesh::TRI6: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_tri6_tri3_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_tri6_tri3_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_tri6_tri3_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_tri6_tri3_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1718,13 +1718,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_2d_affine_mesh_s
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_residual_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_residual_2d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_3d_affine_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1765,9 +1765,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_3d_affine_mesh_s
     case smesh::HEX27: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_hex27_hex8_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_hex27_hex8_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_hex27_hex8_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_hex27_hex8_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1776,9 +1776,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_3d_affine_mesh_s
     case smesh::TET10: {
       switch (resolved_real_type) {
         case smesh::SMESH_FLOAT64:
-          return navier_stokes_tet10_tet4_residual_affine_mesh_soa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
+          return navier_stokes_tet10_tet4_residual_a_msoa(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
         case smesh::SMESH_FLOAT32:
-          return navier_stokes_tet10_tet4_residual_affine_mesh_soa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
+          return navier_stokes_tet10_tet4_residual_a_msoa_float(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, f0, f1, f2, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
         default:
           break;
       }
@@ -1788,7 +1788,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_3d_affine_mesh_s
       break;
   }
   std::fprintf(stderr,
-      "navier_stokes_residual_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+      "navier_stokes_residual_3d_a_msoa does not support element type %d with real type %d\n",
       (int)element_type,
       (int)real_type);
   return SFEM_FAILURE;

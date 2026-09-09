@@ -1,6 +1,6 @@
 #include "../../op/sfem_GeneratedNeumann_c_abi.hpp"
 
-extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(
+extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -13,7 +13,7 @@ extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(
         real_t *const RSTR out0,
         real_t *const RSTR out1
 );
-extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(
+extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -27,7 +27,7 @@ extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_fl
         float *const RSTR out1
 );
 
-extern "C" int neumann_quad4_edgeshell2_boundary_residual_sideset_soa(
+extern "C" int neumann_quad4_edgeshell2_boundary_residual_ss_soa(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -46,10 +46,10 @@ extern "C" int neumann_quad4_edgeshell2_boundary_residual_sideset_soa(
         elements[3],
         elements[2]
     };
-    return neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(nsides, nnodes, proteus_elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
+    return neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa(nsides, nnodes, proteus_elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
 }
 
-extern "C" int neumann_quad4_edgeshell2_boundary_residual_sideset_soa_float(
+extern "C" int neumann_quad4_edgeshell2_boundary_residual_ss_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -68,5 +68,5 @@ extern "C" int neumann_quad4_edgeshell2_boundary_residual_sideset_soa_float(
         elements[3],
         elements[2]
     };
-    return neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(nsides, nnodes, proteus_elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
+    return neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa_float(nsides, nnodes, proteus_elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
 }

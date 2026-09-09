@@ -17,6 +17,7 @@ from sfem import gen
 from sfem._gen_op import _dispatch_sources
 from codegen.framework.backends.cuda import CUDASoABackend
 from codegen.framework.plans.diagnostics import KernelDiagnosticsEntryPlan, KernelDiagnosticsPlan
+from codegen.framework.plans.conventions import abi_local_level
 from codegen.framework.plans.emission import ElementEmissionPlan
 from codegen.framework.plans.generation import GenerationPlan, mesh_kernel_plan_from_context
 from codegen.framework.plans.kernel_signature import (
@@ -1067,20 +1068,20 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("double flops_gradient() const override;", header_source)
             self.assertIn("size_t memory_traffic_bytes_apply() const override;", header_source)
             self.assertIn(
-                "neohookean_ogden_gradient_2d_isoparametric_mesh_soa",
+                "neohookean_ogden_gradient_2d_i_msoa",
                 source,
             )
             self.assertIn(
-                "neohookean_ogden_objective_2d_affine_mesh_soa",
+                "neohookean_ogden_objective_2d_a_msoa",
                 source,
             )
             for private_function in (
-                "neohookean_ogden_tri3_objective_affine_mesh_soa",
-                "neohookean_ogden_tri3_objective_isoparametric_mesh_soa",
-                "neohookean_ogden_tri3_objective_steps_affine_mesh_soa",
-                "neohookean_ogden_tri3_objective_steps_isoparametric_mesh_soa",
-                "neohookean_ogden_tri3_gradient_affine_mesh_soa",
-                "neohookean_ogden_tri3_gradient_isoparametric_mesh_soa",
+                "neohookean_ogden_tri3_objective_a_msoa",
+                "neohookean_ogden_tri3_objective_i_msoa",
+                "neohookean_ogden_tri3_objective_steps_a_msoa",
+                "neohookean_ogden_tri3_objective_steps_i_msoa",
+                "neohookean_ogden_tri3_gradient_a_msoa",
+                "neohookean_ogden_tri3_gradient_i_msoa",
             ):
                 self.assertNotIn(private_function, source)
             self.assertIn("double GeneratedNeoHookeanOgden::flops_gradient() const", source)
@@ -1134,7 +1135,7 @@ class GenApiTest(unittest.TestCase):
             with open(c_abi, encoding="utf-8") as stream:
                 declarations = stream.read()
             self.assertIn(
-                "extern \"C\" int neohookean_ogden_gradient_2d_isoparametric_mesh_soa",
+                "extern \"C\" int neohookean_ogden_gradient_2d_i_msoa",
                 declarations,
             )
             self.assertIn(
@@ -1146,12 +1147,12 @@ class GenApiTest(unittest.TestCase):
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int neohookean_ogden_apply_2d_affine_mesh_soa",
+                "extern \"C\" int neohookean_ogden_apply_2d_a_msoa",
                 declarations,
             )
             self.assertIn("const smesh::ElemType element_type", declarations)
             self.assertNotIn(
-                "extern \"C\" int neohookean_ogden_tri3_apply_affine_mesh_soa",
+                "extern \"C\" int neohookean_ogden_tri3_apply_a_msoa",
                 declarations,
             )
             self.assertIn(
@@ -1185,7 +1186,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("d2/tri3", metadata["generated_include_paths"])
             self.assertIn("op", metadata["generated_include_paths"])
             self.assertIn(
-                "neohookean_ogden_gradient_2d_isoparametric_mesh_soa",
+                "neohookean_ogden_gradient_2d_i_msoa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertEqual(
@@ -1214,10 +1215,10 @@ class GenApiTest(unittest.TestCase):
 
         kernel_sources = {
             "d2/tri3/demo_tri3_operator.cpp": """
-extern "C" int demo_tri3_apply_isoparametric_mesh_soa(ptrdiff_t n, idx_t **elements) { return 0; }
-extern "C" int demo_tri3_apply_affine_mesh_soa(ptrdiff_t n, idx_t **elements) { return 0; }
-extern "C" int demo_tri3_apply_packed_isoparametric_mesh_soa(ptrdiff_t n, idx_t **elements) { return 0; }
-extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **elements) { return 0; }
+extern "C" int demo_tri3_apply_i_msoa(ptrdiff_t n, idx_t **elements) { return 0; }
+extern "C" int demo_tri3_apply_a_msoa(ptrdiff_t n, idx_t **elements) { return 0; }
+extern "C" int demo_tri3_apply_packed_i_msoa(ptrdiff_t n, idx_t **elements) { return 0; }
+extern "C" int demo_tri3_apply_packed_a_msoa(ptrdiff_t n, idx_t **elements) { return 0; }
 """,
         }
 
@@ -1238,23 +1239,23 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             },
         )
         self.assertIn(
-            "demo_apply_2d_isoparametric_mesh_soa",
+            "demo_apply_2d_i_msoa",
             files["op/sfem_GeneratedDemo_isoparametric_dispatch.cpp"],
         )
         self.assertIn(
-            "demo_apply_2d_affine_mesh_soa",
+            "demo_apply_2d_a_msoa",
             files["op/sfem_GeneratedDemo_affine_dispatch.cpp"],
         )
         self.assertIn(
-            "demo_apply_packed_2d_isoparametric_mesh_soa",
+            "demo_apply_packed_2d_i_msoa",
             files["op/sfem_GeneratedDemo_packed_isoparametric_dispatch.cpp"],
         )
         self.assertIn(
-            "demo_apply_packed_2d_affine_mesh_soa",
+            "demo_apply_packed_2d_a_msoa",
             files["op/sfem_GeneratedDemo_packed_affine_dispatch.cpp"],
         )
         self.assertNotIn(
-            "demo_tri3_apply_affine_mesh_soa",
+            "demo_tri3_apply_a_msoa",
             files["op/sfem_GeneratedDemo_isoparametric_dispatch.cpp"],
         )
 
@@ -1393,15 +1394,15 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             )
 
             for operation in ("energy", "gradient", "hessian"):
-                for suffix in ("", "_coords", "_geometry"):
+                for suffix in ("", "coords_", "geometry_"):
                     self.assertIn(
-                        "linear_elasticity_tet4_%s_element%s_soa"
-                        % (operation, suffix),
+                        "linear_elasticity_tet4_%s_%s"
+                        % (operation, abi_local_level(suffix)),
                         le_header,
                     )
                     self.assertIn(
-                        "linear_elasticity_%s_3d_element%s_soa"
-                        % (operation, suffix),
+                        "linear_elasticity_%s_3d_%s"
+                        % (operation, abi_local_level(suffix)),
                         le_dispatch,
                     )
 
@@ -1414,11 +1415,11 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             )
             le_hessian = _generated_function_signature(
                 le_header,
-                "linear_elasticity_tet4_hessian_element_soa",
+                "linear_elasticity_tet4_hessian_esoa",
             )
             nh_hessian = _generated_function_signature(
                 nh_header,
-                "neohookean_ogden_tet4_hessian_element_soa",
+                "neohookean_ogden_tet4_hessian_esoa",
             )
             for token in forbidden_signature_inputs:
                 self.assertNotIn(token, le_hessian)
@@ -1429,9 +1430,9 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             self.assertIn("matrix_streams", le_hessian)
             self.assertNotIn("u_streams", le_hessian)
             self.assertIn("u_streams", nh_hessian)
-            self.assertIn("linear_elasticity_proteus_hex8_hessian_element_soa", le_hex8_header)
+            self.assertIn("linear_elasticity_proteus_hex8_hessian_esoa", le_hex8_header)
             self.assertIn("SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6}", le_hex8_header)
-            self.assertIn("neohookean_ogden_hex8_hessian_element_soa", nh_hex8_header)
+            self.assertIn("neohookean_ogden_hex8_hessian_esoa", nh_hex8_header)
             self.assertIn("q * nelements + evb + lane", le_header)
             self.assertIn("template <typename s_t, int VS = 16, typename elem_type_t>", le_dispatch)
             self.assertNotIn("smesh_mesh.hpp", le_dispatch)
@@ -1477,10 +1478,10 @@ int main() {
   for (int i = 0; i < 144; ++i) {
     matrix_streams[i] = data[i];
   }
-  int status = sfem::codegen::linear_elasticity_tet4_energy_element_soa<double>(N, coords, 1.0, 1.0, u_streams, values);
-  status |= sfem::codegen::linear_elasticity_tet4_gradient_element_soa<double>(N, coords, 1.0, 1.0, u_streams, out_streams);
-  status |= sfem::codegen::linear_elasticity_tet4_hessian_element_soa<double>(N, coords, 1.0, 1.0, matrix_streams);
-  status |= sfem::codegen::linear_elasticity_hessian_3d_element_soa<double>(4, N, coords, 1.0, 1.0, matrix_streams);
+  int status = sfem::codegen::linear_elasticity_tet4_energy_esoa<double>(N, coords, 1.0, 1.0, u_streams, values);
+  status |= sfem::codegen::linear_elasticity_tet4_gradient_esoa<double>(N, coords, 1.0, 1.0, u_streams, out_streams);
+  status |= sfem::codegen::linear_elasticity_tet4_hessian_esoa<double>(N, coords, 1.0, 1.0, matrix_streams);
+  status |= sfem::codegen::linear_elasticity_hessian_3d_esoa<double>(4, N, coords, 1.0, 1.0, matrix_streams);
   return status;
 }
 '''
@@ -1499,8 +1500,8 @@ int main() {
   for (int i = 0; i < 144; ++i) {
     matrix_streams[i] = data[i];
   }
-  int status = sfem::codegen::neohookean_ogden_tet4_hessian_element_soa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
-  status |= sfem::codegen::neohookean_ogden_hessian_3d_element_soa<double>(4, N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  int status = sfem::codegen::neohookean_ogden_tet4_hessian_esoa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  status |= sfem::codegen::neohookean_ogden_hessian_3d_esoa<double>(4, N, coords, 1.0, 1.0, u_streams, matrix_streams);
   return status;
 }
 '''
@@ -1519,8 +1520,8 @@ int main() {
   for (int i = 0; i < 576; ++i) {
     matrix_streams[i] = data[i];
   }
-  int status = sfem::codegen::neohookean_ogden_hex8_hessian_element_soa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
-  status |= sfem::codegen::neohookean_ogden_hessian_3d_element_soa<double>(8, N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  int status = sfem::codegen::neohookean_ogden_hex8_hessian_esoa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
+  status |= sfem::codegen::neohookean_ogden_hessian_3d_esoa<double>(8, N, coords, 1.0, 1.0, u_streams, matrix_streams);
   return status;
 }
 '''
@@ -1537,8 +1538,8 @@ int main() {
   for (int i = 0; i < 576; ++i) {
     matrix_streams[i] = data[i];
   }
-  int status = sfem::codegen::linear_elasticity_hex8_hessian_element_soa<double>(N, coords, 1.0, 1.0, matrix_streams);
-  status |= sfem::codegen::linear_elasticity_hessian_3d_element_soa<double>(8, N, coords, 1.0, 1.0, matrix_streams);
+  int status = sfem::codegen::linear_elasticity_hex8_hessian_esoa<double>(N, coords, 1.0, 1.0, matrix_streams);
+  status |= sfem::codegen::linear_elasticity_hessian_3d_esoa<double>(8, N, coords, 1.0, 1.0, matrix_streams);
   return status;
 }
 '''
@@ -1806,8 +1807,8 @@ int main() {
                 source.index('parameters.require_real_value("C_ka1")'),
                 source.index('parameters.require_real_value("porosity")'),
             )
-            self.assertIn("two_phase_flow_residual_2d_isoparametric_mesh_soa", source)
-            self.assertIn("two_phase_flow_jacobian_action_2d_isoparametric_mesh_soa", source)
+            self.assertIn("two_phase_flow_residual_2d_i_msoa", source)
+            self.assertIn("two_phase_flow_jacobian_action_2d_i_msoa", source)
             self.assertIn("const geom_t *const *adjugate = nullptr;", source)
             self.assertIn("int cache_affine_geometry(", source)
             self.assertIn("const bool matched = set_affine_option", source)
@@ -1826,7 +1827,7 @@ int main() {
                 "ageom_stream<s_t, g_t, VS>",
                 operator_source,
             )
-            self.assertNotIn("two_phase_flow_tri3_residual_isoparametric_mesh_aos", source)
+            self.assertNotIn("two_phase_flow_tri3_residual_i_maos", source)
             self.assertIn("static constexpr ptrdiff_t FIELD_STRIDE = 2;", source)
             self.assertIn("p_w_data = state + 0", source)
             self.assertNotIn("generated_two_phase_flow", source)
@@ -1835,11 +1836,11 @@ int main() {
             with open(c_abi, encoding="utf-8") as stream:
                 declarations = stream.read()
             self.assertIn(
-                "extern \"C\" int two_phase_flow_residual_2d_isoparametric_mesh_soa",
+                "extern \"C\" int two_phase_flow_residual_2d_i_msoa",
                 declarations,
             )
             self.assertNotIn(
-                "extern \"C\" int two_phase_flow_tri3_residual_isoparametric_mesh_soa",
+                "extern \"C\" int two_phase_flow_tri3_residual_i_msoa",
                 declarations,
             )
             self.assertIn(
@@ -1851,7 +1852,7 @@ int main() {
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int two_phase_flow_jacobian_action_2d_isoparametric_mesh_aos",
+                "extern \"C\" int two_phase_flow_jacobian_action_2d_i_maos",
                 declarations,
             )
             manifest = os.path.join(out_dir, "op", "sfem_GeneratedTwoPhaseFlow_manifest.json")
@@ -2118,10 +2119,10 @@ int main() {
                 contents = stream.read()
 
         affine = contents.index(
-            "neohookean_ogden_tet10_gradient_affine_mesh_soa_impl"
+            "neohookean_ogden_tet10_gradient_a_msoa_impl"
         )
         isoparametric = contents.index(
-            "neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_impl"
+            "neohookean_ogden_tet10_gradient_i_msoa_impl"
         )
         # TET10: four points affine, eleven isoparametric.  The numbers are the
         # element's, not the point -- what is pinned is that the two modes do
@@ -2586,7 +2587,7 @@ int main() {
             )
             with open(operator_path, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
-            self.assertIn("__global__ void neohookean_ogden_quad4_objective_affine_mesh_soa_impl", operator_source)
+            self.assertIn("__global__ void neohookean_ogden_quad4_objective_a_msoa_impl", operator_source)
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)
@@ -2628,7 +2629,7 @@ int main() {
             with open(operator_path, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
             self.assertIn("#include <hip/hip_runtime.h>", operator_source)
-            self.assertIn("__global__ void neohookean_ogden_quad4_objective_affine_mesh_soa_impl", operator_source)
+            self.assertIn("__global__ void neohookean_ogden_quad4_objective_a_msoa_impl", operator_source)
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)
@@ -3031,7 +3032,7 @@ int main() {
         )
         self.assertEqual(residual_diagnostics.kind, "residual_soa")
         self.assertIn(
-            "two_phase_flow_tri3_residual_element_soa",
+            "two_phase_flow_tri3_residual_esoa",
             residual_diagnostics.public_names,
         )
         self.assertIn(
@@ -3039,7 +3040,7 @@ int main() {
             residual_diagnostics.public_names,
         )
         self.assertIn(
-            "two_phase_flow_tri3_jacobian_action_element_soa",
+            "two_phase_flow_tri3_jacobian_action_esoa",
             residual_diagnostics.public_names,
         )
         block_entry = residual_diagnostics.entry("two_phase_flow_tri3_jacobian_p_w_p_c")
@@ -3063,8 +3064,8 @@ int main() {
         self.assertEqual(
             mixed_diagnostics.public_names,
             (
-                "stokes_tri6_tri3_residual_element_soa",
-                "stokes_tri6_tri3_jacobian_action_element_soa",
+                "stokes_tri6_tri3_residual_esoa",
+                "stokes_tri6_tri3_jacobian_action_esoa",
             ),
         )
 
@@ -3525,25 +3526,25 @@ int main() {
                 wrapper_contents = input_file.read()
             self.assertIn("class GeneratedPoroHyperelasticity::Impl", wrapper_contents)
             self.assertIn(
-                "poro_hyperelasticity_solid_gradient_3d_isoparametric_mesh_soa",
+                "poro_hyperelasticity_solid_gradient_3d_i_msoa",
                 wrapper_contents,
             )
             self.assertIn(
-                "poro_hyperelasticity_poro_residual_3d_isoparametric_mesh_soa",
+                "poro_hyperelasticity_poro_residual_3d_i_msoa",
                 wrapper_contents,
             )
             self.assertIn(
-                "poro_hyperelasticity_poro_jacobian_action_3d_affine_mesh_soa",
+                "poro_hyperelasticity_poro_jacobian_action_3d_a_msoa",
                 wrapper_contents,
             )
             for private_function in (
-                "poro_hyperelasticity_solid_tet10_objective_affine_mesh_soa",
-                "poro_hyperelasticity_solid_tet10_gradient_isoparametric_mesh_soa",
-                "poro_hyperelasticity_solid_tet10_apply_affine_mesh_soa",
-                "poro_hyperelasticity_poro_tet10_tet4_residual_isoparametric_mesh_soa",
-                "poro_hyperelasticity_poro_tet10_tet4_jacobian_action_affine_mesh_soa",
+                "poro_hyperelasticity_solid_tet10_objective_a_msoa",
+                "poro_hyperelasticity_solid_tet10_gradient_i_msoa",
+                "poro_hyperelasticity_solid_tet10_apply_a_msoa",
+                "poro_hyperelasticity_poro_tet10_tet4_residual_i_msoa",
+                "poro_hyperelasticity_poro_tet10_tet4_jacobian_action_a_msoa",
                 "poro_hyperelasticity_solid_tet10_gradient_soa_diagnostics()",
-                "poro_hyperelasticity_poro_tet10_tet4_residual_element_soa_diagnostics()",
+                "poro_hyperelasticity_poro_tet10_tet4_residual_esoa_diagnostics()",
             ):
                 self.assertNotIn(private_function, wrapper_contents)
             self.assertIn(
@@ -3551,7 +3552,7 @@ int main() {
                 wrapper_contents,
             )
             self.assertIn(
-                "poro_hyperelasticity_poro_residual_element_3d_soa_diagnostics(domain.element_type)",
+                "poro_hyperelasticity_poro_residual_3d_esoa_diagnostics(domain.element_type)",
                 wrapper_contents,
             )
             c_abi = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity_c_abi.hpp")
@@ -3566,7 +3567,7 @@ int main() {
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int poro_hyperelasticity_poro_residual_3d_affine_mesh_soa",
+                "extern \"C\" int poro_hyperelasticity_poro_residual_3d_a_msoa",
                 declarations,
             )
             manifest = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity_manifest.json")
@@ -3579,7 +3580,7 @@ int main() {
             )
             self.assertIn("d3/tet10_tet4", metadata["generated_include_paths"])
             self.assertIn(
-                "poro_hyperelasticity_poro_residual_3d_affine_mesh_soa",
+                "poro_hyperelasticity_poro_residual_3d_a_msoa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertEqual(
@@ -3606,11 +3607,11 @@ int main() {
             with open(wrapper, encoding="utf-8") as input_file:
                 wrapper_contents = input_file.read()
             self.assertNotIn(
-                "poro_hyperelasticity_solid_hex27_gradient_affine_mesh_soa(domain",
+                "poro_hyperelasticity_solid_hex27_gradient_a_msoa(domain",
                 wrapper_contents,
             )
             self.assertIn(
-                "poro_hyperelasticity_poro_hex27_hex8_residual_affine_mesh_soa",
+                "poro_hyperelasticity_poro_hex27_hex8_residual_a_msoa",
                 wrapper_contents,
             )
             local = os.path.join(
@@ -3676,22 +3677,22 @@ int main() {
             with open(source) as input_file:
                 contents = input_file.read()
             self.assertIn('#include "../stokes_d2_simplex_mixed_local.hpp"', contents)
-            self.assertIn("stokes_tri6_tri3_residual_isoparametric_mesh_soa", contents)
-            self.assertIn("stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa", contents)
+            self.assertIn("stokes_tri6_tri3_residual_i_msoa", contents)
+            self.assertIn("stokes_tri6_tri3_jacobian_action_i_msoa", contents)
             self.assertIn(
-                "stokes_tri6_tri3_residual_element_soa_diagnostics",
+                "stokes_tri6_tri3_residual_esoa_diagnostics",
                 contents,
             )
             self.assertIn(
-                "stokes_tri6_tri3_jacobian_action_element_soa_arithmetic_intensity",
+                "stokes_tri6_tri3_jacobian_action_esoa_arithmetic_intensity",
                 contents,
             )
             self.assertIn(
-                "stokes_tri6_tri3_residual_affine_mesh_soa_print_rate",
+                "stokes_tri6_tri3_residual_a_msoa_print_rate",
                 contents,
             )
             self.assertIn(
-                "stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa_float_print_rate",
+                "stokes_tri6_tri3_jacobian_action_i_msoa_float_print_rate",
                 contents,
             )
             self.assertIn("s_t *const RSTR u_out[2]", contents)
@@ -3702,9 +3703,9 @@ int main() {
             with open(wrapper, encoding="utf-8") as input_file:
                 wrapper_contents = input_file.read()
             self.assertIn("class GeneratedStokes::Impl", wrapper_contents)
-            self.assertIn("stokes_residual_2d_isoparametric_mesh_soa", wrapper_contents)
-            self.assertIn("stokes_residual_2d_affine_mesh_soa", wrapper_contents)
-            self.assertIn("stokes_jacobian_action_2d_affine_mesh_soa", wrapper_contents)
+            self.assertIn("stokes_residual_2d_i_msoa", wrapper_contents)
+            self.assertIn("stokes_residual_2d_a_msoa", wrapper_contents)
+            self.assertIn("stokes_jacobian_action_2d_a_msoa", wrapper_contents)
             self.assertIn("residual_uses_affine", wrapper_contents)
             self.assertIn("jacobian_action_uses_affine", wrapper_contents)
             self.assertIn("int cache_affine_geometry(", wrapper_contents)
@@ -3727,19 +3728,19 @@ int main() {
             with open(c_abi, encoding="utf-8") as input_file:
                 declarations = input_file.read()
             self.assertIn(
-                "extern \"C\" int stokes_residual_2d_isoparametric_mesh_soa",
+                "extern \"C\" int stokes_residual_2d_i_msoa",
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int stokes_residual_2d_affine_mesh_soa",
+                "extern \"C\" int stokes_residual_2d_a_msoa",
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa",
+                "extern \"C\" int stokes_form_2_u_p_jacobian_action_2d_a_msoa",
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa",
+                "extern \"C\" int stokes_form_2_u_p_jacobian_action_2d_i_msoa",
                 declarations,
             )
             manifest = os.path.join(out_dir, "op", "sfem_GeneratedStokes_manifest.json")
@@ -3752,7 +3753,7 @@ int main() {
             )
             self.assertIn("d2/tri6_tri3", metadata["generated_include_paths"])
             self.assertIn(
-                "stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa",
+                "stokes_form_2_u_p_jacobian_action_2d_i_msoa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertIn(
@@ -4151,10 +4152,10 @@ int main() {
             self.assertNotIn("ev[lane * NS", operator_source)
             self.assertNotIn("ev[scatter * NS", operator_source)
             affine_begin = operator_source.index(
-                "laplace_tet4_residual_affine_mesh_soa_impl"
+                "laplace_tet4_residual_a_msoa_impl"
             )
             affine_end = operator_source.index(
-                "laplace_tet4_residual_affine_mesh_soa("
+                "laplace_tet4_residual_a_msoa("
             )
             affine_source = operator_source[affine_begin:affine_end]
             self.assertIn("g_met0", affine_source)
@@ -4180,18 +4181,18 @@ int main() {
             self.assertNotIn("affine_grad_ref", affine_source)
             self.assertNotIn("g_adj0", affine_source)
             self.assertNotIn("g_det0", affine_source)
-            self.assertIn("laplace_tet4_residual_affine_mesh_soa_aos", operator_source)
-            self.assertIn("laplace_tet4_residual_affine_mesh_soa_aos_unit", operator_source)
+            self.assertIn("laplace_tet4_residual_a_msoa_aos", operator_source)
+            self.assertIn("laplace_tet4_residual_a_msoa_aos_unit", operator_source)
             self.assertIn(
                 "fff[k] = s_t(g_met[i * 6 + k]);",
                 operator_source,
             )
 
             isoparametric_begin = operator_source.index(
-                "laplace_tet4_residual_isoparametric_mesh_soa_impl"
+                "laplace_tet4_residual_i_msoa_impl"
             )
             isoparametric_end = operator_source.index(
-                "laplace_tet4_residual_isoparametric_mesh_soa("
+                "laplace_tet4_residual_i_msoa("
             )
             isoparametric_source = operator_source[isoparametric_begin:isoparametric_end]
             self.assertIn(
@@ -4208,7 +4209,7 @@ int main() {
             self.assertIn("metric_aos = smesh::FFF::create_AoS", wrapper_source)
             self.assertIn("geom_metric_aos", wrapper_source)
             self.assertIn(
-                "laplace_jacobian_action_3d_affine_mesh_soa_aos_unit",
+                "laplace_jacobian_action_3d_a_msoa_aos_unit",
                 wrapper_source,
             )
 
@@ -4299,10 +4300,10 @@ int main() {
             with open(operator) as source:
                 operator_source = source.read()
             affine_begin = operator_source.index(
-                "laplace_tri3_residual_affine_mesh_soa_impl"
+                "laplace_tri3_residual_a_msoa_impl"
             )
             affine_end = operator_source.index(
-                "laplace_tri3_residual_affine_mesh_soa("
+                "laplace_tri3_residual_a_msoa("
             )
             affine_source = operator_source[affine_begin:affine_end]
             self.assertIn("g_met0", affine_source)
@@ -4329,8 +4330,8 @@ int main() {
             self.assertNotIn("g_adj0", affine_source)
             self.assertNotIn("g_det0", affine_source)
             self.assertNotIn("laplace_d2_simplex_tri3_jacobian_action_block<", operator_source)
-            self.assertIn("laplace_tri3_residual_affine_mesh_soa_aos", operator_source)
-            self.assertIn("laplace_tri3_residual_affine_mesh_soa_aos_unit", operator_source)
+            self.assertIn("laplace_tri3_residual_a_msoa_aos", operator_source)
+            self.assertIn("laplace_tri3_residual_a_msoa_aos_unit", operator_source)
 
             subprocess.run(
                 [
@@ -4438,10 +4439,10 @@ int main() {
             with open(operator) as source:
                 operator_source = source.read()
             affine_begin = operator_source.index(
-                "linear_elasticity_tet4_apply_affine_mesh_soa_impl"
+                "linear_elasticity_tet4_apply_a_msoa_impl"
             )
             affine_end = operator_source.index(
-                "linear_elasticity_tet4_apply_affine_mesh_soa("
+                "linear_elasticity_tet4_apply_a_msoa("
             )
             affine_source = operator_source[affine_begin:affine_end]
             for name in ("objective", "gradient", "apply"):
@@ -4450,17 +4451,17 @@ int main() {
                     operator_source,
                 )
             self.assertIn(
-                "linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit",
+                "linear_elasticity_tet4_gradient_a_msoa_aos_unit",
                 operator_source,
             )
             self.assertIn(
-                "linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit",
+                "linear_elasticity_tet4_apply_a_msoa_aos_unit",
                 operator_source,
             )
             fast_apply = _source_between(
                 operator_source,
-                "linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_impl",
-                'extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit',
+                "linear_elasticity_tet4_apply_a_msoa_aos_unit_impl",
+                'extern "C" int linear_elasticity_tet4_apply_a_msoa_aos_unit',
             )
             self.assertIn("g_adj_aos + element * 9", fast_apply)
             self.assertIn("const s_t q0 = a0 * m5 + a1 * m1 + a2 * m2;", fast_apply)
@@ -4488,11 +4489,11 @@ int main() {
             self.assertIn("jacobian_aos", wrapper_source)
             self.assertIn("jacobian_adjugate_AoS", wrapper_source)
             self.assertIn(
-                "linear_elasticity_apply_3d_affine_mesh_soa",
+                "linear_elasticity_apply_3d_a_msoa",
                 wrapper_source,
             )
             self.assertIn(
-                'linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0',
+                'linear_elasticity_gradient_3d_a_msoa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0',
                 wrapper_source,
             )
             self.assertIn("domain.element_type", wrapper_source)
@@ -4814,13 +4815,13 @@ int main() {
                 encoding="utf-8",
             ) as input_file:
                 proteus_source = input_file.read()
-            self.assertIn("neumann_quad4_edgeshell2_boundary_residual_sideset_soa", quad_source)
+            self.assertIn("neumann_quad4_edgeshell2_boundary_residual_ss_soa", quad_source)
             self.assertNotIn("for (int qy = 0; qy < NQ1; ++qy)", quad_source)
             self.assertIn("idx_t *proteus_elements[4] = {", quad_source)
-            self.assertIn("neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa", quad_source)
+            self.assertIn("neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa", quad_source)
             self.assertIn("#pragma omp simd", proteus_quad_source)
             self.assertIn("neumann_hex8_quadshell4_boundary_residual_soa", source)
-            self.assertIn("neumann_hex8_quadshell4_boundary_residual_sideset_soa", source)
+            self.assertIn("neumann_hex8_quadshell4_boundary_residual_ss_soa", source)
             self.assertIn("neumann_proteus_hex27_proteus_quadshell9_boundary_residual_soa", proteus_source)
             self.assertIn("#pragma omp simd", source)
             self.assertIn("#pragma omp simd", proteus_source)
@@ -4871,7 +4872,7 @@ int main() {
                 "material_defaults must be available when SFEM_ENABLE_RYAML is disabled",
             )
             self.assertIn(
-                "neumann_quadshell4_boundary_residual_3d_sideset_soa",
+                "neumann_quadshell4_boundary_residual_3d_ss_soa",
                 op_source,
             )
             self.assertIn("sideset_from_yaml", op_source)
@@ -4883,7 +4884,7 @@ int main() {
             ) as input_file:
                 c_abi = input_file.read()
             self.assertIn(
-                "neumann_quadshell4_boundary_residual_3d_sideset_soa",
+                "neumann_quadshell4_boundary_residual_3d_ss_soa",
                 c_abi,
             )
             self.assertIn("const smesh::ElemType element_type", c_abi)
@@ -4899,7 +4900,7 @@ int main() {
             )
             self.assertIn("d3/hex8", metadata["generated_include_paths"])
             self.assertIn(
-                "neumann_quadshell4_boundary_residual_3d_sideset_soa",
+                "neumann_quadshell4_boundary_residual_3d_ss_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertEqual(

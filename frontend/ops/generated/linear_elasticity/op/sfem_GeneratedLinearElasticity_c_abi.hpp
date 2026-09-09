@@ -34,7 +34,7 @@ typedef double geom_t;
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int linear_elasticity_apply_2d_affine_mesh_soa(
+extern "C" int linear_elasticity_apply_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -55,7 +55,7 @@ extern "C" int linear_elasticity_apply_2d_affine_mesh_soa(
         void *const RSTR outy
 );
 
-extern "C" int linear_elasticity_apply_2d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_apply_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -75,7 +75,7 @@ extern "C" int linear_elasticity_apply_2d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_apply_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int linear_elasticity_apply_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_apply_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -103,7 +103,7 @@ extern "C" int linear_elasticity_apply_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_apply_3d_affine_mesh_soa_aos_unit(
+extern "C" int linear_elasticity_apply_3d_a_msoa_aos_unit(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -123,7 +123,7 @@ extern "C" int linear_elasticity_apply_3d_affine_mesh_soa_aos_unit(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_apply_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_apply_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -145,7 +145,7 @@ extern "C" int linear_elasticity_apply_3d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_apply_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int linear_elasticity_apply_packed_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_apply_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -180,7 +180,7 @@ extern "C" int linear_elasticity_apply_packed_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_apply_packed_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_apply_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -206,7 +206,7 @@ extern "C" int linear_elasticity_apply_packed_3d_isoparametric_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_apply_packed_two_pass_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_apply_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -247,7 +247,7 @@ extern "C" int linear_elasticity_apply_packed_two_pass_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_apply_packed_two_pass_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_apply_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -279,7 +279,7 @@ extern "C" int linear_elasticity_apply_packed_two_pass_3d_isoparametric_mesh_soa
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_gradient_2d_affine_mesh_soa(
+extern "C" int linear_elasticity_gradient_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -300,7 +300,7 @@ extern "C" int linear_elasticity_gradient_2d_affine_mesh_soa(
         void *const RSTR outy
 );
 
-extern "C" int linear_elasticity_gradient_2d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_gradient_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -320,7 +320,7 @@ extern "C" int linear_elasticity_gradient_2d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_gradient_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_gradient_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -348,7 +348,7 @@ extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit(
+extern "C" int linear_elasticity_gradient_3d_a_msoa_aos_unit(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -368,7 +368,7 @@ extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_gradient_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_gradient_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -390,7 +390,7 @@ extern "C" int linear_elasticity_gradient_3d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_gradient_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int linear_elasticity_gradient_packed_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_gradient_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -425,7 +425,7 @@ extern "C" int linear_elasticity_gradient_packed_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_gradient_packed_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_gradient_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -451,7 +451,7 @@ extern "C" int linear_elasticity_gradient_packed_3d_isoparametric_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_gradient_packed_two_pass_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_gradient_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -492,7 +492,7 @@ extern "C" int linear_elasticity_gradient_packed_two_pass_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_gradient_packed_two_pass_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_gradient_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -524,7 +524,7 @@ extern "C" int linear_elasticity_gradient_packed_two_pass_3d_isoparametric_mesh_
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hessian_block_diag_sym_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -536,7 +536,7 @@ extern "C" int linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_so
         void *const RSTR values
 );
 
-extern "C" int linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hessian_block_diag_sym_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -548,7 +548,7 @@ extern "C" int linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_so
         void *const RSTR values
 );
 
-extern "C" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -562,7 +562,7 @@ extern "C" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa(
         void *const RSTR values
 );
 
-extern "C" int linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hessian_bsr_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -582,7 +582,7 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_hex8_matrix_a
 
 extern "C" int linear_elasticity_hex8_matrix_assembly_variant_count();
 
-extern "C" int linear_elasticity_inexact_apply_compressed_2d_affine_mesh_soa(
+extern "C" int linear_elasticity_inexact_apply_compressed_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -599,7 +599,7 @@ extern "C" int linear_elasticity_inexact_apply_compressed_2d_affine_mesh_soa(
         void *const RSTR outy
 );
 
-extern "C" int linear_elasticity_inexact_apply_compressed_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_inexact_apply_compressed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -618,7 +618,7 @@ extern "C" int linear_elasticity_inexact_apply_compressed_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_inexact_apply_stored_2d_affine_mesh_soa(
+extern "C" int linear_elasticity_inexact_apply_stored_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -634,7 +634,7 @@ extern "C" int linear_elasticity_inexact_apply_stored_2d_affine_mesh_soa(
         void *const RSTR outy
 );
 
-extern "C" int linear_elasticity_inexact_apply_stored_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_inexact_apply_stored_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -652,7 +652,7 @@ extern "C" int linear_elasticity_inexact_apply_stored_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int linear_elasticity_inexact_apply_tangent_2d_affine_mesh_soa(
+extern "C" int linear_elasticity_inexact_apply_tangent_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -672,7 +672,7 @@ extern "C" int linear_elasticity_inexact_apply_tangent_2d_affine_mesh_soa(
         metric_tensor_t *const RSTR tangent
 );
 
-extern "C" int linear_elasticity_inexact_apply_tangent_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_inexact_apply_tangent_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -704,7 +704,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_objective_2
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_objective_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int linear_elasticity_objective_steps_2d_affine_mesh_soa(
+extern "C" int linear_elasticity_objective_steps_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -728,7 +728,7 @@ extern "C" int linear_elasticity_objective_steps_2d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int linear_elasticity_objective_steps_2d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -748,7 +748,7 @@ extern "C" int linear_elasticity_objective_steps_2d_isoparametric_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int linear_elasticity_objective_steps_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_objective_steps_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -779,7 +779,7 @@ extern "C" int linear_elasticity_objective_steps_3d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int linear_elasticity_objective_steps_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -801,7 +801,7 @@ extern "C" int linear_elasticity_objective_steps_3d_isoparametric_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int linear_elasticity_objective_steps_packed_3d_affine_mesh_soa(
+extern "C" int linear_elasticity_objective_steps_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -839,7 +839,7 @@ extern "C" int linear_elasticity_objective_steps_packed_3d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_objective_steps_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,

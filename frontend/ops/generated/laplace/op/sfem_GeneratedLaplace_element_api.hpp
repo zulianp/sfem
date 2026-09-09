@@ -21,7 +21,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_energy_2d_element_soa(
+static SFEM_INLINE int laplace_energy_2d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -31,18 +31,18 @@ static SFEM_INLINE int laplace_energy_2d_element_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_energy_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_tri3_energy_esoa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 40:
-      return laplace_quad4_energy_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_quad4_energy_esoa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 400000:
-      return laplace_proteus_quad4_energy_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_proteus_quad4_energy_esoa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_energy_3d_element_soa(
+static SFEM_INLINE int laplace_energy_3d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -52,20 +52,20 @@ static SFEM_INLINE int laplace_energy_3d_element_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_energy_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_tet4_energy_esoa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 10:
-      return laplace_tet10_energy_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_tet10_energy_esoa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 8:
-      return laplace_hex8_energy_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_hex8_energy_esoa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 100008:
-      return laplace_proteus_hex8_energy_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_proteus_hex8_energy_esoa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_energy_2d_element_coords_soa(
+static SFEM_INLINE int laplace_energy_2d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -75,18 +75,18 @@ static SFEM_INLINE int laplace_energy_2d_element_coords_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_energy_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_tri3_energy_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 40:
-      return laplace_quad4_energy_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_quad4_energy_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 400000:
-      return laplace_proteus_quad4_energy_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_proteus_quad4_energy_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_energy_3d_element_coords_soa(
+static SFEM_INLINE int laplace_energy_3d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -96,20 +96,20 @@ static SFEM_INLINE int laplace_energy_3d_element_coords_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_energy_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_tet4_energy_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 10:
-      return laplace_tet10_energy_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_tet10_energy_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 8:
-      return laplace_hex8_energy_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     case 100008:
-      return laplace_proteus_hex8_energy_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
+      return laplace_proteus_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_energy_2d_element_geometry_soa(
+static SFEM_INLINE int laplace_energy_2d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -120,18 +120,18 @@ static SFEM_INLINE int laplace_energy_2d_element_geometry_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_energy_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
+      return laplace_tri3_energy_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
     case 40:
-      return laplace_quad4_energy_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
+      return laplace_quad4_energy_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
     case 400000:
-      return laplace_proteus_quad4_energy_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
+      return laplace_proteus_quad4_energy_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_energy_3d_element_geometry_soa(
+static SFEM_INLINE int laplace_energy_3d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -142,20 +142,20 @@ static SFEM_INLINE int laplace_energy_3d_element_geometry_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_energy_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
+      return laplace_tet4_energy_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
     case 10:
-      return laplace_tet10_energy_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
+      return laplace_tet10_energy_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
     case 8:
-      return laplace_hex8_energy_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
+      return laplace_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
     case 100008:
-      return laplace_proteus_hex8_energy_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
+      return laplace_proteus_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_gradient_2d_element_soa(
+static SFEM_INLINE int laplace_gradient_2d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -165,18 +165,18 @@ static SFEM_INLINE int laplace_gradient_2d_element_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_gradient_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_tri3_gradient_esoa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 40:
-      return laplace_quad4_gradient_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_quad4_gradient_esoa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 400000:
-      return laplace_proteus_quad4_gradient_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_proteus_quad4_gradient_esoa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_gradient_3d_element_soa(
+static SFEM_INLINE int laplace_gradient_3d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -186,20 +186,20 @@ static SFEM_INLINE int laplace_gradient_3d_element_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_gradient_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_tet4_gradient_esoa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 10:
-      return laplace_tet10_gradient_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_tet10_gradient_esoa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 8:
-      return laplace_hex8_gradient_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_hex8_gradient_esoa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 100008:
-      return laplace_proteus_hex8_gradient_element_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_proteus_hex8_gradient_esoa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_gradient_2d_element_coords_soa(
+static SFEM_INLINE int laplace_gradient_2d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -209,18 +209,18 @@ static SFEM_INLINE int laplace_gradient_2d_element_coords_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_gradient_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_tri3_gradient_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 40:
-      return laplace_quad4_gradient_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_quad4_gradient_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 400000:
-      return laplace_proteus_quad4_gradient_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_proteus_quad4_gradient_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_gradient_3d_element_coords_soa(
+static SFEM_INLINE int laplace_gradient_3d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -230,20 +230,20 @@ static SFEM_INLINE int laplace_gradient_3d_element_coords_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_gradient_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_tet4_gradient_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 10:
-      return laplace_tet10_gradient_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_tet10_gradient_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 8:
-      return laplace_hex8_gradient_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     case 100008:
-      return laplace_proteus_hex8_gradient_element_coords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
+      return laplace_proteus_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, kappa, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_gradient_2d_element_geometry_soa(
+static SFEM_INLINE int laplace_gradient_2d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -254,18 +254,18 @@ static SFEM_INLINE int laplace_gradient_2d_element_geometry_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_gradient_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
+      return laplace_tri3_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
     case 40:
-      return laplace_quad4_gradient_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
+      return laplace_quad4_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
     case 400000:
-      return laplace_proteus_quad4_gradient_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
+      return laplace_proteus_quad4_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_gradient_3d_element_geometry_soa(
+static SFEM_INLINE int laplace_gradient_3d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -276,20 +276,20 @@ static SFEM_INLINE int laplace_gradient_3d_element_geometry_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_gradient_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
+      return laplace_tet4_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
     case 10:
-      return laplace_tet10_gradient_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
+      return laplace_tet10_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
     case 8:
-      return laplace_hex8_gradient_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
+      return laplace_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
     case 100008:
-      return laplace_proteus_hex8_gradient_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
+      return laplace_proteus_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_hessian_2d_element_soa(
+static SFEM_INLINE int laplace_hessian_2d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -298,18 +298,18 @@ static SFEM_INLINE int laplace_hessian_2d_element_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_hessian_element_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_tri3_hessian_esoa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 40:
-      return laplace_quad4_hessian_element_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_quad4_hessian_esoa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 400000:
-      return laplace_proteus_quad4_hessian_element_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_proteus_quad4_hessian_esoa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_hessian_3d_element_soa(
+static SFEM_INLINE int laplace_hessian_3d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -318,20 +318,20 @@ static SFEM_INLINE int laplace_hessian_3d_element_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_hessian_element_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_tet4_hessian_esoa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 10:
-      return laplace_tet10_hessian_element_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_tet10_hessian_esoa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 8:
-      return laplace_hex8_hessian_element_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_hex8_hessian_esoa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 100008:
-      return laplace_proteus_hex8_hessian_element_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_proteus_hex8_hessian_esoa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_hessian_2d_element_coords_soa(
+static SFEM_INLINE int laplace_hessian_2d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -340,18 +340,18 @@ static SFEM_INLINE int laplace_hessian_2d_element_coords_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_hessian_element_coords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_tri3_hessian_ecoords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 40:
-      return laplace_quad4_hessian_element_coords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_quad4_hessian_ecoords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 400000:
-      return laplace_proteus_quad4_hessian_element_coords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_proteus_quad4_hessian_ecoords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_hessian_3d_element_coords_soa(
+static SFEM_INLINE int laplace_hessian_3d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -360,20 +360,20 @@ static SFEM_INLINE int laplace_hessian_3d_element_coords_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_hessian_element_coords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_tet4_hessian_ecoords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 10:
-      return laplace_tet10_hessian_element_coords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_tet10_hessian_ecoords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 8:
-      return laplace_hex8_hessian_element_coords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     case 100008:
-      return laplace_proteus_hex8_hessian_element_coords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
+      return laplace_proteus_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, kappa, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_hessian_2d_element_geometry_soa(
+static SFEM_INLINE int laplace_hessian_2d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -383,18 +383,18 @@ static SFEM_INLINE int laplace_hessian_2d_element_geometry_soa(
 ) {
   switch ((int)element_type) {
     case 3:
-      return laplace_tri3_hessian_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
+      return laplace_tri3_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
     case 40:
-      return laplace_quad4_hessian_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
+      return laplace_quad4_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
     case 400000:
-      return laplace_proteus_quad4_hessian_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
+      return laplace_proteus_quad4_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
 }
 
 template <typename s_t, int VS = 16, typename elem_type_t>
-static SFEM_INLINE int laplace_hessian_3d_element_geometry_soa(
+static SFEM_INLINE int laplace_hessian_3d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -404,13 +404,13 @@ static SFEM_INLINE int laplace_hessian_3d_element_geometry_soa(
 ) {
   switch ((int)element_type) {
     case 4:
-      return laplace_tet4_hessian_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
+      return laplace_tet4_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
     case 10:
-      return laplace_tet10_hessian_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
+      return laplace_tet10_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
     case 8:
-      return laplace_hex8_hessian_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
+      return laplace_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
     case 100008:
-      return laplace_proteus_hex8_hessian_element_geometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
+      return laplace_proteus_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, kappa, matrix_streams);
     default:
       return SFEM_FAILURE;
   }

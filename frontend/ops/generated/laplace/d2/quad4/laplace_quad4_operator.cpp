@@ -1,6 +1,6 @@
 #include "../../op/sfem_GeneratedLaplace_c_abi.hpp"
 
-extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -11,7 +11,7 @@ extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -22,7 +22,7 @@ extern "C" int laplace_proteus_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -33,7 +33,7 @@ extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t out_stride,
         double *const RSTR outx
 );
-extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -44,7 +44,7 @@ extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const RSTR outx
 );
-extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -54,7 +54,7 @@ extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -64,7 +64,7 @@ extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -74,7 +74,7 @@ extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(
         const idx_t *const RSTR colidx,
         double *const RSTR values
 );
-extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -84,7 +84,7 @@ extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const RSTR colidx,
         float *const RSTR values
 );
-extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -98,7 +98,7 @@ extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_quad4_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -122,7 +122,7 @@ extern "C" const sfem::codegen::KernelDiagnostics * laplace_proteus_quad4_object
         void
 );
 
-extern "C" int laplace_quad4_apply_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -139,10 +139,10 @@ extern "C" int laplace_quad4_apply_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, h_stride, hx, out_stride, outx);
+    return laplace_proteus_quad4_apply_i_msoa(nelements, nnodes, proteus_elements, points, kappa, h_stride, hx, out_stride, outx);
 }
 
-extern "C" int laplace_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -159,10 +159,10 @@ extern "C" int laplace_quad4_apply_isoparametric_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, h_stride, hx, out_stride, outx);
+    return laplace_proteus_quad4_apply_i_msoa_float(nelements, nnodes, proteus_elements, points, kappa, h_stride, hx, out_stride, outx);
 }
 
-extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -179,10 +179,10 @@ extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, out_stride, outx);
+    return laplace_proteus_quad4_gradient_i_msoa(nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, out_stride, outx);
 }
 
-extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -199,10 +199,10 @@ extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, out_stride, outx);
+    return laplace_proteus_quad4_gradient_i_msoa_float(nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, out_stride, outx);
 }
 
-extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_hessian_bsr_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -218,10 +218,10 @@ extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
+    return laplace_proteus_quad4_hessian_bsr_i_msoa(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
 }
 
-extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_hessian_bsr_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -237,10 +237,10 @@ extern "C" int laplace_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
+    return laplace_proteus_quad4_hessian_bsr_i_msoa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
 }
 
-extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_hessian_crs_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -256,10 +256,10 @@ extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
+    return laplace_proteus_quad4_hessian_crs_i_msoa(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
 }
 
-extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_hessian_crs_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -275,10 +275,10 @@ extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
+    return laplace_proteus_quad4_hessian_crs_i_msoa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
 }
 
-extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int laplace_quad4_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -298,10 +298,10 @@ extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+    return laplace_proteus_quad4_objective_steps_i_msoa(nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
 }
 
-extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int laplace_quad4_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -321,7 +321,7 @@ extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+    return laplace_proteus_quad4_objective_steps_i_msoa_float(nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * laplace_quad4_apply_soa_diagnostics(

@@ -1,6 +1,6 @@
 #include "../../op/sfem_GeneratedMooneyRivlinKelvinVoigtNewmark_c_abi.hpp"
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -17,7 +17,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_is
         double *const RSTR outx,
         double *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -34,7 +34,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_is
         float *const RSTR outx,
         float *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -48,7 +48,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient
         double *const RSTR outx,
         double *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -62,7 +62,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient
         float *const RSTR outx,
         float *const RSTR outy
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -79,7 +79,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objectiv
         const double *const RSTR steps,
         double *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -96,7 +96,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objectiv
         const float *const RSTR steps,
         float *const RSTR value
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_maos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -107,7 +107,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
         const double *const RSTR direction,
         double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_maos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -118,7 +118,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
         const float *const RSTR direction,
         float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -139,7 +139,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
         double *const RSTR u0_out,
         double *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -160,7 +160,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
         float *const RSTR u0_out,
         float *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_maos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -170,7 +170,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
         const double *const RSTR previous,
         double *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_maos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -180,7 +180,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
         const float *const RSTR previous,
         float *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -198,7 +198,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
         double *const RSTR u0_out,
         double *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -216,7 +216,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
         float *const RSTR u0_out,
         float *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -241,7 +241,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
         double *const RSTR u0_out,
         double *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -266,7 +266,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
         float *const RSTR u0_out,
         float *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -288,7 +288,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
         double *const RSTR u0_out,
         double *const RSTR u1_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -320,7 +320,7 @@ extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_n
         void
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -343,10 +343,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparamet
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -369,10 +369,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_isoparamet
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_apply_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -392,10 +392,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isopara
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -415,10 +415,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_gradient_isopara
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -441,10 +441,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -467,10 +467,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_maos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -487,10 +487,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_aos(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_maos(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_maos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -507,10 +507,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_maos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -537,10 +537,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -567,10 +567,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_aos(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_maos(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -586,10 +586,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isopara
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_aos(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_maos(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_aos_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_maos_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -605,10 +605,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isopara
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_aos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_maos_float(nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -632,10 +632,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isopara
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isoparametric_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -659,10 +659,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_isopara
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa_float(nelements, nnodes, proteus_elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -693,10 +693,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -727,10 +727,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_affine_mesh_soa(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -758,10 +758,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_affine_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_affine_mesh_soa_float(
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -789,7 +789,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_affine_
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa_float(nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out);
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_apply_soa_diagnostics(

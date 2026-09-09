@@ -306,7 +306,7 @@ static SFEM_INLINE int neumann_tet10_trishell6_boundary_residual_soa_impl(
 }
 
 template <typename s_t>
-static SFEM_INLINE int neumann_tet10_trishell6_boundary_residual_sideset_soa_impl(
+static SFEM_INLINE int neumann_tet10_trishell6_boundary_residual_ss_soa_impl(
     const ptrdiff_t nsides,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -363,7 +363,7 @@ extern "C" int neumann_tet10_trishell6_boundary_residual_soa_float(
       nelements, nnodes, elements, points, t0, t1, t2, out_stride, out0, out1, out2);
 }
 
-extern "C" int neumann_tet10_trishell6_boundary_residual_sideset_soa(
+extern "C" int neumann_tet10_trishell6_boundary_residual_ss_soa(
     const ptrdiff_t nsides,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -374,11 +374,11 @@ extern "C" int neumann_tet10_trishell6_boundary_residual_sideset_soa(
     real_t *const RSTR out0,
     real_t *const RSTR out1,
     real_t *const RSTR out2) {
-  return sfem::codegen::neumann_tet10_trishell6_boundary_residual_sideset_soa_impl<real_t>(
+  return sfem::codegen::neumann_tet10_trishell6_boundary_residual_ss_soa_impl<real_t>(
       nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
 }
 
-extern "C" int neumann_tet10_trishell6_boundary_residual_sideset_soa_float(
+extern "C" int neumann_tet10_trishell6_boundary_residual_ss_soa_float(
     const ptrdiff_t nsides,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -389,6 +389,6 @@ extern "C" int neumann_tet10_trishell6_boundary_residual_sideset_soa_float(
     float *const RSTR out0,
     float *const RSTR out1,
     float *const RSTR out2) {
-  return sfem::codegen::neumann_tet10_trishell6_boundary_residual_sideset_soa_impl<float>(
+  return sfem::codegen::neumann_tet10_trishell6_boundary_residual_ss_soa_impl<float>(
       nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
 }

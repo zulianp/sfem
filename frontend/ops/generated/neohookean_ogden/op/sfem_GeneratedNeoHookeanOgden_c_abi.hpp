@@ -34,7 +34,7 @@ typedef double geom_t;
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int neohookean_ogden_apply_2d_affine_mesh_soa(
+extern "C" int neohookean_ogden_apply_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -58,7 +58,7 @@ extern "C" int neohookean_ogden_apply_2d_affine_mesh_soa(
         void *const RSTR outy
 );
 
-extern "C" int neohookean_ogden_apply_2d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_apply_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -81,7 +81,7 @@ extern "C" int neohookean_ogden_apply_2d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int neohookean_ogden_apply_3d_affine_mesh_soa(
+extern "C" int neohookean_ogden_apply_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -113,7 +113,7 @@ extern "C" int neohookean_ogden_apply_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_apply_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_apply_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -139,7 +139,7 @@ extern "C" int neohookean_ogden_apply_3d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int neohookean_ogden_apply_packed_3d_affine_mesh_soa(
+extern "C" int neohookean_ogden_apply_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -178,7 +178,7 @@ extern "C" int neohookean_ogden_apply_packed_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_apply_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -208,7 +208,7 @@ extern "C" int neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_apply_packed_two_pass_3d_affine_mesh_soa(
+extern "C" int neohookean_ogden_apply_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -253,7 +253,7 @@ extern "C" int neohookean_ogden_apply_packed_two_pass_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_apply_packed_two_pass_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_apply_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -289,7 +289,7 @@ extern "C" int neohookean_ogden_apply_packed_two_pass_3d_isoparametric_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_gradient_2d_affine_mesh_soa(
+extern "C" int neohookean_ogden_gradient_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -310,7 +310,7 @@ extern "C" int neohookean_ogden_gradient_2d_affine_mesh_soa(
         void *const RSTR outy
 );
 
-extern "C" int neohookean_ogden_gradient_2d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_gradient_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -330,7 +330,7 @@ extern "C" int neohookean_ogden_gradient_2d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int neohookean_ogden_gradient_3d_affine_mesh_soa(
+extern "C" int neohookean_ogden_gradient_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -358,7 +358,7 @@ extern "C" int neohookean_ogden_gradient_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_gradient_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_gradient_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -380,7 +380,7 @@ extern "C" int neohookean_ogden_gradient_3d_isoparametric_mesh_soa(
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int neohookean_ogden_gradient_packed_3d_affine_mesh_soa(
+extern "C" int neohookean_ogden_gradient_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -415,7 +415,7 @@ extern "C" int neohookean_ogden_gradient_packed_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_gradient_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -441,7 +441,7 @@ extern "C" int neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_gradient_packed_two_pass_3d_affine_mesh_soa(
+extern "C" int neohookean_ogden_gradient_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -482,7 +482,7 @@ extern "C" int neohookean_ogden_gradient_packed_two_pass_3d_affine_mesh_soa(
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_gradient_packed_two_pass_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_gradient_packed_two_pass_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -514,7 +514,7 @@ extern "C" int neohookean_ogden_gradient_packed_two_pass_3d_isoparametric_mesh_s
         void *const RSTR outz
 );
 
-extern "C" int neohookean_ogden_hessian_bsr_2d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -531,7 +531,7 @@ extern "C" int neohookean_ogden_hessian_bsr_2d_isoparametric_mesh_soa(
         void *const RSTR values
 );
 
-extern "C" int neohookean_ogden_hessian_bsr_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hessian_bsr_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -561,7 +561,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_2d
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int neohookean_ogden_objective_steps_2d_affine_mesh_soa(
+extern "C" int neohookean_ogden_objective_steps_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -585,7 +585,7 @@ extern "C" int neohookean_ogden_objective_steps_2d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int neohookean_ogden_objective_steps_2d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -605,7 +605,7 @@ extern "C" int neohookean_ogden_objective_steps_2d_isoparametric_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int neohookean_ogden_objective_steps_3d_affine_mesh_soa(
+extern "C" int neohookean_ogden_objective_steps_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -636,7 +636,7 @@ extern "C" int neohookean_ogden_objective_steps_3d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int neohookean_ogden_objective_steps_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -658,7 +658,7 @@ extern "C" int neohookean_ogden_objective_steps_3d_isoparametric_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int neohookean_ogden_objective_steps_packed_3d_affine_mesh_soa(
+extern "C" int neohookean_ogden_objective_steps_packed_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,
@@ -696,7 +696,7 @@ extern "C" int neohookean_ogden_objective_steps_packed_3d_affine_mesh_soa(
         void *const RSTR value
 );
 
-extern "C" int neohookean_ogden_objective_steps_packed_3d_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_objective_steps_packed_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t n_packs,

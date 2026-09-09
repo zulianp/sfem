@@ -171,7 +171,7 @@ static SFEM_INLINE int neumann_general_tri3_edgeshell2_boundary_residual_soa_imp
 }
 
 template <typename s_t>
-static SFEM_INLINE int neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa_impl(
+static SFEM_INLINE int neumann_general_tri3_edgeshell2_boundary_residual_ss_soa_impl(
     const ptrdiff_t nsides,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -225,7 +225,7 @@ extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_soa_float(
       nelements, nnodes, elements, points, t0, t0_010, t0_100, t1, t1_010, t1_100, out_stride, out0, out1);
 }
 
-extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa(
+extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_ss_soa(
     const ptrdiff_t nsides,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -235,11 +235,11 @@ extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa(
     const int out_stride,
     real_t *const RSTR out0,
     real_t *const RSTR out1) {
-  return sfem::codegen::neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa_impl<real_t>(
+  return sfem::codegen::neumann_general_tri3_edgeshell2_boundary_residual_ss_soa_impl<real_t>(
       nsides, nnodes, elements, parent, side_idx, points, t0, t0_010, t0_100, t1, t1_010, t1_100, out_stride, out0, out1);
 }
 
-extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa_float(
+extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_ss_soa_float(
     const ptrdiff_t nsides,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -249,6 +249,6 @@ extern "C" int neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa_flo
     const int out_stride,
     float *const RSTR out0,
     float *const RSTR out1) {
-  return sfem::codegen::neumann_general_tri3_edgeshell2_boundary_residual_sideset_soa_impl<float>(
+  return sfem::codegen::neumann_general_tri3_edgeshell2_boundary_residual_ss_soa_impl<float>(
       nsides, nnodes, elements, parent, side_idx, points, t0, t0_010, t0_100, t1, t1_010, t1_100, out_stride, out0, out1);
 }
