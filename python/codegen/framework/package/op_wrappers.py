@@ -1,6 +1,8 @@
 from codegen.framework.plans.conventions import (
     diagnostics_tail,
-    ABI_GEOMETRY_SPELLING,
+    ABI_TRAVERSAL_UNIT,
+    abi_geometry,
+    abi_qualifier,
     abi_local_level,
     abi_with_geometry_qualifier,
     ABI_TRAVERSAL_SPELLING,
@@ -5242,33 +5244,23 @@ _DISPATCH_SOURCE_KIND_ORDER = (
 def _dispatch_source_kind(function_name):
     """Which dispatch translation unit `function_name` belongs in.
 
-    The tokens are the same ones `dimension_markers` is built from, so a rename
-    that moves the vocabulary moves the file split with it rather than dropping
-    every dispatch into `_other`.
+    Both halves come from `plans/conventions.py`, and both raise rather than
+    guess.  This used to sniff the name for `_packed_` and for a geometry word,
+    falling through to `"other"` when it recognised neither -- and a sniff cannot
+    tell "this kernel is not packed" from "the token for packed moved and I no
+    longer see it".  The second reads as the first, the packed dispatch entry
+    points join the plain ones, and two translation units silently become one.
+    Every occupant of that slot is now in a table, so an unrecognised one is an
+    error at generation time.
     """
-    # The *kind* keeps the long word -- it names a translation unit, and file
-    # names are outside the abbreviation -- while the *detection* uses the short
-    # token the name actually carries.  Holding both ends of that in one table is
-    # the point: reading the long word out of the name is what collapsed the
-    # affine and isoparametric units into one `_other_dispatch.cpp`.
-    def carries(short):
-        return "_%s_" % short in function_name
-
-    # Isoparametric before affine: the tokens are a single letter each, so a
-    # name is tested against the more specific geometry first.
-    geometry_order = sorted(
-        ABI_GEOMETRY_SPELLING, key=lambda pair: pair[0] != "isoparametric"
-    )
-    for traversal, short_traversal in ABI_TRAVERSAL_SPELLING:
-        if not carries(short_traversal):
-            continue
-        for geometry, short_geometry in geometry_order:
-            if carries(short_geometry):
-                return "%s_%s" % (traversal, geometry)
-    for geometry, short_geometry in geometry_order:
-        if carries(short_geometry):
-            return geometry
-    return "other"
+    qualifier = abi_qualifier(function_name)
+    geometry = abi_geometry(function_name)
+    unit = ABI_TRAVERSAL_UNIT.get(qualifier)
+    if unit is None:
+        # No traversal: a plain kernel, or an inexact-apply store, which shares
+        # the slot but not the translation unit.
+        return geometry
+    return "%s_%s" % (unit, geometry)
 
 
 def _dispatch_groups(material, elements, declarations):
