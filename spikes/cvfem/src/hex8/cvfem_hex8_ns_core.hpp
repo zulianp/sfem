@@ -111,6 +111,16 @@ struct MeshData {
     // bit-identical. A non-box domain must set it: a coordinate test cannot see a re-entrant
     // face, and an unclosed control volume does not fail, it just stops conserving mass.
     std::vector<uint8_t> face_mask;
+    // Faces carrying a prescribed pressure, and the values the two new boundary conditions
+    // need. Empty / zero means neither is in use -- every case in the repository today --
+    // and the boundary term then behaves exactly as it did.
+    //
+    // Plain scalars rather than a Hex8BoundaryDataT because that type is defined in
+    // cvfem_hex8_boundary_scs.hpp, which this header includes further down; hex8_bd()
+    // assembles the struct once the type is in scope.
+    std::vector<uint8_t> pressure_mask;
+    scalar_t             bc_tx{0}, bc_ty{0}, bc_tz{0};
+    scalar_t             bc_p{0};
     // Faces carrying the do-nothing outflow. Empty/zero everywhere means no
     // natural face, which is every case except the backward-facing step, and the
     // outflow branch is then never taken.
@@ -128,6 +138,19 @@ struct MeshData {
 #include "cvfem_hex8_ns_packed.hpp"
 #include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #include "cvfem_hex8_boundary_scs.hpp"
+
+// The prescribed boundary data for one element. A default-constructed result -- what every
+// case with neither condition in use produces -- makes the boundary term behave exactly as
+// it did before the conditions existed.
+static SFEM_INLINE Hex8BoundaryDataT<scalar_t> hex8_bd(const MeshData &d, const ptrdiff_t e) {
+    Hex8BoundaryDataT<scalar_t> bd;
+    bd.tx    = d.bc_tx;
+    bd.ty    = d.bc_ty;
+    bd.tz    = d.bc_tz;
+    bd.p_bar = d.bc_p;
+    bd.pmask = d.pressure_mask.empty() ? 0 : (int)d.pressure_mask[(size_t)e];
+    return bd;
+}
 
 struct BSR4 {
     std::shared_ptr<smesh::Mesh::NodeToNodeGraph> graph;
@@ -437,8 +460,13 @@ inline SFEM_NOINLINE void apply_boundary_scs_residual(MeshData &d, const scalar_
         std::memset(r, 0, sizeof(r));
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) cvfem_hex8_load_adj(d, e, adj, &det);
+        // The masks, which this post-pass used to omit -- it fell back to the bounding-box
+        // test, so on a non-box domain it closed the wrong faces and it never applied the
+        // do-nothing outflow at all. Both are exactly what the masks exist to prevent, and
+        // this is the path the packed residual takes.
         boundary_scs_add_residual(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
-                                  p, r);
+                                  p, r, d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
+                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
                 r[a * 4 + 3] == scalar_t(0))
@@ -466,7 +494,9 @@ inline SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const 
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) cvfem_hex8_load_adj(d, e, adj, &det);
         boundary_scs_add_jacobian_action(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux,
-                                         uy, uz, vx, vy, vz, q, r);
+                                         uy, uz, vx, vy, vz, q, r,
+                                         d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
                 r[a * 4 + 3] == scalar_t(0))
@@ -497,7 +527,7 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc);
         boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
                                   d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
-                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e]);
+                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -524,7 +554,7 @@ inline SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
         cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r, rc);
         boundary_scs_add_residual(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
                                   d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
-                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e]);
+                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -580,7 +610,9 @@ inline SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &
                     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
                             rho, mu, adj, det, ux, uy, uz, es, values, rc, pp);
                     boundary_scs_add_jacobian<false>(
-                            rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, es, values);
+                            rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, es, values,
+                            d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
+                            d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
                 }
             }
         }
@@ -608,7 +640,7 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, rc, p);
         boundary_scs_add_jacobian<true>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values,
                                          d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
-                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e]);
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
     }
 }
 
@@ -630,7 +662,7 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
         boundary_scs_add_jacobian<true>(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64,
                                         values,
                                          d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
-                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e]);
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
     }
 }
 
@@ -690,14 +722,16 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         if (geom == GeomKind::Isoparam) {
             cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(rho, mu, x, y, z, ux, uy, uz, sl, loc, rc, p);
             boundary_scs_add_jacobian<false>(
-                    rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc);
+                    rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
+                    d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
+                    d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         } else {
             scalar_t adj[9], det;
             cvfem_hex8_load_adj(d, e, adj, &det);
             cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj, det, ux, uy, uz, sl, loc, rc, p);
             boundary_scs_add_jacobian<false>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
                                          d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
-                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e]);
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         }
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -829,7 +863,7 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     if (geom == GeomKind::Isoparam) {
         apply_residual_atomic_isoparam(d, rho, mu);
         apply_body_force(d);
-    apply_transient(d, rho);
+        apply_transient(d, rho);
         return;
     }
     if (d.packed) {
@@ -837,7 +871,7 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
         cvfem_hex8_apply_residual_packed(d, *d.packed, rho, mu);
         apply_boundary_scs_residual(d, rho, mu, 0);
         apply_body_force(d);
-    apply_transient(d, rho);
+        apply_transient(d, rho);
         return;
     }
     apply_residual_atomic_sumfact(d, rho, mu);
@@ -896,7 +930,7 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, cons
         cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
         boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r,
                                          d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
-                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e]);
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
@@ -927,7 +961,7 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
         cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, x, y, z, ux, uy, uz, vx, vy, vz, q, r, rc, p);
         boundary_scs_add_jacobian_action(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r,
                                          d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
-                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e]);
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
