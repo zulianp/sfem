@@ -718,10 +718,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);
@@ -939,10 +939,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);
@@ -1977,10 +1977,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);
@@ -2179,10 +2179,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);
@@ -2412,10 +2412,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);
@@ -3553,10 +3553,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);
@@ -3779,10 +3779,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);
@@ -4036,10 +4036,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);

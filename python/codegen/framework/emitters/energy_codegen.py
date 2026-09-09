@@ -2208,12 +2208,10 @@ def _append_sfem_soa_weak_form_lines(
 
     def field_value(field, row, shape="shape"):
         stream_prefix = "" if use_stream_arrays else "weak_"
-        return "%s%s_streams[%s * %d + %d][%s]" % (
+        return "%s%s_streams[%s][%s]" % (
             stream_prefix,
             field,
-            shape,
-            n_field_components,
-            row,
+            c_sum(c_product(shape, n_field_components), row),
             work_item,
         )
 
@@ -2358,8 +2356,14 @@ def _append_sfem_soa_weak_form_lines(
         output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
         lines.extend(_work_item_loop_lines(source_builder, "        "))
         lines.append(
-            "          %s[shape * %d + %d][%s] %s %s;"
-            % (output_streams, n_field_components, row, work_item, op, " + ".join(terms))
+            "          %s[%s][%s] %s %s;"
+            % (
+                output_streams,
+                c_sum(c_product("shape", n_field_components), row),
+                work_item,
+                op,
+                " + ".join(terms),
+            )
         )
         lines.append("        }")
     lines.extend(["      }", "    }"])
@@ -2902,8 +2906,16 @@ def _sfem_soa_isoparametric_geometry_lines(
             lines.extend(
                 [
                     *_work_item_loop_lines(source_builder, "        "),
-                    "          J%d%d_values[%s] += %s[shape * %d + %d][%s] * g%d;"
-                    % (row, col, work_item, coordinate_streams, dim, row, work_item, col),
+                    "          J%d%d_values[%s] += %s[%s][%s] * g%d;"
+                    % (
+                        row,
+                        col,
+                        work_item,
+                        coordinate_streams,
+                        c_sum(c_product("shape", dim), row),
+                        work_item,
+                        col,
+                    ),
                     "        }",
                 ]
             )
@@ -6628,8 +6640,8 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     lines.append("%s          s_t entry = s_t(0);" % indent)
     for ref_component in range(dim):
         terms = [
-            "material[test_component * ND + %d] * adj_lane%d"
-            % (k, ref_component * dim + k)
+            "material[%s] * adj_lane%d"
+            % (c_sum(c_product("test_component", "ND"), k), ref_component * dim + k)
             for k in range(dim)
         ]
         lines.append(
@@ -6799,8 +6811,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "  (void)nnodes;",
                 "  (void)max_nodes_per_pack;",
                 "  (void)n_shared_nodes;",
-                "  int unsupported_matrix_format = 0;",
-                *source_builder.parallel_for_lines(reduction="|:unsupported_matrix_format"),
+                *source_builder.parallel_for_lines(),
                 "  for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
                 "    const ptrdiff_t e_start = pack * n_elements_per_pack;",
                 "    const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
@@ -6813,7 +6824,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "      %s_discover_packed_crs_entries<s_t>(ev, rowptr, colidx, entries);" % function_base,
                 "    }",
                 "  }",
-                "  return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;",
+                "  return SFEM_SUCCESS;",
                 "}",
                 "",
                 "template <typename s_t, typename g_t>",
@@ -7352,8 +7363,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
     lines.extend(
         [
             "",
-            "  int unsupported_matrix_format = 0;",
-            *source_builder.parallel_for_lines(reduction="|:unsupported_matrix_format"),
+            *_sfem_soa_matrix_format_assertion_lines(formats, "  "),
+            *source_builder.parallel_for_lines(),
             "  for (ptrdiff_t element = 0; element < nelements; ++element) {",
             "    idx_t ev[NS];",
             "    s_t element_matrix[NDOFS * NDOFS];",
@@ -7512,7 +7523,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         [
             "  }",
             "",
-            "  return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;",
+            "  return SFEM_SUCCESS;",
             "}",
             "",
         ]
@@ -7604,53 +7615,65 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
     change between elements or between calls.  That check belongs where the
     graph is built -- the operator's setup -- and the kernels now assume it.
 
-    What survives is ``unsupported_matrix_format``, and it is a different thing
-    wearing the old name's clothes: ``FORMAT`` is a compile-time constant, so
-    for any format actually supported this branch is discarded by
-    ``if constexpr`` and costs nothing at run time.  It catches a kernel
-    instantiated for a format it has no scatter for, which is a programming
-    error rather than a data one.
+    Nothing survives to check at run time.  A kernel instantiated for a format
+    it has no scatter for is a programming error, and ``FORMAT`` is a template
+    parameter, so `_sfem_soa_matrix_format_assertion_lines` states it as a
+    `static_assert` at the top of the kernel instead of as a flag reduced over
+    the element loop.
     """
-    cases = (
-        (
-            "bsr",
-            1,
-            "%s_scatter_bsr(ev, element_matrix, rowptr, colidx, values);"
-            % function_base,
-        ),
-        (
-            "crs",
-            0,
-            "%s_scatter_crs(ev, element_matrix, rowptr, colidx, values);"
-            % function_base,
-        ),
-        (
-            "block_diag_sym",
-            6,
-            "%s_scatter_block_diag_sym(ev, element_matrix, values);" % function_base,
-        ),
-    )
-
     lines = []
     first = True
-    for matrix_format, format_id, statement in cases:
+    for matrix_format, format_id in _MATRIX_FORMAT_IDS:
         if matrix_format not in formats:
             continue
         keyword = "if" if first else "} else if"
         lines.append("%s%s constexpr (FORMAT == %d) {" % (indent, keyword, format_id))
-        lines.append("%s  %s" % (indent, statement))
+        lines.append(
+            "%s  %s"
+            % (indent, _MATRIX_FORMAT_SCATTERS[matrix_format] % function_base)
+        )
         first = False
-    if first:
-        lines.append("%sunsupported_matrix_format |= 1;" % indent)
-        return lines
-    lines.extend(
-        [
-            "%s} else {" % indent,
-            "%s  unsupported_matrix_format |= 1;" % indent,
-            "%s}" % indent,
-        ]
-    )
+    if not first:
+        lines.append("%s}" % indent)
     return lines
+
+
+#: The matrix formats a scatter can be instantiated for, and the `FORMAT` value
+#: that selects each.  Shared by the dispatch and the assertion below so the two
+#: cannot disagree about which formats exist.
+_MATRIX_FORMAT_IDS = (
+    ("bsr", 1),
+    ("crs", 0),
+    ("block_diag_sym", 6),
+)
+
+_MATRIX_FORMAT_SCATTERS = {
+    "bsr": "%s_scatter_bsr(ev, element_matrix, rowptr, colidx, values);",
+    "crs": "%s_scatter_crs(ev, element_matrix, rowptr, colidx, values);",
+    "block_diag_sym": "%s_scatter_block_diag_sym(ev, element_matrix, values);",
+}
+
+
+def _sfem_soa_matrix_format_assertion_lines(formats, indent):
+    """Refuse, at compile time, a kernel instantiated for a format it cannot scatter.
+
+    `FORMAT` is a template parameter, so which formats a kernel can scatter is a
+    compile-time property and deserves a compile-time diagnostic.  It used to be
+    a runtime flag -- `int unsupported_matrix_format` reduced over the element
+    loop with `reduction(|:unsupported_matrix_format)` -- which made every thread
+    carry and combine a copy of a value that a correctly instantiated kernel can
+    never set, inside the hot loop, to catch a programming error.  A kernel is
+    not the place to check what the compiler already knows.
+    """
+    ids = [format_id for name, format_id in _MATRIX_FORMAT_IDS if name in formats]
+    if not ids:
+        return []
+    condition = " || ".join("FORMAT == %d" % format_id for format_id in sorted(ids))
+    return [
+        "%sstatic_assert(%s," % (indent, condition),
+        '%s              "this kernel has no scatter for the requested matrix format");'
+        % indent,
+    ]
 
 
 def _sfem_soa_hessian_matrix_public_function_base(prefix, quadrature_rule, geometry_mode):

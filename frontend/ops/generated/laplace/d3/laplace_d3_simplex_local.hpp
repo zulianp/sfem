@@ -73,15 +73,15 @@ static SFEM_INLINE void laplace_d3_simplex_objective_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[shape * 1 + 0][lane] * grad_ref_x[q * NS + shape];
+          gu_ref0_values[lane] += u_streams[shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[shape * 1 + 0][lane] * grad_ref_y[q * NS + shape];
+          gu_ref1_values[lane] += u_streams[shape][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[shape * 1 + 0][lane] * grad_ref_z[q * NS + shape];
+          gu_ref2_values[lane] += u_streams[shape][lane] * grad_ref_z[q * NS + shape];
         }
       }
       #pragma omp simd
@@ -240,15 +240,15 @@ static SFEM_INLINE void laplace_d3_simplex_gradient_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[shape * 1 + 0][lane] * grad_ref_x[q * NS + shape];
+          gu_ref0_values[lane] += u_streams[shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[shape * 1 + 0][lane] * grad_ref_y[q * NS + shape];
+          gu_ref1_values[lane] += u_streams[shape][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[shape * 1 + 0][lane] * grad_ref_z[q * NS + shape];
+          gu_ref2_values[lane] += u_streams[shape][lane] * grad_ref_z[q * NS + shape];
         }
       }
       #pragma omp simd
@@ -284,7 +284,7 @@ static SFEM_INLINE void laplace_d3_simplex_gradient_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape * 1 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
+          out_streams[shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
         }
       }
     }
@@ -433,15 +433,15 @@ static SFEM_INLINE void laplace_d3_simplex_apply_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref0_values[lane] += h_streams[shape * 1 + 0][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref0_values[lane] += h_streams[shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref1_values[lane] += h_streams[shape * 1 + 0][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref1_values[lane] += h_streams[shape][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref2_values[lane] += h_streams[shape * 1 + 0][lane] * grad_ref_z[q * NS + shape];
+          grad_h_ref2_values[lane] += h_streams[shape][lane] * grad_ref_z[q * NS + shape];
         }
       }
       #pragma omp simd
@@ -477,7 +477,7 @@ static SFEM_INLINE void laplace_d3_simplex_apply_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape * 1 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
+          out_streams[shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
         }
       }
     }

@@ -342,10 +342,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);
@@ -763,10 +763,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);

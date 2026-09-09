@@ -89,7 +89,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_residual_block(
     for (int trial = 0; trial < NS; ++trial) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 0][lane];
+        const s_t coeff = current[trial * NC][lane];
         p_w_values[lane] += coeff * shape[q * NS + trial];
         p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
         p_w_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
@@ -102,7 +102,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_residual_block(
     for (int trial = 0; trial < NS; ++trial) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 0][lane];
+        const s_t coeff = previous[trial * NC][lane];
         p_w_old_values[lane] += coeff * shape[q * NS + trial];
       }
     }
@@ -186,7 +186,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_residual_block(
         const s_t adj3 = adjugate[3][goff];
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC + 0][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value + grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
+        output[test * NC][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value + grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
       }
     }
   }
@@ -249,7 +249,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_residual_block_cont
     for (int trial = 0; trial < NS; ++trial) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 0][lane];
+        const s_t coeff = current[trial * NC][lane];
         p_w_values[lane] += coeff * shape[q * NS + trial];
         p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
         p_w_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
@@ -262,7 +262,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_residual_block_cont
     for (int trial = 0; trial < NS; ++trial) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 0][lane];
+        const s_t coeff = previous[trial * NC][lane];
         p_w_old_values[lane] += coeff * shape[q * NS + trial];
       }
     }
@@ -346,7 +346,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_residual_block_cont
         const s_t adj3 = adjugate[3][goff];
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC + 0][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value + grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
+        output[test * NC][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value + grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
       }
     }
   }
@@ -409,7 +409,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_tri3_residual_block
     for (int trial = 0; trial < NS; ++trial) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 0][lane];
+        const s_t coeff = current[trial * NC][lane];
         p_w_values[lane] += coeff * shape[q * NS + trial];
         p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
         p_w_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
@@ -422,7 +422,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_tri3_residual_block
     for (int trial = 0; trial < NS; ++trial) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 0][lane];
+        const s_t coeff = previous[trial * NC][lane];
         p_w_old_values[lane] += coeff * shape[q * NS + trial];
       }
     }
@@ -506,7 +506,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_tri3_residual_block
         const s_t adj3 = adjugate[3][goff];
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC + 0][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value + grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
+        output[test * NC][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value + grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
       }
     }
   }
@@ -569,7 +569,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_tri3_residual_block
     for (int trial = 0; trial < NS; ++trial) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 0][lane];
+        const s_t coeff = current[trial * NC][lane];
         p_w_values[lane] += coeff * shape[q * NS + trial];
         p_w_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
         p_w_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
@@ -582,7 +582,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_tri3_residual_block
     for (int trial = 0; trial < NS; ++trial) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 0][lane];
+        const s_t coeff = previous[trial * NC][lane];
         p_w_old_values[lane] += coeff * shape[q * NS + trial];
       }
     }
@@ -666,7 +666,7 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d2_simplex_tri3_residual_block
         const s_t adj3 = adjugate[3][goff];
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC + 0][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value + grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
+        output[test * NC][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value + grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
       }
     }
   }

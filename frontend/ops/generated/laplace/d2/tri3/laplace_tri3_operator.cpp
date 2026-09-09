@@ -823,8 +823,9 @@ static int laplace_tri3_hessian_i_msoa_assemble_impl(
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
-  int unsupported_matrix_format = 0;
-#pragma omp parallel for schedule(static) reduction(|:unsupported_matrix_format)
+  static_assert(FORMAT == 0 || FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+#pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
@@ -883,19 +884,19 @@ static int laplace_tri3_hessian_i_msoa_assemble_impl(
         const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g0;
+          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J01_values[lane] += bcoordinate_data[shape * 2 + 0][lane] * g1;
+          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J10_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g0;
+          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J11_values[lane] += bcoordinate_data[shape * 2 + 1][lane] * g1;
+          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
         }
       }
       #pragma omp simd
@@ -915,12 +916,10 @@ static int laplace_tri3_hessian_i_msoa_assemble_impl(
       laplace_tri3_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
     } else if constexpr (FORMAT == 0) {
       laplace_tri3_hessian_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
-    } else {
-      unsupported_matrix_format |= 1;
     }
   }
 
-  return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen

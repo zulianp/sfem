@@ -733,39 +733,39 @@ static SFEM_INLINE int laplace_tet10_objective_steps_i_msoa_impl(
         const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
       #pragma omp simd
@@ -1029,39 +1029,39 @@ static SFEM_INLINE int laplace_tet10_objective_steps_packed_i_msoa_impl(
           const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+            J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+            J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+            J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+            J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+            J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+            J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+            J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+            J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+            J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
           }
         }
         #pragma omp simd
@@ -2093,39 +2093,39 @@ static SFEM_INLINE int laplace_tet10_gradient_i_msoa_impl(
         const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
       #pragma omp simd
@@ -2370,39 +2370,39 @@ static SFEM_INLINE int laplace_tet10_gradient_packed_i_msoa_impl(
           const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+            J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+            J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+            J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+            J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+            J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+            J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+            J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+            J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+            J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
           }
         }
         #pragma omp simd
@@ -2678,39 +2678,39 @@ static SFEM_INLINE int laplace_tet10_gradient_packed_two_pass_i_msoa_impl(
           const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+            J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+            J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+            J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+            J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+            J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+            J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+            J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+            J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+            J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
           }
         }
         #pragma omp simd
@@ -3767,39 +3767,39 @@ static SFEM_INLINE int laplace_tet10_apply_i_msoa_impl(
         const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
       #pragma omp simd
@@ -4044,39 +4044,39 @@ static SFEM_INLINE int laplace_tet10_apply_packed_i_msoa_impl(
           const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+            J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+            J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+            J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+            J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+            J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+            J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+            J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+            J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+            J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
           }
         }
         #pragma omp simd
@@ -4352,39 +4352,39 @@ static SFEM_INLINE int laplace_tet10_apply_packed_two_pass_i_msoa_impl(
           const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+            J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+            J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+            J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+            J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+            J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+            J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+            J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+            J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
           }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+            J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
           }
         }
         #pragma omp simd
@@ -4637,8 +4637,9 @@ static int laplace_tet10_hessian_i_msoa_assemble_impl(
   const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tet_q11<s_t>::q_weight();
 
-  int unsupported_matrix_format = 0;
-#pragma omp parallel for schedule(static) reduction(|:unsupported_matrix_format)
+  static_assert(FORMAT == 0 || FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+#pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
@@ -4728,39 +4729,39 @@ static int laplace_tet10_hessian_i_msoa_assemble_impl(
         const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g0;
+          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J01_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g1;
+          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J02_values[lane] += bcoordinate_data[shape * 3 + 0][lane] * g2;
+          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J10_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g0;
+          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J11_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g1;
+          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J12_values[lane] += bcoordinate_data[shape * 3 + 1][lane] * g2;
+          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J20_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g0;
+          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J21_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g1;
+          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J22_values[lane] += bcoordinate_data[shape * 3 + 2][lane] * g2;
+          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
         }
       }
       #pragma omp simd
@@ -4786,12 +4787,10 @@ static int laplace_tet10_hessian_i_msoa_assemble_impl(
       laplace_tet10_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
     } else if constexpr (FORMAT == 0) {
       laplace_tet10_hessian_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
-    } else {
-      unsupported_matrix_format |= 1;
     }
   }
 
-  return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen

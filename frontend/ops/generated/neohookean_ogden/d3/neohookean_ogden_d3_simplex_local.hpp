@@ -104,39 +104,39 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_objective_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * NS + shape];
+          gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * NS + shape];
+          gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * NS + shape];
+          gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * NS + shape];
+          gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * NS + shape];
+          gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * NS + shape];
+          gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * NS + shape];
+          gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * NS + shape];
+          gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * NS + shape];
+          gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
         }
       }
       #pragma omp simd
@@ -329,39 +329,39 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_gradient_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * NS + shape];
+          gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * NS + shape];
+          gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * NS + shape];
+          gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * NS + shape];
+          gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * NS + shape];
+          gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * NS + shape];
+          gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * NS + shape];
+          gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * NS + shape];
+          gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * NS + shape];
+          gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
         }
       }
       #pragma omp simd
@@ -446,15 +446,15 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_gradient_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape * 3 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
+          out_streams[3 * shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape * 3 + 1][lane] += loperand3_values[lane] * grad_ref_x[q * NS + shape] + loperand4_values[lane] * grad_ref_y[q * NS + shape] + loperand5_values[lane] * grad_ref_z[q * NS + shape];
+          out_streams[3 * shape + 1][lane] += loperand3_values[lane] * grad_ref_x[q * NS + shape] + loperand4_values[lane] * grad_ref_y[q * NS + shape] + loperand5_values[lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape * 3 + 2][lane] += loperand6_values[lane] * grad_ref_x[q * NS + shape] + loperand7_values[lane] * grad_ref_y[q * NS + shape] + loperand8_values[lane] * grad_ref_z[q * NS + shape];
+          out_streams[3 * shape + 2][lane] += loperand6_values[lane] * grad_ref_x[q * NS + shape] + loperand7_values[lane] * grad_ref_y[q * NS + shape] + loperand8_values[lane] * grad_ref_z[q * NS + shape];
         }
       }
     }
@@ -672,48 +672,48 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_apply_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref0_values[lane] += h_streams[shape * 3 + 0][lane] * grad_ref_x[q * NS + shape];
+          gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref0_values[lane] += h_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref1_values[lane] += h_streams[shape * 3 + 0][lane] * grad_ref_y[q * NS + shape];
+          gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref1_values[lane] += h_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[shape * 3 + 0][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref2_values[lane] += h_streams[shape * 3 + 0][lane] * grad_ref_z[q * NS + shape];
+          gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
+          grad_h_ref2_values[lane] += h_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref3_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref3_values[lane] += h_streams[shape * 3 + 1][lane] * grad_ref_x[q * NS + shape];
+          gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref3_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref4_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref4_values[lane] += h_streams[shape * 3 + 1][lane] * grad_ref_y[q * NS + shape];
+          gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref4_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref5_values[lane] += u_streams[shape * 3 + 1][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref5_values[lane] += h_streams[shape * 3 + 1][lane] * grad_ref_z[q * NS + shape];
+          gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
+          grad_h_ref5_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref6_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref6_values[lane] += h_streams[shape * 3 + 2][lane] * grad_ref_x[q * NS + shape];
+          gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref6_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref7_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref7_values[lane] += h_streams[shape * 3 + 2][lane] * grad_ref_y[q * NS + shape];
+          gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref7_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref8_values[lane] += u_streams[shape * 3 + 2][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref8_values[lane] += h_streams[shape * 3 + 2][lane] * grad_ref_z[q * NS + shape];
+          gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
+          grad_h_ref8_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
         }
       }
       #pragma omp simd
@@ -911,15 +911,15 @@ static SFEM_INLINE void neohookean_ogden_d3_simplex_apply_block(
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape * 3 + 0][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
+          out_streams[3 * shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape * 3 + 1][lane] += loperand3_values[lane] * grad_ref_x[q * NS + shape] + loperand4_values[lane] * grad_ref_y[q * NS + shape] + loperand5_values[lane] * grad_ref_z[q * NS + shape];
+          out_streams[3 * shape + 1][lane] += loperand3_values[lane] * grad_ref_x[q * NS + shape] + loperand4_values[lane] * grad_ref_y[q * NS + shape] + loperand5_values[lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape * 3 + 2][lane] += loperand6_values[lane] * grad_ref_x[q * NS + shape] + loperand7_values[lane] * grad_ref_y[q * NS + shape] + loperand8_values[lane] * grad_ref_z[q * NS + shape];
+          out_streams[3 * shape + 2][lane] += loperand6_values[lane] * grad_ref_x[q * NS + shape] + loperand7_values[lane] * grad_ref_y[q * NS + shape] + loperand8_values[lane] * grad_ref_z[q * NS + shape];
         }
       }
     }

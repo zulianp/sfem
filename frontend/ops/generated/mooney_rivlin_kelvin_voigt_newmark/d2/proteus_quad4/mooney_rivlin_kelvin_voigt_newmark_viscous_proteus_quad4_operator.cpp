@@ -317,10 +317,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
@@ -700,10 +700,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(

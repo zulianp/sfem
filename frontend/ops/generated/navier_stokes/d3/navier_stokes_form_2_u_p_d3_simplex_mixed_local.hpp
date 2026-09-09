@@ -117,7 +117,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       const s_t adj8 = adjugate[8][goff];
       s_t u0_direction = s_t(0);
       const s_t coeff_direction_u0_0 = direction[0][lane];
-      u0_direction += coeff_direction_u0_0 * field_shape[0][q * U_NS + 0];
+      u0_direction += coeff_direction_u0_0 * field_shape[0][q * U_NS];
       const s_t coeff_direction_u0_1 = direction[1][lane];
       u0_direction += coeff_direction_u0_1 * field_shape[0][q * U_NS + 1];
       const s_t coeff_direction_u0_2 = direction[2][lane];
@@ -138,7 +138,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       u0_direction += coeff_direction_u0_9 * field_shape[0][q * U_NS + 9];
       s_t u1_direction = s_t(0);
       const s_t coeff_direction_u1_0 = direction[10][lane];
-      u1_direction += coeff_direction_u1_0 * field_shape[0][q * U_NS + 0];
+      u1_direction += coeff_direction_u1_0 * field_shape[0][q * U_NS];
       const s_t coeff_direction_u1_1 = direction[11][lane];
       u1_direction += coeff_direction_u1_1 * field_shape[0][q * U_NS + 1];
       const s_t coeff_direction_u1_2 = direction[12][lane];
@@ -159,7 +159,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       u1_direction += coeff_direction_u1_9 * field_shape[0][q * U_NS + 9];
       s_t u2_direction = s_t(0);
       const s_t coeff_direction_u2_0 = direction[20][lane];
-      u2_direction += coeff_direction_u2_0 * field_shape[0][q * U_NS + 0];
+      u2_direction += coeff_direction_u2_0 * field_shape[0][q * U_NS];
       const s_t coeff_direction_u2_1 = direction[21][lane];
       u2_direction += coeff_direction_u2_1 * field_shape[0][q * U_NS + 1];
       const s_t coeff_direction_u2_2 = direction[22][lane];
@@ -180,7 +180,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       u2_direction += coeff_direction_u2_9 * field_shape[0][q * U_NS + 9];
       s_t p_direction = s_t(0);
       const s_t coeff_direction_p_0 = direction[30][lane];
-      p_direction += coeff_direction_p_0 * field_shape[1][q * P_NS + 0];
+      p_direction += coeff_direction_p_0 * field_shape[1][q * P_NS];
       const s_t coeff_direction_p_1 = direction[31][lane];
       p_direction += coeff_direction_p_1 * field_shape[1][q * P_NS + 1];
       const s_t coeff_direction_p_2 = direction[32][lane];
@@ -191,7 +191,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       const s_t grad_coeff0_0 = residual_tmp0;
       const s_t grad_coeff1_1 = residual_tmp0;
       const s_t grad_coeff2_2 = residual_tmp0;
-      const s_t test_grad0_u0_0 = (fgref[0][q * U_NS + 0] * adj0 + fgref[1][q * U_NS + 0] * adj3 + fgref[2][q * U_NS + 0] * adj6) / det;
+      const s_t test_grad0_u0_0 = (fgref[0][q * U_NS] * adj0 + fgref[1][q * U_NS] * adj3 + fgref[2][q * U_NS] * adj6) / det;
       output[0][lane] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_0);
       const s_t test_grad0_u0_1 = (fgref[0][q * U_NS + 1] * adj0 + fgref[1][q * U_NS + 1] * adj3 + fgref[2][q * U_NS + 1] * adj6) / det;
       output[1][lane] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_1);
@@ -211,7 +211,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       output[8][lane] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_8);
       const s_t test_grad0_u0_9 = (fgref[0][q * U_NS + 9] * adj0 + fgref[1][q * U_NS + 9] * adj3 + fgref[2][q * U_NS + 9] * adj6) / det;
       output[9][lane] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_9);
-      const s_t test_grad1_u1_0 = (fgref[0][q * U_NS + 0] * adj1 + fgref[1][q * U_NS + 0] * adj4 + fgref[2][q * U_NS + 0] * adj7) / det;
+      const s_t test_grad1_u1_0 = (fgref[0][q * U_NS] * adj1 + fgref[1][q * U_NS] * adj4 + fgref[2][q * U_NS] * adj7) / det;
       output[10][lane] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_0);
       const s_t test_grad1_u1_1 = (fgref[0][q * U_NS + 1] * adj1 + fgref[1][q * U_NS + 1] * adj4 + fgref[2][q * U_NS + 1] * adj7) / det;
       output[11][lane] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_1);
@@ -231,7 +231,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       output[18][lane] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_8);
       const s_t test_grad1_u1_9 = (fgref[0][q * U_NS + 9] * adj1 + fgref[1][q * U_NS + 9] * adj4 + fgref[2][q * U_NS + 9] * adj7) / det;
       output[19][lane] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_9);
-      const s_t test_grad2_u2_0 = (fgref[0][q * U_NS + 0] * adj2 + fgref[1][q * U_NS + 0] * adj5 + fgref[2][q * U_NS + 0] * adj8) / det;
+      const s_t test_grad2_u2_0 = (fgref[0][q * U_NS] * adj2 + fgref[1][q * U_NS] * adj5 + fgref[2][q * U_NS] * adj8) / det;
       output[20][lane] += q_weight[q] * det * (grad_coeff2_2 * test_grad2_u2_0);
       const s_t test_grad2_u2_1 = (fgref[0][q * U_NS + 1] * adj2 + fgref[1][q * U_NS + 1] * adj5 + fgref[2][q * U_NS + 1] * adj8) / det;
       output[21][lane] += q_weight[q] * det * (grad_coeff2_2 * test_grad2_u2_1);
@@ -290,7 +290,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       const s_t adj8 = adjugate[8][goff];
       s_t u0_direction = s_t(0);
       const s_t coeff_direction_u0_0 = direction[0][lane];
-      u0_direction += coeff_direction_u0_0 * field_shape[0][q * U_NS + 0];
+      u0_direction += coeff_direction_u0_0 * field_shape[0][q * U_NS];
       const s_t coeff_direction_u0_1 = direction[1][lane];
       u0_direction += coeff_direction_u0_1 * field_shape[0][q * U_NS + 1];
       const s_t coeff_direction_u0_2 = direction[2][lane];
@@ -311,7 +311,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       u0_direction += coeff_direction_u0_9 * field_shape[0][q * U_NS + 9];
       s_t u1_direction = s_t(0);
       const s_t coeff_direction_u1_0 = direction[10][lane];
-      u1_direction += coeff_direction_u1_0 * field_shape[0][q * U_NS + 0];
+      u1_direction += coeff_direction_u1_0 * field_shape[0][q * U_NS];
       const s_t coeff_direction_u1_1 = direction[11][lane];
       u1_direction += coeff_direction_u1_1 * field_shape[0][q * U_NS + 1];
       const s_t coeff_direction_u1_2 = direction[12][lane];
@@ -332,7 +332,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       u1_direction += coeff_direction_u1_9 * field_shape[0][q * U_NS + 9];
       s_t u2_direction = s_t(0);
       const s_t coeff_direction_u2_0 = direction[20][lane];
-      u2_direction += coeff_direction_u2_0 * field_shape[0][q * U_NS + 0];
+      u2_direction += coeff_direction_u2_0 * field_shape[0][q * U_NS];
       const s_t coeff_direction_u2_1 = direction[21][lane];
       u2_direction += coeff_direction_u2_1 * field_shape[0][q * U_NS + 1];
       const s_t coeff_direction_u2_2 = direction[22][lane];
@@ -353,7 +353,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       u2_direction += coeff_direction_u2_9 * field_shape[0][q * U_NS + 9];
       s_t p_direction = s_t(0);
       const s_t coeff_direction_p_0 = direction[30][lane];
-      p_direction += coeff_direction_p_0 * field_shape[1][q * P_NS + 0];
+      p_direction += coeff_direction_p_0 * field_shape[1][q * P_NS];
       const s_t coeff_direction_p_1 = direction[31][lane];
       p_direction += coeff_direction_p_1 * field_shape[1][q * P_NS + 1];
       const s_t coeff_direction_p_2 = direction[32][lane];
@@ -364,7 +364,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       const s_t grad_coeff0_0 = residual_tmp0;
       const s_t grad_coeff1_1 = residual_tmp0;
       const s_t grad_coeff2_2 = residual_tmp0;
-      const s_t test_grad0_u0_0 = (fgref[0][q * U_NS + 0] * adj0 + fgref[1][q * U_NS + 0] * adj3 + fgref[2][q * U_NS + 0] * adj6) / det;
+      const s_t test_grad0_u0_0 = (fgref[0][q * U_NS] * adj0 + fgref[1][q * U_NS] * adj3 + fgref[2][q * U_NS] * adj6) / det;
       output[0][lane] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_0);
       const s_t test_grad0_u0_1 = (fgref[0][q * U_NS + 1] * adj0 + fgref[1][q * U_NS + 1] * adj3 + fgref[2][q * U_NS + 1] * adj6) / det;
       output[1][lane] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_1);
@@ -384,7 +384,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       output[8][lane] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_8);
       const s_t test_grad0_u0_9 = (fgref[0][q * U_NS + 9] * adj0 + fgref[1][q * U_NS + 9] * adj3 + fgref[2][q * U_NS + 9] * adj6) / det;
       output[9][lane] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_9);
-      const s_t test_grad1_u1_0 = (fgref[0][q * U_NS + 0] * adj1 + fgref[1][q * U_NS + 0] * adj4 + fgref[2][q * U_NS + 0] * adj7) / det;
+      const s_t test_grad1_u1_0 = (fgref[0][q * U_NS] * adj1 + fgref[1][q * U_NS] * adj4 + fgref[2][q * U_NS] * adj7) / det;
       output[10][lane] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_0);
       const s_t test_grad1_u1_1 = (fgref[0][q * U_NS + 1] * adj1 + fgref[1][q * U_NS + 1] * adj4 + fgref[2][q * U_NS + 1] * adj7) / det;
       output[11][lane] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_1);
@@ -404,7 +404,7 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_simplex_mixed_jacobian_actio
       output[18][lane] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_8);
       const s_t test_grad1_u1_9 = (fgref[0][q * U_NS + 9] * adj1 + fgref[1][q * U_NS + 9] * adj4 + fgref[2][q * U_NS + 9] * adj7) / det;
       output[19][lane] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_9);
-      const s_t test_grad2_u2_0 = (fgref[0][q * U_NS + 0] * adj2 + fgref[1][q * U_NS + 0] * adj5 + fgref[2][q * U_NS + 0] * adj8) / det;
+      const s_t test_grad2_u2_0 = (fgref[0][q * U_NS] * adj2 + fgref[1][q * U_NS] * adj5 + fgref[2][q * U_NS] * adj8) / det;
       output[20][lane] += q_weight[q] * det * (grad_coeff2_2 * test_grad2_u2_0);
       const s_t test_grad2_u2_1 = (fgref[0][q * U_NS + 1] * adj2 + fgref[1][q * U_NS + 1] * adj5 + fgref[2][q * U_NS + 1] * adj8) / det;
       output[21][lane] += q_weight[q] * det * (grad_coeff2_2 * test_grad2_u2_1);

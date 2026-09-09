@@ -63,8 +63,8 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
       s_t u0_grad_0_ref = s_t(0);
       s_t u0_grad_1_ref = s_t(0);
       const s_t coeff_current_u0_0 = current[0][lane];
-      u0_grad_0_ref += coeff_current_u0_0 * fgref[0][q * U_NS + 0];
-      u0_grad_1_ref += coeff_current_u0_0 * fgref[1][q * U_NS + 0];
+      u0_grad_0_ref += coeff_current_u0_0 * fgref[0][q * U_NS];
+      u0_grad_1_ref += coeff_current_u0_0 * fgref[1][q * U_NS];
       const s_t coeff_current_u0_1 = current[1][lane];
       u0_grad_0_ref += coeff_current_u0_1 * fgref[0][q * U_NS + 1];
       u0_grad_1_ref += coeff_current_u0_1 * fgref[1][q * U_NS + 1];
@@ -85,8 +85,8 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
       s_t u1_grad_0_ref = s_t(0);
       s_t u1_grad_1_ref = s_t(0);
       const s_t coeff_current_u1_0 = current[6][lane];
-      u1_grad_0_ref += coeff_current_u1_0 * fgref[0][q * U_NS + 0];
-      u1_grad_1_ref += coeff_current_u1_0 * fgref[1][q * U_NS + 0];
+      u1_grad_0_ref += coeff_current_u1_0 * fgref[0][q * U_NS];
+      u1_grad_1_ref += coeff_current_u1_0 * fgref[1][q * U_NS];
       const s_t coeff_current_u1_1 = current[7][lane];
       u1_grad_0_ref += coeff_current_u1_1 * fgref[0][q * U_NS + 1];
       u1_grad_1_ref += coeff_current_u1_1 * fgref[1][q * U_NS + 1];
@@ -107,8 +107,8 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
       s_t p_grad_0_ref = s_t(0);
       s_t p_grad_1_ref = s_t(0);
       const s_t coeff_current_p_0 = current[12][lane];
-      p_grad_0_ref += coeff_current_p_0 * fgref[ND][q * P_NS + 0];
-      p_grad_1_ref += coeff_current_p_0 * fgref[ND + 1][q * P_NS + 0];
+      p_grad_0_ref += coeff_current_p_0 * fgref[ND][q * P_NS];
+      p_grad_1_ref += coeff_current_p_0 * fgref[ND + 1][q * P_NS];
       const s_t coeff_current_p_1 = current[13][lane];
       p_grad_0_ref += coeff_current_p_1 * fgref[ND][q * P_NS + 1];
       p_grad_1_ref += coeff_current_p_1 * fgref[ND + 1][q * P_NS + 1];
@@ -118,7 +118,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
       const s_t p_grad_0 = (p_grad_0_ref * adj0 + p_grad_1_ref * adj2) / det;
       const s_t p_grad_1 = (p_grad_0_ref * adj1 + p_grad_1_ref * adj3) / det;
       const s_t value_coeff2 = u0_grad_0 + u1_grad_1;
-      const s_t test_value_p_0 = field_shape[1][q * P_NS + 0];
+      const s_t test_value_p_0 = field_shape[1][q * P_NS];
       output[12][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_0);
       const s_t test_value_p_1 = field_shape[1][q * P_NS + 1];
       output[13][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_1);
@@ -159,8 +159,8 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_c
       s_t u0_grad_0_ref = s_t(0);
       s_t u0_grad_1_ref = s_t(0);
       const s_t coeff_current_u0_0 = current[0][lane];
-      u0_grad_0_ref += coeff_current_u0_0 * fgref[0][q * U_NS + 0];
-      u0_grad_1_ref += coeff_current_u0_0 * fgref[1][q * U_NS + 0];
+      u0_grad_0_ref += coeff_current_u0_0 * fgref[0][q * U_NS];
+      u0_grad_1_ref += coeff_current_u0_0 * fgref[1][q * U_NS];
       const s_t coeff_current_u0_1 = current[1][lane];
       u0_grad_0_ref += coeff_current_u0_1 * fgref[0][q * U_NS + 1];
       u0_grad_1_ref += coeff_current_u0_1 * fgref[1][q * U_NS + 1];
@@ -181,8 +181,8 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_c
       s_t u1_grad_0_ref = s_t(0);
       s_t u1_grad_1_ref = s_t(0);
       const s_t coeff_current_u1_0 = current[6][lane];
-      u1_grad_0_ref += coeff_current_u1_0 * fgref[0][q * U_NS + 0];
-      u1_grad_1_ref += coeff_current_u1_0 * fgref[1][q * U_NS + 0];
+      u1_grad_0_ref += coeff_current_u1_0 * fgref[0][q * U_NS];
+      u1_grad_1_ref += coeff_current_u1_0 * fgref[1][q * U_NS];
       const s_t coeff_current_u1_1 = current[7][lane];
       u1_grad_0_ref += coeff_current_u1_1 * fgref[0][q * U_NS + 1];
       u1_grad_1_ref += coeff_current_u1_1 * fgref[1][q * U_NS + 1];
@@ -203,8 +203,8 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_c
       s_t p_grad_0_ref = s_t(0);
       s_t p_grad_1_ref = s_t(0);
       const s_t coeff_current_p_0 = current[12][lane];
-      p_grad_0_ref += coeff_current_p_0 * fgref[ND][q * P_NS + 0];
-      p_grad_1_ref += coeff_current_p_0 * fgref[ND + 1][q * P_NS + 0];
+      p_grad_0_ref += coeff_current_p_0 * fgref[ND][q * P_NS];
+      p_grad_1_ref += coeff_current_p_0 * fgref[ND + 1][q * P_NS];
       const s_t coeff_current_p_1 = current[13][lane];
       p_grad_0_ref += coeff_current_p_1 * fgref[ND][q * P_NS + 1];
       p_grad_1_ref += coeff_current_p_1 * fgref[ND + 1][q * P_NS + 1];
@@ -214,7 +214,7 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_c
       const s_t p_grad_0 = (p_grad_0_ref * adj0 + p_grad_1_ref * adj2) / det;
       const s_t p_grad_1 = (p_grad_0_ref * adj1 + p_grad_1_ref * adj3) / det;
       const s_t value_coeff2 = u0_grad_0 + u1_grad_1;
-      const s_t test_value_p_0 = field_shape[1][q * P_NS + 0];
+      const s_t test_value_p_0 = field_shape[1][q * P_NS];
       output[12][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_0);
       const s_t test_value_p_1 = field_shape[1][q * P_NS + 1];
       output[13][lane] += q_weight[q] * det * (value_coeff2 * test_value_p_1);

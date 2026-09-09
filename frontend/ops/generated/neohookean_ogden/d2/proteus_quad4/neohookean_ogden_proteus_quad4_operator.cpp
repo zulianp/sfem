@@ -267,10 +267,10 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_objective_steps_i_msoa_imp
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
@@ -568,10 +568,10 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_gradient_i_msoa_impl(
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
@@ -865,10 +865,10 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_apply_i_msoa_impl(
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
@@ -1028,8 +1028,9 @@ static int neohookean_ogden_proteus_quad4_hessian_i_msoa_assemble_impl(
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-  int unsupported_matrix_format = 0;
-#pragma omp parallel for schedule(static) reduction(|:unsupported_matrix_format)
+  static_assert(FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+#pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
@@ -1069,10 +1070,10 @@ static int neohookean_ogden_proteus_quad4_hessian_i_msoa_assemble_impl(
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
@@ -1102,12 +1103,10 @@ static int neohookean_ogden_proteus_quad4_hessian_i_msoa_assemble_impl(
 
     if constexpr (FORMAT == 1) {
       neohookean_ogden_proteus_quad4_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
-    } else {
-      unsupported_matrix_format |= 1;
     }
   }
 
-  return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen

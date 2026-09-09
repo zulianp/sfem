@@ -106,9 +106,9 @@ static SFEM_INLINE void laplace_d3_tensor_product_direct_hessian_tensor_product_
             const s_t test_grad_ref1 = shape_1d[qx * NS1 + test_sx] * grad_1d[qy * NS1 + test_sy] * shape_1d[qz * NS1 + test_sz];
             const s_t test_grad_ref2 = shape_1d[qx * NS1 + test_sx] * shape_1d[qy * NS1 + test_sy] * grad_1d[qz * NS1 + test_sz];
             s_t entry = s_t(0);
-            entry += test_grad_ref0 * qw * (material[test_component * ND + 0] * adj_lane0 + material[test_component * ND + 1] * adj_lane1 + material[test_component * ND + 2] * adj_lane2);
-            entry += test_grad_ref1 * qw * (material[test_component * ND + 0] * adj_lane3 + material[test_component * ND + 1] * adj_lane4 + material[test_component * ND + 2] * adj_lane5);
-            entry += test_grad_ref2 * qw * (material[test_component * ND + 0] * adj_lane6 + material[test_component * ND + 1] * adj_lane7 + material[test_component * ND + 2] * adj_lane8);
+            entry += test_grad_ref0 * qw * (material[test_component * ND] * adj_lane0 + material[test_component * ND + 1] * adj_lane1 + material[test_component * ND + 2] * adj_lane2);
+            entry += test_grad_ref1 * qw * (material[test_component * ND] * adj_lane3 + material[test_component * ND + 1] * adj_lane4 + material[test_component * ND + 2] * adj_lane5);
+            entry += test_grad_ref2 * qw * (material[test_component * ND] * adj_lane6 + material[test_component * ND + 1] * adj_lane7 + material[test_component * ND + 2] * adj_lane8);
             const int row = test_component * NS + test_shape;
             const int col = trial_component * NS + trial_shape;
             element_matrix[row * NDOFS + col] += entry;

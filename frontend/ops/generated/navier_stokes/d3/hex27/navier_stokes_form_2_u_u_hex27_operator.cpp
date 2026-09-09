@@ -665,10 +665,10 @@ static SFEM_INLINE int navier_stokes_form_2_u_u_hex27_jacobian_action_isoparamet
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
-        coordinate_grad_ref + 0 * NQ * ND * VS);
+        coordinate_grad_ref + 0);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
-        coordinate_grad_ref + 1 * NQ * ND * VS);
+        coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
         ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
         coordinate_grad_ref + 2 * NQ * ND * VS);

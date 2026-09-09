@@ -89,8 +89,8 @@ static SFEM_INLINE void laplace_d2_tensor_product_direct_hessian_tensor_product_
             const s_t test_grad_ref0 = grad_1d[qx * NS1 + test_sx] * shape_1d[qy * NS1 + test_sy];
             const s_t test_grad_ref1 = shape_1d[qx * NS1 + test_sx] * grad_1d[qy * NS1 + test_sy];
             s_t entry = s_t(0);
-            entry += test_grad_ref0 * qw * (material[test_component * ND + 0] * adj_lane0 + material[test_component * ND + 1] * adj_lane1);
-            entry += test_grad_ref1 * qw * (material[test_component * ND + 0] * adj_lane2 + material[test_component * ND + 1] * adj_lane3);
+            entry += test_grad_ref0 * qw * (material[test_component * ND] * adj_lane0 + material[test_component * ND + 1] * adj_lane1);
+            entry += test_grad_ref1 * qw * (material[test_component * ND] * adj_lane2 + material[test_component * ND + 1] * adj_lane3);
             const int row = test_component * NS + test_shape;
             const int col = trial_component * NS + trial_shape;
             element_matrix[row * NDOFS + col] += entry;
