@@ -23,7 +23,7 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -80,7 +80,7 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_energy_egeometry_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -124,8 +124,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_energy_ecoords_soa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
@@ -134,7 +134,7 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_energy_ecoords_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -178,8 +178,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_energy_esoa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
@@ -189,7 +189,7 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_energy_esoa(
 }
 
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -249,7 +249,7 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_egeometry_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -296,8 +296,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_ecoords_soa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
@@ -306,7 +306,7 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_ecoords_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -353,8 +353,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_esoa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
@@ -364,7 +364,7 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_esoa(
 }
 
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -435,7 +435,7 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_hessian_egeometry_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -469,8 +469,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_hessian_ecoords_soa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
@@ -503,7 +503,7 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_hessian_ecoords_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -537,8 +537,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_hessian_esoa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);

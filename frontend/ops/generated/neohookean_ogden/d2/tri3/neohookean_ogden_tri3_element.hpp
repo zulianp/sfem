@@ -23,7 +23,7 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -71,7 +71,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_egeometry_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -169,7 +169,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_ecoords_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -268,7 +268,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_esoa(
 }
 
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -319,7 +319,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_egeometry_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -420,7 +420,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_ecoords_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -522,7 +522,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_esoa(
 }
 
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -587,7 +587,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_egeometry_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -702,7 +702,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_ecoords_soa(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,

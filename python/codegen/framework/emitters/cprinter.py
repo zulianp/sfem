@@ -6,6 +6,8 @@ subclass inside the layer that is supposed to hold no syntax at all.  Nothing
 above the emission layer needs any of it.
 """
 
+import re
+
 import sympy as sp
 from sympy.printing.c import C99CodePrinter
 
@@ -294,3 +296,64 @@ def _runtime_typed_arg(param, scalar_type):
     if param.rstrip().endswith("]"):
         return "(%s%s *const *)%s" % (const, scalar_type, name)
     return "(%s%s *)%s" % (const, scalar_type, name)
+
+
+def c_product(*factors):
+    """A C product with the integer factors multiplied out.
+
+    `c_product(1, "NQ", "ND", "VS")` is `NQ * ND * VS`; `c_product(3, 3)` is `9`;
+    `c_product(0, "NQ")` is `0`.
+
+    The generator knows these numbers, so emitting `1 * NQ` writes arithmetic
+    into the kernel that was already done -- and writes it once per index
+    expression, which is most lines of a gather or a scatter.  The compiler folds
+    it, but the text is what a person reads.
+    """
+    constant = 1
+    symbols = []
+    for factor in factors:
+        if isinstance(factor, int):
+            constant *= factor
+        elif str(factor).lstrip("-").isdigit():
+            constant *= int(factor)
+        else:
+            symbols.append(str(factor))
+    if constant == 0:
+        return "0"
+    if not symbols:
+        return str(constant)
+    if constant != 1:
+        symbols.insert(0, str(constant))
+    return " * ".join(symbols)
+
+
+def c_sum(*terms):
+    """A C sum with the integer terms added up and the zeros dropped.
+
+    `c_sum(0, "q")` is `q`; `c_sum("q", 0)` is `q`; `c_sum(3, 4)` is `7`.  An
+    index that reads `0 + q` says nothing the reader did not already know.
+    """
+    constant = 0
+    symbols = []
+    for term in terms:
+        if isinstance(term, int):
+            constant += term
+        elif str(term).lstrip("-").isdigit():
+            constant += int(term)
+        elif str(term) != "0":
+            symbols.append(str(term))
+    if not symbols:
+        return str(constant)
+    if constant:
+        symbols.append(str(constant))
+    return " + ".join(symbols)
+
+
+def c_group(expression):
+    """`expression` parenthesised, unless it is a single term already.
+
+    So a folded index reads `q * 3 + 1` where the coefficient vanished and
+    `(NQ + q) * 3 + 1` where it did not, instead of `((0 * NQ + q) * 3 + 1)`.
+    """
+    text = str(expression)
+    return text if re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*|-?\d+", text) else "(%s)" % text

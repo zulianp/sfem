@@ -113,8 +113,8 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_objective_block(
       const s_t adj_lane2 = adj2[goff];
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
-      const s_t gu_ref0 = -(u_streams[0 * 1 + 0][lane]) + u_streams[1 * 1 + 0][lane];
-      const s_t gu_ref1 = -(u_streams[0 * 1 + 0][lane]) + u_streams[2 * 1 + 0][lane];
+      const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[1][lane];
+      const s_t gu_ref1 = -(u_streams[0][lane]) + u_streams[2][lane];
       const s_t idet = s_t(1) / det_lane0;
       const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
       const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
@@ -143,11 +143,11 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_metric_objective_block(
       const s_t geom_metric_lane0 = geom_metric0[goff];
       const s_t geom_metric_lane1 = geom_metric1[goff];
       const s_t geom_metric_lane2 = geom_metric2[goff];
-      const s_t t0 = -u_streams[0 * 1 + 0][lane] + u_streams[1 * 1 + 0][lane];
-      const s_t t1 = -u_streams[0 * 1 + 0][lane] + u_streams[2 * 1 + 0][lane];
+      const s_t t0 = -u_streams[0][lane] + u_streams[1][lane];
+      const s_t t1 = -u_streams[0][lane] + u_streams[2][lane];
       const s_t t2 = geom_metric_lane0*t0 + geom_metric_lane1*t1;
       const s_t t3 = geom_metric_lane1*t0 + geom_metric_lane2*t1;
-      value[lane] += ((s_t(1) / s_t(2)))*kappa*(t2*(-u_streams[0 * 1 + 0][lane] + u_streams[1 * 1 + 0][lane]) + t3*(-u_streams[0 * 1 + 0][lane] + u_streams[2 * 1 + 0][lane]));
+      value[lane] += ((s_t(1) / s_t(2)))*kappa*(t2*(-u_streams[0][lane] + u_streams[1][lane]) + t3*(-u_streams[0][lane] + u_streams[2][lane]));
     }
 }
 
@@ -248,8 +248,8 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_gradient_block(
       const s_t adj_lane2 = adj2[goff];
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
-      const s_t gu_ref0 = -(u_streams[0 * 1 + 0][lane]) + u_streams[1 * 1 + 0][lane];
-      const s_t gu_ref1 = -(u_streams[0 * 1 + 0][lane]) + u_streams[2 * 1 + 0][lane];
+      const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[1][lane];
+      const s_t gu_ref1 = -(u_streams[0][lane]) + u_streams[2][lane];
       const s_t idet = s_t(1) / det_lane0;
       const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
       const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
@@ -257,9 +257,9 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_gradient_block(
     const s_t material1 = gu1*kappa;
     const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
     const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-      out_streams[0 * 1 + 0][lane] += -(loperand0) - loperand1;
-      out_streams[1 * 1 + 0][lane] += loperand0;
-      out_streams[2 * 1 + 0][lane] += loperand1;
+      out_streams[0][lane] += -(loperand0) - loperand1;
+      out_streams[1][lane] += loperand0;
+      out_streams[2][lane] += loperand1;
       }
     }
 }
@@ -284,13 +284,13 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_metric_gradient_block(
       const s_t geom_metric_lane0 = geom_metric0[goff];
       const s_t geom_metric_lane1 = geom_metric1[goff];
       const s_t geom_metric_lane2 = geom_metric2[goff];
-      const s_t t0 = -u_streams[0 * 1 + 0][lane] + u_streams[1 * 1 + 0][lane];
-      const s_t t1 = -u_streams[0 * 1 + 0][lane] + u_streams[2 * 1 + 0][lane];
+      const s_t t0 = -u_streams[0][lane] + u_streams[1][lane];
+      const s_t t1 = -u_streams[0][lane] + u_streams[2][lane];
       const s_t t2 = geom_metric_lane0*t0 + geom_metric_lane1*t1;
       const s_t t3 = geom_metric_lane1*t0 + geom_metric_lane2*t1;
-      out_streams[0 * 1 + 0][lane] += kappa*(-t2 - t3);
-      out_streams[1 * 1 + 0][lane] += kappa*t2;
-      out_streams[2 * 1 + 0][lane] += kappa*t3;
+      out_streams[0][lane] += kappa*(-t2 - t3);
+      out_streams[1][lane] += kappa*t2;
+      out_streams[2][lane] += kappa*t3;
     }
 }
 
@@ -391,8 +391,8 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_apply_block(
       const s_t adj_lane2 = adj2[goff];
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
-      const s_t grad_h_ref0 = -(h_streams[0 * 1 + 0][lane]) + h_streams[1 * 1 + 0][lane];
-      const s_t grad_h_ref1 = -(h_streams[0 * 1 + 0][lane]) + h_streams[2 * 1 + 0][lane];
+      const s_t grad_h_ref0 = -(h_streams[0][lane]) + h_streams[1][lane];
+      const s_t grad_h_ref1 = -(h_streams[0][lane]) + h_streams[2][lane];
       const s_t idet = s_t(1) / det_lane0;
       const s_t trial_grad0 = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane2) * idet;
       const s_t trial_grad1 = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane3) * idet;
@@ -400,9 +400,9 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_apply_block(
     const s_t material1 = kappa*trial_grad1;
     const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
     const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-      out_streams[0 * 1 + 0][lane] += -(loperand0) - loperand1;
-      out_streams[1 * 1 + 0][lane] += loperand0;
-      out_streams[2 * 1 + 0][lane] += loperand1;
+      out_streams[0][lane] += -(loperand0) - loperand1;
+      out_streams[1][lane] += loperand0;
+      out_streams[2][lane] += loperand1;
       }
     }
 }
@@ -427,13 +427,13 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_metric_apply_block(
       const s_t geom_metric_lane0 = geom_metric0[goff];
       const s_t geom_metric_lane1 = geom_metric1[goff];
       const s_t geom_metric_lane2 = geom_metric2[goff];
-      const s_t t0 = -h_streams[0 * 1 + 0][lane] + h_streams[1 * 1 + 0][lane];
-      const s_t t1 = -h_streams[0 * 1 + 0][lane] + h_streams[2 * 1 + 0][lane];
+      const s_t t0 = -h_streams[0][lane] + h_streams[1][lane];
+      const s_t t1 = -h_streams[0][lane] + h_streams[2][lane];
       const s_t t2 = geom_metric_lane0*t0 + geom_metric_lane1*t1;
       const s_t t3 = geom_metric_lane1*t0 + geom_metric_lane2*t1;
-      out_streams[0 * 1 + 0][lane] += kappa*(-t2 - t3);
-      out_streams[1 * 1 + 0][lane] += kappa*t2;
-      out_streams[2 * 1 + 0][lane] += kappa*t3;
+      out_streams[0][lane] += kappa*(-t2 - t3);
+      out_streams[1][lane] += kappa*t2;
+      out_streams[2][lane] += kappa*t3;
     }
 }
 

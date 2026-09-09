@@ -20,7 +20,7 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_energy_2d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -41,7 +41,7 @@ static SFEM_INLINE int laplace_energy_2d_esoa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_energy_3d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -64,7 +64,7 @@ static SFEM_INLINE int laplace_energy_3d_esoa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_energy_2d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -85,7 +85,7 @@ static SFEM_INLINE int laplace_energy_2d_ecoords_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_energy_3d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -108,7 +108,7 @@ static SFEM_INLINE int laplace_energy_3d_ecoords_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_energy_2d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -130,7 +130,7 @@ static SFEM_INLINE int laplace_energy_2d_egeometry_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_energy_3d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -154,7 +154,7 @@ static SFEM_INLINE int laplace_energy_3d_egeometry_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_gradient_2d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -175,7 +175,7 @@ static SFEM_INLINE int laplace_gradient_2d_esoa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_gradient_3d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -198,7 +198,7 @@ static SFEM_INLINE int laplace_gradient_3d_esoa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_gradient_2d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -219,7 +219,7 @@ static SFEM_INLINE int laplace_gradient_2d_ecoords_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_gradient_3d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -242,7 +242,7 @@ static SFEM_INLINE int laplace_gradient_3d_ecoords_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_gradient_2d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -264,7 +264,7 @@ static SFEM_INLINE int laplace_gradient_2d_egeometry_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_gradient_3d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -288,7 +288,7 @@ static SFEM_INLINE int laplace_gradient_3d_egeometry_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_hessian_2d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -308,7 +308,7 @@ static SFEM_INLINE int laplace_hessian_2d_esoa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_hessian_3d_esoa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -330,7 +330,7 @@ static SFEM_INLINE int laplace_hessian_3d_esoa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_hessian_2d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -350,7 +350,7 @@ static SFEM_INLINE int laplace_hessian_2d_ecoords_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_hessian_3d_ecoords_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -372,7 +372,7 @@ static SFEM_INLINE int laplace_hessian_3d_ecoords_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_hessian_2d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,
@@ -393,7 +393,7 @@ static SFEM_INLINE int laplace_hessian_2d_egeometry_soa(
   }
 }
 
-template <typename s_t, int VS = 16, typename elem_type_t>
+template <typename s_t, int VS, typename elem_type_t>
 static SFEM_INLINE int laplace_hessian_3d_egeometry_soa(
     const elem_type_t element_type,
         const ptrdiff_t nelements,

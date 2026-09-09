@@ -146,10 +146,10 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
       const s_t adj_lane2 = adj2[goff];
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
-      const s_t gu_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];
-      const s_t gu_ref1 = -(u_streams[0 * 2 + 0][lane]) + u_streams[2 * 2 + 0][lane];
-      const s_t gu_ref2 = -(u_streams[0 * 2 + 1][lane]) + u_streams[1 * 2 + 1][lane];
-      const s_t gu_ref3 = -(u_streams[0 * 2 + 1][lane]) + u_streams[2 * 2 + 1][lane];
+      const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[2][lane];
+      const s_t gu_ref1 = -(u_streams[0][lane]) + u_streams[4][lane];
+      const s_t gu_ref2 = -(u_streams[1][lane]) + u_streams[3][lane];
+      const s_t gu_ref3 = -(u_streams[1][lane]) + u_streams[5][lane];
       const s_t idet = s_t(1) / det_lane0;
       const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
       const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
@@ -313,10 +313,10 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
       const s_t adj_lane2 = adj2[goff];
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
-      const s_t gu_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];
-      const s_t gu_ref1 = -(u_streams[0 * 2 + 0][lane]) + u_streams[2 * 2 + 0][lane];
-      const s_t gu_ref2 = -(u_streams[0 * 2 + 1][lane]) + u_streams[1 * 2 + 1][lane];
-      const s_t gu_ref3 = -(u_streams[0 * 2 + 1][lane]) + u_streams[2 * 2 + 1][lane];
+      const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[2][lane];
+      const s_t gu_ref1 = -(u_streams[0][lane]) + u_streams[4][lane];
+      const s_t gu_ref2 = -(u_streams[1][lane]) + u_streams[3][lane];
+      const s_t gu_ref3 = -(u_streams[1][lane]) + u_streams[5][lane];
       const s_t idet = s_t(1) / det_lane0;
       const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
       const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
@@ -341,12 +341,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
     const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
     const s_t loperand2 = qw * (material2 * adj_lane0 + material3 * adj_lane1);
     const s_t loperand3 = qw * (material2 * adj_lane2 + material3 * adj_lane3);
-      out_streams[0 * 2 + 0][lane] += -(loperand0) - loperand1;
-      out_streams[0 * 2 + 1][lane] += -(loperand2) - loperand3;
-      out_streams[1 * 2 + 0][lane] += loperand0;
-      out_streams[1 * 2 + 1][lane] += loperand2;
-      out_streams[2 * 2 + 0][lane] += loperand1;
-      out_streams[2 * 2 + 1][lane] += loperand3;
+      out_streams[0][lane] += -(loperand0) - loperand1;
+      out_streams[1][lane] += -(loperand2) - loperand3;
+      out_streams[2][lane] += loperand0;
+      out_streams[3][lane] += loperand2;
+      out_streams[4][lane] += loperand1;
+      out_streams[5][lane] += loperand3;
       }
     }
 }
@@ -526,14 +526,14 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
       const s_t adj_lane2 = adj2[goff];
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
-      const s_t gu_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];
-      const s_t grad_h_ref0 = -(h_streams[0 * 2 + 0][lane]) + h_streams[1 * 2 + 0][lane];
-      const s_t gu_ref1 = -(u_streams[0 * 2 + 0][lane]) + u_streams[2 * 2 + 0][lane];
-      const s_t grad_h_ref1 = -(h_streams[0 * 2 + 0][lane]) + h_streams[2 * 2 + 0][lane];
-      const s_t gu_ref2 = -(u_streams[0 * 2 + 1][lane]) + u_streams[1 * 2 + 1][lane];
-      const s_t grad_h_ref2 = -(h_streams[0 * 2 + 1][lane]) + h_streams[1 * 2 + 1][lane];
-      const s_t gu_ref3 = -(u_streams[0 * 2 + 1][lane]) + u_streams[2 * 2 + 1][lane];
-      const s_t grad_h_ref3 = -(h_streams[0 * 2 + 1][lane]) + h_streams[2 * 2 + 1][lane];
+      const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[2][lane];
+      const s_t grad_h_ref0 = -(h_streams[0][lane]) + h_streams[2][lane];
+      const s_t gu_ref1 = -(u_streams[0][lane]) + u_streams[4][lane];
+      const s_t grad_h_ref1 = -(h_streams[0][lane]) + h_streams[4][lane];
+      const s_t gu_ref2 = -(u_streams[1][lane]) + u_streams[3][lane];
+      const s_t grad_h_ref2 = -(h_streams[1][lane]) + h_streams[3][lane];
+      const s_t gu_ref3 = -(u_streams[1][lane]) + u_streams[5][lane];
+      const s_t grad_h_ref3 = -(h_streams[1][lane]) + h_streams[5][lane];
       const s_t idet = s_t(1) / det_lane0;
       const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
       const s_t trial_grad0 = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane2) * idet;
@@ -571,12 +571,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_simplex_tr
     const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
     const s_t loperand2 = qw * (material2 * adj_lane0 + material3 * adj_lane1);
     const s_t loperand3 = qw * (material2 * adj_lane2 + material3 * adj_lane3);
-      out_streams[0 * 2 + 0][lane] += -(loperand0) - loperand1;
-      out_streams[0 * 2 + 1][lane] += -(loperand2) - loperand3;
-      out_streams[1 * 2 + 0][lane] += loperand0;
-      out_streams[1 * 2 + 1][lane] += loperand2;
-      out_streams[2 * 2 + 0][lane] += loperand1;
-      out_streams[2 * 2 + 1][lane] += loperand3;
+      out_streams[0][lane] += -(loperand0) - loperand1;
+      out_streams[1][lane] += -(loperand2) - loperand3;
+      out_streams[2][lane] += loperand0;
+      out_streams[3][lane] += loperand2;
+      out_streams[4][lane] += loperand1;
+      out_streams[5][lane] += loperand3;
       }
     }
 }

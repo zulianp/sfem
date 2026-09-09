@@ -6,7 +6,7 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -32,7 +32,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_energy_egeometry_soa(
   return neohookean_ogden_proteus_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, values);
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -64,7 +64,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_energy_ecoords_soa(
   return neohookean_ogden_proteus_hex8_energy_ecoords_soa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, values);
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -96,7 +96,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_energy_esoa(
   return neohookean_ogden_proteus_hex8_energy_esoa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, values);
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -129,7 +129,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_gradient_egeometry_soa(
   return neohookean_ogden_proteus_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, ordered_out_streams);
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -168,7 +168,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_gradient_ecoords_soa(
   return neohookean_ogden_proteus_hex8_gradient_ecoords_soa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, ordered_out_streams);
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -207,7 +207,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_gradient_esoa(
   return neohookean_ogden_proteus_hex8_gradient_esoa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, ordered_out_streams);
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -249,7 +249,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hessian_egeometry_soa(
   return neohookean_ogden_proteus_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, ordered_matrix_streams);
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -297,7 +297,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hessian_ecoords_soa(
   return neohookean_ogden_proteus_hex8_hessian_ecoords_soa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, ordered_matrix_streams);
 }
 
-template <typename s_t, int VS = 16>
+template <typename s_t, int VS>
 static SFEM_INLINE int neohookean_ogden_hex8_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,

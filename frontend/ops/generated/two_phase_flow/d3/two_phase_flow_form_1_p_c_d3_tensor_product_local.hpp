@@ -97,17 +97,17 @@ static SFEM_INLINE void two_phase_flow_form_1_p_c_d3_tensor_product_residual_blo
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
       const s_t p_w = current_value[(0 * NQ + q) * VS + lane];
-      const s_t p_w_grad_0_ref = current_grad_ref[((0 * NQ + q) * ND + 0) * VS + lane];
-      const s_t p_w_grad_1_ref = current_grad_ref[((0 * NQ + q) * ND + 1) * VS + lane];
-      const s_t p_w_grad_2_ref = current_grad_ref[((0 * NQ + q) * ND + 2) * VS + lane];
+      const s_t p_w_grad_0_ref = current_grad_ref[(q * ND) * VS + lane];
+      const s_t p_w_grad_1_ref = current_grad_ref[(q * ND + 1) * VS + lane];
+      const s_t p_w_grad_2_ref = current_grad_ref[(q * ND + 2) * VS + lane];
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
       const s_t p_w_old = previous_value[(0 * NQ + q) * VS + lane];
       const s_t p_c = current_value[(1 * NQ + q) * VS + lane];
-      const s_t p_c_grad_0_ref = current_grad_ref[((1 * NQ + q) * ND + 0) * VS + lane];
-      const s_t p_c_grad_1_ref = current_grad_ref[((1 * NQ + q) * ND + 1) * VS + lane];
-      const s_t p_c_grad_2_ref = current_grad_ref[((1 * NQ + q) * ND + 2) * VS + lane];
+      const s_t p_c_grad_0_ref = current_grad_ref[((NQ + q) * ND) * VS + lane];
+      const s_t p_c_grad_1_ref = current_grad_ref[((NQ + q) * ND + 1) * VS + lane];
+      const s_t p_c_grad_2_ref = current_grad_ref[((NQ + q) * ND + 2) * VS + lane];
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
@@ -123,14 +123,14 @@ static SFEM_INLINE void two_phase_flow_form_1_p_c_d3_tensor_product_residual_blo
       const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
       const s_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
       const s_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff[(0 * NQ + q) * VS + lane] = s_t(0);
-      grad_coeff_ref[((0 * NQ + q) * ND + 0) * VS + lane] = s_t(0);
-      grad_coeff_ref[((0 * NQ + q) * ND + 1) * VS + lane] = s_t(0);
-      grad_coeff_ref[((0 * NQ + q) * ND + 2) * VS + lane] = s_t(0);
-      value_coeff[(1 * NQ + q) * VS + lane] = qw * det * value_coeff1;
-      grad_coeff_ref[((1 * NQ + q) * ND + 0) * VS + lane] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
-      grad_coeff_ref[((1 * NQ + q) * ND + 1) * VS + lane] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
-      grad_coeff_ref[((1 * NQ + q) * ND + 2) * VS + lane] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
+      value_coeff[q * VS + lane] = s_t(0);
+      grad_coeff_ref[(q * ND) * VS + lane] = s_t(0);
+      grad_coeff_ref[(q * ND + 1) * VS + lane] = s_t(0);
+      grad_coeff_ref[(q * ND + 2) * VS + lane] = s_t(0);
+      value_coeff[(NQ + q) * VS + lane] = qw * det * value_coeff1;
+      grad_coeff_ref[((NQ + q) * ND) * VS + lane] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
+      grad_coeff_ref[((NQ + q) * ND + 1) * VS + lane] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
+      grad_coeff_ref[((NQ + q) * ND + 2) * VS + lane] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
     }
   }
   tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
@@ -202,17 +202,17 @@ static SFEM_INLINE void two_phase_flow_form_1_p_c_d3_tensor_product_residual_blo
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
       const s_t p_w = current_value[(0 * NQ + q) * VS + lane];
-      const s_t p_w_grad_0_ref = current_grad_ref[((0 * NQ + q) * ND + 0) * VS + lane];
-      const s_t p_w_grad_1_ref = current_grad_ref[((0 * NQ + q) * ND + 1) * VS + lane];
-      const s_t p_w_grad_2_ref = current_grad_ref[((0 * NQ + q) * ND + 2) * VS + lane];
+      const s_t p_w_grad_0_ref = current_grad_ref[(q * ND) * VS + lane];
+      const s_t p_w_grad_1_ref = current_grad_ref[(q * ND + 1) * VS + lane];
+      const s_t p_w_grad_2_ref = current_grad_ref[(q * ND + 2) * VS + lane];
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
       const s_t p_w_old = previous_value[(0 * NQ + q) * VS + lane];
       const s_t p_c = current_value[(1 * NQ + q) * VS + lane];
-      const s_t p_c_grad_0_ref = current_grad_ref[((1 * NQ + q) * ND + 0) * VS + lane];
-      const s_t p_c_grad_1_ref = current_grad_ref[((1 * NQ + q) * ND + 1) * VS + lane];
-      const s_t p_c_grad_2_ref = current_grad_ref[((1 * NQ + q) * ND + 2) * VS + lane];
+      const s_t p_c_grad_0_ref = current_grad_ref[((NQ + q) * ND) * VS + lane];
+      const s_t p_c_grad_1_ref = current_grad_ref[((NQ + q) * ND + 1) * VS + lane];
+      const s_t p_c_grad_2_ref = current_grad_ref[((NQ + q) * ND + 2) * VS + lane];
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
@@ -228,14 +228,14 @@ static SFEM_INLINE void two_phase_flow_form_1_p_c_d3_tensor_product_residual_blo
       const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
       const s_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
       const s_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff[(0 * NQ + q) * VS + lane] = s_t(0);
-      grad_coeff_ref[((0 * NQ + q) * ND + 0) * VS + lane] = s_t(0);
-      grad_coeff_ref[((0 * NQ + q) * ND + 1) * VS + lane] = s_t(0);
-      grad_coeff_ref[((0 * NQ + q) * ND + 2) * VS + lane] = s_t(0);
-      value_coeff[(1 * NQ + q) * VS + lane] = qw * det * value_coeff1;
-      grad_coeff_ref[((1 * NQ + q) * ND + 0) * VS + lane] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
-      grad_coeff_ref[((1 * NQ + q) * ND + 1) * VS + lane] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
-      grad_coeff_ref[((1 * NQ + q) * ND + 2) * VS + lane] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
+      value_coeff[q * VS + lane] = s_t(0);
+      grad_coeff_ref[(q * ND) * VS + lane] = s_t(0);
+      grad_coeff_ref[(q * ND + 1) * VS + lane] = s_t(0);
+      grad_coeff_ref[(q * ND + 2) * VS + lane] = s_t(0);
+      value_coeff[(NQ + q) * VS + lane] = qw * det * value_coeff1;
+      grad_coeff_ref[((NQ + q) * ND) * VS + lane] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
+      grad_coeff_ref[((NQ + q) * ND + 1) * VS + lane] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
+      grad_coeff_ref[((NQ + q) * ND + 2) * VS + lane] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
     }
   }
   tensor_integrate_contiguous<s_t, NQ, NS, VS, ND, NC>(

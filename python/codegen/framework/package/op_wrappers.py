@@ -5051,7 +5051,8 @@ def _element_api_function_params(source, function_name):
 
 def _element_api_dispatch_function_lines(function_name, operation, suffix, entries, params, material_name):
     lines = [
-        "template <typename s_t, int VS = 16, typename elem_type_t>",
+        # No default: the vector width is the caller's choice.
+        "template <typename s_t, int VS, typename elem_type_t>",
         "static SFEM_INLINE int %s(" % function_name,
         "    const elem_type_t element_type%s" % ("," if params else ""),
     ]

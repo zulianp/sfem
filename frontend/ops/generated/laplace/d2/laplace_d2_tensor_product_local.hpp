@@ -52,7 +52,7 @@ static SFEM_INLINE void laplace_d2_tensor_product_objective_block(
   static_assert(ipow(NQ1, 2) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 2 * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
@@ -66,8 +66,8 @@ static SFEM_INLINE void laplace_d2_tensor_product_objective_block(
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
       s_t gu_ref[2];
-      gu_ref[0] = gu_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
-      gu_ref[1] = gu_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
+      gu_ref[0] = gu_ref_q[(2 * q) * VS + lane];
+      gu_ref[1] = gu_ref_q[(2 * q + 1) * VS + lane];
       s_t gu[2];
       const s_t idet = s_t(1) / det_lane0;
       gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
@@ -101,7 +101,7 @@ static SFEM_INLINE void laplace_d2_tensor_product_gradient_block(
   static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 4 * VS];
   s_t loperand_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 2 * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
@@ -115,8 +115,8 @@ static SFEM_INLINE void laplace_d2_tensor_product_gradient_block(
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
       s_t gu_ref[2];
-      gu_ref[0] = gu_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
-      gu_ref[1] = gu_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
+      gu_ref[0] = gu_ref_q[(2 * q) * VS + lane];
+      gu_ref[1] = gu_ref_q[(2 * q + 1) * VS + lane];
       s_t gu[2];
       const s_t idet = s_t(1) / det_lane0;
       gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
@@ -127,11 +127,11 @@ static SFEM_INLINE void laplace_d2_tensor_product_gradient_block(
     material[1] = gu[1]*kappa;
     loperand[0] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1);
     loperand[1] = qw * (material[0] * adj_lane2 + material[1] * adj_lane3);
-      loperand_q[((0 * NQ + q) * 2 + 0) * VS + lane] = loperand[0];
-      loperand_q[((0 * NQ + q) * 2 + 1) * VS + lane] = loperand[1];
+      loperand_q[(2 * q) * VS + lane] = loperand[0];
+      loperand_q[(2 * q + 1) * VS + lane] = loperand[1];
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, &loperand_q[0 * NQ * 2 * VS], out_streams, 0);
+  tensor_test<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
@@ -158,7 +158,7 @@ static SFEM_INLINE void laplace_d2_tensor_product_apply_block(
   static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
   s_t grad_h_ref_q[NQ * 4 * VS];
   s_t loperand_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * NQ * 2 * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
@@ -172,8 +172,8 @@ static SFEM_INLINE void laplace_d2_tensor_product_apply_block(
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
       s_t grad_h_ref[2];
-      grad_h_ref[0] = grad_h_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
-      grad_h_ref[1] = grad_h_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
+      grad_h_ref[0] = grad_h_ref_q[(2 * q) * VS + lane];
+      grad_h_ref[1] = grad_h_ref_q[(2 * q + 1) * VS + lane];
       s_t trial_grad[2];
       const s_t idet = s_t(1) / det_lane0;
       trial_grad[0] = (grad_h_ref[0] * adj_lane0 + grad_h_ref[1] * adj_lane2) * idet;
@@ -184,11 +184,11 @@ static SFEM_INLINE void laplace_d2_tensor_product_apply_block(
     material[1] = kappa*trial_grad[1];
     loperand[0] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1);
     loperand[1] = qw * (material[0] * adj_lane2 + material[1] * adj_lane3);
-      loperand_q[((0 * NQ + q) * 2 + 0) * VS + lane] = loperand[0];
-      loperand_q[((0 * NQ + q) * 2 + 1) * VS + lane] = loperand[1];
+      loperand_q[(2 * q) * VS + lane] = loperand[0];
+      loperand_q[(2 * q + 1) * VS + lane] = loperand[1];
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, &loperand_q[0 * NQ * 2 * VS], out_streams, 0);
+  tensor_test<s_t, NQ, NS, VS, 2, 1>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
 }
 
 } // namespace codegen

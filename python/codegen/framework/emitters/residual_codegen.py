@@ -147,6 +147,9 @@ from codegen.framework.emitters.artifacts import (
     GeneratedKernelFile,
 )
 from codegen.framework.emitters.cprinter import (
+    c_group,
+    c_product,
+    c_sum,
     _sfem_ccode,
     _sfem_math_header_source,
 )
@@ -324,14 +327,34 @@ def _affine_geometry_stream_conversion_lines(streams, indent):
         % (indent, n_streams),
         "%sconst s_t *bageom_streams[%d];"
         % (indent, n_streams),
-        "%sfor (int geometry_stream = 0; geometry_stream < %d; ++geometry_stream) {"
-        % (indent, n_streams),
-        "%s  bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>("
-        % indent,
-        "%s      ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());"
-        % indent,
-        "%s}" % indent,
-    ]
+    ] + _affine_geometry_stream_assignment_lines(indent, n_streams)
+
+
+def _affine_geometry_stream_assignment_lines(indent, n_streams):
+    """Convert each affine geometry stream, as a loop or as its one iteration.
+
+    A loop that runs once is a loop a reader has to check the bounds of before
+    seeing that it does not loop.  With a single stream -- a scalar problem's
+    determinant, most often -- the body says the same thing in two lines.
+    """
+    def convert(index, extra):
+        return [
+            "%s%sbageom_streams[%s] = ageom_stream<s_t, g_t, VS>("
+            % (indent, extra, index),
+            "%s%s    ne, affine_geometry_sources[%s], baffine_geometry_data[%s], std::is_same<g_t, s_t>());"
+            % (indent, extra, index, index),
+        ]
+
+    if n_streams == 1:
+        return convert("0", "")
+    return (
+        [
+            "%sfor (int geometry_stream = 0; geometry_stream < %d; ++geometry_stream) {"
+            % (indent, n_streams)
+        ]
+        + convert("geometry_stream", "  ")
+        + ["%s}" % indent]
+    )
 
 
 def _affine_geometry_stream_helper_lines():
@@ -2250,8 +2273,13 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
                 if not dependencies.gradient_coefficients[row][d]:
                     continue
                 terms = [
-                    "fgref[%d * ND + %d][q * %s + %d] * adj%d"
-                    % (reference_index, k, n_shape_name, test, k * dim + d)
+                    "fgref[%s][q * %s + %d] * adj%d"
+                    % (
+                        c_sum(c_product(reference_index, "ND"), k),
+                        n_shape_name,
+                        test,
+                        k * dim + d,
+                    )
                     for k in range(dim)
                 ]
                 lines.append(
@@ -2537,15 +2565,14 @@ def _mixed_local_field_evaluation_lines(
                     if group.uses_gradient:
                         for d in range(dim):
                             lines.append(
-                                "%s%s%s_grad_%d_ref += %s * fgref[%d * ND + %d][q * %s + %d];"
+                                "%s%s%s_grad_%d_ref += %s * fgref[%s][q * %s + %d];"
                                 % (
                                     indent,
                                     field.name,
                                     group.symbol_suffix,
                                     d,
                                     coeff_name,
-                                    reference_index,
-                                    d,
+                                    c_sum(c_product(reference_index, "ND"), d),
                                     n_shape_name,
                                     trial,
                                 )
@@ -2564,14 +2591,13 @@ def _mixed_local_field_evaluation_lines(
                 if group.uses_gradient:
                     for d in range(dim):
                         lines.append(
-                            "%s  %s%s_grad_%d_ref += coeff * fgref[%d * ND + %d][q * %s + trial];"
+                            "%s  %s%s_grad_%d_ref += coeff * fgref[%s][q * %s + trial];"
                             % (
                                 indent,
                                 field.name,
                                 group.symbol_suffix,
                                 d,
-                                reference_index,
-                                d,
+                                c_sum(c_product(reference_index, "ND"), d),
                                 n_shape_name,
                             )
                         )
@@ -3692,7 +3718,10 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         )
         lane_body.append(
             AssignmentNode(
-                expr_ref("value_coeff[(%d * NQ + q) * VS + lane]" % row),
+                expr_ref(
+                    "value_coeff[%s * VS + lane]"
+                    % c_group(c_sum(c_product(row, "NQ"), "q"))
+                ),
                 expr_ref(value),
             )
         )
@@ -3708,8 +3737,13 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             lane_body.append(
                 AssignmentNode(
                     expr_ref(
-                        "grad_coeff_ref[((%d * NQ + q) * ND + %d) * VS + lane]"
-                        % (row, k)
+                        "grad_coeff_ref[%s * VS + lane]"
+                        % c_group(
+                            c_sum(
+                                c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"),
+                                k,
+                            )
+                        )
                     ),
                     expr_ref(value),
                 )
@@ -3873,8 +3907,19 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "%s_grad_%d_ref" % (stem, k),
                         (),
                         expr_ref(
-                            "%s_grad_ref[((%d * NQ + q) * ND + %d) * VS + lane]"
-                            % (group.name, field_index, k)
+                            "%s_grad_ref[%s * VS + lane]"
+                            % (
+                                group.name,
+                                c_group(
+                                    c_sum(
+                                        c_product(
+                                            c_group(c_sum(c_product(field_index, "NQ"), "q")),
+                                            "ND",
+                                        ),
+                                        k,
+                                    )
+                                ),
+                            )
                         ),
                     )
                     for k in range(dim)

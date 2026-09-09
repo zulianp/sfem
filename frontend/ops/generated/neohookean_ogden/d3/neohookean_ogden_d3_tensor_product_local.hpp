@@ -58,9 +58,9 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_objective_block(
   static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 9 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[2 * NQ * 3 * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ * VS]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -80,15 +80,15 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_objective_block(
       const s_t adj_lane8 = adj8[goff];
       const s_t det_lane0 = det0[goff];
       s_t gu_ref[9];
-      gu_ref[0] = gu_ref_q[((0 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[1] = gu_ref_q[((0 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[2] = gu_ref_q[((0 * NQ + q) * 3 + 2) * VS + lane];
-      gu_ref[3] = gu_ref_q[((1 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[4] = gu_ref_q[((1 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[5] = gu_ref_q[((1 * NQ + q) * 3 + 2) * VS + lane];
-      gu_ref[6] = gu_ref_q[((2 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[7] = gu_ref_q[((2 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[8] = gu_ref_q[((2 * NQ + q) * 3 + 2) * VS + lane];
+      gu_ref[0] = gu_ref_q[(3 * q) * VS + lane];
+      gu_ref[1] = gu_ref_q[(3 * q + 1) * VS + lane];
+      gu_ref[2] = gu_ref_q[(3 * q + 2) * VS + lane];
+      gu_ref[3] = gu_ref_q[(3 * (NQ + q)) * VS + lane];
+      gu_ref[4] = gu_ref_q[(3 * (NQ + q) + 1) * VS + lane];
+      gu_ref[5] = gu_ref_q[(3 * (NQ + q) + 2) * VS + lane];
+      gu_ref[6] = gu_ref_q[(3 * (2 * NQ + q)) * VS + lane];
+      gu_ref[7] = gu_ref_q[(3 * (2 * NQ + q) + 1) * VS + lane];
+      gu_ref[8] = gu_ref_q[(3 * (2 * NQ + q) + 2) * VS + lane];
       s_t gu[9];
       const s_t idet = s_t(1) / det_lane0;
       gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane3 + gu_ref[2] * adj_lane6) * idet;
@@ -139,9 +139,9 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_gradient_block(
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 9 * VS];
   s_t loperand_q[NQ * 9 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[2 * NQ * 3 * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ * VS]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -161,15 +161,15 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_gradient_block(
       const s_t adj_lane8 = adj8[goff];
       const s_t det_lane0 = det0[goff];
       s_t gu_ref[9];
-      gu_ref[0] = gu_ref_q[((0 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[1] = gu_ref_q[((0 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[2] = gu_ref_q[((0 * NQ + q) * 3 + 2) * VS + lane];
-      gu_ref[3] = gu_ref_q[((1 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[4] = gu_ref_q[((1 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[5] = gu_ref_q[((1 * NQ + q) * 3 + 2) * VS + lane];
-      gu_ref[6] = gu_ref_q[((2 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[7] = gu_ref_q[((2 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[8] = gu_ref_q[((2 * NQ + q) * 3 + 2) * VS + lane];
+      gu_ref[0] = gu_ref_q[(3 * q) * VS + lane];
+      gu_ref[1] = gu_ref_q[(3 * q + 1) * VS + lane];
+      gu_ref[2] = gu_ref_q[(3 * q + 2) * VS + lane];
+      gu_ref[3] = gu_ref_q[(3 * (NQ + q)) * VS + lane];
+      gu_ref[4] = gu_ref_q[(3 * (NQ + q) + 1) * VS + lane];
+      gu_ref[5] = gu_ref_q[(3 * (NQ + q) + 2) * VS + lane];
+      gu_ref[6] = gu_ref_q[(3 * (2 * NQ + q)) * VS + lane];
+      gu_ref[7] = gu_ref_q[(3 * (2 * NQ + q) + 1) * VS + lane];
+      gu_ref[8] = gu_ref_q[(3 * (2 * NQ + q) + 2) * VS + lane];
       s_t gu[9];
       const s_t idet = s_t(1) / det_lane0;
       gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane3 + gu_ref[2] * adj_lane6) * idet;
@@ -220,20 +220,20 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_gradient_block(
     loperand[6] = qw * (material[6] * adj_lane0 + material[7] * adj_lane1 + material[8] * adj_lane2);
     loperand[7] = qw * (material[6] * adj_lane3 + material[7] * adj_lane4 + material[8] * adj_lane5);
     loperand[8] = qw * (material[6] * adj_lane6 + material[7] * adj_lane7 + material[8] * adj_lane8);
-      loperand_q[((0 * NQ + q) * 3 + 0) * VS + lane] = loperand[0];
-      loperand_q[((0 * NQ + q) * 3 + 1) * VS + lane] = loperand[1];
-      loperand_q[((0 * NQ + q) * 3 + 2) * VS + lane] = loperand[2];
-      loperand_q[((1 * NQ + q) * 3 + 0) * VS + lane] = loperand[3];
-      loperand_q[((1 * NQ + q) * 3 + 1) * VS + lane] = loperand[4];
-      loperand_q[((1 * NQ + q) * 3 + 2) * VS + lane] = loperand[5];
-      loperand_q[((2 * NQ + q) * 3 + 0) * VS + lane] = loperand[6];
-      loperand_q[((2 * NQ + q) * 3 + 1) * VS + lane] = loperand[7];
-      loperand_q[((2 * NQ + q) * 3 + 2) * VS + lane] = loperand[8];
+      loperand_q[(3 * q) * VS + lane] = loperand[0];
+      loperand_q[(3 * q + 1) * VS + lane] = loperand[1];
+      loperand_q[(3 * q + 2) * VS + lane] = loperand[2];
+      loperand_q[(3 * (NQ + q)) * VS + lane] = loperand[3];
+      loperand_q[(3 * (NQ + q) + 1) * VS + lane] = loperand[4];
+      loperand_q[(3 * (NQ + q) + 2) * VS + lane] = loperand[5];
+      loperand_q[(3 * (2 * NQ + q)) * VS + lane] = loperand[6];
+      loperand_q[(3 * (2 * NQ + q) + 1) * VS + lane] = loperand[7];
+      loperand_q[(3 * (2 * NQ + q) + 2) * VS + lane] = loperand[8];
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0 * NQ * 3 * VS], out_streams, 0);
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[1 * NQ * 3 * VS], out_streams, 1);
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[2 * NQ * 3 * VS], out_streams, 2);
+  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[3 * NQ * VS], out_streams, 1);
+  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[6 * NQ * VS], out_streams, 2);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
@@ -268,12 +268,12 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_apply_block(
   s_t gu_ref_q[NQ * 9 * VS];
   s_t grad_h_ref_q[NQ * 9 * VS];
   s_t loperand_q[NQ * 9 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[1 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[2 * NQ * 3 * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[2 * NQ * 3 * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[3 * NQ * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ * VS]);
+  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[6 * NQ * VS]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -293,25 +293,25 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_apply_block(
       const s_t adj_lane8 = adj8[goff];
       const s_t det_lane0 = det0[goff];
       s_t gu_ref[9];
-      gu_ref[0] = gu_ref_q[((0 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[1] = gu_ref_q[((0 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[2] = gu_ref_q[((0 * NQ + q) * 3 + 2) * VS + lane];
-      gu_ref[3] = gu_ref_q[((1 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[4] = gu_ref_q[((1 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[5] = gu_ref_q[((1 * NQ + q) * 3 + 2) * VS + lane];
-      gu_ref[6] = gu_ref_q[((2 * NQ + q) * 3 + 0) * VS + lane];
-      gu_ref[7] = gu_ref_q[((2 * NQ + q) * 3 + 1) * VS + lane];
-      gu_ref[8] = gu_ref_q[((2 * NQ + q) * 3 + 2) * VS + lane];
+      gu_ref[0] = gu_ref_q[(3 * q) * VS + lane];
+      gu_ref[1] = gu_ref_q[(3 * q + 1) * VS + lane];
+      gu_ref[2] = gu_ref_q[(3 * q + 2) * VS + lane];
+      gu_ref[3] = gu_ref_q[(3 * (NQ + q)) * VS + lane];
+      gu_ref[4] = gu_ref_q[(3 * (NQ + q) + 1) * VS + lane];
+      gu_ref[5] = gu_ref_q[(3 * (NQ + q) + 2) * VS + lane];
+      gu_ref[6] = gu_ref_q[(3 * (2 * NQ + q)) * VS + lane];
+      gu_ref[7] = gu_ref_q[(3 * (2 * NQ + q) + 1) * VS + lane];
+      gu_ref[8] = gu_ref_q[(3 * (2 * NQ + q) + 2) * VS + lane];
       s_t grad_h_ref[9];
-      grad_h_ref[0] = grad_h_ref_q[((0 * NQ + q) * 3 + 0) * VS + lane];
-      grad_h_ref[1] = grad_h_ref_q[((0 * NQ + q) * 3 + 1) * VS + lane];
-      grad_h_ref[2] = grad_h_ref_q[((0 * NQ + q) * 3 + 2) * VS + lane];
-      grad_h_ref[3] = grad_h_ref_q[((1 * NQ + q) * 3 + 0) * VS + lane];
-      grad_h_ref[4] = grad_h_ref_q[((1 * NQ + q) * 3 + 1) * VS + lane];
-      grad_h_ref[5] = grad_h_ref_q[((1 * NQ + q) * 3 + 2) * VS + lane];
-      grad_h_ref[6] = grad_h_ref_q[((2 * NQ + q) * 3 + 0) * VS + lane];
-      grad_h_ref[7] = grad_h_ref_q[((2 * NQ + q) * 3 + 1) * VS + lane];
-      grad_h_ref[8] = grad_h_ref_q[((2 * NQ + q) * 3 + 2) * VS + lane];
+      grad_h_ref[0] = grad_h_ref_q[(3 * q) * VS + lane];
+      grad_h_ref[1] = grad_h_ref_q[(3 * q + 1) * VS + lane];
+      grad_h_ref[2] = grad_h_ref_q[(3 * q + 2) * VS + lane];
+      grad_h_ref[3] = grad_h_ref_q[(3 * (NQ + q)) * VS + lane];
+      grad_h_ref[4] = grad_h_ref_q[(3 * (NQ + q) + 1) * VS + lane];
+      grad_h_ref[5] = grad_h_ref_q[(3 * (NQ + q) + 2) * VS + lane];
+      grad_h_ref[6] = grad_h_ref_q[(3 * (2 * NQ + q)) * VS + lane];
+      grad_h_ref[7] = grad_h_ref_q[(3 * (2 * NQ + q) + 1) * VS + lane];
+      grad_h_ref[8] = grad_h_ref_q[(3 * (2 * NQ + q) + 2) * VS + lane];
       s_t gu[9];
       s_t trial_grad[9];
       const s_t idet = s_t(1) / det_lane0;
@@ -467,20 +467,20 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_apply_block(
     loperand[6] = qw * (material[6] * adj_lane0 + material[7] * adj_lane1 + material[8] * adj_lane2);
     loperand[7] = qw * (material[6] * adj_lane3 + material[7] * adj_lane4 + material[8] * adj_lane5);
     loperand[8] = qw * (material[6] * adj_lane6 + material[7] * adj_lane7 + material[8] * adj_lane8);
-      loperand_q[((0 * NQ + q) * 3 + 0) * VS + lane] = loperand[0];
-      loperand_q[((0 * NQ + q) * 3 + 1) * VS + lane] = loperand[1];
-      loperand_q[((0 * NQ + q) * 3 + 2) * VS + lane] = loperand[2];
-      loperand_q[((1 * NQ + q) * 3 + 0) * VS + lane] = loperand[3];
-      loperand_q[((1 * NQ + q) * 3 + 1) * VS + lane] = loperand[4];
-      loperand_q[((1 * NQ + q) * 3 + 2) * VS + lane] = loperand[5];
-      loperand_q[((2 * NQ + q) * 3 + 0) * VS + lane] = loperand[6];
-      loperand_q[((2 * NQ + q) * 3 + 1) * VS + lane] = loperand[7];
-      loperand_q[((2 * NQ + q) * 3 + 2) * VS + lane] = loperand[8];
+      loperand_q[(3 * q) * VS + lane] = loperand[0];
+      loperand_q[(3 * q + 1) * VS + lane] = loperand[1];
+      loperand_q[(3 * q + 2) * VS + lane] = loperand[2];
+      loperand_q[(3 * (NQ + q)) * VS + lane] = loperand[3];
+      loperand_q[(3 * (NQ + q) + 1) * VS + lane] = loperand[4];
+      loperand_q[(3 * (NQ + q) + 2) * VS + lane] = loperand[5];
+      loperand_q[(3 * (2 * NQ + q)) * VS + lane] = loperand[6];
+      loperand_q[(3 * (2 * NQ + q) + 1) * VS + lane] = loperand[7];
+      loperand_q[(3 * (2 * NQ + q) + 2) * VS + lane] = loperand[8];
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0 * NQ * 3 * VS], out_streams, 0);
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[1 * NQ * 3 * VS], out_streams, 1);
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[2 * NQ * 3 * VS], out_streams, 2);
+  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[3 * NQ * VS], out_streams, 1);
+  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[6 * NQ * VS], out_streams, 2);
 }
 
 } // namespace codegen

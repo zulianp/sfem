@@ -718,10 +718,8 @@ static SFEM_INLINE int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_a_ms
     const g_t *const affine_geometry_sources[1] = {g_det0 + evb};
     s_t baffine_geometry_data[1][VS];
     const s_t *bageom_streams[1];
-    for (int geometry_stream = 0; geometry_stream < 1; ++geometry_stream) {
-      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
-    }
+    bageom_streams[0] = ageom_stream<s_t, g_t, VS>(
+        ne, affine_geometry_sources[0], baffine_geometry_data[0], std::is_same<g_t, s_t>());
 
     two_phase_flow_form_2_p_c_p_c_d2_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[0], affine_shape_1d, affine_q_weight_1d, boutput);
 
