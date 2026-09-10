@@ -290,7 +290,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
       for (int lane = 0; lane < ne; ++lane) {
         const ptrdiff_t goff = q * geometry_stride + lane;
         const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
@@ -569,7 +568,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
       for (int lane = 0; lane < ne; ++lane) {
         const ptrdiff_t goff = q * geometry_stride + lane;
         const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
@@ -1478,7 +1476,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       for (int lane = 0; lane < ne; ++lane) {
         const ptrdiff_t goff = q * geometry_stride + lane;
         const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
@@ -2061,7 +2058,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       for (int lane = 0; lane < ne; ++lane) {
         const ptrdiff_t goff = q * geometry_stride + lane;
         const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
