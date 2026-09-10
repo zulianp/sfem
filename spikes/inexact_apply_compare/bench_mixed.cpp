@@ -100,6 +100,11 @@ template <typename F> static double best_mdof(int repeats, ptrdiff_t ndof, F &&f
 
 int main(int argc, char **argv) {
     const int repeats = argc > 1 ? std::atoi(argv[1]) : 7;
+    // An optional single mesh size, for when the question is throughput at one
+    // resolution rather than the refinement study: a saturated thread sweep
+    // wants one large mesh measured many times, not five of which four are too
+    // small to fill the machine.
+    const int only = argc > 2 ? std::atoi(argv[2]) : 0;
     int threads = 1;
 #ifdef _OPENMP
     threads = omp_get_max_threads();
@@ -115,6 +120,7 @@ int main(int argc, char **argv) {
                 "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
 
     for (int n : {8, 16, 24, 32, 40}) {
+        if (only && n != only) continue;
         Mesh m = build(n);
         const ptrdiff_t N = m.nnodes, EC = m.nelements, CS = EC + 64, ndof = 3 * N;
         std::vector<double> ux(N),uy(N),uz(N), zx(N),zy(N),zz(N), hx(N),hy(N),hz(N);
@@ -223,7 +229,7 @@ int main(int argc, char **argv) {
         // and what f32 and f16 add over it is the store's own contribution.
         std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e\n",
                     (long)EC, (long)N, (long)ndof, e, s64, s32, s16, a, d64, d32, d16);
-        if (n == 40) {
+        if (n == 40 || (only && n == only)) {
             std::printf("\n  stored-f64 vs exact rel diff %.2e\n", d64);
             auto be = [&](double s){ return s <= e ? -1.0 : (1.0/a)/(1.0/e - 1.0/s); };
             std::printf("  break-even applies per tangent: f64 %.1f  f32 %.1f  f16 %.1f\n",
