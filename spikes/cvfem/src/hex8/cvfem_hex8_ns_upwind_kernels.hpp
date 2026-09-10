@@ -1467,7 +1467,7 @@ static SFEM_INLINE void cvfem_hex8_visc_dir_simd(const scalar_t                 
     }
 }
 
-template <int I, int J, bool RC = false>
+template <int I, int J, bool RC = false, bool EPS = false>
 static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                      rho,
                                                   const scalar_t                      mu,
                                                   const scalar_t                      rc_scale,
@@ -1506,7 +1506,11 @@ static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                
             mdot -= coeff * corr;
         }
         scalar_t amdot, sgn;
-        cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+        // A literal zero when the band is off, so cvfem_upwind_abs's branch folds and
+        // this loop keeps vectorising. A runtime zero would leave the compare in the
+        // SIMD body, which is the shape of guard that cost 1.83x here when the
+        // Rhie-Chow coefficient carried one -- see Hex8RhieChowPack::coeff.
+        cvfem_upwind_abs(mdot, EPS ? ueps : scalar_t(0), amdot, sgn);
         const scalar_t mpos = half * (mdot + amdot);
         const scalar_t mneg = half * (mdot - amdot);
         const scalar_t pmid = half * (in.p[I][lane] + in.p[J][lane]);
@@ -1524,7 +1528,7 @@ static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                
     }
 }
 
-template <int S, int I, int J, bool RC = false, bool QG = false>
+template <int S, int I, int J, bool RC = false, bool QG = false, bool EPS = false>
 static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t                      rho,
                                                      const scalar_t                      half,
                                                      const scalar_t                      one,
@@ -1577,7 +1581,11 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t             
             }
         }
         scalar_t amdot, sgn;
-        cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+        // A literal zero when the band is off, so cvfem_upwind_abs's branch folds and
+        // this loop keeps vectorising. A runtime zero would leave the compare in the
+        // SIMD body, which is the shape of guard that cost 1.83x here when the
+        // Rhie-Chow coefficient carried one -- see Hex8RhieChowPack::coeff.
+        cvfem_upwind_abs(mdot, EPS ? ueps : scalar_t(0), amdot, sgn);
         const scalar_t mpos  = half * (mdot + amdot);
         const scalar_t mneg  = half * (mdot - amdot);
         const scalar_t d_pos = half * (one + sgn);
@@ -1602,7 +1610,7 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t             
     }
 }
 
-template <bool RC = false>
+template <bool RC = false, bool EPS = false>
 static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
                                                  const scalar_t                      mu,
                                                  const scalar_t                      rc_scale,
@@ -1618,19 +1626,20 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
                                                  const scalar_t *const SFEM_RESTRICT Az2,
                                                  const Hex8InputPack                &in,
                                                  const Hex8RhieChowPack             *rc,
-                                                 Hex8ResidualPack                   &out) {
-    cvfem_hex8_conv_face_simd<0, 1, RC>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out);
-    cvfem_hex8_conv_face_simd<3, 2, RC>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out);
-    cvfem_hex8_conv_face_simd<4, 5, RC>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out);
-    cvfem_hex8_conv_face_simd<7, 6, RC>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out);
-    cvfem_hex8_conv_face_simd<0, 3, RC>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out);
-    cvfem_hex8_conv_face_simd<1, 2, RC>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out);
-    cvfem_hex8_conv_face_simd<4, 7, RC>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out);
-    cvfem_hex8_conv_face_simd<5, 6, RC>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out);
-    cvfem_hex8_conv_face_simd<0, 4, RC>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out);
-    cvfem_hex8_conv_face_simd<1, 5, RC>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out);
-    cvfem_hex8_conv_face_simd<2, 6, RC>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out);
-    cvfem_hex8_conv_face_simd<3, 7, RC>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out);
+                                                 Hex8ResidualPack                   &out,
+                                                 const scalar_t                      ueps = scalar_t(0)) {
+    cvfem_hex8_conv_face_simd<0, 1, RC, EPS>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<3, 2, RC, EPS>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<4, 5, RC, EPS>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<7, 6, RC, EPS>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<0, 3, RC, EPS>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<1, 2, RC, EPS>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<4, 7, RC, EPS>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<5, 6, RC, EPS>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<0, 4, RC, EPS>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<1, 5, RC, EPS>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<2, 6, RC, EPS>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps);
+    cvfem_hex8_conv_face_simd<3, 7, RC, EPS>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps);
 }
 
 static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
@@ -1664,7 +1673,7 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
                                     out);
 }
 
-template <bool RC = false, bool QG = false>
+template <bool RC = false, bool QG = false, bool EPS = false>
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
                                                     const scalar_t                      half,
                                                     const scalar_t                      one,
@@ -1680,19 +1689,20 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t              
                                                     const Hex8InputPack                &u,
                                                     const Hex8InputPack                &du,
                                                     const Hex8RhieChowPack             *rc,
-                                                    Hex8ResidualPack                   &out) {
-    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out);
-    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out);
+                                                    Hex8ResidualPack                   &out,
+                                                    const scalar_t                      ueps = scalar_t(0)) {
+    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG, EPS>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG, EPS>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG, EPS>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG, EPS>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG, EPS>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG, EPS>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG, EPS>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG, EPS>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG, EPS>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG, EPS>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG, EPS>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps);
+    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps);
 }
 
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
@@ -1840,7 +1850,10 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
         const Hex8InputPack                  &in,
         Hex8ResidualPack                     &out,
         const Hex8RhieChowPack               *rc       = nullptr,
-        const scalar_t                        rc_scale = scalar_t(0)) {
+        const scalar_t                        rc_scale = scalar_t(0),
+        // The Harten band. Absent here until now, which is why the solver's flat packed
+        // path silently ran the hard switch while SFEM_UPWIND_EPS reached every other one.
+        const scalar_t                        ueps     = scalar_t(0)) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -1911,12 +1924,29 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
     cvfem_hex8_visc_dir_simd<0, 4, 1, 5, 2, 6, 3, 7>(
             mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax2, Ay2, Az2, out);
 
+    // The upwind band, dispatched at compile time.
+    //
+    // cvfem_upwind_abs branches on `eps > 0`, and this is the SIMD face loop -- the same
+    // loop in which a guard on the Rhie-Chow coefficient cost 1.83x by tipping GCC's cost
+    // model out of vectorising it. A runtime eps would leave that compare in the body of
+    // every run, including the overwhelming majority that use the hard switch. So the
+    // band is a template flag: EPS=false passes a literal zero, the branch folds, and the
+    // default path emits what it emitted before this parameter existed.
+    const bool eps_on = ueps > scalar_t(0);
     if (rc && rc_scale != scalar_t(0)) {
-        cvfem_hex8_conv_all_simd<true>(
-                rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out);
+        if (eps_on)
+            cvfem_hex8_conv_all_simd<true, true>(
+                    rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out, ueps);
+        else
+            cvfem_hex8_conv_all_simd<true, false>(
+                    rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out);
     } else {
-        cvfem_hex8_conv_all_simd<false>(
-                rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out);
+        if (eps_on)
+            cvfem_hex8_conv_all_simd<false, true>(
+                    rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out, ueps);
+        else
+            cvfem_hex8_conv_all_simd<false, false>(
+                    rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out);
     }
 }
 
@@ -1938,7 +1968,8 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
         Hex8ResidualPack                     &out,
         const Hex8RhieChowPack               *rc       = nullptr,
         const scalar_t                        rc_scale = scalar_t(0),
-        const bool                            has_qg   = false) {
+        const bool                            has_qg   = false,
+        const scalar_t                        ueps     = scalar_t(0)) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -2013,17 +2044,38 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
     // Three instantiations rather than a runtime test inside the face loop: the term is
     // either present for a whole sweep or absent for it, and has_qg == false must stay
     // bit-identical to what this kernel emitted before the term existed.
+    // The upwind band, dispatched at compile time.
+    //
+    // cvfem_upwind_abs branches on `eps > 0`, and this is the SIMD face loop -- the same
+    // loop in which a guard on the Rhie-Chow coefficient cost 1.83x by tipping GCC's cost
+    // model out of vectorising it. A runtime eps would leave that compare in the body of
+    // every run, including the overwhelming majority that use the hard switch. So the
+    // band is a template flag: EPS=false passes a literal zero, the branch folds, and the
+    // default path emits what it emitted before this parameter existed.
+    const bool eps_on = ueps > scalar_t(0);
     if (rc && rc_scale != scalar_t(0)) {
         if (has_qg) {
-            cvfem_hex8_conv_all_jv_simd<true, true>(
-                    rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+            if (eps_on)
+                cvfem_hex8_conv_all_jv_simd<true, true, true>(
+                        rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out, ueps);
+            else
+                cvfem_hex8_conv_all_jv_simd<true, true, false>(
+                        rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
         } else {
-            cvfem_hex8_conv_all_jv_simd<true, false>(
-                    rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+            if (eps_on)
+                cvfem_hex8_conv_all_jv_simd<true, false, true>(
+                        rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out, ueps);
+            else
+                cvfem_hex8_conv_all_jv_simd<true, false, false>(
+                        rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
         }
     } else {
-        cvfem_hex8_conv_all_jv_simd<false, false>(
-                rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+        if (eps_on)
+            cvfem_hex8_conv_all_jv_simd<false, false, true>(
+                    rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out, ueps);
+        else
+            cvfem_hex8_conv_all_jv_simd<false, false, false>(
+                    rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
     }
 }
 

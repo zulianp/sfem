@@ -260,7 +260,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedDa
                                                            in,
                                                            outp,
                                                            with_rc ? &rcp : nullptr,
-                                                           d.rhie_chow_scale);
+                                                           d.rhie_chow_scale,
+                                                           d.upwind_eps);
                 cvfem_hex8_scatter_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
             }
 
@@ -422,7 +423,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                                                           outp,
                                                           with_rc ? &rcp : nullptr,
                                                           d.rhie_chow_scale,
-                                                          with_qg);
+                                                          with_qg,
+                                                          d.upwind_eps);
                 cvfem_hex8_scatter_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
             }
 
