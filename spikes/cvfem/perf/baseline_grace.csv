@@ -5,25 +5,27 @@
 # which measures both in one allocation and bands at 5%.
 # Re-record only deliberately, and say in the commit message what changed and
 # on what evidence -- a silently re-recorded baseline gates nothing.
-# recorded: 2026-09-08 23:12:10
-# host: nid006550
-# commit: cacf01bf5
+# recorded: 2026-09-10 12:58:19
+# host: nid006552
+# commit: unknown
 # threads: 72
 # reps: 9
-# binary: build_omp/cvfem_hex8_ns_upwind_bench
-key,operation,layout,kernel,cube_n,ndof,mdof_s,band_pct,observed_spread_pct
-residual_packed_sumfact,residual,packed,sumfact,128,8586756,2596.0,12,1.4
-residual_packed_sumfact_big,residual,packed,sumfact,160,16693124,2553.8,12,1.2
-residual_packed_sympy,residual,packed,sympy,128,8586756,2025.9,12,3.3
-residual_packed_current,residual,packed,current,128,8586756,2105.1,12,3.0
-jac_action_packed_sumfact,jac_action,packed,sumfact,128,8586756,1933.0,12,8.7
-jac_action_packed_sympy,jac_action,packed,sympy,128,8586756,1927.3,12,1.8
-jac_action_packed_current,jac_action,packed,current,128,8586756,1928.2,12,0.8
-residual_colored_sumfact,residual,colored,sumfact,128,8586756,1527.2,12,1.6
-bsr_apply_packed_sumfact,bsr_apply,packed,sumfact,128,8586756,443.2,-,46.6
-assemble_store_sumfact,assemble,store,sumfact,128,8586756,75.7,-,20.4
-assemble_colored_sumfact,assemble,colored,sumfact,128,8586756,93.4,-,22.3
-assemble_packed_sumfact,assemble,packed,sumfact,128,8586756,56.8,-,12.4
-residual_packed_rc,residual,packed,sumfact,128,8586756,1652.7,12,0.8
-residual_packed_rc_bnd,residual,packed,sumfact,128,8586756,1391.4,12,0.8
-residual_packed_rc_perapply,residual,packed,sumfact,128,8586756,723.3,12,1.5
+# binary: build_alps/cvfem_hex8_ns_upwind_bench
+key,operation,layout,kernel,cube_n,extra,ndof,mdof_s,band_pct,observed_spread_pct
+residual_packed_sumfact,residual,packed,sumfact,128,"",8586756,2599.0,12,4.9
+residual_packed_sumfact_big,residual,packed,sumfact,160,"",16693124,2613.2,12,1.0
+residual_packed_sympy,residual,packed,sympy,128,"",8586756,2048.1,12,1.9
+residual_packed_current,residual,packed,current,128,"",8586756,2122.9,12,1.4
+jac_action_packed_sumfact,jac_action,packed,sumfact,128,"",8586756,1914.6,12,0.8
+jac_action_atomic_sumfact,jac_action,atomic,sumfact,128,"",8586756,840.9,12,1.7
+jac_action_packed_isoparam,jac_action,packed,sumfact,128,"--geom isoparam",8586756,779.5,12,1.7
+residual_colored_sumfact,residual,colored,sumfact,128,"",8586756,1525.6,12,1.4
+bsr_apply_packed_sumfact,bsr_apply,packed,sumfact,128,"",8586756,441.0,-,1.7
+assemble_store_sumfact,assemble,store,sumfact,128,"",8586756,75.6,-,21.1
+assemble_colored_sumfact,assemble,colored,sumfact,128,"",8586756,93.8,-,22.7
+assemble_packed_sumfact,assemble,packed,sumfact,128,"",8586756,57.1,-,12.4
+residual_packed_rc,residual,packed,sumfact,128,"--rhie-chow",8586756,1682.5,12,3.2
+residual_packed_rc_bnd,residual,packed,sumfact,128,"--rhie-chow --boundary",8586756,1526.0,12,2.3
+residual_packed_rc_perapply,residual,packed,sumfact,128,"--rhie-chow --pgrad-per-apply",8586756,727.2,12,1.6
+jac_action_packed_rc,jac_action,packed,sumfact,128,"--rhie-chow",8586756,600.3,12,1.2
+jac_action_packed_rc_bnd,jac_action,packed,sumfact,128,"--rhie-chow --boundary",8586756,580.6,12,3.9
