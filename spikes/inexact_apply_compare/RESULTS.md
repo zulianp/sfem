@@ -442,6 +442,58 @@ emitted headers include across it (`../../kernel_math.hpp`), and `half_t` must b
 taken from `sfem_config.h` rather than declared locally, since it is `__fp16` on
 one target and `_Float16` on the other.
 
+## Store precision and throughput, all three elements on Grace
+
+The accuracy question above is answered by a severity sweep.  The throughput
+question is separate and answered here: what the three store widths *cost to
+apply*, on one Grace GH200 socket (Neoverse-V2, GCC 13.3 from
+`prgenv-gnu/24.11`, `OMP_PLACES=cores`), largest mesh only, MDOF/s.
+
+| element | dof | threads | exact | st. f64 | st. f32 | st. f16 | assembly |
+|---|---|---|---|---|---|---|---|
+| TET4  |  206763 |  1 |   1.38 |   3.27 |   3.36 |   3.06 |  0.67 |
+| TET4  |  206763 |  8 |  10.98 |  23.95 |  25.23 |  26.31 |  5.32 |
+| TET4  |  206763 | 32 |  42.77 |  91.52 |  98.47 | 100.98 | 21.17 |
+| TET4  |  206763 | 72 |  93.27 | 185.94 | 211.52 | 216.02 | 45.32 |
+| HEX8  |  206763 |  1 |   1.47 |   5.52 |   5.42 |   5.01 |  0.45 |
+| HEX8  |  206763 |  8 |  11.59 |  42.67 |  41.96 |  38.53 |  3.58 |
+| HEX8  |  206763 | 32 |  44.55 | 148.69 | 147.24 | 137.87 | 14.21 |
+| HEX8  |  206763 | 72 |  96.33 | 313.71 | 308.44 | 290.71 | 31.47 |
+| TET10 | 1594323 |  1 |   2.58 |   6.59 |   6.64 |   6.92 |  0.24 |
+| TET10 | 1594323 |  8 |  20.62 |  51.57 |  51.59 |  54.24 |  2.42 |
+| TET10 | 1594323 | 32 |  80.48 | 195.77 | 190.25 | 198.44 | 11.47 |
+| TET10 | 1594323 | 72 | 174.04 | 401.08 | 394.74 | 411.31 | 26.50 |
+
+At 72 threads, f16 against f64: **+16.2% on TET4, -7.3% on HEX8, +2.6% on
+TET10**.  f32 against f64: +13.8%, -1.7%, -1.6%.
+
+**Narrowing the store is worth it only where the store is what the apply is
+moving.**  The store is 126 numbers per element on every element, so what
+differs is how many elements a dof is shared between: 234 stored numbers per dof
+on TET4 against 39 on HEX8 and 30 on TET10.  TET4 moves six times the store
+traffic per dof, its apply is bandwidth-bound, and both narrower widths pay
+there.
+
+That explains TET4 and nothing else.  HEX8 and TET10 are within 30% of each
+other in store traffic per dof and f16 goes opposite ways on them, so traffic
+alone does not decide it -- the `_Float16` conversion cost and the apply's own
+arithmetic intensity both enter, and this measurement does not separate them.
+What can be said without separating them is the practical rule: **f16 is worth
+carrying on the low-order simplex and not elsewhere**, and f32 is never worse
+than f64 by more than 2% anywhere.
+
+Break-even rises steeply with element order, because assembling the tangent gets
+dearer while the apply does not: 3.5 to 4.4 applies per tangent on TET4, 4.4 to
+4.6 on HEX8, and 11.6 to 17.9 on TET10.
+
+Two methodology notes.  `OMP_PROC_BIND=true` and `close` agree within noise at
+every thread count on both TET4 and HEX8, which settles a discrepancy between
+this file's scripts.  And an earlier attempt swept all five mesh sizes at every
+thread count and produced erratic rows -- 44.9, 55.2, 148.1, 66.6, 158.2 down one
+column -- because the four smaller meshes do not fill 72 cores.  Measuring the
+largest mesh alone is reproducible to three digits, and `bench_mixed` now takes
+an optional mesh size for exactly that.
+
 ## What the first version of these measurements got wrong
 
 The throughput figures above replace an earlier set that was wrong, and the way it
