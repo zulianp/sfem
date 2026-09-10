@@ -16,6 +16,12 @@
 #
 #   sbatch jobs/verify_report.sbatch
 #   sbatch --export=ALL,VERIFY_GROUPS="mms port" jobs/verify_report.sbatch
+#   sbatch --export=ALL,VERIFY_SOLVER=fgmres jobs/verify_report.sbatch
+#
+# VERIFY_SOLVER and VERIFY_RESTART are named in the env list below rather than left to
+# reach the script through the ambient environment: which linear solver produced a
+# verification report is part of what the report asserts, and it should not depend on how
+# far an exported variable happens to survive srun and uenv.
 #
 # Results are what the driver printed, so they carry their own dof counts; the machine and
 # thread count reach the report through the manifest. --exclusive because the report
@@ -51,6 +57,8 @@ uenv run $UENV_ARGS -- env \
     OUT="$OUT" \
     VERIFY_GROUPS="${VERIFY_GROUPS:-mms bc port step pump}" \
     VERIFY_LEVEL="${VERIFY_LEVEL:-1}" \
+    VERIFY_SOLVER="${VERIFY_SOLVER:-direct}" \
+    VERIFY_RESTART="${VERIFY_RESTART:-480}" \
     OMP_NUM_THREADS="$OMP_NUM_THREADS" \
     bash "$SPIKE_ROOT/scripts/verify_report.sh"
 
