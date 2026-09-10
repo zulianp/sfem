@@ -7303,6 +7303,25 @@ def _sfem_soa_hessian_matrix_assembly_function(
             kernel_constant("VS", "1", indent="  "),
             kernel_constant("NDOFS", "NC * NS", indent="  "),
             discard_unused("nnodes", indent="  "),
+            # One signature carries every sparse format's arrays so that the
+            # dispatch can call it whatever the format is, but a given kernel
+            # emits one format's scatter.  The rest are named by nobody, which
+            # `-Wextra -Werror` rejects; the resolver checks each against the
+            # body it ends up with and only unnames the ones truly unread.
+            *(
+                discard_unused(parameter, indent="  ")
+                for parameter in (
+                    "rowptr",
+                    "colidx",
+                    "diag_offsets",
+                    "ndiag",
+                    "coo_nnz",
+                    "coo_rows",
+                    "coo_cols",
+                    "coo_triplet_rows",
+                    "coo_triplet_cols",
+                )
+            ),
         ]
     )
     if uses_current:

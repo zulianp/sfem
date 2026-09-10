@@ -82,9 +82,17 @@ UNUSED_CONSTANT_BUDGET = 0
 #: budgets above -- these were never marked, so nothing pointed at them.  Almost
 #: all are one shape: the matrix-assembly kernel takes every sparse format's
 #: parameters and emits only the selected format's branch, so `diag_offsets`,
-#: `ndiag` and the five `coo_*` arrays go unread in 15 kernels each.  A ratchet
-#: to drive down, not a target that has been met.
-UNUSED_PARAMETER_BUDGET = 179
+#: `ndiag` and the five `coo_*` arrays go unread in 15 kernels each.
+#:
+#: 179 -> 74 once those were marked: the assembly signature carries every
+#: format's arrays so the dispatch can call it whatever the format is, and the
+#: resolver checks each against the body the kernel ends up with, so the ones a
+#: given format does read keep their names.  What is left is the simplex local
+#: kernels, whose reference-basis streams go unread when the kernel is handed a
+#: cached metric instead -- the fix there is for the plan to stop putting the
+#: stream on the boundary, not for emission to unname it.  A ratchet to drive
+#: down, not a target that has been met.
+UNUSED_PARAMETER_BUDGET = 74
 
 #: Node-ordering permutations built inside a kernel.
 #:
