@@ -126,13 +126,13 @@ struct Hex8RhieChowPack {
 //
 // Stored as SoA by (surface, component) for the same reason Hex8RhieChowPack::coeff is:
 // the gather is then a strided SoA read and not a stride-60 walk.
-struct Hex8TangentPack {
-    alignas(ALIGN_BYTES) scalar_t mpos[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t mneg[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t uupx[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t uupy[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t uupz[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
-};
+// Read straight out of the store in the face loop, not staged into a pack first. Staging
+// it was the obvious shape -- Hex8RhieChowPack::coeff is staged, and that was worth 1.83x --
+// but the two are not alike: coeff is twelve scalars replacing a guard that stopped the
+// loop vectorising, and this is sixty scalars replacing nothing but a few multiplies. Held
+// in a struct it is a 7.7 KB stack object written and read back for every sixteen elements,
+// which is 480 bytes per element of L1 traffic on top of the DRAM stream. Measured both
+// ways; see subpar/README.md.
 static constexpr int CVFEM_HEX8_PA_PER_SCS = 5;
 static constexpr int CVFEM_HEX8_PA_PER_ELEM = CVFEM_HEX8_PA_PER_SCS * CVFEM_HEX8_N_SCS;
 
@@ -1721,9 +1721,18 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_pa_simd(const scalar_t          
                                                         const scalar_t *const SFEM_RESTRICT Az,
                                                         const Hex8InputPack                &du,
                                                         const Hex8RhieChowPack             *rc,
-                                                        const Hex8TangentPack              &t,
+                                                        const scalar_t *const SFEM_RESTRICT pa,
+                                                        const ptrdiff_t                     nelem,
                                                         Hex8ResidualPack                   &out) {
     if constexpr (!RC) (void)rc;
+    // `pa` already points at this group's first element, so these are five contiguous
+    // vector loads. Lanes past the end of the mesh read into the next slice and are
+    // discarded by the scatter, which is why the store carries a pad.
+    const scalar_t *const SFEM_RESTRICT t_mpos = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 0) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_mneg = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 1) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_uupx = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 2) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_uupy = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 3) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_uupz = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 4) * nelem;
 #pragma omp simd
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         const scalar_t ax    = Ax[lane];
@@ -1744,12 +1753,12 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_pa_simd(const scalar_t          
                                   half * (rc->qgz[I][lane] + rc->qgz[J][lane]) * dz);
             }
         }
-        const scalar_t mpos = t.mpos[S][lane];
-        const scalar_t mneg = t.mneg[S][lane];
+        const scalar_t mpos = t_mpos[lane];
+        const scalar_t mneg = t_mneg[lane];
         const scalar_t qmid = half * (du.p[I][lane] + du.p[J][lane]);
-        const scalar_t fx   = dmdot * t.uupx[S][lane] + mpos * du.ux[I][lane] + mneg * du.ux[J][lane] + qmid * ax;
-        const scalar_t fy   = dmdot * t.uupy[S][lane] + mpos * du.uy[I][lane] + mneg * du.uy[J][lane] + qmid * ay;
-        const scalar_t fz   = dmdot * t.uupz[S][lane] + mpos * du.uz[I][lane] + mneg * du.uz[J][lane] + qmid * az;
+        const scalar_t fx   = dmdot * t_uupx[lane] + mpos * du.ux[I][lane] + mneg * du.ux[J][lane] + qmid * ax;
+        const scalar_t fy   = dmdot * t_uupy[lane] + mpos * du.uy[I][lane] + mneg * du.uy[J][lane] + qmid * ay;
+        const scalar_t fz   = dmdot * t_uupz[lane] + mpos * du.uz[I][lane] + mneg * du.uz[J][lane] + qmid * az;
         out.rx[I][lane] += fx;
         out.ry[I][lane] += fy;
         out.rz[I][lane] += fz;
@@ -1775,20 +1784,21 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_pa_simd(const scalar_t           
                                                        const scalar_t *const SFEM_RESTRICT Az2,
                                                        const Hex8InputPack                &du,
                                                        const Hex8RhieChowPack             *rc,
-                                                       const Hex8TangentPack              &t,
+                                                       const scalar_t *const SFEM_RESTRICT pa,
+                                                       const ptrdiff_t                     nelem,
                                                        Hex8ResidualPack                   &out) {
-    cvfem_hex8_conv_face_jv_pa_simd<0, 0, 1, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<1, 3, 2, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<2, 4, 5, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<3, 7, 6, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<4, 0, 3, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<5, 1, 2, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<6, 4, 7, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<7, 5, 6, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<8, 0, 4, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<9, 1, 5, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<10, 2, 6, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, t, out);
-    cvfem_hex8_conv_face_jv_pa_simd<11, 3, 7, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<0, 0, 1, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<1, 3, 2, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<2, 4, 5, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<3, 7, 6, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<4, 0, 3, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<5, 1, 2, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<6, 4, 7, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<7, 5, 6, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<8, 0, 4, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<9, 1, 5, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<10, 2, 6, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
+    cvfem_hex8_conv_face_jv_pa_simd<11, 3, 7, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
 }
 
 template <bool RC = false, bool QG = false, bool EPS = false>
@@ -2260,7 +2270,8 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_pa_simd(
         const scalar_t *const SFEM_RESTRICT   cof8,
         const scalar_t *const SFEM_RESTRICT   det,
         const Hex8InputPack                  &du,
-        const Hex8TangentPack                &t,
+        const scalar_t *const SFEM_RESTRICT   pa,
+        const ptrdiff_t                       nelem,
         Hex8ResidualPack                     &out,
         const Hex8RhieChowPack               *rc       = nullptr,
         const scalar_t                        rc_scale = scalar_t(0),
@@ -2294,13 +2305,13 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_pa_simd(
     if (rc && rc_scale != scalar_t(0)) {
         if (has_qg)
             cvfem_hex8_conv_all_jv_pa_simd<true, true>(
-                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, t, out);
+                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
         else
             cvfem_hex8_conv_all_jv_pa_simd<true, false>(
-                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, t, out);
+                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
     } else {
         cvfem_hex8_conv_all_jv_pa_simd<false, false>(
-                rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, t, out);
+                rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
     }
 }
 

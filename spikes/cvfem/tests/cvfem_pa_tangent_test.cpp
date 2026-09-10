@@ -110,8 +110,14 @@ int main(int argc, char **argv) {
 
     // The store is what it claims to be, and small.
     {
-        const bool sized = (ptrdiff_t)d.pa_tangent.size() == (ptrdiff_t)CVFEM_HEX8_PA_PER_ELEM * d.nelements;
-        check(sized, "the store is 60 scalars per element", (double)d.pa_tangent.size());
+        // Sixty per element plus one SIMD group of pad. The pad is not decoration: the face
+        // loops read the store directly, so a final group that runs past the end of the mesh
+        // reads into it, and without it that read would be out of bounds. Its results are
+        // discarded by the scatter, which writes only lanes below nlanes.
+        const ptrdiff_t want = (ptrdiff_t)CVFEM_HEX8_PA_PER_ELEM * d.nelements + CVFEM_HEX8_VEC_SIZE;
+        const bool sized = (ptrdiff_t)d.pa_tangent.size() == want;
+        check(sized, "the store is 60 scalars per element plus a SIMD group of pad",
+              (double)d.pa_tangent.size());
         const double bpd = cvfem_hex8_pa_bytes_per_dof(d);
         check(bpd > 0 && bpd < 130.0, "and under 130 bytes per degree of freedom", bpd);
     }

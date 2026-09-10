@@ -282,7 +282,11 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
     if (d.pa_valid && d.pa_nelements == d.nelements && d.pa_rho == rho && d.pa_mu == mu &&
         d.pa_scale == d.rhie_chow_scale && d.pa_ueps == ueps)
         return;
-    d.pa_tangent.resize((size_t)CVFEM_HEX8_PA_PER_ELEM * (size_t)d.nelements);
+    // Padded by one SIMD group: the face loops read this store directly, so the lanes of a
+    // final group that runs past the end of the mesh read into the pad. Their results are
+    // discarded by the scatter, which writes only lanes below nlanes.
+    d.pa_tangent.assign((size_t)CVFEM_HEX8_PA_PER_ELEM * (size_t)d.nelements + CVFEM_HEX8_VEC_SIZE,
+                        scalar_t(0));
     d.pa_rho       = rho;
     d.pa_mu        = mu;
     d.pa_scale     = d.rhie_chow_scale;
@@ -347,22 +351,6 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
     }
 }
 
-template <typename MeshT>
-static SFEM_INLINE void cvfem_hex8_gather_pa_tangent(const MeshT      &d,
-                                                     const ptrdiff_t   begin,
-                                                     const int         nlanes,
-                                                     Hex8TangentPack  &t) {
-    const scalar_t *const SFEM_RESTRICT src = d.pa_tangent.data();
-    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
-        scalar_t *const SFEM_RESTRICT dst[CVFEM_HEX8_PA_PER_SCS] = {
-                t.mpos[s], t.mneg[s], t.uupx[s], t.uupy[s], t.uupz[s]};
-        for (int c = 0; c < CVFEM_HEX8_PA_PER_SCS; ++c) {
-            const scalar_t *const SFEM_RESTRICT from = src + cvfem_hex8_pa_offset(d.nelements, s, c);
-            for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane)
-                dst[c][lane] = lane < nlanes ? from[begin + lane] : scalar_t(0);
-        }
-    }
-}
 
 // Bytes the store costs, so a speedup can be reported next to its price rather than on its
 // own. The assembled matrix is about 847 bytes per degree of freedom for comparison.

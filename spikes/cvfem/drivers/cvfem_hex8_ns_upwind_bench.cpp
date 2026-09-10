@@ -433,8 +433,9 @@ int main(int argc, char **argv) {
                     "  --partial-assembly  build the element tangent once -- five scalars per\n"
                     "                 sub-control surface, sixty per element -- and read it in the\n"
                     "                 Jacobian action instead of gathering the state and rederiving\n"
-                    "                 the mass flux and upwind switch on every matvec. Needs\n"
-                    "                 --jac-action on --layout packed|store with --geom affine.\n"
+                    "                 the mass flux and upwind switch on every matvec. MEASURED AND\n"
+                    "                 LOST: 17-19%% slower than direct evaluation (subpar/README.md),\n"
+                    "                 so it needs -DCVFEM_ENABLE_SUBPAR=ON to run at all.\n"
                     "  --qgrad-atomic   reconstruct the nodal gradient with the flat atomic sweep\n"
                     "                 instead of over packs. Same operator; the packed one has no\n"
                     "                 atomics and is deterministic. Here to measure the difference,\n"
@@ -494,6 +495,21 @@ int main(int argc, char **argv) {
     // sweep builds -- those assembly sweeps are scalar per element, so the only difference
     // is whether the coordinates and the nodal gradient are read from the pack or from the
     // mesh. What decides is the KERNEL, and rc_kernel_ok below is where that is settled.
+    // Measured and lost: 17-19% SLOWER than direct evaluation at 4.1M and 8.6M dof on
+    // Grace, in two independent implementations. Rejected by name here for the reason
+    // --kernel sympy_row and sympy_face are -- a run must not report a throughput under a
+    // configuration that was shown not to be worth using -- and kept compiling so the
+    // measurement stays repeatable if the hardware changes. See subpar/README.md.
+#ifndef CVFEM_ENABLE_SUBPAR
+    if (partial_assembly) {
+        std::fprintf(stderr,
+                     "--partial-assembly was measured and lost: 17-19%% slower than direct\n"
+                     "evaluation at 4.1M and 8.6M dof on Grace (see subpar/README.md).\n"
+                     "Rebuild with -DCVFEM_ENABLE_SUBPAR=ON to measure it again.\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+#endif
     // The store holds a per-element tangent built from one adjugate at the element centre,
     // which is not what the isoparametric kernels evaluate, and it is read by a packed SIMD
     // sweep. Refused elsewhere rather than measured on an operator it does not describe.
