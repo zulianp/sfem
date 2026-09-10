@@ -265,14 +265,8 @@ the metric artefact documented above, not a property of this material; it is
 recorded here only so that a reader who runs the default and sees 2.9e-02 knows
 which number to believe.
 
-**Storage precision is free on this element, which inverts the TET4 advice.**
-The f32 and f16 columns agree with f64 to two digits at every refinement -- 3.9e-03
-against 3.9e-03, 7.0e-04 against 7.2e-04.  On TET4 the same comparison gives
-6.4e-08 for f32 and 5.1e-04 for f16, because there the projection is exact and
-the store is the only error there is.  On TET10 the projection error is three to
-four orders larger than anything the store contributes, so f16 costs nothing
-measurable and saves three quarters of the memory.  The Grace conclusion that
-fp16 is not worth carrying was drawn on TET4 and does not transfer.
+See "What the store's precision actually costs" below for the f32 and f16
+columns, which need a severity sweep to read and not a single row.
 
 HEX8 says the same thing on a different element:
 
@@ -293,6 +287,80 @@ TET4.  The exact TET10 apply is only 1.9x more expensive per dof than the
 exact TET4 one, while assembling the tangent costs about the same in all three,
 so the fixed cost is amortised over more applies.  The speed-up once past it is
 3.5x on TET10 and 4.6x on HEX8, against 2.8x on TET4.
+
+## What the store's precision actually costs
+
+The columns above invite a wrong reading.  At the deformation these benchmarks
+use, f32 and f16 agree with f64 to two digits, which looks like "the store's
+precision is free on a curved element".  It is not free; it is hidden, and a
+severity sweep says by how much and until when.
+
+`run_store_precision.sh <element>` sweeps the deformation amplitude at the
+finest mesh.  Amplitude zero is the control: the deformation gradient is
+constant there, so the projection is exact on *any* element and the whole
+remaining difference is the store's own.  Without that row a store error and a
+projection error are the same number and cannot be told apart.
+
+TET10, 1.59 Mdof:
+
+| amplitude | f64 (projection) | f32 | f16 | f16 inflation |
+|---|---|---|---|---|
+| 0      | 2.4e-16 | 2.4e-08 | 3.1e-04 | control |
+| 0.0025 | 8.6e-05 | 8.6e-05 | 2.0e-04 | +133% |
+| 0.005  | 1.7e-04 | 1.7e-04 | 2.5e-04 |  +47% |
+| 0.01   | 3.5e-04 | 3.5e-04 | 3.9e-04 |  +11% |
+| 0.02   | 7.0e-04 | 7.0e-04 | 7.2e-04 |   +3% |
+| 0.04   | 1.4e-03 | 1.4e-03 | 1.4e-03 |   +0% |
+| 0.08   | 2.9e-03 | 2.9e-03 | 2.9e-03 |   +0% |
+
+HEX8, 206763 dof:
+
+| amplitude | f64 (projection) | f32 | f16 | f16 inflation |
+|---|---|---|---|---|
+| 0     | 2.4e-16 | 2.6e-08 | 1.1e-05 | control |
+| 0.005 | 5.6e-05 | 5.6e-05 | 1.0e-04 | +79% |
+| 0.01  | 1.1e-04 | 1.1e-04 | 1.4e-04 | +27% |
+| 0.02  | 2.3e-04 | 2.3e-04 | 2.4e-04 |  +4% |
+| 0.08  | 1.0e-03 | 1.0e-03 | 1.0e-03 |  +0% |
+
+Three things follow, and only the third is the headline.
+
+**The projection error is first order in the deformation.**  Each doubling of
+the amplitude doubles the f64 column, exactly, over five doublings.  That is the
+same first order the mesh refinement shows, and it is what the projection is.
+
+**The two errors combine in quadrature.**  Fitting `total^2 = P^2 + Q^2` to the
+deformed rows gives a store term `Q` of 1.2e-04 on TET10 and 6.0e-05 on HEX8,
+and the model then reproduces every measured f16 entry to one digit.  So the
+store does not add to the projection error, it is absorbed by it -- which is why
+the inflation column falls away rather than staying constant.
+
+**f16 is within ten per cent of a perfect store once the projection error
+exceeds about `2.2 Q`** -- amplitude 0.007 on TET10, 0.010 on HEX8.  Below that
+it dominates and the store is what you are measuring.  At the amplitude these
+tables use, 0.02, f16 costs 3% on TET10 and 4% on HEX8: small, but not the
+"nothing measurable" that reading one row suggests.
+
+f32 needs no such argument.  Its store term is 2.5e-08, four orders below the
+projection error at any deformation worth applying, and it tracks f64 to two
+digits from the first non-zero amplitude.  **f32 is unconditionally free here;
+f16 is conditionally free**, and the condition is a deformation large enough to
+hide it.
+
+Two consequences worth stating plainly.  Refining the mesh moves *towards* f16
+mattering, not away: the projection error falls as `O(h)` while `Q` does not
+move, so the finest TET10 mesh here is already at +3% and four more refinements
+would put the store back in charge.  And on TET4 the projection is exact, so
+`P = 0` and f16's 1.1e-04 is the entire error -- there is nothing for it to hide
+behind, which is what the Grace measurement was seeing when it concluded fp16
+was not worth carrying.  That conclusion was right for the element it was drawn
+on and does not generalise; this one does not generalise downwards either.
+
+The undeformed control is not a store floor to quote on its own: it is 3.1e-04
+on TET10 and 1.1e-05 on HEX8, a factor of 28 apart, because the quantisation
+error depends on the dynamic range of the tangent being stored and the
+undeformed tangent is a special, unusually uniform case.  `Q` fitted from the
+deformed rows is the number that predicts.
 
 ## Threads
 
@@ -355,7 +423,10 @@ for the slow ones.  On homogeneous cores the scatter costs a constant factor,
 not scalability.  A conclusion about a kernel drawn from a heterogeneous laptop
 needed a homogeneous machine to check, and did not survive it.
 
-**fp16 is not worth carrying on this machine.**  At one thread it is *slower*
+**fp16 is not worth carrying on this machine** -- on throughput.  That is a
+separate question from what it costs in accuracy, which "What the store's
+precision actually costs" above answers with a severity sweep; the two happen to
+agree that f32 is the default to reach for, by different arguments.  At one thread it is *slower*
 than both f32 and f64 (2.85 against 3.10 and 2.91), and at 72 threads it is
 within two per cent of f32 (209.60 against 205.81) while costing four decimal
 digits.  `half_t` is `_Float16` here and `__fp16` on the laptop, and the
@@ -406,13 +477,17 @@ single kernel with no harness at all and confirms the corrected figures.
 
     spikes/inexact_apply_compare/run_split.sh <material> <element> [repeats]
     spikes/inexact_apply_compare/run_mixed.sh <element> [repeats]
+    spikes/inexact_apply_compare/run_store_precision.sh <element> [amplitudes...]
     spikes/inexact_apply_compare/run_warp.sh  <material> <element> [n]
 
 `run_mixed.sh` drives the two-unit material and takes no material argument: it
 generates one tree and links two sets of kernels out of it, because the energy
 unit's exact entry point is `apply_a_msoa` and the residual unit's is
 `jacobian_action_a_msoa`.  `MIXED_EXTRA_FLAGS=-DRANDOM_INCREMENT` selects the
-white-noise increment, which is the one to use for anything about accuracy.
+white-noise increment, which is the one to use for anything about accuracy, and
+`-DSTATE_AMPLITUDE=<a>` sets the deformation severity.  `run_store_precision.sh`
+is those two together as a sweep, with the zero-amplitude control that separates
+a store error from a projection error.
 
 Elements are TET4, HEX8 and TET10.  `WARP_EXTRA_FLAGS=-DRANDOM_INCREMENT` selects
 the white-noise increment.  `SFEM_MAIN_CHECKOUT`, `SFEM_BUILD`, `SFEM_PYTHON` and
