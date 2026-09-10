@@ -105,6 +105,59 @@ gemm. And none of this was measured on a GPU, where the arithmetic-intensity arg
 different enough that the ordering could invert -- as packing already does between Grace
 and Hopper.
 
+## `cvfem_hex8_ns_upwind_sympy_subpar.hpp` — row-wise and face-wise CSE for HEX8 assembly
+
+**Why they existed.** The generated assembly is one expression tree cut into CSE scopes, and
+the cut is free to be made anywhere: the whole kernel at once (`sympy`), one 4x4 block
+(`sympy_block`), one matrix row (`sympy_row`), one sub-control surface (`sympy_face`). Four
+scopes, one `sp.cse` call each, no other difference. Which one wins is not predictable from
+the source, so all four were emitted and measured.
+
+**Why they lost.** Grace, one socket, 72 threads, `OMP_PROC_BIND=true`, n=96 — 884,736
+elements, **3,650,692 dof**, the size at which CPU assembly throughput plateaus. Medians of
+three interleaved trials, from `eval/cpu_repeats.csv`. Affine assembly, MDOF/s:
+
+| kernel | atomic | packed | colored | store |
+|---|---:|---:|---:|---:|
+| `sumfact` (hand-written) | 37.2 | 55.5 | **79.0** | 72.8 |
+| `sympy` (flat) | 53.7 | **55.0** | 67.2 | **71.9** |
+| `sympy_block` | 54.2 | 55.0 | 66.5 | 71.4 |
+| `sympy_row` | **54.3** | 54.8 | 65.3 | 71.0 |
+| `sympy_face` | 24.0 | 53.8 | 57.9 | 69.4 |
+
+`sympy_face` is the decisive one, and its cause is legible in the emitted text rather than in
+the timings: **2016 `CVFEM_ATOMIC_ADD`s against 768**. Flat, block-wise and row-wise all
+scatter once per BSR entry, because every face's contribution to an entry is already summed
+inside the scope. A face-scoped kernel cannot do that — the twelve scopes are compiled
+independently and each scatters its own partial — so it pays 2.6x the atomic traffic for the
+same matrix. On the atomic layout, where that traffic is the bottleneck, it costs 2.24x; on
+the layouts that scatter privately it costs 2–14%, which is the same defect measured through
+a cheaper scatter. Never fastest anywhere, on either platform: 24.0 against 54.3 on CPU
+atomic, 106.4 against 238.3 on the GPU.
+
+`sympy_row` is the opposite case and is retired on much weaker grounds, which is worth saying
+plainly. It is **nominally fastest in one cell out of four, by 0.2%** — a three-way tie with
+`sympy` and `sympy_block` inside a ~4% noise band — and it loses by 0.3–2.9% in the other
+three. On the GPU it is 6.5% behind `sympy_block` when element-coloured. So it was retired as
+a tie going to the simpler kernel, not as a variant that was beaten. Quarantining both halves
+the generated header: 34,684 to 17,032 lines, 2.02 to 1.01 MiB.
+
+**Two outliers, recorded so the raw file is not misread.** Of the 60 sympy samples in
+`eval/cpu_repeats.csv`, two collapse to roughly 40% of their neighbours in a single trial:
+`atomic/sympy_row` reads 21.74 in one of three (against 54.27 and 54.74), and
+`colored/sympy/isoparam` reads 41.38 (against 56.10 and 56.20). `eval/cpu_saturated.csv`,
+which is single-shot, has a third: `store/sympy` at 23.50 against a 71.9 median. These are
+machine noise, and they are why the decision was taken on medians of three. Read
+single-trial, the first of them would have condemned `sympy_row` as catastrophically slow for
+the same reason `sympy_face` genuinely is.
+
+**What this does not settle.** Only assembly was measured here. The generated *residual* is
+arrangement-independent by construction — one emitted residual serves all four `sympy*` names
+— and the Jacobian action had been measured under exactly one kernel name, because no
+generated action kernel existed. So none of the above was evidence about the operation a
+Krylov solve spends its time in. That question was asked separately, and answered differently:
+see the `sympy_action*` section below, where the arrangement is worth 1.51x.
+
 ## `sympy_action*` — generated CSE for the HEX8 Jacobian action
 
 **Why they existed.** HEX8 had no generated Jacobian action at all: the four `sympy*`
