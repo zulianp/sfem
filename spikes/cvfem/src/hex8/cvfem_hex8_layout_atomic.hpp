@@ -44,6 +44,10 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
             cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
         } else if (kernel == KernelKind::SympyActionFace) {
             cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
+        } else if (kernel == KernelKind::SympyActionGeom) {
+            cvfem_hex8_ns_upwind_sympy_jacobian_action_geom(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
+        } else if (kernel == KernelKind::SympyActionGeomFace) {
+            cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
         }
         // Branch rather than pass `ex.rc` and `p` unconditionally: with --rhie-chow off the
         // literal call below hands the kernel a default-constructed rc and a null pressure,
