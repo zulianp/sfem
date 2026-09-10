@@ -816,7 +816,7 @@ inline void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol
 // here covers the sumfact, isoparametric and packed sweeps at once instead of touching five
 // host kernels and five CUDA kernels for the same arithmetic.
 inline void apply_body_force(MeshData &d) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_node_volume");
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_body_force");
     if (d.fx.empty()) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
 #pragma omp parallel for schedule(static)
@@ -940,6 +940,41 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
 // runs every operator over one shared values buffer without clearing it between them, so
 // an Op that cleared would silently drop the operators assembled before it. The element
 // scatter accumulates either way, so this costs nothing but the skipped memset.
+// The transient term's diagonal, on the assembled matrix. Identical in substance to the
+// block one assemble_block_diag adds -- rho V a0 / dt on each velocity diagonal entry and
+// nothing on pressure -- and it reads the same transient_diag_weight, so the two cannot
+// disagree about the coefficient.
+//
+// It was missing, and that is not cosmetic. apply_jacobian_action_accumulate applies the
+// term and assemble_block_diag applies it, so in an unsteady run the assembled matrix was
+// the STEADY Jacobian while the operator it preconditions and the smoother built beside it
+// were the unsteady one. For a small timestep rho V a0 / dt is the dominant diagonal, so
+// the preconditioner was missing the largest entry it has.
+inline void assemble_transient_diag(MeshData &d, const scalar_t rho, BSR4 &b) {
+    const scalar_t a = transient_diag_weight(d, rho);
+    if (a == scalar_t(0)) return;
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_transient_diag");
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+    scalar_t *const SFEM_RESTRICT values = b.data();
+    // diag_slots is what precompute_element_bsr_slots leaves behind and is the direct
+    // answer; the row scan is the fallback for a matrix assembled without it.
+    const bool have_diag = (ptrdiff_t)b.diag_slots.size() == d.nnodes;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t r = 0; r < d.nnodes; ++r) {
+        const scalar_t w = a * d.node_vol[(size_t)r];
+        if (have_diag) {
+            const smesh::count_t j = b.diag_slots[(size_t)r];
+            if (j < 0) continue;
+            for (int c = 0; c < 3; ++c) values[(ptrdiff_t)j * 16 + c * 4 + c] += w;
+            continue;
+        }
+        for (smesh::count_t j = b.rowptr[r]; j < b.rowptr[r + 1]; ++j) {
+            if (b.colidx[j] != (smesh::idx_t)r) continue;
+            for (int c = 0; c < 3; ++c) values[(ptrdiff_t)j * 16 + c * 4 + c] += w;
+        }
+    }
+}
+
 inline void assemble_jacobian(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu, const GeomKind geom,
                               const bool zero_first = true) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian");
@@ -951,6 +986,7 @@ inline void assemble_jacobian(MeshData &d, BSR4 &b, const scalar_t rho, const sc
         assemble_jacobian_colored_sumfact(d, *d.packed, *d.coloring, b, rho, mu);
     else
         assemble_jacobian_atomic_sumfact(d, b, rho, mu);
+    assemble_transient_diag(d, rho, b);
 }
 
 SFEM_INLINE void gather_element_dir(const MeshData &d, const ptrdiff_t e, const scalar_t *const SFEM_RESTRICT dir,
@@ -1036,7 +1072,7 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
 inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
                                              const scalar_t *const SFEM_RESTRICT dir,
                                              scalar_t *const SFEM_RESTRICT       jv) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action");
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_accumulate");
     // The Rhie-Chow correction differentiates through the nodal pressure-gradient
     // reconstruction, so the direction's own reconstructed gradient is needed. One extra
     // pass per Jacobian apply, the same shape as the one update() already does for p.
