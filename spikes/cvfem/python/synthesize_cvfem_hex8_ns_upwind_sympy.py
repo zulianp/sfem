@@ -237,6 +237,38 @@ def direction_locals() -> str:
     return "\n".join(lines)
 
 
+def cse_action_facewise_code(face_jacs: list[list[sp.Expr]], sym: dict[str, object]) -> str:
+    """The action accumulated one sub-control surface at a time.
+
+    The finest cut available, and the one the other arrangements argue for: cutting the
+    CSE scope beat the flat whole-kernel scope on this operator, so the question is how
+    far that goes. Each face touches two nodes, so a scope here is eight outputs of much
+    simpler algebra than any slice of the assembled twelve-face sum.
+
+    Face-wise lost badly as an ASSEMBLY arrangement -- 24.0 against 54.3 MDOF/s on CPU
+    atomic -- but for a reason that does not exist here: it issued 2016 CVFEM_ATOMIC_ADDs
+    against flat's 768. The action accumulates into a local r[], so the extra writes are
+    register or stack traffic rather than atomics, and that verdict does not carry over.
+    """
+    v = direction_symbols(sym)
+    n = len(v)
+    body = []
+    for fj in face_jacs:
+        exprs, outs = [], []
+        for i in range(N_DOF):
+            row = fj[i * n:(i + 1) * n]
+            e = sp.Add(*[c * vj for c, vj in zip(row, v) if c != 0])
+            if e != 0:
+                exprs.append(e)
+                outs.append(f"r[{i}]")
+        if not exprs:
+            continue
+        body.append("    {")
+        body.append(cse_code(exprs, outs, indent="        ", op="+="))
+        body.append("    }")
+    return "\n".join(body)
+
+
 def cse_action_code(action: list[sp.Expr], scope: str) -> str:
     """Emit the action under one CSE arrangement.
 
@@ -518,6 +550,26 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_act
 }}
 
 template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise(const scalar_t rho,
+                                                            const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                                            const scalar_t *const SFEM_RESTRICT ux,
+                                                            const scalar_t *const SFEM_RESTRICT uy,
+                                                            const scalar_t *const SFEM_RESTRICT uz,
+                                                            const scalar_t *const SFEM_RESTRICT vx,
+                                                            const scalar_t *const SFEM_RESTRICT vy,
+                                                            const scalar_t *const SFEM_RESTRICT vz,
+                                                            const scalar_t *const SFEM_RESTRICT q,
+                                                            scalar_t *const SFEM_RESTRICT r) {{
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+{geom_locals()}
+{input_locals(include_pressure=False)}
+{direction_locals()}
+{sign_locals(mdots)}
+{cse_action_facewise_code(face_jacs, sym)}
+}}
+
+template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
                                                                           const scalar_t mu,
                                                                           const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
@@ -687,7 +739,15 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
 # still generated -- the removal was made on measured grounds and has to stay
 # reproducible -- but into a separate header that only builds under
 # -DCVFEM_ENABLE_SUBPAR. See subpar/README.md for the numbers.
-SUBPAR_MARKERS = ("_rowwise", "_facewise")
+# The quarantined ARRANGEMENTS, named precisely rather than by substring.
+#
+# This was ("_rowwise", "_facewise"), which quarantines any function whose name happens to
+# contain either -- and it silently swallowed the first new kernel to use one of those
+# words, a Jacobian-action arrangement that has never been measured and that the assembly
+# verdict says nothing about. A rule that decides by substring cannot distinguish a variant
+# that lost from one that merely shares a word with it.
+SUBPAR_MARKERS = ("_add_bsr_slots_rowwise", "_add_bsr_slots_facewise",
+                  "_add_local_slots_rowwise", "_add_local_slots_facewise")
 
 SUBPAR_OUT = SPIKE_ROOT / "subpar" / "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
 
