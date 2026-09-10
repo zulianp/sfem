@@ -157,6 +157,22 @@ def sfem_tensor_product_kernels_header_source(
     return _expand_residual_stream_layouts(_TENSOR_PRODUCT_KERNELS_TEMPLATE % values)
 
 
+# The reductions in `test` and `integrate` keep their index arithmetic, and it
+# was measured rather than argued.  They accumulate into registers across the
+# quadrature direction and store once, so the base of each read moves with the
+# reduction variable and cannot be named outside the lane loop.  Naming it would
+# mean interchanging the lane and reduction loops, which turns one register
+# accumulation into a read-modify-write through the stage buffer.
+#
+# Interchanging one of the nine stages -- the first of the three-dimensional
+# `test` -- cost, on one Grace node at 204.8 MDOF with a 20 GB working set and
+# OMP_PROC_BIND=true: 7.7% to 14.4% single threaded across three interleaved
+# pairs, 4.8% at 32 threads, and 0.6% at 72 where the kernel is memory bound.
+# Answers were identical throughout, so the whole of it was cost.
+#
+# Everything whose base does *not* move with the reduction -- every store, and
+# the reads the surrounding loops already fix -- is named outside the loop.
+
 _TENSOR_PRODUCT_KERNELS_TEMPLATE = r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
 #define SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
 

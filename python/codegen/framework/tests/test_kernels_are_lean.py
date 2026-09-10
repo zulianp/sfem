@@ -109,6 +109,15 @@ UNUSED_PARAMETER_BUDGET = 74
 #: the measure tells them apart by their indices rather than by their name.
 KERNEL_PERMUTATION_BUDGET = 0
 
+#: Lane-indexed reads whose base is fixed for the whole loop were 2016 and are
+#: 35.  The 35 are the `test`/`integrate` reductions in
+#: `tensor_product_kernels.hpp`, whose base moves with the reduction variable;
+#: naming it needs the loop nest interchanged, which was measured on Grace and
+#: costs up to 14% (see the note at the head of
+#: `emitters/tensor_product_kernels.py`).  There is no budget for them here
+#: because they are not the defect this file gates -- they are the shape a
+#: strided reduction has.
+
 #: `extern "C"` wrappers around a `KernelDiagnostics` free function.  There
 #: were 1400 of them and nothing referenced any.
 WRAPPED_HELPER_BUDGET = 0
