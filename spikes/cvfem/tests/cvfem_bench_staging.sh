@@ -106,6 +106,34 @@ differs "assemble, affine split"               --assemble --kernel split
 differs "block diagonal, affine"               --assemble-diag
 differs "block diagonal, isoparam"             --assemble-diag --geom isoparam
 
+echo "== the transient term, on every operation"
+# tests/cvfem_bench_transient_test pins the term itself against closed forms. What is
+# checked here is that it REACHES each operation and each layout, which is a property of the
+# driver rather than of the pass.
+ok "residual + transient"                      --transient 0.01
+ok "residual + transient, BDF2"                --transient 0.01 --bdf 2
+ok "jac-action + transient"                    --jac-action --transient 0.01
+ok "assemble + transient"                      --assemble --transient 0.01
+ok "assemble + transient + boundary"           --assemble --transient 0.01 --boundary
+ok "diag + transient"                          --assemble-diag --transient 0.01
+ok "diag + transient + rc + boundary"          --assemble-diag --transient 0.01 --rhie-chow --boundary
+ok "split + transient, isoparam"               --assemble --geom isoparam --kernel split --transient 0.01
+transient_reaches() {
+    desc="$1"; shift
+    off=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout "$@" 2>&1 | sed -n 's/^ *checksum: //p')
+    on=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout "$@" --transient 0.01 2>&1 | sed -n 's/^ *checksum: //p')
+    if [ -n "$off" ] && [ -n "$on" ] && [ "$off" != "$on" ]; then
+        printf '%-62s OK   steady %s -> transient %s\n' "$desc" "$off" "$on"
+    else
+        printf '%-62s FAIL (off=%s on=%s)\n' "$desc" "${off:-none}" "${on:-none}"
+        FAIL=$((FAIL + 1))
+    fi
+}
+transient_reaches "residual, packed"           packed
+transient_reaches "residual, colored"          colored
+transient_reaches "jac-action, packed"         packed --jac-action
+transient_reaches "assemble, store"            store --assemble
+
 echo "== still refused, and must stay so"
 # No generated kernel carries Rhie-Chow: the term was never put into the SymPy expressions.
 refused "assemble + rc, sympy"                 --assemble --rhie-chow --kernel sympy

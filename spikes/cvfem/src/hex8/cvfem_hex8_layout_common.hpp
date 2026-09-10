@@ -259,6 +259,15 @@ struct MeshData {
     // load balanced rather than merely short.
     std::vector<ptrdiff_t> bnd_elems;
     scalar_t              Lx{0}, Ly{0}, Lz{0};
+
+    // --transient dt makes the operator unsteady. In a control-volume scheme the mass
+    // matrix IS the control volume, so the term is diagonal: it needs a nodal volume and
+    // one velocity history level per BDF order, and nothing else. dt <= 0 means steady,
+    // which is the default and is what every existing measurement was taken with.
+    scalar_t              dt{0};
+    int                   bdf_order{1};
+    std::vector<scalar_t> u_prev, u_prev2;  // 3 * nnodes, interleaved
+    std::vector<scalar_t> node_vol;
 };
 
 struct BSR4 {
@@ -562,6 +571,132 @@ static SFEM_NOINLINE void assemble_boundary_scs_jacobian_pass(MeshData      &d,
         boundary_scs_add_jacobian<true>(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz,
                                         x, y, z, ux, uy, uz, slots + (size_t)e * 64, values, fmask, 0);
         (void)p;
+    }
+}
+
+// ---------------------------------------------------------------- the transient term
+//
+// A third post-pass, for the third reason the other two are post-passes: in a
+// control-volume scheme the mass matrix IS the control volume. The momentum equation
+// integrated over CV_i carries d/dt of (rho u_i V_i), so the term is diagonal in the nodes
+// and touches no sub-control-surface flux -- one pass covers the atomic, packed, colored
+// and store sweeps at once. There is no consistent mass matrix to assemble and none should
+// be introduced; an FEM mass matrix here would be a different discretisation.
+//
+// This mirrors apply_transient / apply_transient_action / build_node_volume in
+// cvfem_hex8_ns_core.hpp. The two families cannot include each other -- each #errors on the
+// other's guard -- so this is a duplicate, and a duplicate drifts. What stops it is
+// tests/cvfem_bench_transient_test, which pins the node volume against a closed form (the
+// volumes sum to the domain volume, and on a uniform box every interior node has exactly
+// h^3) and the action against a central difference of the residual term.
+
+static void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol) {
+    node_vol.assign((size_t)d.nnodes, scalar_t(0));
+    // jacobian_determinant is precomputed for affine geometry only, so evaluate it here
+    // when it is absent rather than reading an empty array.
+    const bool have_det = (ptrdiff_t)d.jacobian_determinant.size() >= d.nelements;
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t det;
+        if (have_det) {
+            det = d.jacobian_determinant[(size_t)e];
+        } else {
+            scalar_t x[8], y[8], z[8], adj[9];
+            gather_element_coords(d, e, x, y, z);
+            cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
+        }
+        const scalar_t v = std::fabs(det) / scalar_t(8);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) node_vol[d.elems[a][e]] += v;
+    }
+}
+
+// BDF1/BDF2 coefficients for r += rho V (a0 u^{n+1} + a1 u^n + a2 u^{n-1}) / dt. BDF2 needs
+// two history levels, so a run that has only one falls back to BDF1 -- the standard
+// start-up, signalled by leaving u_prev2 empty.
+struct BdfCoeffs {
+    scalar_t a0, a1, a2;
+    int      order;
+};
+
+static BdfCoeffs bdf_coeffs(const MeshData &d) {
+    const bool have_two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
+    if (have_two) return {scalar_t(1.5), scalar_t(-2), scalar_t(0.5), 2};
+    return {scalar_t(1), scalar_t(-1), scalar_t(0), 1};
+}
+
+static SFEM_NOINLINE void apply_transient_pass(MeshData &d, const scalar_t rho) {
+    if (d.dt <= scalar_t(0)) return;
+    if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+    const BdfCoeffs c   = bdf_coeffs(d);
+    const scalar_t  inv = scalar_t(1) / d.dt;
+    const bool      two = c.order == 2;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t w   = rho * d.node_vol[(size_t)i] * inv;
+        const size_t   k   = (size_t)i * 3;
+        const scalar_t p2x = two ? d.u_prev2[k + 0] : scalar_t(0);
+        const scalar_t p2y = two ? d.u_prev2[k + 1] : scalar_t(0);
+        const scalar_t p2z = two ? d.u_prev2[k + 2] : scalar_t(0);
+        d.rx[(size_t)i] += w * (c.a0 * d.ux[(size_t)i] + c.a1 * d.u_prev[k + 0] + c.a2 * p2x);
+        d.ry[(size_t)i] += w * (c.a0 * d.uy[(size_t)i] + c.a1 * d.u_prev[k + 1] + c.a2 * p2y);
+        d.rz[(size_t)i] += w * (c.a0 * d.uz[(size_t)i] + c.a1 * d.u_prev[k + 2] + c.a2 * p2z);
+    }
+}
+
+// The derivative is rho V a0 / dt on each velocity diagonal entry and nothing on pressure,
+// so the saddle-point structure is untouched -- which is why the block diagonal still needs
+// Rhie-Chow to have an invertible pressure entry no matter how small the timestep is.
+//
+// The history is deliberately NOT required here: the coefficient is rho a0 / dt whatever
+// u^n holds. The solver learned this the hard way -- requiring it gave every coarse level,
+// which never receives a history, a steady Jacobian.
+static scalar_t transient_diag_weight(const MeshData &d, const scalar_t rho) {
+    if (d.dt <= scalar_t(0)) return scalar_t(0);
+    if ((ptrdiff_t)d.u_prev.size() == 3 * d.nnodes) return bdf_coeffs(d).a0 * rho / d.dt;
+    return (d.bdf_order >= 2 ? scalar_t(1.5) : scalar_t(1)) * rho / d.dt;
+}
+
+static SFEM_NOINLINE void apply_transient_action_pass(MeshData                           &d,
+                                                      const scalar_t                      rho,
+                                                      const scalar_t *const SFEM_RESTRICT dir,
+                                                      scalar_t *const SFEM_RESTRICT       jv) {
+    const scalar_t a = transient_diag_weight(d, rho);
+    if (a == scalar_t(0)) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t w = a * d.node_vol[(size_t)i];
+        for (int c = 0; c < 3; ++c) jv[(ptrdiff_t)i * N_FIELDS + c] += w * dir[(ptrdiff_t)i * N_FIELDS + c];
+    }
+}
+
+// The same term on the assembled matrix and on the block diagonal. Added here rather than
+// in the element kernels for the reason above, and consistent with the residual by
+// construction because both read transient_diag_weight.
+static SFEM_NOINLINE void assemble_transient_diag_pass(MeshData &d, const scalar_t rho, BSR4 &b) {
+    const scalar_t a = transient_diag_weight(d, rho);
+    if (a == scalar_t(0)) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+    scalar_t *const SFEM_RESTRICT values = b.values->data();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t r = 0; r < d.nnodes; ++r) {
+        const scalar_t w = a * d.node_vol[(size_t)r];
+        for (smesh::count_t j = b.rowptr[r]; j < b.rowptr[r + 1]; ++j) {
+            if (b.colidx[j] != (smesh::idx_t)r) continue;
+            for (int c = 0; c < 3; ++c) values[(ptrdiff_t)j * 16 + c * 4 + c] += w;
+        }
+    }
+}
+
+static SFEM_NOINLINE void assemble_diag_transient_pass(MeshData &d, const scalar_t rho,
+                                                       std::vector<scalar_t> &diag) {
+    const scalar_t a = transient_diag_weight(d, rho);
+    if (a == scalar_t(0)) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t w = a * d.node_vol[(size_t)i];
+        for (int c = 0; c < 3; ++c) diag[(size_t)i * 16 + (size_t)c * 4 + (size_t)c] += w;
     }
 }
 
