@@ -1,0 +1,569 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!55!black]{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+\titleformat{\section}{\normalfont\Large\bfseries\color{blue!45!black}}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{blue!30!black}}{\thesubsection}{1em}{}
+
+\newcommand{\Rey}{\mathrm{Re}}
+\newcommand{\bu}{\mathbf{u}}
+\newcommand{\bv}{\mathbf{v}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\bn}{\mathbf{n}}
+\newcommand{\ba}{\mathbf{a}}
+\newcommand{\bd}{\mathbf{d}}
+\newcommand{\bF}{\mathbf{F}}
+\newcommand{\bR}{\mathbf{R}}
+\newcommand{\bff}{\mathbf{f}}
+\newcommand{\bt}{\mathbf{t}}
+\newcommand{\bg}{\mathbf{g}}
+\newcommand{\bJ}{\mathsf{J}}
+\newcommand{\bA}{\mathsf{A}}
+\newcommand{\bI}{\mathsf{I}}
+\newcommand{\bttau}{\boldsymbol{\tau}}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\mdot}{\dot m}
+
+\title{\bfseries The CVFEM Navier--Stokes operators\\
+\large Discretisation of the incompressible equations on trilinear hexahedra,\\
+and the family of discrete operators a matrix-free solver evaluates}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This note fixes the discretisation and enumerates the discrete operators built on it. The
+scheme is a colocated control-volume finite-element method on trilinear hexahedra: the
+unknowns live at the mesh nodes, the balance is written over the dual control volumes, and
+the fluxes are evaluated on sub-control surfaces cut out of each element. Pressure--velocity
+coupling is by a Rhie--Chow mass-flux correction; convection is upwinded through a switch
+that can be smoothed to keep the flux differentiable at stagnation.
+
+The reason to write the operators down separately, rather than as one residual and its
+derivative, is that they are not one thing. A Newton--Krylov solve evaluates at least five
+of them per step, they carry different terms by design rather than by omission, and they
+differ in cost by a factor of fifty. Section~\ref{sec:operators} lists them with their
+domains of definition, and Section~\ref{sec:cost} with their measured throughput.
+\end{abstract}
+
+\section{Continuous problem}
+
+On a bounded domain $\Omega \subset \mathbb{R}^3$ we solve the incompressible Navier--Stokes
+equations in conservative form for velocity $\bu$ and pressure $p$, with constant density
+$\rho$ and dynamic viscosity $\mu$,
+\begin{align}
+  \rho \frac{\partial \bu}{\partial t}
+  + \nabla \cdot \left( \rho\, \bu \otimes \bu \right)
+  + \nabla p - \nabla \cdot \bttau &= \rho\, \bff , \label{eq:mom} \\[2pt]
+  \nabla \cdot \bu &= 0 , \label{eq:cont}
+\end{align}
+with the Newtonian deviatoric stress
+\begin{equation}
+  \bttau = \mu \left( \nabla \bu + \nabla \bu^{\mathsf T} \right) ,
+  \qquad \tau_{cd} = \mu \left( \partial_d u_c + \partial_c u_d \right) .
+  \label{eq:stress}
+\end{equation}
+The trace term $-\tfrac23 \mu (\nabla\cdot\bu)\,\bI$ is absent: it vanishes for a
+divergence-free field and retaining it would make the discrete stress depend on how well
+\eqref{eq:cont} is satisfied at the current iterate rather than at the solution.
+
+Integrating \eqref{eq:mom}--\eqref{eq:cont} over a control volume $C$ with boundary
+$\partial C$ and applying the divergence theorem gives the balance the discretisation
+reproduces:
+\begin{align}
+  \frac{\dd}{\dd t} \int_C \rho\, \bu \dd V
+  + \oint_{\partial C} \left[ \rho\, \bu (\bu \cdot \bn) + p\,\bn - \bttau \bn \right] \dd S
+  &= \int_C \rho\, \bff \dd V , \label{eq:cvmom} \\[2pt]
+  \oint_{\partial C} \rho\, \bu \cdot \bn \dd S &= 0 . \label{eq:cvcont}
+\end{align}
+Every term of every operator below is a quadrature of one of these two, so the discrete
+system is conservative by construction: a flux leaving one control volume enters its
+neighbour with the opposite sign and the same value.
+
+\section{The dual mesh and its geometry}
+
+\subsection{Control volumes and sub-control surfaces}
+
+The primal mesh is a partition of $\Omega$ into trilinear hexahedra. The unknowns
+$(\bu_i, p_i)$ are colocated at the $N$ mesh nodes, and the control volume $C_i$ is the
+median-dual cell of node $i$: within each element containing $i$, the sub-volume bounded by
+the planes through the element centroid, the face centroids and the edge midpoints. Each
+hexahedron therefore contributes one of its eight sub-volumes to each of its eight nodes,
+and
+\begin{equation}
+  V_i \;=\; \sum_{e \,\ni\, i} \frac{1}{8} \left| \det \bJ_e \right| ,
+  \label{eq:nodevol}
+\end{equation}
+where $\bJ_e$ is the element Jacobian defined below. The $V_i$ partition $\Omega$ exactly:
+$\sum_i V_i = |\Omega|$.
+
+The interface between $C_i$ and $C_j$ inside one element is a \emph{sub-control surface}
+(SCS). In a hexahedron the pairs $(i,j)$ that share such an interface are exactly the twelve
+edges, so each element carries $N_{\mathrm{scs}} = 12$ interior sub-control surfaces, grouped
+four to each of the three parametric directions. A sub-control surface lying on
+$\partial\Omega$ is instead a \emph{boundary sub-face}; each of the six element faces carries
+four of them, one per node of that face, and they close the control volumes that touch the
+domain boundary.
+
+\subsection{Isoparametric map and area vectors}
+
+Let $\bx_a$, $a = 0,\dots,7$, be the nodes of an element and $N_a(\boldsymbol{\xi})$ the
+trilinear shape functions on the reference cube $\hat\Omega = [0,1]^3$. The geometric map and
+its Jacobian are
+\begin{equation}
+  \bx(\boldsymbol{\xi}) = \sum_{a} N_a(\boldsymbol{\xi})\, \bx_a ,
+  \qquad
+  \bJ(\boldsymbol{\xi}) = \frac{\partial \bx}{\partial \boldsymbol{\xi}} ,
+  \qquad
+  \bA(\boldsymbol{\xi}) = \operatorname{adj} \bJ = \det(\bJ)\, \bJ^{-1} .
+  \label{eq:jac}
+\end{equation}
+Gradients push forward as $\nabla_{\!\bx} \phi = \bJ^{-\mathsf T} \nabla_{\!\boldsymbol\xi}
+\phi = \bA^{\mathsf T} \nabla_{\!\boldsymbol\xi} \phi / \det \bJ$.
+
+The sub-control surface associated with parametric direction $d$ is, in the reference
+element, a quarter of the unit face normal to $\xi_d$. By Nanson's formula its oriented area
+in physical space is
+\begin{equation}
+  \ba^{(d)} \;=\; \int_{\hat S} \det(\bJ)\, \bJ^{-\mathsf T} \mathbf{e}_d \dd \hat S
+  \;=\; \tfrac14 \, \bA_{d,:} \;=\; \tfrac14 \det(\bJ) \, \nabla \xi_d ,
+  \label{eq:area}
+\end{equation}
+the $d$-th row of the adjugate, scaled by the reference sub-face area $\tfrac14$. This single
+identity supplies every area vector in the scheme, interior and boundary alike; a boundary
+sub-face on the element face normal to $\xi_d$ carries $\pm\ba^{(d)}$ with the sign chosen
+outward.
+
+\subsection{Two geometric variants}
+\label{sec:geomvariants}
+
+Equation \eqref{eq:area} is evaluated in two ways, and the choice is a modelling decision
+rather than an optimisation.
+
+\paragraph{Isoparametric.} $\bJ$, $\bA$ and $\det\bJ$ are evaluated at each sub-control
+surface centroid $\boldsymbol{\xi}_s$, and the velocity gradient with them. Each of the twelve
+surfaces then carries its own area vector and its own gradient. This is exact for the
+trilinear geometry.
+
+\paragraph{Affine.} The geometry is evaluated once, at the element centre
+$\boldsymbol{\xi} = (\tfrac12,\tfrac12,\tfrac12)$, and reused for all twelve surfaces. The
+four sub-control surfaces of a given direction then share one area vector
+$\ba^{(d)}$, and the velocity gradient is a single element constant
+\begin{equation}
+  \nabla \bu \big|_e \;=\; \frac{1}{\det \bJ} \, \bA^{\mathsf T} \,
+  \big[ \, \delta_1 \bu \;\; \delta_2 \bu \;\; \delta_3 \bu \, \big] ,
+  \qquad
+  \delta_d \bu = \tfrac14 \!\! \sum_{a \in F_d^{+}} \!\! \bu_a \;-\; \tfrac14 \!\! \sum_{a \in F_d^{-}} \!\! \bu_a ,
+  \label{eq:affinegrad}
+\end{equation}
+with $F_d^{\pm}$ the four nodes of the two element faces normal to $\xi_d$. For a
+parallelepiped the two variants coincide identically; on a distorted hexahedron the affine
+variant is a one-point rule for a bilinear surface and is second-order accurate rather than
+exact. Both are carried, because the affine form collapses twelve geometric evaluations into
+one and the resulting operator is between three and five times cheaper.
+
+\section{The interior flux}
+\label{sec:interior}
+
+Let $s$ be a sub-control surface of an element, separating nodes $i$ and $j$, with area
+vector $\ba$ oriented from $i$ to $j$, and write
+\begin{equation}
+  \bar\bu = \tfrac12 (\bu_i + \bu_j), \qquad
+  \bar p  = \tfrac12 (p_i + p_j), \qquad
+  \bd = \bx_j - \bx_i .
+\end{equation}
+
+\subsection{Mass flux}
+
+The mass flux through $s$ is the linearly interpolated normal flux plus the Rhie--Chow
+correction of \S\ref{sec:rc},
+\begin{equation}
+  \mdot_s \;=\; \rho \, \bar\bu \cdot \ba \;+\; \mdot_s^{\mathrm{RC}} .
+  \label{eq:mdot}
+\end{equation}
+
+\subsection{Convection, pressure and viscous traction}
+
+The convective momentum flux is upwinded on the sign of $\mdot_s$,
+\begin{equation}
+  \mdot_s^{+} = \tfrac12\left(\mdot_s + |\mdot_s|_\varepsilon\right), \qquad
+  \mdot_s^{-} = \tfrac12\left(\mdot_s - |\mdot_s|_\varepsilon\right),
+  \label{eq:mpm}
+\end{equation}
+so that $\mdot_s^{+} \bu_i + \mdot_s^{-} \bu_j$ selects the upwind node exactly when
+$|\cdot|_\varepsilon = |\cdot|$. The pressure is interpolated centrally and the viscous
+traction is taken from the element gradient of \S\ref{sec:geomvariants}. The total momentum
+and mass fluxes through $s$ are
+\begin{align}
+  \bF_s &= \mdot_s^{+} \bu_i + \mdot_s^{-} \bu_j + \bar p \, \ba - \bttau \ba ,
+  \label{eq:flux} \\
+  \bttau \ba &= \mu \left[ \left( \nabla\bu + \nabla\bu^{\mathsf T} \right) \ba \right] .
+  \nonumber
+\end{align}
+Each surface contributes to both of its nodes with opposite signs,
+\begin{equation}
+  \bR_i \mathrel{+}= \bF_s , \quad
+  \bR_j \mathrel{-}= \bF_s , \quad
+  R^{c}_i \mathrel{+}= \mdot_s , \quad
+  R^{c}_j \mathrel{-}= \mdot_s ,
+  \label{eq:scatter}
+\end{equation}
+which is what makes the scheme discretely conservative: summing $R^c$ over all nodes leaves
+only boundary sub-faces.
+
+\subsection{The smoothed upwind switch}
+\label{sec:upwind}
+
+The hard switch takes $|\mdot|_\varepsilon = |\mdot|$, which has a corner at $\mdot = 0$.
+Where the flow stagnates --- inside a recirculation, or across a partly reversed outlet ---
+sub-control surfaces sit arbitrarily close to that corner while the two upwinded states still
+differ by $O(1)$, so the flux is not differentiable near the iterate and Newton loses its
+rate. Following Venkatakrishnan's requirement that a switch be inactive where it is not
+needed and reach that state smoothly, the absolute value is replaced by
+\begin{equation}
+  |\mdot|_\varepsilon \;=\;
+  \begin{cases}
+    |\mdot| , & |\mdot| \ge \varepsilon , \\[4pt]
+    \dfrac{\mdot^2 \left( 2\varepsilon - |\mdot| \right)}{\varepsilon^2} , & |\mdot| < \varepsilon ,
+  \end{cases}
+  \label{eq:band}
+\end{equation}
+which matches $|\mdot|$ in value and slope at $|\mdot| = \varepsilon$, vanishes with zero
+slope at the origin, and never exceeds $|\mdot|$. Surfaces carrying real flux are untouched;
+surfaces carrying none lose their upwinding and blend to central differencing. The direction
+matters: an entropy-fix style band that saturates $|\mdot|$ at a floor $\varepsilon/2$ instead
+\emph{adds} dissipation $\tfrac{\varepsilon}{4}(\bu_i - \bu_j)$ on every zero-flux surface,
+which in a unidirectional flow is most of the mesh. Taking $\varepsilon = 0$ recovers the hard
+switch exactly.
+
+\section{Pressure--velocity coupling}
+\label{sec:rc}
+
+On a colocated arrangement the mass flux $\rho\,\bar\bu\cdot\ba$ does not see the odd pressure
+mode, and \eqref{eq:cvcont} admits a checkerboard. The Rhie--Chow correction restores the
+coupling by adding to the interpolated flux a term proportional to the difference between the
+\emph{compact} pressure difference across the surface and the \emph{reconstructed} one,
+\begin{equation}
+  \mdot_s^{\mathrm{RC}} \;=\; -\,c_s \left[
+    \left( p_j - p_i \right)
+    - \tfrac12 \left( \nabla p_i + \nabla p_j \right) \cdot \bd
+  \right] ,
+  \label{eq:rc}
+\end{equation}
+with the surface coefficient
+\begin{equation}
+  c_s \;=\; \rho \, D_s \, \frac{|\ba|^2}{\ba \cdot \bd} ,
+  \qquad
+  D_s \;=\; \frac{\alpha \, |\bd|^2}{2 \mu} ,
+  \qquad\text{hence}\qquad
+  c_s \;=\; \frac{\alpha \, \rho \, |\bd|^2 \, |\ba|^2}{2 \mu \, (\ba \cdot \bd)} .
+  \label{eq:rccoeff}
+\end{equation}
+Here $\alpha$ is a dimensionless scale, $\alpha = 1$ by default and $\alpha = 0$ recovering the
+uncorrected flux. The coefficient is set to zero on a degenerate surface, $|\ba\cdot\bd|$
+below a relative floor, so that a collapsed element contributes nothing rather than a
+division by a vanishing quantity.
+
+Two properties of \eqref{eq:rc} are worth stating because they determine where it may be
+used. First, the bracket annihilates any pressure field whose reconstructed gradient is
+exact, in particular any globally linear $p$: the correction is a genuine stabilisation and
+not a consistency error. Second, $c_s$ depends only on the geometry and on $\rho, \mu,
+\alpha$, so it is constant over a Newton solve and may be precomputed once per surface.
+
+\subsection{The reconstructed nodal gradient}
+\label{sec:nodalgrad}
+
+The gradients in \eqref{eq:rc} are the volume-weighted average of the element gradients
+meeting at the node,
+\begin{equation}
+  \nabla p_i \;=\;
+  \frac{\displaystyle\sum_{e \,\ni\, i} |\det \bJ_e| \; \nabla p \big|_e}
+       {\displaystyle\sum_{e \,\ni\, i} |\det \bJ_e|} ,
+  \label{eq:nodalgrad}
+\end{equation}
+where $\nabla p|_e$ is the element-constant gradient \eqref{eq:affinegrad} applied to $p$, or
+its isoparametric counterpart at the element centre. This is a linear operator
+$\mathcal{G} : \mathbb{R}^{N} \to \mathbb{R}^{3N}$ acting on the nodal pressures, and its
+stencil reaches every node of every element containing $i$ --- a wider set than the
+nearest-neighbour graph of the mesh. That single fact separates two of the operators in
+\S\ref{sec:operators}.
+
+\section{Boundary closure}
+\label{sec:boundary}
+
+A control volume touching $\partial\Omega$ is not closed by interior sub-control surfaces
+alone; its boundary sub-faces must carry the remaining flux, or \eqref{eq:cvcont} is not a
+balance at all. For a boundary sub-face of node $i$ with outward area vector $\ba$ the flux is
+$\mdot = \rho\, \bu_i \cdot \ba$ and three closures are used.
+
+\paragraph{Closed / prescribed velocity.} The full flux with the local state,
+\begin{equation}
+  \bR_i \mathrel{+}= \mdot\, \bu_i + p_i \ba - \bttau \ba ,
+  \qquad
+  R^c_i \mathrel{+}= \mdot .
+  \label{eq:bstd}
+\end{equation}
+On a no-slip wall $\bu_i = 0$ makes the convective and mass terms vanish identically and
+leaves the pressure and viscous traction, which is the correct wall contribution.
+
+\paragraph{Prescribed pressure.} As \eqref{eq:bstd} with $\bar p$ in place of $p_i$. The
+viscous traction is still evaluated from the interior state, so this prescribes the pressure
+and not the whole normal traction.
+
+\paragraph{Natural (do-nothing) outflow.} The condition $(p\,\bI - \bttau)\bn = \bt$ is
+imposed by \emph{omitting} the pressure and viscous terms rather than evaluating them,
+\begin{equation}
+  \bR_i \mathrel{+}= \max(\mdot, 0)\, \bu_i + \bt \, |\ba| ,
+  \qquad
+  R^c_i \mathrel{+}= \mdot .
+  \label{eq:bnat}
+\end{equation}
+Two details are load-bearing. Retaining $p_i \ba$ here would leave the constant-pressure mode
+in the null space --- a uniform pressure shift integrates to zero over every closed control
+volume --- so the gauge would remain undetermined and require a pin. And the convective term
+is clipped to $\max(\mdot,0)$ because this closure has no upwind switch: on a sub-face with
+$\mdot < 0$ the unguarded form convects the exterior state inward, which is the classical
+backflow instability of a recirculating outlet. The continuity row keeps the true, unclipped
+$\mdot$, since clipping it would destroy global mass conservation.
+
+\section{Time integration and body force}
+
+The transient term is the only place where the control-volume structure makes the mass matrix
+trivial. In \eqref{eq:cvmom} the volume integral of $\rho\bu$ over $C_i$ is $\rho V_i \bu_i$
+up to the same order as the rest of the scheme, so the mass matrix \emph{is} the control
+volume: diagonal, already available from \eqref{eq:nodevol}, and requiring no assembly. A
+consistent finite-element mass matrix would be a different discretisation, not a better one.
+
+With backward differentiation of order $k$ and step $\Delta t$,
+\begin{equation}
+  \bR_i \mathrel{+}= \frac{\rho V_i}{\Delta t}
+  \left( a_0 \bu_i^{n+1} + a_1 \bu_i^{n} + a_2 \bu_i^{n-1} \right),
+  \qquad
+  \begin{array}{lccc}
+    \text{BDF1:} & a_0 = 1, & a_1 = -1, & a_2 = 0, \\
+    \text{BDF2:} & a_0 = \tfrac32, & a_1 = -2, & a_2 = \tfrac12,
+  \end{array}
+  \label{eq:bdf}
+\end{equation}
+with $\sum_k a_k = 0$, so a constant history contributes exactly nothing. The term touches the
+three velocity components and never the continuity row: the incompressibility constraint has
+no time derivative, and giving it one would be a different system. Its contribution to the
+Jacobian is therefore the diagonal
+\begin{equation}
+  \frac{\partial}{\partial \bu_i}
+  \left[ \frac{\rho V_i a_0}{\Delta t} \bu_i \right]
+  = \frac{\rho V_i a_0}{\Delta t} \, \bI_{3\times3} ,
+  \label{eq:bdfjac}
+\end{equation}
+independent of the history. A body force enters the same way, as $\bR_i \mathrel{-}=
+\rho\,\bff(\bx_i)\, V_i$, and for the same reason: neither term involves a sub-control-surface
+flux, so both are node-local post-passes over the mesh.
+
+\section{The discrete operators}
+\label{sec:operators}
+
+Collect the unknowns as $w = (\bu_1,p_1,\dots,\bu_N,p_N) \in \mathbb{R}^{4N}$. Everything
+above defines one nonlinear map; what a solver actually evaluates is the family below. They
+are listed with what each carries, because they do not all carry the same terms and the
+differences are deliberate.
+
+\subsection{$\mathcal{F}$ --- the residual}
+
+\begin{equation}
+  \mathcal{F}(w)_i \;=\;
+  \underbrace{\sum_{s \,\in\, \partial C_i} \pm \bF_s}_{\text{interior sub-control surfaces}}
+  \;+\; \underbrace{\sum_{b} \bF_b}_{\text{boundary closure}}
+  \;+\; \underbrace{\frac{\rho V_i}{\Delta t}\sum_k a_k \bu_i^{n+1-k}}_{\text{transient}}
+  \;-\; \underbrace{\rho \bff_i V_i}_{\text{body force}} ,
+  \label{eq:residual}
+\end{equation}
+with the continuity component assembled from $\pm\mdot_s$ and $\mdot_b$ in the same sweep.
+Evaluating it requires the nodal gradient \eqref{eq:nodalgrad} of the current pressure, which
+is a function of the Newton iterate and may therefore be computed once per Newton step rather
+than once per residual.
+
+\subsection{$\mathcal{J}(w)\,v$ --- the exact Jacobian action}
+\label{sec:jacaction}
+
+The Fr\'echet derivative applied to a direction $v = (\bv, q)$. Every term of
+\eqref{eq:residual} is differentiated, including the reconstruction \eqref{eq:nodalgrad}:
+since $\mathcal{G}$ is linear, its derivative in the direction $q$ is $\mathcal{G} q$, and the
+Rhie--Chow perturbation is
+\begin{equation}
+  \delta \mdot_s^{\mathrm{RC}} \;=\; -\,c_s \left[
+    \left( q_j - q_i \right)
+    - \tfrac12 \left( \nabla q_i + \nabla q_j \right) \cdot \bd
+  \right] ,
+  \qquad \nabla q = \mathcal{G} q .
+  \label{eq:rcjac}
+\end{equation}
+The upwind switch is differentiated through \eqref{eq:band}, whose derivative is
+\begin{equation}
+  \frac{\dd |\mdot|_\varepsilon}{\dd \mdot} =
+  \begin{cases}
+    \operatorname{sgn}(\mdot) , & |\mdot| \ge \varepsilon , \\[4pt]
+    \operatorname{sgn}(\mdot)\,\dfrac{4\varepsilon |\mdot| - 3 \mdot^2}{\varepsilon^2} , & |\mdot| < \varepsilon .
+  \end{cases}
+\end{equation}
+This operator is the one a Krylov method applies, and \eqref{eq:rcjac} is what makes it
+expensive: $\mathcal{G}q$ is a full sweep over the elements, the direction changes at every
+iteration, and so --- unlike $\mathcal{G}p$ --- it cannot be hoisted out of the solve.
+
+\subsection{$J(w)$ --- the assembled Jacobian, with frozen reconstruction}
+\label{sec:jacassembled}
+
+The same derivative with the second term of \eqref{eq:rcjac} dropped,
+\begin{equation}
+  \delta \mdot_s^{\mathrm{RC}} \;=\; -\,c_s \left( q_j - q_i \right) ,
+  \label{eq:rcfrozen}
+\end{equation}
+that is, the reconstruction is held frozen at the current iterate. This is not an oversight
+and not an approximation made for speed: by \S\ref{sec:nodalgrad} the operator $\mathcal{G}$
+couples node $i$ to every node of every element containing $i$, so retaining it would widen
+the sparsity pattern beyond the mesh's nearest-neighbour graph. The assembled matrix exists to
+build preconditioners, and a preconditioner on a wider graph than the operator it
+preconditions is a poor trade. With \eqref{eq:rcfrozen} the pattern is exactly the
+node-to-node graph and the matrix has the $4\times4$ block structure
+\begin{equation}
+  J \;=\;
+  \begin{pmatrix}
+    F & B^{\mathsf T} \\
+    B & C
+  \end{pmatrix} ,
+  \label{eq:blockform}
+\end{equation}
+with $F$ the momentum block (convection, viscosity and, when unsteady, the mass term), $B$ the
+discrete divergence and $B^{\mathsf T}$ the discrete gradient. The pressure block carries a
+plus sign here because the continuity residual is written as $+\oint \rho\,\bu\cdot\bn$; the
+$-C$ familiar from the stabilised-Stokes literature is the same operator with that row
+negated.
+
+$C$ is the Rhie--Chow operator, and differentiating \eqref{eq:rcfrozen} through the scatter
+\eqref{eq:scatter} identifies it exactly: $C_{ij} = -c_s$ for each sub-control surface joining
+$i$ and $j$, and $C_{ii} = \sum_{s \ni i} c_s$. It is the graph Laplacian of the mesh with
+weights $c_s > 0$ --- symmetric, positive semidefinite, with the constant vector in its
+kernel, which is the discrete statement that the pressure is determined only up to a gauge.
+
+Without Rhie--Chow the fourth row and column of $J$ do not merely lose their diagonal: they
+are structurally empty at every node whose control volume is closed. Summing the oriented
+areas over a closed surface gives $\sum_{s \in \partial C_i} \sigma_s \ba_s = 0$, and both
+$B_{ii}$ and $B^{\mathsf T}_{ii}$ are $\tfrac{\rho}{2}$ and $\tfrac12$ times exactly that sum.
+So $C = 0$ leaves a genuine saddle point whose $4\times4$ diagonal blocks are singular with a
+one-dimensional kernel --- which is why no point- or block-wise relaxation can be built on
+them, and why the boundary closure of \S\ref{sec:boundary} is a prerequisite for the
+preconditioner and not only for conservation.
+
+\subsection{$D$ --- the block diagonal}
+
+The $N$ diagonal $4\times4$ blocks of \eqref{eq:blockform},
+\begin{equation}
+  D_i \;=\; \frac{\partial \mathcal{F}_i}{\partial w_i} \;=\;
+  \begin{pmatrix}
+    F_{ii} & B^{\mathsf T}_{ii} \\
+    B_{ii} & C_{ii}
+  \end{pmatrix}
+  \in \mathbb{R}^{4\times4} ,
+\end{equation}
+carrying the same terms as $J$, including the boundary closure and the transient diagonal
+\eqref{eq:bdfjac}. It is the object a block-Jacobi smoother inverts, and by the closure
+identity of \S\ref{sec:jacassembled} its usefulness rests entirely on $C_{ii} \neq 0$: on a
+closed control volume the other three entries of its fourth row and column vanish, so without
+the Rhie--Chow term $D_i$ is singular for every $i$ and a smoother built on it is undefined
+rather than merely slow.
+
+\subsection{$J v$ --- the sparse matrix--vector product}
+
+Given $J$ assembled, the action can also be evaluated as a block sparse matrix--vector
+product. Mathematically this is \S\ref{sec:jacassembled} applied to $v$ --- it therefore
+carries the frozen reconstruction \eqref{eq:rcfrozen} and differs from \S\ref{sec:jacaction}
+by exactly the term $\tfrac12 c_s (\nabla q_i + \nabla q_j)\cdot\bd$. Its cost is set by the
+sparsity pattern alone and is independent of which physical terms the entries carry.
+
+\subsection{$S$ --- the pressure Schur complement diagonal}
+
+For a SIMPLE-type preconditioner the exact Schur complement $C - B F^{-1} B^{\mathsf T}$ is
+replaced by its diagonal, with $F$ approximated by its own velocity diagonal,
+\begin{equation}
+  S_i \;=\; \operatorname{diag}\!\left(
+    C - B \, \operatorname{diag}(F)^{-1} B^{\mathsf T}
+  \right)_i ,
+  \label{eq:schur}
+\end{equation}
+read directly from the assembled blocks: $C_{ii}$ is the pressure--pressure entry of block
+$(i,i)$, and the correction sums over the row of $J$. Unlike the classical $\mu\,M_p^{-1}$
+approximation this makes no assumption about which term dominates --- it reads both the
+Rhie--Chow operator and the velocity coupling out of the matrix that was assembled.
+
+\subsection{Splitting the momentum block}
+
+The viscous contribution to \eqref{eq:flux} is $-\bttau\ba$ with $\bttau$ linear in $\bu$ and
+$\ba$ purely geometric, so that part of $F$ depends on the mesh and $\mu$ alone and is
+constant across a Newton solve. Writing $F = F_{\mathrm{visc}} + F_{\mathrm{conv}}(\bu)$
+allows the constant half to be formed once and the varying half added at each iteration; the
+sum reproduces $F$ exactly, since the two are the two halves of one expression rather than two
+approximations. The Rhie--Chow blocks belong entirely to the varying half.
+
+\section{What the terms cost}
+\label{sec:cost}
+
+The operators above differ in cost by more than an order of magnitude, and the differences do
+not follow the number of terms. The table gives measured throughput in millions of degrees of
+freedom per second on one 72-core Grace socket at $4.12 \times 10^6$ degrees of freedom, with
+the bare element sweep --- no Rhie--Chow, no boundary closure, no transient --- as the
+reference.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Operator & MDOF/s & vs.\ bare sweep \\
+\midrule
+Residual $\mathcal{F}$, interior flux only            & 2945 & 1.00 \\
+\quad $+$ Rhie--Chow, reconstruction reused           & 1759 & 1.67 \\
+\quad $+$ boundary closure                            & 1559 & 1.89 \\
+\quad $+$ transient                                   & 1436 & 2.05 \\
+\quad $+$ reconstruction rebuilt every evaluation     &  667 & 4.41 \\
+\midrule
+Jacobian action $\mathcal{J}v$, interior flux only    & 2067 & 1.00 \\
+\quad $+$ exact Rhie--Chow \eqref{eq:rcjac}           &  605 & 3.42 \\
+\quad $+$ boundary closure and transient              &  561 & 3.68 \\
+\midrule
+Matrix--vector product $Jv$                           &  462 & 4.47 \\
+Assembly of $J$                                       & 39--87 & 34--75 \\
+Block diagonal $D$                                    &   90 & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Three readings of this table bear on the design rather than on the implementation.
+
+The exact Rhie--Chow term costs the Jacobian action a factor of $3.4$ on its own, against
+$1.67$ for the same term in the residual. The asymmetry is \eqref{eq:rcjac}: the residual
+reconstructs the gradient of a field that is fixed over the Newton step, the action
+reconstructs the gradient of a direction that changes at every Krylov iteration, and only the
+former can be amortised. Where the reconstruction cannot be reused --- the last residual row
+--- the residual pays the same factor.
+
+The matrix--vector product is slower than the matrix-free action carrying the same physics,
+by $1.25$, before counting the assembly that produced the matrix. The reason is traffic
+rather than arithmetic: the assembled blocks are roughly $840$ bytes per degree of freedom
+and must be streamed in full at every application, whereas the matrix-free operator reads the
+state and the mesh and recomputes the rest. This is also why the product's cost is flat in the
+physics while the matrix-free operator's is not. The assembled matrix earns its place as the
+source of $D$ and $S$, not as a way to apply $J$.
+
+Adding physics narrows the gap between matrix-free and assembled from $4.5$ to $1.25$ without
+closing it. Any future term heavy enough to close it would also, by the same argument, be
+heavy enough to make assembly worth revisiting --- which is the quantitative form of the
+usual matrix-free trade-off, and the reason the terms are enumerated separately here rather
+than folded into a single residual.
+
+\end{document}
