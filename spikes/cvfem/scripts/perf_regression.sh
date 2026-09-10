@@ -349,13 +349,18 @@ PY
 # ------------------------------------------------------------------- confirmation pass
 #
 # A configuration that fails is re-measured before it is believed. This is not leniency:
-# residual_packed_sympy has now produced two wild low readings on this machine in a
-# handful of runs -- 1690 against a usual 2050 while recording a baseline, and 1260 in an
-# A/B whose immediate rerun came back at +0.1% -- so a single failing sample is not
-# evidence of a regression, and reporting it as one teaches people to ignore the gate.
+# residual_packed_sympy has now produced THREE wild low readings on this machine in a
+# handful of runs -- 1690 against a usual 2050 while recording a baseline, 1260 in an A/B
+# whose immediate rerun came back at +0.1%, and 1403 in an A/B where the same two binaries
+# measured -0.1% in a fresh allocation, each ran at 2057 standalone, and an A-vs-A control
+# in between read +0.1%. A single failing sample is not evidence of a regression, and
+# reporting it as one teaches people to ignore the gate.
 #
-# The cost is zero unless something fails, and the discipline is the one that caught the
-# run-order artifact earlier: measure it again before you believe it.
+# WHAT THIS PASS CANNOT DO, and the third case above is why. It re-measures inside the SAME
+# allocation on the SAME node, so it separates a one-off sample from a repeatable one and
+# nothing else. A node that is slow for the whole job, or an allocation-level effect,
+# reproduces perfectly here and gets reported as confirmed. The verdict below says so
+# rather than claiming more than the measurement supports.
 set +e
 python3 "$OUT/analyse.py"
 rc=$?
@@ -381,7 +386,18 @@ if [ "$rc" -ne 0 ] && [ "$MODE" = against ] && [ -s "$FAILED" ]; then
         rc=0
     else
         echo
-        echo "CONFIRMED: the regression reproduced on a second measurement."
+        echo "REPRODUCED IN THIS ALLOCATION: the regression showed up again when those"
+        echo "configurations were measured a second time on this node."
+        echo
+        echo "That rules out a one-off sample. It does NOT rule out a slow node or an"
+        echo "allocation-level effect, which reproduce here just as faithfully as a code"
+        echo "regression does -- and one already has, at -31% on a configuration the two"
+        echo "binaries were later shown to run identically. Before believing this:"
+        echo
+        echo "  1. re-run the same two binaries in a FRESH allocation;"
+        echo "  2. measure each binary on its own, several invocations, not interleaved."
+        echo
+        echo "If both come back clean, the finding is the node and not the change."
     fi
 fi
 exit $rc
