@@ -57,21 +57,24 @@ static SFEM_INLINE void laplace_d2_tensor_product_objective_block(
     const int qx = q % NQ1;
     const int qy = q / NQ1;
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q) * VS];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1) * VS];
+    const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
+    const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
+    const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
+    const s_t *const RSTR adj_q3 = adj3 + q * geometry_stride;
+    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
-      const s_t adj_lane0 = adj0[goff];
-      const s_t adj_lane1 = adj1[goff];
-      const s_t adj_lane2 = adj2[goff];
-      const s_t adj_lane3 = adj3[goff];
-      const s_t det_lane0 = det0[goff];
-      s_t gu_ref[2];
-      gu_ref[0] = gu_ref_q[(2 * q) * VS + lane];
-      gu_ref[1] = gu_ref_q[(2 * q + 1) * VS + lane];
+      const s_t adj_lane0 = adj_q0[lane];
+      const s_t adj_lane1 = adj_q1[lane];
+      const s_t adj_lane2 = adj_q2[lane];
+      const s_t adj_lane3 = adj_q3[lane];
+      const s_t det_lane0 = det_q0[lane];
       s_t gu[2];
       const s_t idet = s_t(1) / det_lane0;
-      gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
-      gu[1] = (gu_ref[0] * adj_lane1 + gu_ref[1] * adj_lane3) * idet;
+      gu[0] = (gu_ref0[lane] * adj_lane0 + gu_ref1[lane] * adj_lane2) * idet;
+      gu[1] = (gu_ref0[lane] * adj_lane1 + gu_ref1[lane] * adj_lane3) * idet;
     value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu[0]) + pow_2(gu[1])));
     }
   }
@@ -106,21 +109,24 @@ static SFEM_INLINE void laplace_d2_tensor_product_gradient_block(
     const int qx = q % NQ1;
     const int qy = q / NQ1;
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q) * VS];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1) * VS];
+    const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
+    const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
+    const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
+    const s_t *const RSTR adj_q3 = adj3 + q * geometry_stride;
+    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
-      const s_t adj_lane0 = adj0[goff];
-      const s_t adj_lane1 = adj1[goff];
-      const s_t adj_lane2 = adj2[goff];
-      const s_t adj_lane3 = adj3[goff];
-      const s_t det_lane0 = det0[goff];
-      s_t gu_ref[2];
-      gu_ref[0] = gu_ref_q[(2 * q) * VS + lane];
-      gu_ref[1] = gu_ref_q[(2 * q + 1) * VS + lane];
+      const s_t adj_lane0 = adj_q0[lane];
+      const s_t adj_lane1 = adj_q1[lane];
+      const s_t adj_lane2 = adj_q2[lane];
+      const s_t adj_lane3 = adj_q3[lane];
+      const s_t det_lane0 = det_q0[lane];
       s_t gu[2];
       const s_t idet = s_t(1) / det_lane0;
-      gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
-      gu[1] = (gu_ref[0] * adj_lane1 + gu_ref[1] * adj_lane3) * idet;
+      gu[0] = (gu_ref0[lane] * adj_lane0 + gu_ref1[lane] * adj_lane2) * idet;
+      gu[1] = (gu_ref0[lane] * adj_lane1 + gu_ref1[lane] * adj_lane3) * idet;
       s_t loperand[2];
     s_t material[2];
     material[0] = gu[0]*kappa;
@@ -163,21 +169,24 @@ static SFEM_INLINE void laplace_d2_tensor_product_apply_block(
     const int qx = q % NQ1;
     const int qy = q / NQ1;
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
+    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(2 * q) * VS];
+    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(2 * q + 1) * VS];
+    const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
+    const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
+    const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
+    const s_t *const RSTR adj_q3 = adj3 + q * geometry_stride;
+    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
-      const s_t adj_lane0 = adj0[goff];
-      const s_t adj_lane1 = adj1[goff];
-      const s_t adj_lane2 = adj2[goff];
-      const s_t adj_lane3 = adj3[goff];
-      const s_t det_lane0 = det0[goff];
-      s_t grad_h_ref[2];
-      grad_h_ref[0] = grad_h_ref_q[(2 * q) * VS + lane];
-      grad_h_ref[1] = grad_h_ref_q[(2 * q + 1) * VS + lane];
+      const s_t adj_lane0 = adj_q0[lane];
+      const s_t adj_lane1 = adj_q1[lane];
+      const s_t adj_lane2 = adj_q2[lane];
+      const s_t adj_lane3 = adj_q3[lane];
+      const s_t det_lane0 = det_q0[lane];
       s_t trial_grad[2];
       const s_t idet = s_t(1) / det_lane0;
-      trial_grad[0] = (grad_h_ref[0] * adj_lane0 + grad_h_ref[1] * adj_lane2) * idet;
-      trial_grad[1] = (grad_h_ref[0] * adj_lane1 + grad_h_ref[1] * adj_lane3) * idet;
+      trial_grad[0] = (grad_h_ref0[lane] * adj_lane0 + grad_h_ref1[lane] * adj_lane2) * idet;
+      trial_grad[1] = (grad_h_ref0[lane] * adj_lane1 + grad_h_ref1[lane] * adj_lane3) * idet;
       s_t loperand[2];
     s_t material[2];
     material[0] = kappa*trial_grad[0];

@@ -200,6 +200,35 @@ def _work_item_index(source_builder):
     return "lane"
 
 
+def _reference_gradient_offset_lines(name, n_field_components, dim, indent):
+    """Name each quadrature point's slice of a reference gradient, above the loop.
+
+    The slice belongs to the quadrature point, not to the lane, so computing
+    `(3 * (NQ + q) + 1) * VS + lane` once per lane rebuilds a base address the
+    whole loop shares.  Naming the base outside leaves `gu_ref1[lane]` inside,
+    which is the same load without the index arithmetic and without the
+    `s_t gu_ref[9]` the kernel used to fill in order to avoid writing the index
+    out nine times.
+    """
+    return tuple(
+        "%sconst s_t *const RSTR %s%d = &%s_q[%s * VS];"
+        % (
+            indent,
+            name,
+            row * dim + col,
+            name,
+            c_group(
+                c_sum(
+                    c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
+                    col,
+                )
+            ),
+        )
+        for row in range(n_field_components)
+        for col in range(dim)
+    )
+
+
 def _work_item_loop_lines(source_builder, indent):
     if hasattr(source_builder, "work_item_loop_lines"):
         target = getattr(source_builder, "target", None)
@@ -1657,58 +1686,38 @@ def _append_sfem_soa_tensor_weak_form_lines(
         "    const s_t qw = %s;"
         % _tensor_product_quadrature_weight_expr(dim)
     )
-    lines.extend(_work_item_loop_lines(source_builder, "    "))
-    lines.extend(
-        [
-            "      const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
-        ]
-    )
+    if uses_current:
+        lines.extend(
+            _reference_gradient_offset_lines("gu_ref", n_field_components, dim, "    ")
+        )
+    if uses_direction:
+        lines.extend(
+            _reference_gradient_offset_lines(
+                "grad_h_ref", n_field_components, dim, "    "
+            )
+        )
+    # The geometry stream is indexed by quadrature point and lane, and only the
+    # lane part varies inside the loop, so the point's base is named once here.
     for component in range(dim * dim):
         lines.append(
-            "      const s_t %s = adj%d[goff];"
-            % (_work_item_name(source_builder, "adj", component), component)
+            "    const s_t *const RSTR adj_q%d = adj%d + q * geometry_stride;"
+            % (component, component)
+        )
+    lines.append("    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;")
+    lines.extend(_work_item_loop_lines(source_builder, "    "))
+    for component in range(dim * dim):
+        lines.append(
+            "      const s_t %s = adj_q%d[%s];"
+            % (
+                _work_item_name(source_builder, "adj", component),
+                component,
+                work_item,
+            )
         )
     lines.append(
-        "      const s_t %s = det0[goff];"
-        % _work_item_name(source_builder, "det", 0)
+        "      const s_t %s = det_q0[%s];"
+        % (_work_item_name(source_builder, "det", 0), work_item)
     )
-    if uses_current:
-        lines.append("      s_t gu_ref[%d];" % (n_field_components * dim))
-        for row in range(n_field_components):
-            for col in range(dim):
-                component = row * dim + col
-                lines.append(
-                    "      gu_ref[%d] = gu_ref_q[%s * VS + %s];"
-                    % (
-                        component,
-                        c_group(
-                            c_sum(
-                                c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
-                                col,
-                            )
-                        ),
-                        work_item,
-                    )
-                )
-    if uses_direction:
-        lines.append("      s_t grad_h_ref[%d];" % (n_field_components * dim))
-        for row in range(n_field_components):
-            for col in range(dim):
-                component = row * dim + col
-                lines.append(
-                    "      grad_h_ref[%d] = grad_h_ref_q[%s * VS + %s];"
-                    % (
-                        component,
-                        c_group(
-                            c_sum(
-                                c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
-                                col,
-                            )
-                        ),
-                        work_item,
-                    )
-                )
-
     def geometry_value(name, component):
         return _work_item_name(source_builder, name, component)
 
@@ -1729,9 +1738,10 @@ def _append_sfem_soa_tensor_weak_form_lines(
         for col in range(dim):
             if uses_current:
                 terms = [
-                    "gu_ref[%d] * %s"
+                    "gu_ref%d[%s] * %s"
                     % (
                         row * dim + k,
+                        work_item,
                         geometry_value("adj", k * dim + col),
                     )
                     for k in range(dim)
@@ -1742,9 +1752,10 @@ def _append_sfem_soa_tensor_weak_form_lines(
                 )
             if uses_direction:
                 terms = [
-                    "grad_h_ref[%d] * %s"
+                    "grad_h_ref%d[%s] * %s"
                     % (
                         row * dim + k,
+                        work_item,
                         geometry_value("adj", k * dim + col),
                     )
                     for k in range(dim)
