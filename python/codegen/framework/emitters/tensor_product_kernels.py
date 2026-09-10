@@ -217,6 +217,8 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
     for (int qy = 0; qy < NQ1; ++qy) {
       for (int qx = 0; qx < NQ1; ++qx) {
         const int q = qx + NQ1 * qy;
+        s_t *const RSTR gradient_q0 = &gradient[(q * 2 + 0) * VS];
+        s_t *const RSTR gradient_q1 = &gradient[(q * 2 + 1) * VS];
 %(work_item_loop_16)s
           s_t gx = s_t(0);
           s_t gy = s_t(0);
@@ -225,8 +227,8 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 2> {
             gx += grad_x[i] * shape_1d[qy * NS1 + sy];
             gy += value_x[i] * grad_1d[qy * NS1 + sy];
           }
-          gradient[(q * 2 + 0) * VS + %(work_item)s] = gx;
-          gradient[(q * 2 + 1) * VS + %(work_item)s] = gy;
+          gradient_q0[%(work_item)s] = gx;
+          gradient_q1[%(work_item)s] = gy;
         }
       }
     }
@@ -360,6 +362,9 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
       for (int qy = 0; qy < NQ1; ++qy) {
         for (int qx = 0; qx < NQ1; ++qx) {
           const int q = qx + NQ1 * (qy + NQ1 * qz);
+          s_t *const RSTR gradient_q0 = &gradient[(q * 3 + 0) * VS];
+          s_t *const RSTR gradient_q1 = &gradient[(q * 3 + 1) * VS];
+          s_t *const RSTR gradient_q2 = &gradient[(q * 3 + 2) * VS];
 %(work_item_loop_20)s
             s_t gx = s_t(0);
             s_t gy = s_t(0);
@@ -370,9 +375,9 @@ struct TensorProductWeakOps<s_t, NQ, NS, VS, 3> {
               gy += grad_y_xy[j] * shape_1d[qz * NS1 + sz];
               gz += value_xy[j] * grad_1d[qz * NS1 + sz];
             }
-            gradient[(q * 3 + 0) * VS + %(work_item)s] = gx;
-            gradient[(q * 3 + 1) * VS + %(work_item)s] = gy;
-            gradient[(q * 3 + 2) * VS + %(work_item)s] = gz;
+            gradient_q0[%(work_item)s] = gx;
+            gradient_q1[%(work_item)s] = gy;
+            gradient_q2[%(work_item)s] = gz;
           }
         }
       }
@@ -548,6 +553,9 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
     }
     for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
       const int q = qx + NQ1 * qy;
+      s_t *const RSTR value_q = &value[(f * NQ + q) * VS];
+      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 2 + 0) * VS];
+      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 2 + 1) * VS];
 %(work_item_loop_12)s
         s_t v = s_t(0);
         s_t g0 = s_t(0);
@@ -558,9 +566,9 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
           g0 += gx[i] * shape_1d[qy * NS1 + sy];
           g1 += vx[i] * grad_1d[qy * NS1 + sy];
         }
-        value[(f * NQ + q) * VS + %(work_item)s] = v;
-        gradient[((f * NQ + q) * 2 + 0) * VS + %(work_item)s] = g0;
-        gradient[((f * NQ + q) * 2 + 1) * VS + %(work_item)s] = g1;
+        value_q[%(work_item)s] = v;
+        gradient_q0[%(work_item)s] = g0;
+        gradient_q1[%(work_item)s] = g1;
       }
     }
   }
@@ -575,23 +583,25 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
     static constexpr int NS1 = integer_root(NS, 2);
     s_t vx[NC * NQ1 * NS1 * VS];
     for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+    s_t *const RSTR vx_q = &vx[((f * NQ1 + qx) * NS1 + sy) * VS];
 %(work_item_loop_12)s
         s_t v = s_t(0);
         for (int sx = 0; sx < NS1; ++sx) {
           const int s = sx + NS1 * sy;
           v += streams[s * NC + f][%(work_item)s] * shape_1d[qx * NS1 + sx];
         }
-        vx[((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s] = v;
+        vx_q[%(work_item)s] = v;
       }
     }
     for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
       const int q = qx + NQ1 * qy;
+      s_t *const RSTR value_q = &value[(f * NQ + q) * VS];
 %(work_item_loop_12)s
         s_t v = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
           v += vx[((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
         }
-        value[(f * NQ + q) * VS + %(work_item)s] = v;
+        value_q[%(work_item)s] = v;
       }
     }
   }
@@ -646,13 +656,14 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
     static constexpr int NS1 = integer_root(NS, 2);
     s_t sv[NC * NQ1 * NS1 * VS];
     for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+    s_t *const RSTR sv_q = &sv[((f * NQ1 + qx) * NS1 + sy) * VS];
 %(work_item_loop_12)s
         s_t a = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
           const int q = qx + NQ1 * qy;
           a += value_coeff[(f * NQ + q) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
         }
-        sv[((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s] = a;
+        sv_q[%(work_item)s] = a;
       }
     }
     for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
@@ -719,6 +730,10 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
     }
     for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
       const int q = qx + NQ1 * (qy + NQ1 * qz);
+      s_t *const RSTR value_q = &value[(f * NQ + q) * VS];
+      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 3 + 0) * VS];
+      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 3 + 1) * VS];
+      s_t *const RSTR gradient_q2 = &gradient[((f * NQ + q) * 3 + 2) * VS];
 %(work_item_loop_12)s
         s_t v = s_t(0);
         s_t g0 = s_t(0);
@@ -731,10 +746,10 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
           g1 += g1xy[j] * shape_1d[qz * NS1 + sz];
           g2 += vxy[j] * grad_1d[qz * NS1 + sz];
         }
-        value[(f * NQ + q) * VS + %(work_item)s] = v;
-        gradient[((f * NQ + q) * 3 + 0) * VS + %(work_item)s] = g0;
-        gradient[((f * NQ + q) * 3 + 1) * VS + %(work_item)s] = g1;
-        gradient[((f * NQ + q) * 3 + 2) * VS + %(work_item)s] = g2;
+        value_q[%(work_item)s] = v;
+        gradient_q0[%(work_item)s] = g0;
+        gradient_q1[%(work_item)s] = g1;
+        gradient_q2[%(work_item)s] = g2;
       }
     }
   }
@@ -750,32 +765,35 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
     s_t vx[NC * NQ1 * NS1 * NS1 * VS];
     s_t vxy[NC * NQ1 * NQ1 * NS1 * VS];
     for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR vx_q = &vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS];
 %(work_item_loop_12)s
         s_t v = s_t(0);
         for (int sx = 0; sx < NS1; ++sx) {
           const int s = sx + NS1 * (sy + NS1 * sz);
           v += streams[s * NC + f][%(work_item)s] * shape_1d[qx * NS1 + sx];
         }
-        vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s] = v;
+        vx_q[%(work_item)s] = v;
       }
     }
     for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR vxy_q = &vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS];
 %(work_item_loop_12)s
         s_t v = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
           v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
         }
-        vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s] = v;
+        vxy_q[%(work_item)s] = v;
       }
     }
     for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
       const int q = qx + NQ1 * (qy + NQ1 * qz);
+      s_t *const RSTR value_q = &value[(f * NQ + q) * VS];
 %(work_item_loop_12)s
         s_t v = s_t(0);
         for (int sz = 0; sz < NS1; ++sz) {
           v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s] * shape_1d[qz * NS1 + sz];
         }
-        value[(f * NQ + q) * VS + %(work_item)s] = v;
+        value_q[%(work_item)s] = v;
       }
     }
   }
@@ -851,22 +869,24 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
     s_t z0[NC * NQ1 * NQ1 * NS1 * VS];
     s_t yz0[NC * NQ1 * NS1 * NS1 * VS];
     for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR z0_q = &z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS];
 %(work_item_loop_12)s
         s_t a = s_t(0);
         for (int qz = 0; qz < NQ1; ++qz) {
           const int q = qx + NQ1 * (qy + NQ1 * qz);
           a += value_coeff[(f * NQ + q) * VS + %(work_item)s] * shape_1d[qz * NS1 + sz];
         }
-        z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s] = a;
+        z0_q[%(work_item)s] = a;
       }
     }
     for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR yz0_q = &yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS];
 %(work_item_loop_12)s
         s_t a = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
           a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
         }
-        yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s] = a;
+        yz0_q[%(work_item)s] = a;
       }
     }
     for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
