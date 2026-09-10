@@ -198,6 +198,10 @@ struct CsvRow {
     // reader to attribute the whole matvec to the element kernel. -1 where it does not apply.
     double      qgrad_seconds;
     double      qgrad_frac;
+    // Bytes per degree of freedom of stored element tangent, 0 when there is none. A faster
+    // matvec that caps the problem size per node is the trade full assembly already loses,
+    // so the price belongs beside the rate.
+    double      pa_bytes_per_dof;
     const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
 };
 
@@ -216,7 +220,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
             "n_colors,packs_per_color_min,packs_per_color_max,checksum,"
             "rhie_chow,rhie_chow_scale,boundary,"
             "ran_kernel,ran_rc,ran_boundary,exact_rc,pgrad_per_apply,live_vectors,"
-            "upwind_eps,transient,s_qgrad,frac_qgrad";
+            "upwind_eps,transient,s_qgrad,frac_qgrad,pa_bytes_per_dof";
     for (int i = 0; i < PH_N; ++i) header += std::string(",ms_") + g_phase_name[i];
 
     bool need_header = true;
@@ -266,6 +270,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
         std::fprintf(f, ",%.9e,%.6f", r.qgrad_seconds, r.qgrad_frac);
     else
         std::fprintf(f, ",,");
+    std::fprintf(f, ",%.3f", r.pa_bytes_per_dof);
     for (int i = 0; i < PH_N; ++i) {
         if (r.phase)
             std::fprintf(f, ",%.6f", 1000.0 * r.phase[i] / double(r.repeat));
@@ -316,6 +321,8 @@ int main(int argc, char **argv) {
     // baseline was measured with.
     scalar_t    dt         = 0;
     int         bdf_order  = 1;
+    // Partial assembly: build the element tangent once and let the matvec read it.
+    int         partial_assembly = 0;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -369,6 +376,8 @@ int main(int argc, char **argv) {
             pgrad_per_apply = 1;
         else if (arg == "--qgrad-atomic")
             g_qgrad_atomic = 1;
+        else if (arg == "--partial-assembly")
+            partial_assembly = 1;
         else if (arg == "--live-vectors" && i + 1 < argc)
             live_vectors = std::atoi(argv[++i]);
         else if (arg == "--transient" && i + 1 < argc)
@@ -421,6 +430,11 @@ int main(int argc, char **argv) {
                     "                 no Rhie-Chow term. Off by default: without it there is no\n"
                     "                 pressure-pressure coupling at all, which is a smaller and\n"
                     "                 faster operator than the one the solver runs.\n"
+                    "  --partial-assembly  build the element tangent once -- five scalars per\n"
+                    "                 sub-control surface, sixty per element -- and read it in the\n"
+                    "                 Jacobian action instead of gathering the state and rederiving\n"
+                    "                 the mass flux and upwind switch on every matvec. Needs\n"
+                    "                 --jac-action on --layout packed|store with --geom affine.\n"
                     "  --qgrad-atomic   reconstruct the nodal gradient with the flat atomic sweep\n"
                     "                 instead of over packs. Same operator; the packed one has no\n"
                     "                 atomics and is deterministic. Here to measure the difference,\n"
@@ -480,6 +494,29 @@ int main(int argc, char **argv) {
     // sweep builds -- those assembly sweeps are scalar per element, so the only difference
     // is whether the coordinates and the nodal gradient are read from the pack or from the
     // mesh. What decides is the KERNEL, and rc_kernel_ok below is where that is settled.
+    // The store holds a per-element tangent built from one adjugate at the element centre,
+    // which is not what the isoparametric kernels evaluate, and it is read by a packed SIMD
+    // sweep. Refused elsewhere rather than measured on an operator it does not describe.
+    if (partial_assembly && !(jac_action && (layout == "packed" || layout == "store") && geom == "affine")) {
+        std::fprintf(stderr,
+                     "--partial-assembly needs --jac-action on --layout packed|store with "
+                     "--geom affine (got %s/%s/%s)\n",
+                     jac_action ? "--jac-action" : "another operation", layout.c_str(), geom.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // The tangent is a function of the state AND of the state's reconstructed pressure
+    // gradient. Rebuilding that gradient inside every apply is the one case where the
+    // gradient is not a per-Newton-step quantity, so a tangent built once would be stale
+    // from the second apply onward -- a wrong operator, not a slow one.
+    if (partial_assembly && pgrad_per_apply) {
+        std::fprintf(stderr,
+                     "--partial-assembly and --pgrad-per-apply are incompatible: the tangent is "
+                     "built from the reconstructed gradient, which --pgrad-per-apply changes on "
+                     "every apply\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
     if (pgrad_per_apply && !rhie_chow) {
         std::fprintf(stderr, "--pgrad-per-apply is meaningless without --rhie-chow\n");
         if (own_mpi) MPI_Finalize();
@@ -834,6 +871,16 @@ int main(int argc, char **argv) {
         bench_nodal_grad(d, packed, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
         std::printf("rhie_chow: scale %g, nodal gradient %s\n", (double)rc_scale,
                     pgrad_per_apply ? "rebuilt per apply" : "hoisted out of the timed loop");
+    }
+
+    // Built here, once, for the same reason the nodal gradient is: it is a function of the
+    // Newton iterate, and a Krylov solve applies the operator hundreds of times at a state
+    // that does not move. Outside the timed loop because that is where the solver would
+    // pay it -- in update(), not in apply().
+    if (partial_assembly) {
+        cvfem_hex8_build_pa_tangent(d, rho, mu, scalar_t(0));
+        std::printf("partial_assembly: %d scalars/element, %.1f bytes/dof (assembled matrix is ~847)\n",
+                    CVFEM_HEX8_PA_PER_ELEM, cvfem_hex8_pa_bytes_per_dof(d));
     }
 
     BSR4                  bsr;
@@ -1211,7 +1258,9 @@ int main(int argc, char **argv) {
             // beside the phases of the sweep it precedes rather than only in a stdout line.
             if (g_breakdown) g_phase[PH_QGRAD] += dt_qg;
         }
-        if (layout == "colored")
+        if (partial_assembly)
+            apply_jacobian_action_packed_pa(d, packed, rho, mu, dir_v, jac_out.data());
+        else if (layout == "colored")
             apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
         else if (layout == "packed" || layout == "store")
             apply_jacobian_action_packed(d, packed, rho, mu, dir_v, jac_out.data(), geom_kind);
@@ -1693,7 +1742,8 @@ int main(int argc, char **argv) {
         const bool kernel_ran = !(jac_action || bsr_apply || assemble_diag) ||
                                 kernel_is_action_only(kernel_kind);
         row.ran_kernel =
-                !kernel_ran ? "n/a"
+                partial_assembly ? "pa_sumfact"
+                : !kernel_ran ? "n/a"
                 // The isoparametric residual on a pack-based layout always runs the
                 // isoparametric SIMD kernel; the requested name is not consulted.
                 : (geom_kind == GeomKind::Isoparam && layout != "atomic" && !assemble) ? "isoparam_simd"
@@ -1724,6 +1774,7 @@ int main(int argc, char **argv) {
         // solver scope needs to see that, and a zero that is present says it.
         row.upwind_eps      = 0.0;
         row.transient       = dt > scalar_t(0) ? 1 : 0;
+        row.pa_bytes_per_dof = partial_assembly ? cvfem_hex8_pa_bytes_per_dof(d) : 0.0;
         row.qgrad_seconds   = with_qgrad ? qgrad_seconds / double(repeat) : -1.0;
         row.qgrad_frac      = with_qgrad ? qgrad_seconds / seconds : -1.0;
         row.phase                = g_breakdown ? g_phase : nullptr;

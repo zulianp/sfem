@@ -178,6 +178,24 @@ transient_reaches "residual, colored"          colored
 transient_reaches "jac-action, packed"         packed --jac-action
 transient_reaches "assemble, store"            store --assemble
 
+echo "== the partially assembled Jacobian action"
+# The oracle is the driver's own jac_action_rc_vs_atomic_rel: the timed apply against the
+# atomic reference, which shares no code with the packed partially assembled sweep.
+ok "PA, rc"                                    --jac-action --layout packed --rhie-chow --partial-assembly
+ok "PA, rc + boundary"                         --jac-action --layout packed --rhie-chow --boundary --partial-assembly
+ok "PA, rc + boundary + transient"             --jac-action --layout packed --rhie-chow --boundary --transient 0.01 --partial-assembly
+ok "PA, no rc"                                 --jac-action --layout packed --partial-assembly
+ok "PA, store layout"                          --jac-action --layout store --rhie-chow --partial-assembly
+# The store is a per-element tangent built from one adjugate at the element centre, read by
+# a packed SIMD sweep. It describes neither the isoparametric operator nor a scalar one.
+refused "PA, isoparam"                         --jac-action --layout packed --geom isoparam --partial-assembly
+refused "PA, atomic layout"                    --jac-action --layout atomic --rhie-chow --partial-assembly
+refused "PA, residual"                         --layout packed --rhie-chow --partial-assembly
+refused "PA, assemble"                         --assemble --layout packed --partial-assembly
+# The tangent is built from the reconstructed gradient; --pgrad-per-apply moves that on
+# every apply, so a tangent built once would be stale from the second one onward.
+refused "PA + pgrad-per-apply"                 --jac-action --layout packed --rhie-chow --pgrad-per-apply --partial-assembly
+
 echo "== still refused, and must stay so"
 # No generated kernel carries Rhie-Chow: the term was never put into the SymPy expressions.
 refused "assemble + rc, sympy"                 --assemble --rhie-chow --kernel sympy
