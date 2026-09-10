@@ -116,6 +116,11 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
     scalar_t *const SFEM_RESTRICT rz        = d.rz.data();
     scalar_t *const SFEM_RESTRICT rc        = d.rc.data();
     const size_t                  scratch_n = packed_scratch_n(p);
+    // Rhie-Chow staged exactly as apply_residual_packed stages it: six per-pack arrays in
+    // scratch slot 3 rather than three, the coordinates and the nodal gradient. The colored
+    // sweep is the same pack sweep with a colour loop around it, so the staging is the same
+    // and this is a lift, not a second implementation.
+    const int                     with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
     {
@@ -123,11 +128,16 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                geom_kind == GeomKind::Isoparam ? thread_scratch<scalar_t>(3, packed_xyz_n(p)) : nullptr;
+                (geom_kind == GeomKind::Isoparam || with_rc)
+                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
+                        : nullptr;
         const ptrdiff_t               xyz_n  = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
 
         for (int color = 0; color < c.n_colors; ++color) {
             const ptrdiff_t cbegin = c.color_ptr[(size_t)color];
@@ -145,6 +155,9 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                 double _t = phase_now();
                 std::memset(pack_out, 0, (size_t)(n_contiguous + n_ghost) * (size_t)N_FIELDS * sizeof(scalar_t));
                 fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+                if (with_rc)
+                    cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
+                                                   pack_z, pack_pgx, pack_pgy, pack_pgz);
                 if (geom_kind == GeomKind::Isoparam)
                     fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
                 if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
@@ -170,6 +183,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                     alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
                     Hex8InputPack                 in;
                     Hex8ResidualPack              outp;
+                    Hex8RhieChowPack              rcp;
                     for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                         const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                         gather_hex8_simd_from_pack(p.elems,
@@ -188,8 +202,12 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                                                    cof7,
                                                    cof8,
                                                    det);
+                        if (with_rc)
+                            cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy,
+                                                           pack_pgz, begin, nlanes, rcp);
                         cvfem_hex8_ns_upwind_residual_sumfact_simd(
-                                rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp);
+                                rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
+                                with_rc ? &rcp : nullptr, d.rhie_chow_scale);
                         scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
                     }
                 } else {
@@ -245,7 +263,16 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                                                         const GeomKind                      geom_kind) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
 
+    // The hoisted Rhie-Chow coefficient, twelve per element. Its own cache key means this
+    // is a no-op unless rho, mu, the scale or the mesh moved -- see Hex8RhieChowPack::coeff.
+    cvfem_hex8_build_rc_coeff(d, rho, mu);
+
     const size_t scratch_n = packed_scratch_n(p);
+    const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+    // The exact form differentiates through the nodal gradient reconstruction, so it needs
+    // that reconstruction applied to the DIRECTION's pressure too. Present only when the
+    // caller filled qgx/qgy/qgz; otherwise the kernel takes the frozen-gradient form.
+    const bool   with_qg   = with_rc && !d.qgx.empty();
 
 #pragma omp parallel
     {
@@ -254,11 +281,20 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                geom_kind == GeomKind::Isoparam ? thread_scratch<scalar_t>(3, packed_xyz_n(p)) : nullptr;
+                (geom_kind == GeomKind::Isoparam || with_rc)
+                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
+                        : nullptr;
         const ptrdiff_t               xyz_n  = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(p)) : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
+        scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
 
         for (int color = 0; color < c.n_colors; ++color) {
             const ptrdiff_t cbegin = c.color_ptr[(size_t)color];
@@ -277,6 +313,12 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                 std::memset(pack_out, 0, (size_t)(n_contiguous + n_ghost) * (size_t)N_FIELDS * sizeof(scalar_t));
                 fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
                 fill_pack_interleaved(p, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
+                if (with_rc)
+                    cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
+                                                   pack_z, pack_pgx, pack_pgy, pack_pgz);
+                if (with_qg)
+                    cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy,
+                                               pack_qgz);
                 if (geom_kind == GeomKind::Isoparam)
                     fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
                 if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
@@ -284,6 +326,7 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                 Hex8InputPack    u_pack, du_pack;
                 Hex8ResidualPack outp;
                 Hex8CoordPack    xyz;
+                Hex8RhieChowPack rcp;
                 for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                     const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                     if (geom_kind == GeomKind::Isoparam) {
@@ -325,8 +368,16 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                                                           cof7,
                                                           cof8,
                                                           det);
+                        if (with_rc) {
+                            cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy,
+                                                           pack_pgz, begin, nlanes, rcp);
+                            cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
+                        }
+                        if (with_qg)
+                            cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
                         cvfem_hex8_ns_upwind_jacobian_action_simd(
-                                rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, u_pack, du_pack, outp);
+                                rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, u_pack, du_pack,
+                                outp, with_rc ? &rcp : nullptr, d.rhie_chow_scale, with_qg);
                     }
                     scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
                 }
