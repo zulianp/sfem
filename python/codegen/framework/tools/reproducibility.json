@@ -780,30 +780,6 @@
       "l2": 5.267632024491,
       "material": "laplace"
     },
-    "laplace_jacobian_action_3d_a_msoa": {
-      "l1": 20.47002422187,
-      "l2": 1.321353078322
-    },
-    "laplace_jacobian_action_3d_a_msoa_float": {
-      "l1": 20.47002401704,
-      "l2": 1.321353067699
-    },
-    "laplace_jacobian_action_3d_i_maos": {
-      "l1": 12.04485181802,
-      "l2": 0.7651822457734
-    },
-    "laplace_jacobian_action_3d_i_maos_float": {
-      "l1": 12.04485141525,
-      "l2": 0.7651822228542
-    },
-    "laplace_jacobian_action_3d_i_msoa": {
-      "l1": 20.47002330372,
-      "l2": 1.321353002035
-    },
-    "laplace_jacobian_action_3d_i_msoa_float": {
-      "l1": 20.47002278862,
-      "l2": 1.32135297548
-    },
     "laplace_objective_steps_3d_a_msoa": {
       "l1": 0.01056281932017,
       "l2": 0.0005252220955924,
@@ -823,30 +799,6 @@
       "l1": 0.01056281898339,
       "l2": 0.0005252220787077,
       "material": "laplace"
-    },
-    "laplace_residual_3d_a_msoa": {
-      "l1": 15.7032810477,
-      "l2": 1.005640303105
-    },
-    "laplace_residual_3d_a_msoa_float": {
-      "l1": 15.70328080206,
-      "l2": 1.005640288217
-    },
-    "laplace_residual_3d_i_maos": {
-      "l1": 8.462263714453,
-      "l2": 0.5358582227816
-    },
-    "laplace_residual_3d_i_maos_float": {
-      "l1": 8.46226350691,
-      "l2": 0.5358582060047
-    },
-    "laplace_residual_3d_i_msoa": {
-      "l1": 15.70328031131,
-      "l2": 1.005640235813
-    },
-    "laplace_residual_3d_i_msoa_float": {
-      "l1": 15.70327976107,
-      "l2": 1.005640200104
     },
     "linear_elasticity_apply_3d_a_msoa": {
       "l1": 4.103551126906,
@@ -912,22 +864,6 @@
       "l1": 1798.092,
       "l2": 17.88312485948,
       "material": "linear_elasticity"
-    },
-    "linear_elasticity_objective_3d_a_msoa": {
-      "l1": 15.31561425434,
-      "l2": 1.256059952018
-    },
-    "linear_elasticity_objective_3d_a_msoa_float": {
-      "l1": 15.31561412849,
-      "l2": 1.256059942737
-    },
-    "linear_elasticity_objective_3d_i_msoa": {
-      "l1": 15.31561381028,
-      "l2": 1.256059912577
-    },
-    "linear_elasticity_objective_3d_i_msoa_float": {
-      "l1": 15.31561343465,
-      "l2": 1.256059884898
     },
     "linear_elasticity_objective_steps_3d_a_msoa": {
       "l1": 0.1169939097979,
