@@ -78,6 +78,17 @@ def _reference_coordinates(element):
         # `PROTEUS_QUAD4` numbers them lexicographically, and the caller
         # reorders these into that numbering when it needs to.
         return ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
+    if element in ("HEX27", "PROTEUS_HEX27"):
+        # The unit cube's 27 nodes. Build them lexicographically and place each
+        # at the index this element's mesh numbering gives it, so the two
+        # elements describe the same cube.
+        lexicographic = tuple(
+            ((n % 3) / 2.0, ((n // 3) % 3) / 2.0, (n // 9) / 2.0) for n in range(27)
+        )
+        placed = [None] * 27
+        for position, node in enumerate(tensor_product_cartesian_shape_order(3, 27)):
+            placed[node] = lexicographic[position]
+        return tuple(placed)
     if element == "HEX8":
         return (
             (0.0, 0.0, 0.0),
@@ -873,73 +884,104 @@ class CoupledResidualSystemTest(unittest.TestCase):
                                 places=11,
                             )
 
-    def test_quad4_and_proteus_quad4_agree_on_one_physical_mesh(self):
-        """The same square, numbered two ways, must give the same answer.
+    def test_a_mesh_ordered_element_agrees_with_its_cartesian_twin(self):
+        """The same cell, numbered two ways, must give the same answer.
 
-        `QUAD4` carries the SFEM/VTK numbering and `PROTEUS_QUAD4` the
-        lexicographic one, and the kernels are written against the
-        lexicographic basis, so the mesh-order element permutes its
-        connectivity and the Cartesian one must not.  Nothing checked that:
-        five sites in `emitters/residual_codegen.py` asked only whether the
-        element was a Cartesian *hex*, so a `PROTEUS_QUAD4` kernel permuted its
-        fields by (0, 1, 3, 2) anyway while gathering its coordinates
-        unpermuted, and the two elements disagreed on the same mesh.
+        `QUAD4`, `HEX8` and `HEX27` carry the SFEM/VTK numbering and their
+        `PROTEUS_*` twins the lexicographic one.  The kernels are written
+        against the lexicographic basis, so the mesh-order element permutes its
+        connectivity at the entry point and the Cartesian one must not permute
+        at all.
 
-        This compares them directly rather than against a reference basis,
-        because the reference data is the same object for both elements and so
+        Nothing checked that, and both halves were wrong.  Five sites in
+        `emitters/residual_codegen.py` asked only whether the element was a
+        Cartesian *hex*, so a `PROTEUS_QUAD4` kernel permuted its fields by
+        (0, 1, 3, 2) anyway while gathering its coordinates unpermuted.  And no
+        `PROTEUS_HEX27` was generated at all, so `d3/hex27*` carried real
+        kernels that permuted their own connectivity instead of forwarding.
+
+        This compares the two elements directly rather than against a reference
+        basis, because the reference data is the same object for both and so
         cannot say anything about ordering.
         """
         compiler = shutil.which("c++")
         if compiler is None:
             self.skipTest("c++ compiler is not available")
 
-        # Cartesian position i holds the node this element numbers order[i].
-        order = tensor_product_cartesian_shape_order(2, 4)
-        reorder = lambda values: tuple(values[i] for i in order)
+        for mesh_order, cartesian, dim in (
+            ("QUAD4", "PROTEUS_QUAD4", 2),
+            ("HEX27", "PROTEUS_HEX27", 3),
+        ):
+            with self.subTest(element=mesh_order):
+                self._assert_numbering_does_not_change_the_answer(
+                    compiler, mesh_order, cartesian, dim
+                )
 
-        square = _reference_coordinates("QUAD4")
-        current = ((1.0, 1.12, 1.24, 1.36), (0.7, 0.65, 0.6, 0.55))
+    def _assert_numbering_does_not_change_the_answer(
+        self, compiler, mesh_order, cartesian, dim
+    ):
+        coords = _reference_coordinates(mesh_order)
+        n_shape = len(coords)
+        # Cartesian position i holds the node this element numbers order[i],
+        # so `renumber` reads a mesh-ordered list in Cartesian order and
+        # `restore` puts a Cartesian-ordered result back under mesh numbering.
+        # These are inverses, not the same map: for QUAD4 the permutation is its
+        # own inverse and using either would pass, which is exactly why HEX27
+        # has to be in this test as well.
+        order = tensor_product_cartesian_shape_order(dim, n_shape)
+
+        def renumber(values):
+            return tuple(values[i] for i in order)
+
+        def restore(values):
+            placed = [None] * n_shape
+            for position, node in enumerate(order):
+                placed[node] = values[position]
+            return tuple(placed)
+
+        current = (
+            tuple(1.0 + 0.12 * s for s in range(n_shape)),
+            tuple(0.7 - 0.05 * s for s in range(n_shape)),
+        )
         previous = tuple(tuple(v - 0.03 for v in field) for field in current)
-        direction = ((0.04, 0.08, 0.12, 0.16), (-0.025, -0.05, -0.075, -0.1))
+        direction = (
+            tuple(0.04 * (s + 1) for s in range(n_shape)),
+            tuple(-0.025 * (s + 1) for s in range(n_shape)),
+        )
 
         answers = {}
-        for element in ("QUAD4", "PROTEUS_QUAD4"):
-            cartesian = element == "PROTEUS_QUAD4"
+        for element in (mesh_order, cartesian):
+            cartesian_twin = element == cartesian
             with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
-                library = self._build_residual_library(compiler, tmpdir, element)
+                library = self._build_residual_library(compiler, tmpdir, element, dim)
                 for form, trial in (("residual", None), ("jacobian_action", direction)):
                     result = self._call_isoparametric_mesh_kernel(
                         library,
                         element,
                         form,
-                        reorder(square) if cartesian else square,
-                        tuple(reorder(f) for f in current) if cartesian else current,
-                        tuple(reorder(f) for f in previous) if cartesian else previous,
-                        (tuple(reorder(f) for f in trial) if cartesian else trial)
+                        renumber(coords) if cartesian_twin else coords,
+                        tuple(renumber(f) for f in current) if cartesian_twin else current,
+                        tuple(renumber(f) for f in previous) if cartesian_twin else previous,
+                        (tuple(renumber(f) for f in trial) if cartesian_twin else trial)
                         if trial is not None
                         else None,
                     )
                     # Undo the renumbering so both are indexed by the same node.
                     answers[element, form] = (
-                        tuple(reorder(field) for field in result)
-                        if cartesian
+                        tuple(restore(field) for field in result)
+                        if cartesian_twin
                         else result
                     )
 
         for form in ("residual", "jacobian_action"):
             for field in range(2):
-                for mesh_order, cartesian in zip(
-                    answers["QUAD4", form][field],
-                    answers["PROTEUS_QUAD4", form][field],
-                ):
-                    self.assertAlmostEqual(mesh_order, cartesian, places=11)
-                self.assertNotAlmostEqual(
-                    answers["QUAD4", form][field][0], 0.0, places=6
-                )
+                for a, b in zip(answers[mesh_order, form][field], answers[cartesian, form][field]):
+                    self.assertAlmostEqual(a, b, places=11)
+                self.assertNotAlmostEqual(answers[mesh_order, form][field][0], 0.0, places=6)
 
-    def _build_residual_library(self, compiler, tmpdir, element):
+    def _build_residual_library(self, compiler, tmpdir, element, dim=2):
         files = generate_coupled_residual_sfem_files(
-            residual_emission_model_from_system(two_field_diffusion_system(2)[0]),
+            residual_emission_model_from_system(two_field_diffusion_system(dim)[0]),
             prefix="coupled_diffusion",
             emission_plan=_element_emission_plan(element),
         )
