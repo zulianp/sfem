@@ -35,6 +35,17 @@
 // others.  Declaring it here would conflict on whichever one it is not.
 
 
+// Deformation severity.  The projection approximates a tangent that varies over
+// the cell, so how far the state is from a constant gradient is the condition
+// it approximates -- and at zero it is exact on any element, which makes that
+// row a control that isolates the store's own error.  `bench_split.cpp` has
+// carried this knob for the single-unit case; the previous state scales with it
+// so that the viscous unit's velocity gradient vanishes at zero too.
+#ifndef STATE_AMPLITUDE
+#define STATE_AMPLITUDE 0.02
+#endif
+#define PREVIOUS_AMPLITUDE ((STATE_AMPLITUDE) * 0.65)
+
 #include "generated_abi.inc"
 
 extern "C" int EXACT_ELASTIC_APPLY(
@@ -97,11 +108,11 @@ int main(int argc, char **argv) {
     std::printf("mooney_rivlin_kelvin_voigt_newmark (elastic + viscous), %s, threads %d, best of %d\n\n",
                 ELEMENT_NAME,
                 threads, repeats);
-    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s\n",
+    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s %9s\n",
                 "elements", "nodes", "ndof", "exact", "st.f64", "st.f32", "st.f16",
-                "assembly", "f32 diff", "f16 diff");
-    std::printf("%10s %10s %12s | %s | %8s | %9s %9s\n", "", "", "",
-                "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel");
+                "assembly", "f64 diff", "f32 diff", "f16 diff");
+    std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s\n", "", "", "",
+                "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
 
     for (int n : {8, 16, 24, 32, 40}) {
         Mesh m = build(n);
@@ -109,8 +120,8 @@ int main(int argc, char **argv) {
         std::vector<double> ux(N),uy(N),uz(N), zx(N),zy(N),zz(N), hx(N),hy(N),hz(N);
         for (ptrdiff_t v = 0; v < N; ++v) {
             const double x=m.px[v], y=m.py[v], z=m.pz[v];
-            ux[v]=0.02*std::sin(3*x+y+0.5*z); uy[v]=0.02*std::sin(x+3*y+1.5*z); uz[v]=0.02*std::sin(0.5*x+1.5*y+3*z);
-            zx[v]=0.013*std::sin(2*x+0.4*y+z); zy[v]=0.013*std::sin(0.4*x+2*y+z); zz[v]=0.013*std::sin(x+0.6*y+2*z);
+            ux[v]=(STATE_AMPLITUDE)*std::sin(3*x+y+0.5*z); uy[v]=(STATE_AMPLITUDE)*std::sin(x+3*y+1.5*z); uz[v]=(STATE_AMPLITUDE)*std::sin(0.5*x+1.5*y+3*z);
+            zx[v]=(PREVIOUS_AMPLITUDE)*std::sin(2*x+0.4*y+z); zy[v]=(PREVIOUS_AMPLITUDE)*std::sin(0.4*x+2*y+z); zz[v]=(PREVIOUS_AMPLITUDE)*std::sin(x+0.6*y+2*z);
 #ifdef RANDOM_INCREMENT
             // A smooth increment makes the deviation ratio flat under
             // refinement even where the projection converges perfectly well:
@@ -208,8 +219,10 @@ int main(int argc, char **argv) {
         const double s32 = best_mdof(repeats, ndof, [&]{ run_stored(E32.data(), V32.data()); });
         const double s16 = best_mdof(repeats, ndof, run_compressed);
         const double a   = best_mdof(repeats, ndof, assemble);
-        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e\n",
-                    (long)EC, (long)N, (long)ndof, e, s64, s32, s16, a, d32, d16);
+        // All three error columns per row: f64 is the projection error alone,
+        // and what f32 and f16 add over it is the store's own contribution.
+        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e\n",
+                    (long)EC, (long)N, (long)ndof, e, s64, s32, s16, a, d64, d32, d16);
         if (n == 40) {
             std::printf("\n  stored-f64 vs exact rel diff %.2e\n", d64);
             auto be = [&](double s){ return s <= e ? -1.0 : (1.0/a)/(1.0/e - 1.0/s); };
