@@ -141,6 +141,19 @@ struct CsvRow {
     int         rhie_chow;   // 0, or the scale the Rhie-Chow term ran at
     double      rhie_chow_scale;
     int         boundary;    // 1 if the boundary control volumes were closed
+    // ---- what actually ran, as opposed to what was asked for ------------------------
+    //
+    // The three fields above record the REQUEST. That is how a row comes to claim a term
+    // the code path dropped: the flag was passed, so the column says 1. These say what the
+    // dispatch actually reached, and they are what a report must read.
+    const char *ran_kernel;    // the kernel that executed, or "n/a" where the operation ignores --kernel
+    const char *ran_rc;        // "exact" | "frozen" | "off"
+    const char *ran_boundary;  // "on" | "off"
+    int         exact_rc;      // the direction's reconstructed gradient was staged
+    int         pgrad_per_apply;
+    int         live_vectors;
+    double      upwind_eps;    // always 0 in this driver; recorded so the column is not silently absent
+    int         transient;     // always 0; the benchmark family has no transient term
     const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
 };
 
@@ -157,7 +170,9 @@ static void csv_write(const std::string &path, const CsvRow &r) {
             "nodes,elements,dofs,bsr_nnz,bsr_values_MiB,repeat,seconds_per_call,"
             "MDOF_s,MDOF_s_element_visits,MELEM_s,GFLOP_s_model,"
             "n_colors,packs_per_color_min,packs_per_color_max,checksum,"
-            "rhie_chow,rhie_chow_scale,boundary";
+            "rhie_chow,rhie_chow_scale,boundary,"
+            "ran_kernel,ran_rc,ran_boundary,exact_rc,pgrad_per_apply,live_vectors,"
+            "upwind_eps,transient";
     for (int i = 0; i < PH_N; ++i) header += std::string(",ms_") + g_phase_name[i];
 
     bool need_header = true;
@@ -201,6 +216,8 @@ static void csv_write(const std::string &path, const CsvRow &r) {
                  r.mdofs, r.mdofs_element_visits, r.melems, r.gflops_model,
                  r.n_colors, r.packs_per_color_min, r.packs_per_color_max, r.checksum);
     std::fprintf(f, ",%d,%.6f,%d", r.rhie_chow, r.rhie_chow_scale, r.boundary);
+    std::fprintf(f, ",%s,%s,%s,%d,%d,%d,%.6g,%d", r.ran_kernel, r.ran_rc, r.ran_boundary,
+                 r.exact_rc, r.pgrad_per_apply, r.live_vectors, r.upwind_eps, r.transient);
     for (int i = 0; i < PH_N; ++i) {
         if (r.phase)
             std::fprintf(f, ",%.6f", 1000.0 * r.phase[i] / double(r.repeat));
@@ -468,7 +485,83 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
+
     const KernelKind kernel_kind = parse_kernel(kernel);
+    // ------------------------------------------------- what this build cannot honour
+    //
+    // Each of these was ACCEPTED before, ran different code than it named, and wrote a row
+    // claiming the configuration it was asked for. That is the failure this driver already
+    // rejects by name elsewhere ("a run cannot report a throughput under a kernel name that
+    // did not execute", above) -- these are the combinations that slipped through the same
+    // net on a different axis.
+
+    // `split` is assembly-only by construction and `fd` is a Jacobian reference with no
+    // residual form; both fall through to the hand-written `current` residual and would be
+    // recorded under their own name.
+    const bool residual_op = !(assemble || assemble_diag || jac_action || bsr_apply);
+    if (residual_op && (kernel_kind == KernelKind::Split || kernel_kind == KernelKind::Fd)) {
+        std::fprintf(stderr,
+                     "--kernel %s has no residual form; it would run and report the "
+                     "hand-written `current` kernel\n",
+                     kernel.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+
+    // The verification chains compare against `current` and against a finite difference of
+    // it, and neither carries Rhie-Chow. With the term on they report a mismatch that is
+    // the missing term in the reference, not a defect in what is being verified.
+    if (rhie_chow && (verify || verify_jac)) {
+        std::fprintf(stderr,
+                     "--verify/--verify-jac cannot run with --rhie-chow: the reference "
+                     "kernels carry no Rhie-Chow term, so the comparison fails by "
+                     "construction\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+
+    // Read only inside the sumfact branch of the colored and store assemblies.
+    if (g_dense_flush && !(assemble && kernel_kind == KernelKind::Sumfact &&
+                           (layout == "colored" || layout == "store"))) {
+        std::fprintf(stderr,
+                     "--dense-flush is read only by --assemble --kernel sumfact on "
+                     "--layout colored|store\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+
+    // The block diagonal dispatches on geometry alone -- see diag_fn -- so --layout would
+    // be recorded in the row while atomic code ran, together with pack_size and the colour
+    // counts of a layout that was never used.
+    if (assemble_diag && layout != "atomic") {
+        std::fprintf(stderr,
+                     "--assemble-diag ignores --layout (it is always the atomic diagonal); "
+                     "pass --layout atomic or drop it (got '%s')\n",
+                     layout.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // The assembled boundary closure exists in exactly one function --
+    // assemble_jacobian_atomic_sumfact -- so every other assembly kernel, and every
+    // isoparametric one, drops it while the row records boundary=1.
+    if (boundary && (assemble || bsr_apply) &&
+        (kernel_kind != KernelKind::Sumfact || geom == "isoparam")) {
+        std::fprintf(stderr,
+                     "--boundary with --assemble/--bsr-apply is carried only by "
+                     "--kernel sumfact --geom affine; '%s'/%s would drop it silently\n",
+                     kernel.c_str(), geom.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // Until the diagonal carries them, asking for either would record a row claiming a term
+    // assemble_diag_atomic does not compute.
+    if (assemble_diag && (rhie_chow || boundary)) {
+        std::fprintf(stderr,
+                     "--assemble-diag carries neither --rhie-chow nor --boundary yet; the "
+                     "row would claim a term it did not compute\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
     // sympy_row and sympy_face lost the saturated evaluation and were moved to subpar/.
     // Rejected by name here, which is what keeps the stubs in cvfem_hex8_layout_common.hpp
     // unreachable -- and, more to the point, means a run cannot report a throughput under
@@ -1315,8 +1408,11 @@ int main(int argc, char **argv) {
                                                 : residual_flops;
         CsvRow row{};
         row.tag                  = csv_tag.c_str();
-        row.operation            = bsr_apply ? "bsr_apply"
-                                             : (jac_action ? "jac_action" : (assemble ? "assemble" : "residual"));
+        row.operation            = bsr_apply       ? "bsr_apply"
+                                   : jac_action    ? "jac_action"
+                                   : assemble      ? "assemble"
+                                   : assemble_diag ? "assemble_diag"
+                                                   : "residual";
         row.layout               = layout.c_str();
         row.kernel               = kernel.c_str();
         row.geom                 = geom.c_str();
@@ -1342,6 +1438,46 @@ int main(int argc, char **argv) {
         row.rhie_chow            = rhie_chow;
         row.rhie_chow_scale      = rhie_chow ? (double)rc_scale : 0.0;
         row.boundary             = boundary;
+
+        // ---- what actually ran ------------------------------------------------------
+        //
+        // This MUST mirror the dispatch in apply_fn / jac_fn / jac_action_fn / diag_fn
+        // above; it is the one place where a row can be made to describe the code that
+        // executed rather than the flags that were passed. Everything it can get wrong is
+        // now either refused at the top of main or covered by a case here, and
+        // tests/cvfem_bench_coverage_test checks the mapping.
+        //
+        // Three operations ignore --kernel entirely -- no apply_jacobian_action_* or
+        // assemble_diag_* takes a KernelKind, and the SpMV takes nothing at all -- so the
+        // requested name says nothing about what ran and "n/a" is the honest entry.
+        const bool kernel_ran = !(jac_action || bsr_apply || assemble_diag);
+        row.ran_kernel =
+                !kernel_ran ? "n/a"
+                // The isoparametric residual on a pack-based layout always runs the
+                // isoparametric SIMD kernel; the requested name is not consulted.
+                : (geom_kind == GeomKind::Isoparam && layout != "atomic" && !assemble) ? "isoparam_simd"
+                // There is no dedicated `current` assembly kernel, so it lands on fd.
+                : (assemble && kernel_kind == KernelKind::Current) ? "fd"
+                                                                   : kernel.c_str();
+        // The exact form -- differentiating through the nodal gradient reconstruction --
+        // is staged only by the Jacobian action. The assembled Jacobian keeps the frozen
+        // form deliberately: the exact term couples pressures beyond nearest neighbours
+        // and would widen the BSR pattern, and that operator exists only to build the
+        // preconditioner.
+        row.ran_rc       = !rhie_chow                       ? "off"
+                           : jac_action                     ? "exact"
+                           : (assemble || bsr_apply)        ? "frozen"
+                                                            : "on";
+        row.ran_boundary = boundary ? "on" : "off";
+        row.exact_rc     = (rhie_chow && jac_action) ? 1 : 0;
+        row.pgrad_per_apply = pgrad_per_apply;
+        row.live_vectors    = live_vectors;
+        // Recorded as columns rather than left absent: this driver runs every kernel with
+        // the hard upwind switch and with no transient term, while the solver plumbs both
+        // (SFEM_UPWIND_EPS, and BDF1/BDF2). A reader comparing a benchmark rate against a
+        // solver scope needs to see that, and a zero that is present says it.
+        row.upwind_eps      = 0.0;
+        row.transient       = 0;
         row.phase                = g_breakdown ? g_phase : nullptr;
         csv_write(csv_path, row);
     }
