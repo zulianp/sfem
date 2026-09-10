@@ -282,6 +282,90 @@ untouched by all of this, checked in the same runs: 1910 -&gt; 1912 MDOF/s for t
 Jacobian action and 2642 -&gt; 2640 for the residual, with bit-identical checksums.</p>
 <p>Reproduce with <code>jobs/fused_rc.sbatch</code> (the cascade) and <code>jobs/rc_hoist.sbatch</code> (the
 hoist, against the binary from the parent commit).</p>
+<h3>What the remaining bench-to-solver gap is, and is not</h3>
+<p>The bench's packed Jacobian action reads 1482 MDOF/s at 4,121,204 dof and the solver's
+own scope reads 851 at 4,343,300 -- 1.74x apart on the same kernel, the same pack size
+(2048 elements) and near-identical element counts. Two candidates are now settled.</p>
+<p><strong>It is not problem size.</strong> The bench is flat: 1798 at 1.1M dof, 1458 at 4.1M, 1476 at
+11.2M. Measuring at the solver's size changes nothing.</p>
+<p><strong>It is not the Krylov working set.</strong> That was the leading hypothesis -- the bench
+replays one apply on one direction with everything warm, while the solver evaluates the
+same kernel with its basis live and a fresh direction each iteration. <code>--live-vectors N</code>
+makes the bench do exactly that: N vectors of the solution size, churned between applies
+and taken in rotation as the direction, with only the apply on the clock. It makes no
+difference at all.</p>
+<table>
+<thead>
+<tr>
+<th align="right">live vectors</th>
+<th align="right">working set</th>
+<th align="right">kernel_only MDOF/s</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="right">0</td>
+<td align="right">--</td>
+<td align="right">1482</td>
+</tr>
+<tr>
+<td align="right">3</td>
+<td align="right">94 MiB</td>
+<td align="right">1498</td>
+</tr>
+<tr>
+<td align="right">7</td>
+<td align="right">220 MiB</td>
+<td align="right">1486</td>
+</tr>
+<tr>
+<td align="right">14</td>
+<td align="right">440 MiB</td>
+<td align="right">1482</td>
+</tr>
+</tbody>
+</table>
+<p>Flat from nothing to 440 MiB, well past this socket's 117 MiB of L3. The hypothesis was
+wrong and the instrument built to test it says so cleanly.</p>
+<p><strong>A quarter of it is pack locality.</strong> The bench space-fills its element order by default
+and the driver never does. Turning the bench's off reproduces a good part of the gap:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="right">mean nodes per pack</th>
+<th align="right">kernel_only MDOF/s</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bench, SFC ordered</td>
+<td align="right">2735</td>
+<td align="right">1483</td>
+</tr>
+<tr>
+<td>bench, <code>--no-sfc</code></td>
+<td align="right">4373</td>
+<td align="right">1183</td>
+</tr>
+<tr>
+<td>solver, no SFC</td>
+<td align="right">--</td>
+<td align="right">851</td>
+</tr>
+</tbody>
+</table>
+<p>A pack of 2048 elements holds 2735 nodes when the order is space-filling and 4373 when
+it is lexicographic, and the sweep pays 1.25x for the difference. The solver's packed
+mesh costs 1.34x the original storage (37,254 KB against 27,869) where the bench's costs
+about 0.7x, which is the same signature read off memory rather than throughput -- and the
+solver's domain is a 256x64x64 channel, so a contiguous run of 2048 elements there is a
+far worse slab than the cube measured here.</p>
+<p>So <strong>space-filling the solver's element order is worth about 1.25x on the flat element
+sweep</strong>, which is more than either change made to the kernel itself today, and it is a
+mesh-setup change rather than a kernel one. The residual 1.39x after that is not yet
+attributed.</p>
+<p>Reproduce with <code>jobs/live_vectors.sbatch</code>.</p>
 <h2>The boundary closure was bound by its own load imbalance</h2>
 <p>The flat operator closes its boundary control volumes in a second sweep after the
 element kernel, and that sweep walked the WHOLE mesh -- gathering coordinates, fields
