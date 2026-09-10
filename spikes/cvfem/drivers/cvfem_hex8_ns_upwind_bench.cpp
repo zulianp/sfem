@@ -495,6 +495,25 @@ int main(int argc, char **argv) {
     // did not execute", above) -- these are the combinations that slipped through the same
     // net on a different axis.
 
+    // The generated Jacobian-action arrangements run only for that operation, and only on
+    // the atomic layout: they are scalar kernels, so the packed and colored sweeps -- which
+    // are SIMD over a pack -- have nothing to call them from. Refused elsewhere rather than
+    // mapped onto whatever would have run.
+    if (kernel_is_action_only(kernel_kind) && !(jac_action && layout == "atomic")) {
+        std::fprintf(stderr,
+                     "--kernel %s is a Jacobian-action arrangement: it needs --jac-action "
+                     "--layout atomic (got %s/%s)\n",
+                     kernel.c_str(), jac_action ? "--jac-action" : "another operation", layout.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // They carry no Rhie-Chow term, so a row would claim one it did not compute.
+    if (kernel_is_action_only(kernel_kind) && rhie_chow) {
+        std::fprintf(stderr, "--kernel %s carries no Rhie-Chow term\n", kernel.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+
     // `split` is assembly-only by construction and `fd` is a Jacobian reference with no
     // residual form; both fall through to the hand-written `current` residual and would be
     // recorded under their own name.
@@ -604,7 +623,10 @@ int main(int argc, char **argv) {
     // default `sumfact` and was refused for a kernel it does not call.
     // --assemble-diag dispatches on geometry alone too (see diag_fn), so it belongs on
     // this list for the same reason.
-    const bool kernel_is_consulted = !(jac_action || bsr_apply || assemble_diag);
+    // ...with one exception since the action gained generated kernels: the three
+    // `sympy_action*` arrangements ARE dispatched by --jac-action on the atomic layout.
+    const bool kernel_is_consulted =
+            !(jac_action || bsr_apply || assemble_diag) || kernel_is_action_only(kernel_kind);
     if (kernel_is_consulted && geom_kind == GeomKind::Isoparam &&
         kernel_kind != KernelKind::Current && kernel_kind != KernelKind::Sympy &&
         kernel_kind != KernelKind::Fd && kernel_kind != KernelKind::Split) {
@@ -1066,7 +1088,7 @@ int main(int argc, char **argv) {
         else if (geom_kind == GeomKind::Isoparam)
             apply_jacobian_action_atomic_isoparam(d, rho, mu, dir_v, jac_out.data());
         else
-            apply_jacobian_action_atomic(d, rho, mu, dir_v, jac_out.data());
+            apply_jacobian_action_atomic(d, rho, mu, dir_v, jac_out.data(), kernel_kind);
             if (boundary)
             apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0,
                                                     dir_v, jac_out.data());
@@ -1450,7 +1472,8 @@ int main(int argc, char **argv) {
         // Three operations ignore --kernel entirely -- no apply_jacobian_action_* or
         // assemble_diag_* takes a KernelKind, and the SpMV takes nothing at all -- so the
         // requested name says nothing about what ran and "n/a" is the honest entry.
-        const bool kernel_ran = !(jac_action || bsr_apply || assemble_diag);
+        const bool kernel_ran = !(jac_action || bsr_apply || assemble_diag) ||
+                                kernel_is_action_only(kernel_kind);
         row.ran_kernel =
                 !kernel_ran ? "n/a"
                 // The isoparametric residual on a pack-based layout always runs the

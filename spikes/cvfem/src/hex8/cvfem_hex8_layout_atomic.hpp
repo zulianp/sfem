@@ -12,7 +12,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
                                                        const scalar_t        rho,
                                                        const scalar_t        mu,
                                                        const scalar_t *const dir,
-                                                       scalar_t *const       jv) {
+                                                       scalar_t *const       jv,
+                                                       const KernelKind      kernel = KernelKind::Sumfact) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
 
     const Hex8Extras opt(d);
@@ -31,12 +32,23 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
         }
         scalar_t adj[9], det;
         load_hex8_adj(d, e, adj, &det);
+        // The generated Jacobian-action arrangements. They carry no Rhie-Chow term -- the
+        // generator builds them from the bare flux algebra, as it does the residual and the
+        // assembly -- so the driver refuses --rhie-chow with them rather than letting a row
+        // claim a term the kernel does not compute.
+        if (kernel == KernelKind::SympyAction) {
+            cvfem_hex8_ns_upwind_sympy_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
+        } else if (kernel == KernelKind::SympyActionNode) {
+            cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
+        } else if (kernel == KernelKind::SympyActionComp) {
+            cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
+        }
         // Branch rather than pass `ex.rc` and `p` unconditionally: with --rhie-chow off the
         // literal call below hands the kernel a default-constructed rc and a null pressure,
         // both of which fold away at inline time, so the default path emits exactly the code
         // it emitted before this option existed. A runtime-valued rc would leave the
         // Rhie-Chow branch in the hot loop for every run that does not ask for it.
-        if (opt.with_rc) {
+        else if (opt.with_rc) {
             Hex8ExtraScratch ex;
             ex.load(d, opt, e);
             cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, ex.rc, p);
