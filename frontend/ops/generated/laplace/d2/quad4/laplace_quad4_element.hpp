@@ -16,9 +16,7 @@ static SFEM_INLINE int laplace_quad4_energy_egeometry_soa(
         s_t *const RSTR values
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   const s_t *ordered_u_streams[NDOFS];
@@ -40,9 +38,7 @@ static SFEM_INLINE int laplace_quad4_energy_ecoords_soa(
         s_t *const RSTR values
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   const s_t *ordered_coords[NDOFS];
@@ -71,9 +67,7 @@ static SFEM_INLINE int laplace_quad4_energy_esoa(
         s_t *const RSTR values
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   const s_t *ordered_coords[NDOFS];
@@ -103,9 +97,7 @@ static SFEM_INLINE int laplace_quad4_gradient_egeometry_soa(
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   const s_t *ordered_u_streams[NDOFS];
@@ -134,9 +126,7 @@ static SFEM_INLINE int laplace_quad4_gradient_ecoords_soa(
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   const s_t *ordered_coords[NDOFS];
@@ -172,9 +162,7 @@ static SFEM_INLINE int laplace_quad4_gradient_esoa(
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   const s_t *ordered_coords[NDOFS];
@@ -210,9 +198,7 @@ static SFEM_INLINE int laplace_quad4_hessian_egeometry_soa(
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   s_t *ordered_matrix_streams[NDOFS * NDOFS];
@@ -242,9 +228,7 @@ static SFEM_INLINE int laplace_quad4_hessian_ecoords_soa(
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   const s_t *ordered_coords[NDOFS];
@@ -281,9 +265,7 @@ static SFEM_INLINE int laplace_quad4_hessian_esoa(
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 2;
-  static constexpr int ND = 2;
   static constexpr int NS = 4;
-  static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2};
   const s_t *ordered_coords[NDOFS];

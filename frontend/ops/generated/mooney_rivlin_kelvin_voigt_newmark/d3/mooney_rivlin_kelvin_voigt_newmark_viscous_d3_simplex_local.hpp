@@ -50,7 +50,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     const s_t newmark_velocity_alpha,
     s_t *const RSTR output[3 * NS]
 ) {
-  static constexpr int ND = 3;
   static constexpr int NC = 3;
   for (int q = 0; q < NQ; ++q) {
     s_t u0_grad_0_ref_values[VS];
@@ -328,7 +327,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     const s_t newmark_velocity_alpha,
     s_t output[3 * NS][VS]
 ) {
-  static constexpr int ND = 3;
   static constexpr int NC = 3;
   for (int q = 0; q < NQ; ++q) {
     s_t u0_grad_0_ref_values[VS];
@@ -606,8 +604,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t newmark_velocity_alpha,
     s_t *const RSTR output[3 * NS]
 ) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 3;
   for (int q = 0; q < NQ; ++q) {
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
@@ -769,8 +765,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t newmark_velocity_alpha,
     s_t output[3 * NS][VS]
 ) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 3;
   for (int q = 0; q < NQ; ++q) {
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
@@ -933,7 +927,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     const s_t newmark_velocity_alpha,
     s_t *const RSTR output[3 * NS]
 ) {
-  static constexpr int ND = 3;
   static constexpr int NC = 3;
   for (int q = 0; q < NQ; ++q) {
     s_t u0_grad_0_ref_values[VS];
@@ -1515,7 +1508,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     const s_t newmark_velocity_alpha,
     s_t output[3 * NS][VS]
 ) {
-  static constexpr int ND = 3;
   static constexpr int NC = 3;
   for (int q = 0; q < NQ; ++q) {
     s_t u0_grad_0_ref_values[VS];
@@ -2097,8 +2089,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t newmark_velocity_alpha,
     s_t *const RSTR output[3 * NS]
 ) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 3;
   for (int q = 0; q < NQ; ++q) {
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
@@ -2510,8 +2500,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t newmark_velocity_alpha,
     s_t output[3 * NS][VS]
 ) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 3;
   for (int q = 0; q < NQ; ++q) {
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {

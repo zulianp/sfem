@@ -168,7 +168,7 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
@@ -185,11 +185,9 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_affine
   static constexpr int ND = 2;
   static constexpr int NQ = 6;
   static constexpr int CELL_NS = 6;
-  static constexpr int NS = CELL_NS;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 15;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const field_shape[NC] = {sfem::codegen::ref_tri6_q6<s_t>::shape(), sfem::codegen::ref_tri3_q6<s_t>::shape()};
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y()};
 
@@ -323,7 +321,7 @@ namespace codegen {
 template <typename s_t>
 static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isoparametric_mesh_mixed_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
     const ptrdiff_t direction_stride,
@@ -340,7 +338,6 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_isopar
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 15;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
 #pragma omp parallel for schedule(static)

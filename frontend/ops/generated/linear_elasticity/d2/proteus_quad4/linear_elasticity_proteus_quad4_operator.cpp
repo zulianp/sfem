@@ -102,7 +102,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -121,14 +121,11 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_objective_steps_i_msoa_im
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -316,7 +313,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_quad4_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -332,14 +329,11 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_gradient_i_msoa_impl(
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -522,7 +516,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_quad4_apply_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -538,14 +532,11 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_apply_i_msoa_impl(
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -749,7 +740,7 @@ static SFEM_INLINE void linear_elasticity_proteus_quad4_hessian_i_msoa_scatter_b
 template <typename s_t, typename g_t, int FORMAT>
 static int linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
     const s_t lmbda,
@@ -770,7 +761,6 @@ static int linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
   static constexpr int NS = 4;
   static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();

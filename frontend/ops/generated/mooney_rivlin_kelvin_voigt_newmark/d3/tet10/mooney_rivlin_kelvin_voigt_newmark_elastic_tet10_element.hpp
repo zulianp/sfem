@@ -22,7 +22,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_energy_e
         s_t *const RSTR values
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 10;
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
@@ -294,7 +293,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 10;
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
@@ -575,7 +573,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_hessian_
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 10;
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;

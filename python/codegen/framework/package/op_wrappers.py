@@ -1500,7 +1500,7 @@ namespace sfem {
     });
   }
 
-  int %(op)s::hessian_crs(const real_t *const x,
+  int %(op)s::hessian_crs(%(hessian_crs_current_parameter)s,
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
@@ -1513,7 +1513,7 @@ namespace sfem {
     });
   }
 
-  int %(op)s::hessian_bsr(const real_t *const x,
+  int %(op)s::hessian_bsr(%(hessian_bsr_current_parameter)s,
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
@@ -1529,7 +1529,7 @@ namespace sfem {
 
 
 
-  int %(op)s::hessian_block_diag_sym(const real_t *const x,
+  int %(op)s::hessian_block_diag_sym(%(hessian_block_diag_sym_current_parameter)s,
                                        real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_block_diag_sym");
 %(hessian_block_diag_sym_current_prologue)s
@@ -1710,6 +1710,9 @@ namespace sfem {
             indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
+        "hessian_crs_current_parameter": _hyperelastic_hessian_current_parameter(
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+        ),
         "hessian_crs_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
             "hessian_crs",
@@ -1724,6 +1727,9 @@ namespace sfem {
             indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
+        "hessian_bsr_current_parameter": _hyperelastic_hessian_current_parameter(
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+        ),
         "hessian_bsr_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
             "hessian_bsr",
@@ -1737,6 +1743,9 @@ namespace sfem {
             ("values",),
             indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
+        ),
+        "hessian_block_diag_sym_current_parameter": _hyperelastic_hessian_current_parameter(
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "hessian_block_diag_sym_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
@@ -8402,13 +8411,28 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
     return "\n".join(lines)
 
 
+def _hyperelastic_hessian_current_parameter(apply_dependencies_by_dim):
+    """Name the state parameter only where the body goes on to read it.
+
+    A hessian that ignores the state still has to accept it -- the signature is
+    fixed by the virtual it overrides -- but naming what nothing reads is what
+    `-Wextra -Werror` rejects, and the discard that used to silence it said the
+    same thing twice.
+    """
+    uses_current = any(
+        bool(getattr(dependencies, "current", False))
+        for dependencies in apply_dependencies_by_dim.values()
+    )
+    return "const real_t *const x" if uses_current else "const real_t *const"
+
+
 def _hyperelastic_hessian_current_prologue(op_name, operation, apply_dependencies_by_dim):
     uses_current = any(
         bool(getattr(dependencies, "current", False))
         for dependencies in apply_dependencies_by_dim.values()
     )
     if not uses_current:
-        return "    (void)x;"
+        return ""
     return "\n".join(
         (
             "    const real_t *const current = x;",

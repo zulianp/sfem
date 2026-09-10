@@ -890,12 +890,12 @@ namespace sfem {
     });
   }
 
-  int GeneratedLaplace::hessian_crs(const real_t *const x,
+  int GeneratedLaplace::hessian_crs(const real_t *const,
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_crs");
-    (void)x;
+
     auto mesh = impl_->space->mesh_ptr();
     auto points = const_cast<const geom_t *const *>(mesh->points()->data());
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -911,12 +911,12 @@ namespace sfem {
     });
   }
 
-  int GeneratedLaplace::hessian_bsr(const real_t *const x,
+  int GeneratedLaplace::hessian_bsr(const real_t *const,
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_bsr");
-    (void)x;
+
     auto mesh = impl_->space->mesh_ptr();
     auto points = const_cast<const geom_t *const *>(mesh->points()->data());
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -935,10 +935,10 @@ namespace sfem {
 
 
 
-  int GeneratedLaplace::hessian_block_diag_sym(const real_t *const x,
+  int GeneratedLaplace::hessian_block_diag_sym(const real_t *const,
                                        real_t *const values) {
     SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_block_diag_sym");
-    (void)x;
+
     auto mesh = impl_->space->mesh_ptr();
     auto points = const_cast<const geom_t *const *>(mesh->points()->data());
     return impl_->domains->iterate([&](const OpDomain &domain) {

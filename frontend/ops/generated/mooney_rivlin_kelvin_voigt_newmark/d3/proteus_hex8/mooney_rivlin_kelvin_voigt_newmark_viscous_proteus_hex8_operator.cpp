@@ -80,7 +80,7 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
@@ -108,12 +108,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
     s_t *const RSTR u1_out,
     s_t *const RSTR u2_out
 ) {
-  static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int NC = 3;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
@@ -231,7 +229,7 @@ namespace codegen {
 template <typename s_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_i_msoa_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
     const s_t eta_b,
@@ -255,7 +253,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_r
   static constexpr int NS = 8;
   static constexpr int NC = 3;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
@@ -437,7 +434,7 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
@@ -469,12 +466,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
     s_t *const RSTR u1_out,
     s_t *const RSTR u2_out
 ) {
-  static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int NC = 3;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
@@ -599,7 +594,7 @@ namespace codegen {
 template <typename s_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_msoa_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
     const s_t eta_b,
@@ -627,7 +622,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_j
   static constexpr int NS = 8;
   static constexpr int NC = 3;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();

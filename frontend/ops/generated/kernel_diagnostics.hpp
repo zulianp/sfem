@@ -108,8 +108,7 @@ static SFEM_INLINE size_t KernelDiagnostics_total_bytes(
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
     const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  (void)accumulator_bytes;
+    const size_t) {
   const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;
   const size_t geometry_bytes = n * (size_t)d->n_qp * (size_t)d->geometry_streams * scalar_bytes;
   const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;
@@ -123,8 +122,7 @@ static SFEM_INLINE size_t KernelDiagnostics_total_bytes_affine_mesh(
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
     const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  (void)accumulator_bytes;
+    const size_t) {
   const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;
   const size_t geometry_bytes = n * (size_t)(d->dim * d->dim + 1) * scalar_bytes;
   const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;
@@ -138,8 +136,7 @@ static SFEM_INLINE size_t KernelDiagnostics_total_bytes_isoparametric_mesh(
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
     const size_t real_bytes,
-    const size_t accumulator_bytes) {
-  (void)accumulator_bytes;
+    const size_t) {
   const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;
   const size_t geometry_bytes = n * (size_t)d->dim * (size_t)d->n_shape * scalar_bytes;
   const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;

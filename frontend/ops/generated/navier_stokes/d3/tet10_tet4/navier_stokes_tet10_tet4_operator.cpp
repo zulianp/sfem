@@ -168,7 +168,7 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_tet10_tet4_residual_affine_mesh_mixed_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
@@ -200,11 +200,9 @@ static SFEM_INLINE int navier_stokes_tet10_tet4_residual_affine_mesh_mixed_impl(
   static constexpr int ND = 3;
   static constexpr int NQ = 11;
   static constexpr int CELL_NS = 10;
-  static constexpr int NS = CELL_NS;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 34;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const field_shape[NC] = {sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet4_q11<s_t>::shape()};
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z()};
 
@@ -378,7 +376,7 @@ namespace codegen {
 template <typename s_t>
 static SFEM_INLINE int navier_stokes_tet10_tet4_residual_isoparametric_mesh_mixed_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
     const s_t convection_scale,
@@ -405,7 +403,6 @@ static SFEM_INLINE int navier_stokes_tet10_tet4_residual_isoparametric_mesh_mixe
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 34;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
@@ -597,7 +594,7 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixed_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
@@ -626,11 +623,9 @@ static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixe
   static constexpr int ND = 3;
   static constexpr int NQ = 11;
   static constexpr int CELL_NS = 10;
-  static constexpr int NS = CELL_NS;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 34;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const field_shape[NC] = {sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet4_q11<s_t>::shape()};
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z()};
 
@@ -801,7 +796,7 @@ namespace codegen {
 template <typename s_t>
 static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
     const s_t convection_scale,
@@ -825,7 +820,6 @@ static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_isoparametric_me
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 34;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();

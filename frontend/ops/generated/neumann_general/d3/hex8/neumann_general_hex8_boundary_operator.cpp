@@ -15,13 +15,6 @@ namespace codegen {
 
 template <typename s_t>
 struct neumann_general_hex8_quadshell4_boundary_residual_soa_reference_data {
-  static constexpr int NS1 = 2;
-  static constexpr int NQ1 = 2;
-  static constexpr int NS = 4;
-  static constexpr int NQ = 4;
-  static constexpr int REF_DIM = 2;
-  static constexpr int PHYSICAL_DIM = 3;
-
   static const s_t *shape_1d() {
     static const s_t data[4] = {
       s_t(0.78867513459481287),

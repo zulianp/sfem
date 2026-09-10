@@ -22,7 +22,6 @@ static SFEM_INLINE int linear_elasticity_tet4_energy_egeometry_soa(
         s_t *const RSTR values
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 4;
   static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
@@ -297,7 +296,6 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_egeometry_soa(
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 4;
   static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
@@ -580,7 +578,6 @@ static SFEM_INLINE int linear_elasticity_tet4_hessian_egeometry_soa(
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 4;
   static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;

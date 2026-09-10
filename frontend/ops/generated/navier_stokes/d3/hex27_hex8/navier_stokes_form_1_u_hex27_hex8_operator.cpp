@@ -168,7 +168,7 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_form_1_u_hex27_hex8_residual_affine_mesh_mixed_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
@@ -200,11 +200,9 @@ static SFEM_INLINE int navier_stokes_form_1_u_hex27_hex8_residual_affine_mesh_mi
   static constexpr int ND = 3;
   static constexpr int NQ = 64;
   static constexpr int CELL_NS = 27;
-  static constexpr int NS = CELL_NS;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 89;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()};
   const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
   const idx_t *const RSTR field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
@@ -382,7 +380,7 @@ namespace codegen {
 template <typename s_t>
 static SFEM_INLINE int navier_stokes_form_1_u_hex27_hex8_residual_isoparametric_mesh_mixed_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
     const s_t convection_scale,
@@ -409,7 +407,6 @@ static SFEM_INLINE int navier_stokes_form_1_u_hex27_hex8_residual_isoparametric_
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 89;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
   const idx_t *const RSTR field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};

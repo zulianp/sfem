@@ -102,7 +102,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_tri3_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -124,7 +124,6 @@ static SFEM_INLINE int linear_elasticity_tri3_objective_steps_a_msoa_impl(
   static constexpr int NC = 2;
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
-  (void)nnodes;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -304,7 +303,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_tri3_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -323,7 +322,6 @@ static SFEM_INLINE int linear_elasticity_tri3_gradient_a_msoa_impl(
   static constexpr int NC = 2;
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
-  (void)nnodes;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -498,7 +496,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_tri3_apply_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -517,7 +515,6 @@ static SFEM_INLINE int linear_elasticity_tri3_apply_a_msoa_impl(
   static constexpr int NC = 2;
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
-  (void)nnodes;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -713,7 +710,7 @@ static SFEM_INLINE void linear_elasticity_tri3_hessian_i_msoa_scatter_block_diag
 template <typename s_t, typename g_t, int FORMAT>
 static int linear_elasticity_tri3_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
     const s_t lmbda,
@@ -734,7 +731,6 @@ static int linear_elasticity_tri3_hessian_i_msoa_assemble_impl(
   static constexpr int NS = 3;
   static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();

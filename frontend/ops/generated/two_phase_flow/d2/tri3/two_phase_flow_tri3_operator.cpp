@@ -422,7 +422,7 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int two_phase_flow_tri3_residual_a_msoa_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
@@ -460,12 +460,10 @@ static SFEM_INLINE int two_phase_flow_tri3_residual_a_msoa_impl(
     s_t *const RSTR p_w_out,
     s_t *const RSTR p_c_out
 ) {
-  static constexpr int ND = 2;
   static constexpr int NQ = 6;
   static constexpr int NS = 3;
   static constexpr int NC = 2;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const affine_shape = sfem::codegen::ref_tri3_q6<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y();
@@ -640,7 +638,7 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int two_phase_flow_tri3_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
@@ -678,12 +676,10 @@ static SFEM_INLINE int two_phase_flow_tri3_jacobian_action_a_msoa_impl(
     s_t *const RSTR p_w_out,
     s_t *const RSTR p_c_out
 ) {
-  static constexpr int ND = 2;
   static constexpr int NQ = 6;
   static constexpr int NS = 3;
   static constexpr int NC = 2;
   static constexpr int VS = 16;
-  (void)nnodes;
   const s_t *const affine_shape = sfem::codegen::ref_tri3_q6<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y();

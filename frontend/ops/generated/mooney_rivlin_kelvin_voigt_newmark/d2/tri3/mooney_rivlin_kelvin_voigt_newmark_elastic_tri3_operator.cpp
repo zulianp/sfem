@@ -101,7 +101,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -123,7 +123,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
   static constexpr int NC = 2;
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
-  (void)nnodes;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -303,7 +302,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -322,7 +321,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
   static constexpr int NC = 2;
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
-  (void)nnodes;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
@@ -497,7 +495,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -519,7 +517,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_m
   static constexpr int NC = 2;
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
-  (void)nnodes;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)

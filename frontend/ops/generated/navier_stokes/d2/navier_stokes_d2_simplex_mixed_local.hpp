@@ -51,11 +51,6 @@ static SFEM_INLINE void navier_stokes_d2_simplex_mixed_residual_block(
     const s_t rho,
     s_t *const RSTR output[15]
 ) {
-  static constexpr int ND = 2;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 15;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 6;
   static constexpr int P_NS = 3;
   for (int q = 0; q < NQ; ++q) {
@@ -247,11 +242,6 @@ static SFEM_INLINE void navier_stokes_d2_simplex_mixed_residual_block_contiguous
     const s_t rho,
     s_t output[15][VS]
 ) {
-  static constexpr int ND = 2;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 15;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 6;
   static constexpr int P_NS = 3;
   for (int q = 0; q < NQ; ++q) {
@@ -441,11 +431,6 @@ static SFEM_INLINE void navier_stokes_d2_simplex_mixed_jacobian_action_block(
     const s_t rho,
     s_t *const RSTR output[15]
 ) {
-  static constexpr int ND = 2;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 15;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 6;
   static constexpr int P_NS = 3;
   for (int q = 0; q < NQ; ++q) {
@@ -638,11 +623,6 @@ static SFEM_INLINE void navier_stokes_d2_simplex_mixed_jacobian_action_block_con
     const s_t rho,
     s_t output[15][VS]
 ) {
-  static constexpr int ND = 2;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 15;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 6;
   static constexpr int P_NS = 3;
   for (int q = 0; q < NQ; ++q) {

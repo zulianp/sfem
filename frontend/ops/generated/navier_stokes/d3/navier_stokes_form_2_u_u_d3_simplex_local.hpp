@@ -49,11 +49,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_u_d3_simplex_jacobian_action_bloc
     const s_t rho,
     s_t *const RSTR output[30]
 ) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 1;
-  static constexpr int N_FIELD_STREAMS = 30;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 10;
   for (int q = 0; q < NQ; ++q) {
     #pragma omp simd
@@ -496,11 +491,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_u_d3_simplex_jacobian_action_bloc
     const s_t rho,
     s_t output[30][VS]
 ) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 1;
-  static constexpr int N_FIELD_STREAMS = 30;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 10;
   for (int q = 0; q < NQ; ++q) {
     #pragma omp simd

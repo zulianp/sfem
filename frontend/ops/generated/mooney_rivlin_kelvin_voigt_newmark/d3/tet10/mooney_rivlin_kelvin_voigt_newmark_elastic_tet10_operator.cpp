@@ -103,7 +103,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -132,7 +132,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objectiv
   static constexpr int NC = 3;
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
-  (void)nnodes;
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
   const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_z();
@@ -283,11 +282,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objectiv
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const geom_t *const RSTR g_adj0,
@@ -318,8 +317,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objectiv
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
-  (void)n_shared_nodes;
 
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
@@ -496,7 +493,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -517,7 +514,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objectiv
   static constexpr int ND = 3;
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
@@ -710,11 +706,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objectiv
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const geom_t *const *const RSTR points,
@@ -737,8 +733,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objectiv
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
-  (void)n_shared_nodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -1024,7 +1018,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -1050,7 +1044,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
   static constexpr int NC = 3;
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
-  (void)nnodes;
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
   const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_z();
@@ -1196,7 +1189,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -1228,7 +1221,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
@@ -1412,11 +1404,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -1450,7 +1442,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
@@ -1467,7 +1458,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
@@ -1656,7 +1646,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -1674,7 +1664,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
   static constexpr int ND = 3;
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
@@ -1862,7 +1851,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -1886,7 +1875,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -2116,11 +2104,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -2146,7 +2134,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -2167,7 +2154,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
@@ -2453,7 +2439,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -2483,7 +2469,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_a_
   static constexpr int NC = 3;
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
-  (void)nnodes;
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
   const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_z();
@@ -2640,7 +2625,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -2676,7 +2661,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
@@ -2876,11 +2860,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -2918,7 +2902,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
@@ -2936,7 +2919,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
@@ -3140,7 +3122,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -3162,7 +3144,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_i_
   static constexpr int ND = 3;
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
@@ -3361,7 +3342,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -3389,7 +3370,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -3635,11 +3615,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -3669,7 +3649,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -3691,7 +3670,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_pa
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];

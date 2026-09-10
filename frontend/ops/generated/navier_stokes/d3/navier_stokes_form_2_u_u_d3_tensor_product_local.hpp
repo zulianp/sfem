@@ -50,10 +50,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_u_d3_tensor_product_jacobian_acti
     s_t *const RSTR output[81]
 ) {
   static constexpr int ND = 3;
-  static constexpr int NC = 1;
-  static constexpr int N_FIELD_STREAMS = 81;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 27;
   static constexpr int NQ1 = integer_root(NQ, ND);
   static_assert(ipow(NQ1, ND) == NQ, "NQ must be tensor-product compatible");
@@ -199,10 +195,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_u_d3_tensor_product_jacobian_acti
     s_t output[81][VS]
 ) {
   static constexpr int ND = 3;
-  static constexpr int NC = 1;
-  static constexpr int N_FIELD_STREAMS = 81;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 27;
   static constexpr int NQ1 = integer_root(NQ, ND);
   static_assert(ipow(NQ1, ND) == NQ, "NQ must be tensor-product compatible");

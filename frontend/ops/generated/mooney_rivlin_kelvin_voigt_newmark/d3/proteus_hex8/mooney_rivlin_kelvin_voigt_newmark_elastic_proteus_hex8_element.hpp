@@ -22,7 +22,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_e
         s_t *const RSTR values
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
   static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
@@ -188,7 +187,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
   static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
@@ -363,7 +361,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_h
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
   static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;

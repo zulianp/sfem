@@ -17,8 +17,6 @@ template <typename s_t>
 struct neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data {
   static constexpr int NS = 2;
   static constexpr int NQ = 2;
-  static constexpr int REF_DIM = 1;
-  static constexpr int PHYSICAL_DIM = 2;
 
   static const s_t *shape() {
     static const s_t data[4] = {

@@ -21,7 +21,6 @@ static SFEM_INLINE int laplace_tri3_energy_egeometry_soa(
         s_t *const RSTR values
 ) {
   static constexpr int NC = 1;
-  static constexpr int ND = 2;
   static constexpr int NS = 3;
   static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
@@ -227,7 +226,6 @@ static SFEM_INLINE int laplace_tri3_gradient_egeometry_soa(
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 1;
-  static constexpr int ND = 2;
   static constexpr int NS = 3;
   static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
@@ -441,7 +439,6 @@ static SFEM_INLINE int laplace_tri3_hessian_egeometry_soa(
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 1;
-  static constexpr int ND = 2;
   static constexpr int NS = 3;
   static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;

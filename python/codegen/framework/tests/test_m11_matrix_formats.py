@@ -257,7 +257,15 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                     method_end = wrapper_source.index("void %s::set_option" % op_name, method_begin)
                     block_diag_method = wrapper_source[method_begin:method_end]
                     if material_name == "linear_elasticity":
-                        self.assertIn("(void)x;", block_diag_method)
+                        # A linear material's tangent does not depend on the
+                        # state, so the parameter it must still accept carries
+                        # no name -- rather than a name plus a `(void)x;` to
+                        # apologise for it.
+                        self.assertIn(
+                            "hessian_block_diag_sym(const real_t *const,",
+                            block_diag_method,
+                        )
+                        self.assertNotIn("(void)x;", block_diag_method)
                         self.assertNotIn("requires a current state", block_diag_method)
                     else:
                         self.assertIn("const real_t *const current = x;", block_diag_method)

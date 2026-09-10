@@ -102,7 +102,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_tet4_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_met0,
         const g_t *const RSTR g_met1,
@@ -119,7 +119,6 @@ static SFEM_INLINE int laplace_tet4_objective_steps_a_msoa_impl(
         const s_t *const RSTR steps,
         s_t *const RSTR value
 ) {
-  (void)nnodes;
 
   #pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
@@ -201,11 +200,11 @@ static SFEM_INLINE int laplace_tet4_objective_steps_packed_a_msoa_impl(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const geom_t *const RSTR g_met0,
@@ -224,11 +223,6 @@ static SFEM_INLINE int laplace_tet4_objective_steps_packed_a_msoa_impl(
     s_t *const RSTR value
 ) {
   static constexpr int NC = 1;
-  static constexpr int NQ = 1;
-  static constexpr int NS = 4;
-  static constexpr int VS = 16;
-  (void)nnodes;
-  (void)n_shared_nodes;
 
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -405,7 +399,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_tet4_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_met0,
         const g_t *const RSTR g_met1,
@@ -419,7 +413,6 @@ static SFEM_INLINE int laplace_tet4_gradient_a_msoa_impl(
         const ptrdiff_t out_stride,
         s_t *const RSTR outx
 ) {
-  (void)nnodes;
 
   #pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
@@ -501,7 +494,7 @@ static SFEM_INLINE int laplace_tet4_gradient_packed_a_msoa_impl(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -521,10 +514,6 @@ static SFEM_INLINE int laplace_tet4_gradient_packed_a_msoa_impl(
     s_t *const RSTR outx
 ) {
   static constexpr int NC = 1;
-  static constexpr int NQ = 1;
-  static constexpr int NS = 4;
-  static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -658,11 +647,11 @@ static SFEM_INLINE int laplace_tet4_gradient_packed_two_pass_a_msoa_impl(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -684,10 +673,6 @@ static SFEM_INLINE int laplace_tet4_gradient_packed_two_pass_a_msoa_impl(
     s_t *const RSTR outx
 ) {
   static constexpr int NC = 1;
-  static constexpr int NQ = 1;
-  static constexpr int NS = 4;
-  static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -701,7 +686,6 @@ static SFEM_INLINE int laplace_tet4_gradient_packed_two_pass_a_msoa_impl(
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
@@ -898,7 +882,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_tet4_apply_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_met0,
         const g_t *const RSTR g_met1,
@@ -912,7 +896,6 @@ static SFEM_INLINE int laplace_tet4_apply_a_msoa_impl(
         const ptrdiff_t out_stride,
         s_t *const RSTR outx
 ) {
-  (void)nnodes;
 
   #pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
@@ -994,7 +977,7 @@ static SFEM_INLINE int laplace_tet4_apply_packed_a_msoa_impl(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -1014,10 +997,6 @@ static SFEM_INLINE int laplace_tet4_apply_packed_a_msoa_impl(
     s_t *const RSTR outx
 ) {
   static constexpr int NC = 1;
-  static constexpr int NQ = 1;
-  static constexpr int NS = 4;
-  static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -1151,11 +1130,11 @@ static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -1177,10 +1156,6 @@ static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
     s_t *const RSTR outx
 ) {
   static constexpr int NC = 1;
-  static constexpr int NQ = 1;
-  static constexpr int NS = 4;
-  static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -1194,7 +1169,6 @@ static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
@@ -1429,7 +1403,7 @@ static SFEM_INLINE void laplace_tet4_hessian_i_msoa_scatter_crs(
 template <typename s_t, typename g_t, int FORMAT>
 static int laplace_tet4_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
     const s_t kappa,
@@ -1449,7 +1423,6 @@ static int laplace_tet4_hessian_i_msoa_assemble_impl(
   static constexpr int NS = 4;
   static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];

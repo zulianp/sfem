@@ -52,11 +52,6 @@ static SFEM_INLINE void navier_stokes_form_1_u_d3_simplex_mixed_residual_block(
     const s_t rho,
     s_t *const RSTR output[34]
 ) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 34;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 10;
   static constexpr int P_NS = 4;
   for (int q = 0; q < NQ; ++q) {
@@ -509,11 +504,6 @@ static SFEM_INLINE void navier_stokes_form_1_u_d3_simplex_mixed_residual_block_c
     const s_t rho,
     s_t output[34][VS]
 ) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 34;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 10;
   static constexpr int P_NS = 4;
   for (int q = 0; q < NQ; ++q) {

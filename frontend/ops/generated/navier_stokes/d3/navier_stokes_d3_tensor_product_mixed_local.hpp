@@ -53,10 +53,6 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_residual_block(
     s_t *const RSTR output[89]
 ) {
   static constexpr int ND = 3;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 89;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 27;
   static constexpr int P_NS = 8;
   static constexpr int NQ1 = integer_root(NQ, ND);
@@ -220,10 +216,6 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_residual_block_con
     s_t output[89][VS]
 ) {
   static constexpr int ND = 3;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 89;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 27;
   static constexpr int P_NS = 8;
   static constexpr int NQ1 = integer_root(NQ, ND);
@@ -373,10 +365,6 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_jacobian_action_bl
     s_t *const RSTR output[89]
 ) {
   static constexpr int ND = 3;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 89;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 27;
   static constexpr int P_NS = 8;
   static constexpr int NQ1 = integer_root(NQ, ND);
@@ -541,10 +529,6 @@ static SFEM_INLINE void navier_stokes_d3_tensor_product_mixed_jacobian_action_bl
     s_t output[89][VS]
 ) {
   static constexpr int ND = 3;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 89;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
   static constexpr int U_NS = 27;
   static constexpr int P_NS = 8;
   static constexpr int NQ1 = integer_root(NQ, ND);

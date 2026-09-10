@@ -17,8 +17,6 @@ template <typename s_t>
 struct neumann_general_tet10_trishell6_boundary_residual_soa_reference_data {
   static constexpr int NS = 6;
   static constexpr int NQ = 6;
-  static constexpr int REF_DIM = 2;
-  static constexpr int PHYSICAL_DIM = 3;
 
   static const s_t *shape() {
     static const s_t data[36] = {

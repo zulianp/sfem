@@ -66,7 +66,6 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d3_simplex_jacobian_action
     const s_t rho_w0,
     s_t *const RSTR output[2 * NS]
 ) {
-  static constexpr int ND = 3;
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
     s_t p_w_values[VS];
@@ -260,7 +259,6 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d3_simplex_jacobian_action
     const s_t rho_w0,
     s_t output[2 * NS][VS]
 ) {
-  static constexpr int ND = 3;
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
     s_t p_w_values[VS];
@@ -454,7 +452,6 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d3_simplex_tet4_jacobian_a
     const s_t rho_w0,
     s_t *const RSTR output[2 * NS]
 ) {
-  static constexpr int ND = 3;
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
     s_t p_w_values[VS];
@@ -648,7 +645,6 @@ static SFEM_INLINE void two_phase_flow_form_2_p_w_p_w_d3_simplex_tet4_jacobian_a
     const s_t rho_w0,
     s_t output[2 * NS][VS]
 ) {
-  static constexpr int ND = 3;
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
     s_t p_w_values[VS];

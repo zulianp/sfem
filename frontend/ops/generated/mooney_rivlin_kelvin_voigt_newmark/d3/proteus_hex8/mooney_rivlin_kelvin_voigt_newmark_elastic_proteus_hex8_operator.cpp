@@ -101,7 +101,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -130,12 +130,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
   static constexpr int NC = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  (void)nnodes;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -282,11 +279,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const geom_t *const RSTR g_adj0,
@@ -317,14 +314,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
-  (void)n_shared_nodes;
 
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -496,7 +489,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -517,15 +510,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
   static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -669,11 +659,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const geom_t *const *const RSTR points,
@@ -696,8 +686,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
-  (void)n_shared_nodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -705,8 +693,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_o
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -941,7 +927,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -967,12 +953,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
   static constexpr int NC = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  (void)nnodes;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -1114,7 +1097,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -1146,13 +1129,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -1331,11 +1311,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -1369,13 +1349,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -1387,7 +1364,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
@@ -1576,7 +1552,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -1594,15 +1570,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
   static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -1741,7 +1714,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -1765,7 +1738,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -1773,8 +1745,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -1953,11 +1923,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -1983,7 +1953,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -1991,8 +1960,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -2005,7 +1972,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_g
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
@@ -2248,7 +2214,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
         const g_t *const RSTR g_adj1,
@@ -2278,12 +2244,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
   static constexpr int NC = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  (void)nnodes;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -2436,7 +2399,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -2472,13 +2435,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -2673,11 +2633,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -2715,13 +2675,10 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -2734,7 +2691,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
@@ -2938,7 +2894,7 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
+        const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
         const s_t lmbda,
@@ -2960,15 +2916,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
   static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  (void)nnodes;
   const g_t *const RSTR x = points[0];
   const g_t *const RSTR y = points[1];
   const g_t *const RSTR z = points[2];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -3118,7 +3071,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -3146,7 +3099,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -3154,8 +3106,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -3350,11 +3300,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
+    const ptrdiff_t,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
-    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR,
     const ptrdiff_t *const RSTR ghost_ptr,
     const idx_t *const RSTR ghost_idx,
     const ptrdiff_t n_ghost_entries,
@@ -3384,7 +3334,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int VS = 16;
-  (void)nnodes;
 
   const geom_t *const RSTR x = points[0];
   const geom_t *const RSTR y = points[1];
@@ -3392,8 +3341,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
-  static constexpr int NQ1 = 2;
-  static constexpr int NS1 = 2;
 
 #pragma omp parallel
   {
@@ -3407,7 +3354,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_a
       const ptrdiff_t e_start = pack * n_elements_per_pack;
       const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
       const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-      (void)n_shared_nodes;
       const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
       const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
       const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];

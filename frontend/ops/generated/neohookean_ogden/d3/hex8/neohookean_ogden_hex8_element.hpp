@@ -17,9 +17,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_energy_egeometry_soa(
         s_t *const RSTR values
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_u_streams[NDOFS];
@@ -42,9 +40,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_energy_ecoords_soa(
         s_t *const RSTR values
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_coords[NDOFS];
@@ -74,9 +70,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_energy_esoa(
         s_t *const RSTR values
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_coords[NDOFS];
@@ -107,9 +101,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_gradient_egeometry_soa(
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_u_streams[NDOFS];
@@ -139,9 +131,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_gradient_ecoords_soa(
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_coords[NDOFS];
@@ -178,9 +168,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_gradient_esoa(
         s_t *const *const RSTR out_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_coords[NDOFS];
@@ -218,9 +206,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hessian_egeometry_soa(
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_u_streams[NDOFS];
@@ -259,9 +245,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hessian_ecoords_soa(
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_coords[NDOFS];
@@ -307,9 +291,7 @@ static SFEM_INLINE int neohookean_ogden_hex8_hessian_esoa(
         s_t *const *const RSTR matrix_streams
 ) {
   static constexpr int NC = 3;
-  static constexpr int ND = 3;
   static constexpr int NS = 8;
-  static constexpr int NQ = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
   const s_t *ordered_coords[NDOFS];

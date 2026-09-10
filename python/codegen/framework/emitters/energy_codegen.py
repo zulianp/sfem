@@ -1,5 +1,11 @@
 import sympy as sp
 
+from codegen.framework.emitters.kernel_prologue import (
+    discard_unused,
+    kernel_constant,
+    resolve_dead_parameters,
+    resolve_kernel_constants,
+)
 from codegen.framework.plans.conventions import (
     PREFIXES,
     abi_geometry_name,
@@ -308,7 +314,7 @@ def _affine_geometry_stream_helper_lines(source_builder):
         index = _work_item_index(source_builder)
         lines.extend(
             [
-                "  (void)ne;",
+                discard_unused("ne", indent="  "),
                 "  converted[%s] = s_t(source[%s]);" % (index, index),
             ]
         )
@@ -420,34 +426,6 @@ def _inline_qualifier(source_builder):
 def _defines_sfem_inline(source_builder):
     return _inline_qualifier(source_builder) == "SFEM_INLINE"
 
-
-def _prune_unused_spatial_dim(source):
-    """Drop `ND` from kernels that never read a coordinate.
-
-    The constant is declared beside `ND` wherever a kernel declares one, which
-    is the only place the two are known together, but only kernels that build
-    their own geometry go on to use it: an affine kernel is handed the adjugate
-    already computed and never touches a coordinate.  Declaring it there anyway
-    would leave an unused constant in roughly a third of the generated kernels.
-
-    Deciding per kernel up front would mean asking, in emission, which geometry
-    a form reads -- a question the planning layer owns.  Removing what turned
-    out to be unused asks nothing: the kernel body is right there and either
-    mentions the name or does not.
-    """
-    lines = source.split("\n")
-    kept = []
-    for index, line in enumerate(lines):
-        if line.strip().startswith("static constexpr int ND = "):
-            body = []
-            for following in lines[index + 1:]:
-                if following.startswith("}"):
-                    break
-                body.append(following)
-            if "ND" not in "\n".join(body):
-                continue
-        kept.append(line)
-    return "\n".join(kept)
 
 def generate_sfem_soa_cpp_files(
     forms,
@@ -675,10 +653,9 @@ def generate_sfem_soa_cpp_files(
         ),
         ]
     )
-    return tuple(
-        GeneratedKernelFile(entry.path, _prune_unused_spatial_dim(entry.source))
-        for entry in files
-    ) + _sfem_soa_reference_header_files((affine_quadrature_rule, quadrature_rule))
+    return tuple(files) + _sfem_soa_reference_header_files(
+        (affine_quadrature_rule, quadrature_rule)
+    )
 
 
 def generate_sfem_soa_cpp_files_for_element(
@@ -867,7 +844,7 @@ def _sfem_soa_local_header(
                 lines.append("")
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
-    return "\n".join(lines)
+    return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
 def _sfem_soa_emits_hessian_header(
@@ -987,7 +964,7 @@ def _sfem_soa_hessian_header(
         lines.append("")
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
-    return "\n".join(lines)
+    return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
 def _sfem_soa_direct_hessian_element_matrix_function(
@@ -1040,18 +1017,16 @@ def _sfem_soa_direct_hessian_element_matrix_function(
             "  static_assert(NQ > 0, \"NQ must be positive\");",
             "  static_assert(NS > 0, \"NS must be positive\");",
             "  static_assert(VS > 0, \"VS must be positive\");",
-            "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NDOFS = NC * NS;",
+            kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NDOFS", "NC * NS", indent="  "),
         ]
     )
     if use_tensor_product_reference:
         lines.extend(
             [
-                "  static constexpr int NQ1 = integer_root(NQ, %d);"
-                % quadrature_rule.dim,
-                "  static constexpr int NS1 = integer_root(NS, %d);"
-                % quadrature_rule.dim,
+                kernel_constant("NQ1", "integer_root(NQ, %d)" % quadrature_rule.dim, indent="  "),
+                kernel_constant("NS1", "integer_root(NS, %d)" % quadrature_rule.dim, indent="  "),
                 "  static_assert(ipow(NQ1, %d) == NQ, \"NQ must be tensor-product compatible\");"
                 % quadrature_rule.dim,
                 "  static_assert(ipow(NS1, %d) == NS, \"NS must be tensor-product compatible\");"
@@ -1312,10 +1287,8 @@ def _sfem_soa_weak_form_block_function(
         if use_stream_arrays:
             lines.extend(
                 [
-                    "  static constexpr int NQ1 = integer_root(NQ, %d);"
-                    % quadrature_rule.dim,
-                    "  static constexpr int NS1 = integer_root(NS, %d);"
-                    % quadrature_rule.dim,
+                    kernel_constant("NQ1", "integer_root(NQ, %d)" % quadrature_rule.dim, indent="  "),
+                    kernel_constant("NS1", "integer_root(NS, %d)" % quadrature_rule.dim, indent="  "),
                     '  static_assert(ipow(NQ1, %d) == NQ, \"NQ must be tensor-product compatible\");'
                     % quadrature_rule.dim,
                     '  static_assert(ipow(NS1, %d) == NS, \"NS must be tensor-product compatible\");'
@@ -1325,10 +1298,8 @@ def _sfem_soa_weak_form_block_function(
         else:
             lines.extend(
                 [
-                    "  static constexpr int NQ1 = %d;"
-                    % quadrature_rule.tensor_product_n_qp_1d,
-                    "  static constexpr int NS1 = %d;"
-                    % quadrature_rule.tensor_product_n_shape_1d,
+                    kernel_constant("NQ1", "%d" % quadrature_rule.tensor_product_n_qp_1d, indent="  "),
+                    kernel_constant("NS1", "%d" % quadrature_rule.tensor_product_n_shape_1d, indent="  "),
                 ]
             )
     if not use_stream_arrays and shared.uses_current:
@@ -1473,10 +1444,8 @@ def _sfem_soa_pointwise_block_function(
     if shared.use_tensor_product_reference:
         lines.extend(
             [
-                "  static constexpr int NQ1 = %d;"
-                % quadrature_rule.tensor_product_n_qp_1d,
-                "  static constexpr int NS1 = %d;"
-                % quadrature_rule.tensor_product_n_shape_1d,
+                kernel_constant("NQ1", "%d" % quadrature_rule.tensor_product_n_qp_1d, indent="  "),
+                kernel_constant("NS1", "%d" % quadrature_rule.tensor_product_n_shape_1d, indent="  "),
             ]
         )
         lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "  "))
@@ -3237,7 +3206,7 @@ def _sfem_soa_operator_source(
                 )
         lines.append("")
 
-    return "\n".join(lines)
+    return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
 def _is_tet4_linear_elasticity_aos_unit_candidate(form, prefix, dim, n_nodes, quadrature_rule):
@@ -3312,7 +3281,7 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
     lines.extend(
         [
             ") {",
-            "  (void)nnodes;",
+            discard_unused("nnodes", indent="  "),
             "",
             *source_builder.parallel_for_lines(),
             "  for (ptrdiff_t element = 0; element < nelements; ++element) {",
@@ -3595,13 +3564,13 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "    %s *const RSTR value" % scalar_type,
                 ") {",
                 "  using s_t = %s;" % scalar_type,
-                "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-                "  static constexpr int NQ = %d;" % n_qp,
-                "  static constexpr int NS = %d;" % n_nodes,
-                "  static constexpr int VS = %d;" % vector_size,
-                "  (void)nnodes;",
-                "  (void)n_shared_nodes;",
+                kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+                kernel_constant("NQ", n_qp, indent="  "),
+                kernel_constant("NS", n_nodes, indent="  "),
+                kernel_constant("VS", vector_size, indent="  "),
+                discard_unused("nnodes", indent="  "),
+                discard_unused("n_shared_nodes", indent="  "),
                 "",
             ]
         )
@@ -3634,10 +3603,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         if use_tensor_product_reference:
             lines.extend(
                 [
-                    "  static constexpr int NQ1 = %d;"
-                    % quadrature_rule.tensor_product_n_qp_1d,
-                    "  static constexpr int NS1 = %d;"
-                    % quadrature_rule.tensor_product_n_shape_1d,
+                    kernel_constant("NQ1", "%d" % quadrature_rule.tensor_product_n_qp_1d, indent="  "),
+                    kernel_constant("NS1", "%d" % quadrature_rule.tensor_product_n_shape_1d, indent="  "),
                 ]
             )
         lines.extend(
@@ -4576,7 +4543,7 @@ def _expanded_simplex_metric_body(plan, source_builder):
     dim = plan.dim
     scale = _sfem_ccode(plan.scale)
     scatter = _target_scatter_add_lines(source_builder)
-    lines = ["  (void)nnodes;", ""]
+    lines = [discard_unused("nnodes", indent="  "), ""]
     lines.extend(_target_parallel_element_loop_lines(source_builder))
     lines.append(
         "  for (ptrdiff_t element = 0; element < nelements; ++element) {"
@@ -4763,11 +4730,11 @@ def _sfem_soa_mesh_operator_function(
     lines.extend(
         [
             ") {",
-            "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NS = %d;" % n_nodes,
-            "  (void)nnodes;",
+            kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NS", n_nodes, indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     if geometry_mode == "isoparametric":
@@ -4804,10 +4771,8 @@ def _sfem_soa_mesh_operator_function(
     if use_tensor_product_reference:
         lines.extend(
             [
-                "  static constexpr int NQ1 = %d;"
-                % quadrature_rule.tensor_product_n_qp_1d,
-                "  static constexpr int NS1 = %d;"
-                % quadrature_rule.tensor_product_n_shape_1d,
+                kernel_constant("NQ1", "%d" % quadrature_rule.tensor_product_n_qp_1d, indent="  "),
+                kernel_constant("NS1", "%d" % quadrature_rule.tensor_product_n_shape_1d, indent="  "),
             ]
         )
     lines.append("")
@@ -5318,12 +5283,12 @@ def _sfem_soa_packed_apply_public_wrappers(
                 [
                     ") {",
                     "  using s_t = %s;" % scalar_type,
-                    "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-                    "  static constexpr int NQ = %d;" % n_qp,
-                    "  static constexpr int NS = %d;" % n_nodes,
-                    "  static constexpr int VS = %d;" % vector_size,
-                    "  (void)nnodes;",
+                    kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+                    kernel_constant("NQ", n_qp, indent="  "),
+                    kernel_constant("NS", n_nodes, indent="  "),
+                    kernel_constant("VS", vector_size, indent="  "),
+                    discard_unused("nnodes", indent="  "),
                     "",
                 ]
             )
@@ -5356,10 +5321,8 @@ def _sfem_soa_packed_apply_public_wrappers(
             if use_tensor_product_reference:
                 lines.extend(
                     [
-                        "  static constexpr int NQ1 = %d;"
-                        % quadrature_rule.tensor_product_n_qp_1d,
-                        "  static constexpr int NS1 = %d;"
-                        % quadrature_rule.tensor_product_n_shape_1d,
+                        kernel_constant("NQ1", "%d" % quadrature_rule.tensor_product_n_qp_1d, indent="  "),
+                        kernel_constant("NS1", "%d" % quadrature_rule.tensor_product_n_shape_1d, indent="  "),
                     ]
                 )
             lines.extend(
@@ -5395,7 +5358,7 @@ def _sfem_soa_packed_apply_public_wrappers(
             if two_pass:
                 lines.extend(
                     [
-                        "      (void)n_shared_nodes;",
+                        discard_unused("n_shared_nodes", indent="      "),
                         "      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
                         "      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;",
                         "      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
@@ -5847,7 +5810,7 @@ def _expanded_simplex_metric_value_body(plan, source_builder):
     dim = plan.dim
     scale = _sfem_ccode(plan.scale)
     lines = [
-        "  (void)nnodes;",
+        discard_unused("nnodes", indent="  "),
         "",
     ]
     lines.extend(_target_parallel_element_loop_lines(source_builder))
@@ -6065,11 +6028,11 @@ def _sfem_soa_mesh_objective_steps_function(
     lines.extend(
         [
             ") {",
-            "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NS = %d;" % n_nodes,
-            "  (void)nnodes;",
+            kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NS", n_nodes, indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     if geometry_mode == "isoparametric":
@@ -6104,10 +6067,8 @@ def _sfem_soa_mesh_objective_steps_function(
     if use_tensor_product_reference:
         lines.extend(
             [
-                "  static constexpr int NQ1 = %d;"
-                % quadrature_rule.tensor_product_n_qp_1d,
-                "  static constexpr int NS1 = %d;"
-                % quadrature_rule.tensor_product_n_shape_1d,
+                kernel_constant("NQ1", "%d" % quadrature_rule.tensor_product_n_qp_1d, indent="  "),
+                kernel_constant("NS1", "%d" % quadrature_rule.tensor_product_n_shape_1d, indent="  "),
             ]
         )
 
@@ -6503,10 +6464,8 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     if use_tensor_product_reference and emit_tensor_product_static_constants:
         lines.extend(
             [
-                "%sstatic constexpr int NQ1 = %d;"
-                % (indent, quadrature_rule.tensor_product_n_qp_1d),
-                "%sstatic constexpr int NS1 = %d;"
-                % (indent, quadrature_rule.tensor_product_n_shape_1d),
+                kernel_constant("NQ1", quadrature_rule.tensor_product_n_qp_1d, indent=indent),
+                kernel_constant("NS1", quadrature_rule.tensor_product_n_shape_1d, indent=indent),
             ]
         )
     lines.append("%sfor (int q = 0; q < NQ; ++q) {" % indent)
@@ -6805,12 +6764,12 @@ def _sfem_soa_hessian_packed_crs_passes(
         lines.extend(
             [
                 ") {",
-                "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-                "  static constexpr int NS = %d;" % n_nodes,
-                "  (void)nnodes;",
-                "  (void)max_nodes_per_pack;",
-                "  (void)n_shared_nodes;",
+                kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+                kernel_constant("NS", n_nodes, indent="  "),
+                discard_unused("nnodes", indent="  "),
+                discard_unused("max_nodes_per_pack", indent="  "),
+                discard_unused("n_shared_nodes", indent="  "),
                 *source_builder.parallel_for_lines(),
                 "  for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
                 "    const ptrdiff_t e_start = pack * n_elements_per_pack;",
@@ -6835,14 +6794,14 @@ def _sfem_soa_hessian_packed_crs_passes(
         lines.extend(
             [
                 ") {",
-                "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-                "  static constexpr int NQ = %d;" % n_qp,
-                "  static constexpr int NS = %d;" % n_nodes,
-                "  static constexpr int VS = 1;",
-                "  static constexpr int NDOFS = NC * NS;",
-                "  (void)nnodes;",
-                "  (void)n_shared_nodes;",
+                kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+                kernel_constant("NQ", n_qp, indent="  "),
+                kernel_constant("NS", n_nodes, indent="  "),
+                kernel_constant("VS", "1", indent="  "),
+                kernel_constant("NDOFS", "NC * NS", indent="  "),
+                discard_unused("nnodes", indent="  "),
+                discard_unused("n_shared_nodes", indent="  "),
             ]
         )
         for d in range(dim):
@@ -6944,7 +6903,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "        s_t bh_data[NS * NC][VS];",
                 "        s_t bout_data[NS * NC][VS];",
                 "        s_t bcoordinate_data[NS * ND][VS];",
-                "        static constexpr int ne = VS;",
+                kernel_constant("ne", "VS", indent="        "),
             ]
         )
         if uses_current:
@@ -7321,13 +7280,13 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "    const idx_t *const RSTR coo_cols,",
             "    idx_t *const RSTR coo_triplet_rows,",
             "    idx_t *const RSTR coo_triplet_cols) {",
-            "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NS = %d;" % n_nodes,
-            "  static constexpr int VS = 1;",
-            "  static constexpr int NDOFS = NC * NS;",
-            "  (void)nnodes;",
+            kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NS", n_nodes, indent="  "),
+            kernel_constant("VS", "1", indent="  "),
+            kernel_constant("NDOFS", "NC * NS", indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     if uses_current:
@@ -7371,7 +7330,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "    s_t bh_data[NS * NC][VS];",
             "    s_t bout_data[NS * NC][VS];",
             "    s_t bcoordinate_data[NS * ND][VS];",
-            "    static constexpr int ne = VS;",
+            kernel_constant("ne", "VS", indent="    "),
         ]
     )
     if uses_current:
@@ -8000,9 +7959,9 @@ def _sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes, n_field_com
         "    const count_t *const RSTR rowptr,",
         "    const idx_t *const RSTR colidx,",
         "    s_t *const RSTR values) {",
-        "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-        "  static constexpr int NS = %d;" % n_nodes,
+        kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+        kernel_constant("NS", n_nodes, indent="  "),
         "  count_t row_begin[NS];",
         "  int lenrow[NS];",
         "  int local_col[NS * NS];",
@@ -8056,10 +8015,10 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes, n_fie
         "    const count_t *const RSTR rowptr,",
         "    const idx_t *const RSTR colidx,",
         "    count_t *const RSTR entries) {",
-        "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-        "  static constexpr int NS = %d;" % n_nodes,
-        "  static constexpr int NDOFS = NC * NS;",
+        kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+        kernel_constant("NS", n_nodes, indent="  "),
+        kernel_constant("NDOFS", "NC * NS", indent="  "),
         "  idx_t ks[NS];",
         "  for (int i = 0; i < NS; ++i) {",
         "    const count_t row_begin = rowptr[ev[i]];",
@@ -8085,10 +8044,10 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes, n_fie
         "    const s_t *const RSTR element_matrix,",
         "    const count_t *const RSTR entries,",
         "    s_t *const RSTR values) {",
-        "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-        "  static constexpr int NS = %d;" % n_nodes,
-        "  static constexpr int NDOFS = NC * NS;",
+        kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+        kernel_constant("NS", n_nodes, indent="  "),
+        kernel_constant("NDOFS", "NC * NS", indent="  "),
         "  for (int row = 0; row < NDOFS; ++row) {",
         "    for (int col = 0; col < NDOFS; ++col) {",
         "#pragma omp atomic update",
@@ -8732,8 +8691,7 @@ def _sfem_soa_diagnostics_header(
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
         "    const size_t real_bytes,",
-        "    const size_t accumulator_bytes) {",
-        "  (void)accumulator_bytes;",
+        "    const size_t) {",
         "  const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
         "  const size_t geometry_bytes = n * (size_t)d->n_qp * (size_t)d->geometry_streams * scalar_bytes;",
         "  const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
@@ -8747,8 +8705,7 @@ def _sfem_soa_diagnostics_header(
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
         "    const size_t real_bytes,",
-        "    const size_t accumulator_bytes) {",
-        "  (void)accumulator_bytes;",
+        "    const size_t) {",
         "  const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
         "  const size_t geometry_bytes = n * (size_t)(d->dim * d->dim + 1) * scalar_bytes;",
         "  const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
@@ -8762,8 +8719,7 @@ def _sfem_soa_diagnostics_header(
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
         "    const size_t real_bytes,",
-        "    const size_t accumulator_bytes) {",
-        "  (void)accumulator_bytes;",
+        "    const size_t) {",
         "  const size_t n = nelements > 0 ? (size_t)nelements : (size_t)0;",
         "  const size_t geometry_bytes = n * (size_t)d->dim * (size_t)d->n_shape * scalar_bytes;",
         "  const size_t field_bytes = n * (size_t)(d->u_streams + d->h_streams) * real_bytes;",
@@ -9307,7 +9263,7 @@ def _sfem_soa_element_api_header(
         )
         lines.append("")
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
-    return "\n".join(lines)
+    return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
 def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
@@ -9412,7 +9368,7 @@ def _sfem_soa_element_api_alias_header(
             )
             lines.append("")
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
-    return "\n".join(lines)
+    return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
 def _sfem_soa_element_api_alias_function_lines(
@@ -9435,11 +9391,11 @@ def _sfem_soa_element_api_alias_function_lines(
     lines.extend(
         [
             ") {",
-            "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NS = %d;" % n_nodes,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NDOFS = NC * NS;",
+            kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NS", n_nodes, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NDOFS", "NC * NS", indent="  "),
             "  static constexpr int SHAPE_ORDER[NS] = {%s};" % ", ".join(str(i) for i in shape_order),
         ]
     )
@@ -9750,11 +9706,11 @@ def _sfem_soa_element_api_operation_lines(
         lines.extend(
             [
                 ") {",
-                "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-                "  static constexpr int NS = %d;" % n_nodes,
-                "  static constexpr int NQ = %d;" % n_qp,
-                "  static constexpr int NDOFS = NC * NS;",
+                kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+                kernel_constant("NS", n_nodes, indent="  "),
+                kernel_constant("NQ", n_qp, indent="  "),
+                kernel_constant("NDOFS", "NC * NS", indent="  "),
                 "  if (nelements <= 0) return SFEM_SUCCESS;",
                 "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
             ]
@@ -9825,11 +9781,11 @@ def _sfem_soa_element_api_hessian_lines(
         lines.extend(
             [
                 ") {",
-                "  static constexpr int NC = %d;" % n_field_components,
-                "  static constexpr int ND = %d;" % dim,
-                "  static constexpr int NS = %d;" % n_nodes,
-                "  static constexpr int NQ = %d;" % n_qp,
-                "  static constexpr int NDOFS = NC * NS;",
+                kernel_constant("NC", n_field_components, indent="  "),
+                kernel_constant("ND", dim, indent="  "),
+                kernel_constant("NS", n_nodes, indent="  "),
+                kernel_constant("NQ", n_qp, indent="  "),
+                kernel_constant("NDOFS", "NC * NS", indent="  "),
                 "  if (nelements <= 0) return SFEM_SUCCESS;",
                 "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
                 "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
