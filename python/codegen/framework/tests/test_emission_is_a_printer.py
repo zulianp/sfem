@@ -51,7 +51,15 @@ PLAN_INPUTS = (
 #: dependency set, ``quadrature_rule`` is a rule and ``matrix_format_plan`` is a
 #: plan, and all 130 such branches read as not-a-decision.  Nothing moved into
 #: emission to cause the rise.
-BUDGET = 199
+#:
+#: 199 -> 194: five copies of one ternary deciding a kernel's gather order left
+#: `emitters/residual_codegen.py` for `plans.layout.gather_shape_order`.  They
+#: were five copies of the same four lines and four of them were wrong in the
+#: same way -- they asked whether the element was a Cartesian *hex* and never
+#: whether it was a Cartesian quad -- which is the argument for the rule this
+#: budget enforces: a decision duplicated across emission sites is a decision
+#: that can disagree with itself.
+BUDGET = 194
 
 
 def _tested_names(test):

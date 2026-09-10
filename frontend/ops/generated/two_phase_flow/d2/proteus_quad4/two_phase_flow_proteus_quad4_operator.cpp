@@ -467,7 +467,6 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_residual_a_msoa_impl(
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
-  const idx_t *const RSTR field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -479,7 +478,7 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_residual_a_msoa_impl(
     const s_t *const previous_components[NC] = {p_w_old, p_c_old};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = field_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         #pragma omp simd
@@ -514,7 +513,7 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_residual_a_msoa_impl(
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = field_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
@@ -634,7 +633,6 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_residual_i_msoa_impl(
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
-  const idx_t *const RSTR field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -661,7 +659,7 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_residual_i_msoa_impl(
     const s_t *const previous_components[NC] = {p_w_old, p_c_old};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = field_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         #pragma omp simd
@@ -698,7 +696,7 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_residual_i_msoa_impl(
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = field_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
@@ -887,7 +885,6 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_jacobian_action_a_msoa_impl(
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
-  const idx_t *const RSTR field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -899,7 +896,7 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_jacobian_action_a_msoa_impl(
     const s_t *const direction_components[NC] = {p_w_direction, p_c_direction};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = field_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         #pragma omp simd
@@ -934,7 +931,7 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_jacobian_action_a_msoa_impl(
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = field_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
@@ -1054,7 +1051,6 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_jacobian_action_i_msoa_impl(
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
-  const idx_t *const RSTR field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -1081,7 +1077,7 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_jacobian_action_i_msoa_impl(
     const s_t *const direction_components[NC] = {p_w_direction, p_c_direction};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = field_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         #pragma omp simd
@@ -1118,7 +1114,7 @@ static SFEM_INLINE int two_phase_flow_proteus_quad4_jacobian_action_i_msoa_impl(
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = field_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
