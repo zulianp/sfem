@@ -366,6 +366,78 @@ sweep</strong>, which is more than either change made to the kernel itself today
 mesh-setup change rather than a kernel one. The residual 1.39x after that is not yet
 attributed.</p>
 <p>Reproduce with <code>jobs/live_vectors.sbatch</code>.</p>
+<h3>Space-filling the driver's element order</h3>
+<p>The driver never ordered its mesh; the benchmark always has. Applying the same
+reordering to the driver, both settings back to back in one allocation so only the order
+differs, element sweep from the tracer:</p>
+<table>
+<thead>
+<tr>
+<th>run</th>
+<th align="right">dof</th>
+<th align="right">SFEM_SFC=0</th>
+<th align="right">SFEM_SFC=1</th>
+<th align="right"></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>flat_N32</td>
+<td align="right">561,924</td>
+<td align="right">1033</td>
+<td align="right">1249</td>
+<td align="right">1.21x</td>
+</tr>
+<tr>
+<td>flat_N48</td>
+<td align="right">1,853,572</td>
+<td align="right">976</td>
+<td align="right">1120</td>
+<td align="right">1.15x</td>
+</tr>
+<tr>
+<td>flat_N64</td>
+<td align="right">4,343,300</td>
+<td align="right">921</td>
+<td align="right">1072</td>
+<td align="right">1.16x</td>
+</tr>
+<tr>
+<td>ss_L2_N16</td>
+<td align="right">561,924</td>
+<td align="right">878</td>
+<td align="right">894</td>
+<td align="right">1.02x</td>
+</tr>
+<tr>
+<td>ss_L2_N24</td>
+<td align="right">1,853,572</td>
+<td align="right">827</td>
+<td align="right">870</td>
+<td align="right">1.05x</td>
+</tr>
+<tr>
+<td>ss_L2_N32</td>
+<td align="right">4,343,300</td>
+<td align="right">767</td>
+<td align="right">788</td>
+<td align="right">1.03x</td>
+</tr>
+</tbody>
+</table>
+<p>So about 1.17x on the flat element sweep, and 1.02-1.05x on the semi-structured one,
+which is the smaller gain the macro-element layout would predict: a macro-element
+already carries its own lattice, so a pack of them is far less sensitive to the order
+they are numbered in.</p>
+<p>Two things to be honest about. The gain is a little below the 1.25x the benchmark
+measured for the same switch, and below what a 256x64x64 channel packing into slabs
+would have suggested -- the expectation that the driver would gain MORE than the cube
+was wrong. And within each pair the SFEM_SFC=0 run goes first, so any warm-up favouring
+the second run biases these ratios up; the throughput A/B on unchanged code put that
+effect at about 2%.</p>
+<p>Against the benchmark, the flat sweep at 4.3M dof now reads 1072 where the bench reads
+1482 at 4.1M, so the unattributed gap is 1.38x rather than the 1.74x it was.</p>
+<p>Reproduce with <code>jobs/sfc_driver.sbatch</code>.</p>
 <h2>The boundary closure was bound by its own load imbalance</h2>
 <p>The flat operator closes its boundary control volumes in a second sweep after the
 element kernel, and that sweep walked the WHOLE mesh -- gathering coordinates, fields

@@ -31,6 +31,7 @@
 #include "smesh_glob.hpp"
 #include "smesh_buffer.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_mesh_reorder.hpp"
 #include "smesh_semistructured.hpp"
 
 #include <algorithm>
@@ -2781,6 +2782,31 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "mesh generation failed\n");
         return EXIT_FAILURE;
     }
+
+    // Space-fill the element and node order before anything derives indices from the mesh.
+    //
+    // The packed sweep works a pack of elements at a time and gathers their nodes into a
+    // pack-local buffer, so how many distinct nodes a pack touches -- and therefore how much
+    // of its gather is ghost traffic -- is decided entirely by the order the mesh is
+    // numbered in. Measured on the benchmark at 4,121,204 dof with 2048-element packs, a
+    // pack holds 2735 nodes space-filled and 4373 lexicographic, and the element sweep runs
+    // at 1483 against 1183 MDOF/s. This driver never did it, and its own scope reads well
+    // below what the benchmark measures for the same kernel; see the bench-to-solver section
+    // of docs/CVFEM_Throughput.md.
+    //
+    // It belongs here, before the sidesets below, because a Sideset stores (parent element,
+    // local face index) and renumbering the elements underneath one would silently re-point
+    // it at a different face. SFC::reorder can remap sidesets that already exist, but there
+    // are none yet at this point and not creating the problem beats fixing it.
+    //
+    // SFEM_SFC=0 restores the original order. It is not a physics switch: the discretisation
+    // is unchanged and only the summation order of the ghost reduction moves with it, so
+    // results shift at round-off and no further.
+    if (smesh::Env::read<int>("SFEM_SFC", 1)) {
+        auto sfc = smesh::SFC::create_from_env();
+        if (sfc) sfc->reorder(*mesh);
+    }
+
     // Named sidesets, built once on the MACRO mesh and carried from there.
     //
     // These are the specification of the boundary; the per-element bitmask the kernels read
