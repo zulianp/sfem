@@ -73,6 +73,7 @@ from codegen.framework.plans.layout import (
     _is_tensor_product_family,
     _linear_index_offset,
     _mixed_field_shape_orders,
+    gather_shape_order,
     _mixed_stream_shape_offsets,
     _mixed_tensor_product_field_stream_order,
     _mixed_triplet_stream_indices,
@@ -124,7 +125,6 @@ from codegen.framework.fem.reference import (
     sfem_simplex_field_reference_data,
     sfem_soa_element_specialization,
     sfem_tensor_product_field_reference_data,
-    sfem_tensor_product_hex_uses_cartesian_ordering,
     SfemReferenceData,
 )
 from codegen.framework.emitters.quadrature_codegen import (
@@ -5398,13 +5398,7 @@ def _mesh_operator_source(
     )
     uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
     omit_simplex_reference_basis_inputs = gradient_metric is not None
-    shape_order = (
-        tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
-        else tensor_product_cartesian_shape_order(dim, n_shape)
-        if tensor_product
-        else tuple(range(n_shape))
-    )
+    shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
         n_fields,
@@ -6367,13 +6361,7 @@ def _scalar_crs_matrix_assembly_source(
     )
     row_streams = _compatible_matrix_stream_indices(row_fields, n_shape)
     column_streams = _compatible_matrix_stream_indices(column_fields, n_shape)
-    shape_order = (
-        tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
-        else tensor_product_cartesian_shape_order(dim, n_shape)
-        if tensor_product
-        else tuple(range(n_shape))
-    )
+    shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(tuple(range(n_shape)), 1, shape_order)
     if n_fields != 1:
         field_stream_order = streams_in_shape_order(
@@ -7128,13 +7116,7 @@ def _isoparametric_mesh_operator_source(
     tensor_product = _is_tensor_product_family(rule, basis_family)
     tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
     gradient_metric = None
-    shape_order = (
-        tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
-        else tensor_product_cartesian_shape_order(dim, n_shape)
-        if tensor_product
-        else tuple(range(n_shape))
-    )
+    shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
         n_fields,
@@ -7402,13 +7384,7 @@ def _scalar_packed_jacobian_action_source(
     n_qp = rule.n_qp
     tensor_product = _is_tensor_product_family(rule, basis_family)
     tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
-    shape_order = (
-        tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
-        else tensor_product_cartesian_shape_order(dim, n_shape)
-        if tensor_product
-        else tuple(range(n_shape))
-    )
+    shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
         n_fields,
@@ -8432,13 +8408,7 @@ def _scalar_packed_affine_jacobian_action_source(
     )
     uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
     omit_simplex_reference_basis_inputs = gradient_metric is not None
-    shape_order = (
-        tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
-        else tensor_product_cartesian_shape_order(dim, n_shape)
-        if tensor_product
-        else tuple(range(n_shape))
-    )
+    shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
         n_fields,

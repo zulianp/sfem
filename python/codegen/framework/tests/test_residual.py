@@ -27,6 +27,8 @@ from codegen.framework.plans.scheduling import (
 )
 from codegen.framework.plans.residual_model import residual_emission_model_from_system
 
+from codegen.framework.fem.tensor_product import tensor_product_cartesian_shape_order
+
 def _ensure_parent(path):
     """A generated path may carry a directory -- `reference/<key>.hpp` does."""
     parent = os.path.dirname(path)
@@ -71,6 +73,11 @@ def _reference_coordinates(element):
             (0.0, 1.0, 0.0),
             (0.0, 0.0, 1.0),
         )
+    if element in ("QUAD4", "PROTEUS_QUAD4"):
+        # The unit square. `QUAD4` numbers its corners counter-clockwise;
+        # `PROTEUS_QUAD4` numbers them lexicographically, and the caller
+        # reorders these into that numbering when it needs to.
+        return ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
     if element == "HEX8":
         return (
             (0.0, 0.0, 0.0),
@@ -865,6 +872,102 @@ class CoupledResidualSystemTest(unittest.TestCase):
                                 accumulation[field],
                                 places=11,
                             )
+
+    def test_quad4_and_proteus_quad4_agree_on_one_physical_mesh(self):
+        """The same square, numbered two ways, must give the same answer.
+
+        `QUAD4` carries the SFEM/VTK numbering and `PROTEUS_QUAD4` the
+        lexicographic one, and the kernels are written against the
+        lexicographic basis, so the mesh-order element permutes its
+        connectivity and the Cartesian one must not.  Nothing checked that:
+        five sites in `emitters/residual_codegen.py` asked only whether the
+        element was a Cartesian *hex*, so a `PROTEUS_QUAD4` kernel permuted its
+        fields by (0, 1, 3, 2) anyway while gathering its coordinates
+        unpermuted, and the two elements disagreed on the same mesh.
+
+        This compares them directly rather than against a reference basis,
+        because the reference data is the same object for both elements and so
+        cannot say anything about ordering.
+        """
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        # Cartesian position i holds the node this element numbers order[i].
+        order = tensor_product_cartesian_shape_order(2, 4)
+        reorder = lambda values: tuple(values[i] for i in order)
+
+        square = _reference_coordinates("QUAD4")
+        current = ((1.0, 1.12, 1.24, 1.36), (0.7, 0.65, 0.6, 0.55))
+        previous = tuple(tuple(v - 0.03 for v in field) for field in current)
+        direction = ((0.04, 0.08, 0.12, 0.16), (-0.025, -0.05, -0.075, -0.1))
+
+        answers = {}
+        for element in ("QUAD4", "PROTEUS_QUAD4"):
+            cartesian = element == "PROTEUS_QUAD4"
+            with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
+                library = self._build_residual_library(compiler, tmpdir, element)
+                for form, trial in (("residual", None), ("jacobian_action", direction)):
+                    result = self._call_isoparametric_mesh_kernel(
+                        library,
+                        element,
+                        form,
+                        reorder(square) if cartesian else square,
+                        tuple(reorder(f) for f in current) if cartesian else current,
+                        tuple(reorder(f) for f in previous) if cartesian else previous,
+                        (tuple(reorder(f) for f in trial) if cartesian else trial)
+                        if trial is not None
+                        else None,
+                    )
+                    # Undo the renumbering so both are indexed by the same node.
+                    answers[element, form] = (
+                        tuple(reorder(field) for field in result)
+                        if cartesian
+                        else result
+                    )
+
+        for form in ("residual", "jacobian_action"):
+            for field in range(2):
+                for mesh_order, cartesian in zip(
+                    answers["QUAD4", form][field],
+                    answers["PROTEUS_QUAD4", form][field],
+                ):
+                    self.assertAlmostEqual(mesh_order, cartesian, places=11)
+                self.assertNotAlmostEqual(
+                    answers["QUAD4", form][field][0], 0.0, places=6
+                )
+
+    def _build_residual_library(self, compiler, tmpdir, element):
+        files = generate_coupled_residual_sfem_files(
+            residual_emission_model_from_system(two_field_diffusion_system(2)[0]),
+            prefix="coupled_diffusion",
+            emission_plan=_element_emission_plan(element),
+        )
+        for generated in files:
+            _ensure_parent(os.path.join(tmpdir, generated.path))
+            with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as stream:
+                stream.write(generated.source)
+        library_path = os.path.join(
+            tmpdir,
+            "libresidual.%s" % ("dylib" if os.uname().sysname == "Darwin" else "so"),
+        )
+        subprocess.run(
+            [
+                compiler,
+                "-std=c++17",
+                "-O2",
+                "-fPIC",
+                "-dynamiclib" if os.uname().sysname == "Darwin" else "-shared",
+                os.path.join(tmpdir, "coupled_diffusion_%s_operator.cpp" % element.lower()),
+                "-o",
+                library_path,
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        return ctypes.CDLL(library_path)
 
     def _call_isoparametric_mesh_kernel(
         self,

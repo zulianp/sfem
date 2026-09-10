@@ -38,8 +38,38 @@ def _linear_index_offset(values):
     return None
 
 
+def uses_cartesian_ordering(element_type):
+    """Whether this element's mesh already numbers its nodes lexicographically.
+
+    The `PROTEUS_*` elements do; `HEX8`, `HEX27` and `QUAD4` carry the SFEM/VTK
+    numbering, which walks a face counter-clockwise instead. Sum factorisation
+    needs lexicographic order, so the difference has to be reconciled somewhere,
+    and asking here is what keeps every caller asking the same question.
+
+    Both families must be tested. Five sites in `emitters/residual_codegen.py`
+    tested only the hex half, which made a `PROTEUS_QUAD4` kernel -- already
+    Cartesian -- permute its fields by (0, 1, 3, 2) anyway while gathering its
+    coordinates unpermuted through this module, so geometry and fields
+    disagreed inside one isoparametric kernel.
+    """
+    return sfem_tensor_product_hex_uses_cartesian_ordering(
+        element_type
+    ) or sfem_tensor_product_quad_uses_cartesian_ordering(element_type)
+
+
+def gather_shape_order(element_type, dim, n_shape, tensor_product):
+    """The order a kernel's field streams are gathered in.
+
+    Identity unless the element is tensor-product *and* its mesh numbering is
+    not already Cartesian; a simplex has no tensor-product order to convert to.
+    """
+    if uses_cartesian_ordering(element_type) or not tensor_product:
+        return tuple(range(n_shape))
+    return tensor_product_cartesian_shape_order(dim, n_shape)
+
+
 def _tensor_product_coordinate_shape_order(dim, n_shape, element_type):
-    if sfem_tensor_product_hex_uses_cartesian_ordering(element_type) or sfem_tensor_product_quad_uses_cartesian_ordering(element_type):
+    if uses_cartesian_ordering(element_type):
         return tuple(range(n_shape))
     return tensor_product_cartesian_shape_order(dim, n_shape)
 
@@ -108,7 +138,7 @@ def _mixed_field_shape_orders(
         )
         orders.append(
             tuple(range(n_shape))
-            if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+            if uses_cartesian_ordering(element_type)
             else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
         )
     return tuple(orders)
@@ -134,7 +164,7 @@ def _mixed_tensor_product_field_stream_order(
         )
         shape_order = (
             tuple(range(n_shape))
-            if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+            if uses_cartesian_ordering(element_type)
             else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
         )
         order.extend(layout.stream_index(field_index, shape) for shape in shape_order)
