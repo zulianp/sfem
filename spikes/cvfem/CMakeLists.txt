@@ -172,6 +172,13 @@ if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_verify_report_selftest
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/python/cvfem_verify_report.py --selftest)
+    # The kernel report's job is to keep a throughput next to the operator it was measured
+    # on. A wrong rate is caught by anyone who knows the kernel; the right rate under the
+    # wrong operator is not, and that is the failure the report exists to prevent -- so its
+    # coverage classifier and its CSV reader are tested rather than trusted.
+    add_test(NAME cvfem_kernel_report_selftest
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/python/cvfem_kernel_report.py --selftest)
 endif()
 
 # ------------------------------------------------ generated headers match their generators
