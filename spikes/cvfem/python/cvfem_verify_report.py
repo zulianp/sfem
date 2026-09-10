@@ -13,7 +13,7 @@ python3 on the development laptop. So the convergence fit is a hand-rolled log-l
 squares -- deliberately the same estimator as
 verification_and_validation/common/convergence.py::fit_convergence_rate, which the plan
 asked to reuse and which cannot be imported here because it needs numpy -- and the plots
-are hand-emitted inline SVG, following python/report_cvfem_bench.py, which made the same
+are hand-emitted inline SVG, this directory's convention for charts, which was chosen for the same
 call for the same reason.
 
 HTML comes from `markdown_py`, per --html. It is not bundled either, so a missing one is

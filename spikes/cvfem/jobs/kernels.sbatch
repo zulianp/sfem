@@ -83,6 +83,18 @@ run jac_rc_bnd_dt       $BIG --layout packed --jac-action --rhie-chow --boundary
 run jac_live7           $BIG --layout packed --jac-action --rhie-chow --boundary --live-vectors 7
 run spmv                $BIG --layout packed --bsr-apply
 
+echo
+echo "== the residual cascade on atomic, for the layout comparison =="
+# The packed layout's margin over atomic is quoted from the bare kernel, where it is
+# largest. Whether it survives the physics is a separate question and needs the same
+# cascade on the other layout to answer -- so this is here, and it is why the report can
+# say what a layout comparison made on the bare kernel is worth.
+run res_atomic_bare      $BIG --layout atomic
+run res_atomic_rc        $BIG --layout atomic --rhie-chow
+run res_atomic_rc_bnd    $BIG --layout atomic --rhie-chow --boundary
+run res_atomic_perapply  $BIG --layout atomic --rhie-chow --pgrad-per-apply
+run jac_atomic_rc_bnd    $BIG --layout atomic --jac-action --rhie-chow --boundary
+
 # ------------------------------------------------------- the same cascades, smaller
 echo
 echo "== both cascades at the smaller size =="

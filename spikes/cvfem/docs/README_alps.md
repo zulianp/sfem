@@ -74,7 +74,7 @@ next move is SIMD across elements rather than more data-movement work.
 ## 3. Report and plots
 
 ```bash
-python3 python/report_cvfem_bench.py bench_alps_*/cvfem_hex8_bench.csv \
+python3 python/cvfem_kernel_report.py bench_alps_*/cvfem_hex8_bench.csv \
         --perf perf_hex8_alps_*/cvfem_hex8_perf.csv \
         -o report.html --title "CVFEM HEX8 on Grace"
 ```
@@ -88,15 +88,10 @@ table it came from underneath it.
 Add `--fragment` to emit body-only HTML suitable for publishing as a Claude Code
 artifact.
 
-For figures to drop into a paper or slides:
-
-```bash
-python3 python/plot_cvfem_bench.py bench_alps_*/cvfem_hex8_bench.csv -o plots/ \
-        --format pdf --cache-mib 117      # Grace: 117 MiB L3
-```
-
-That one needs matplotlib. If it is not in the uenv, use the HTML report — it
-needs nothing.
+The matplotlib figure script that used to sit here is gone with the report it
+imported from. Charts in this repository are hand-emitted inline SVG precisely
+because matplotlib is absent from the uenv, so a figure for a paper or slides
+comes out of the report's own HTML rather than from a second toolchain.
 
 ## Reading the numbers
 

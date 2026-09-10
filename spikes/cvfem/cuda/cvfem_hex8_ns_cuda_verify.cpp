@@ -61,7 +61,7 @@ void residual_soa_to_interleaved(const MeshData &d, std::vector<double> &out) {
 // ---------------------------------------------------------------- CSV output
 //
 // Emits the same schema cvfem_hex8_ns_upwind_bench.cpp writes, so GPU rows land in the
-// files report_cvfem_bench.py and plot_cvfem_bench.py already read, with no change to
+// files python/cvfem_kernel_report.py already reads, with no change to
 // either. Two columns are appended -- `device` and `block_size` -- which those scripts
 // ignore, because they read with csv.DictReader and .get() with defaults.
 //

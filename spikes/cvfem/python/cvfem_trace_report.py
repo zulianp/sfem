@@ -8,7 +8,7 @@ and each path is a smesh.trace.csv (name,calls,total,avg) from one run.
 
 Throughput is degrees of freedom per second, which for a routine called `calls` times on a
 problem of `ndof` is calls * ndof / total. Reported in MDOF/s so it can be compared against
-the numbers in perf/baseline_grace.csv and docs/CVFEM_Operator_Cascade.md.
+the numbers in perf/baseline_grace.csv and docs/CVFEM_Kernels.md.
 
 Standard library only, for the same reason the verification report is: numpy, matplotlib
 and markdown are absent from the Alps uenv and from the development laptop's python3.

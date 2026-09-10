@@ -133,8 +133,8 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
 }
 
 // One machine-readable row per run. The header is written when the file is new,
-// so a sweep can just append and the analysis scripts (plot_cvfem_bench.py,
-// report_cvfem_bench.py) read whatever accumulated.
+// so a sweep can just append and the analysis script (python/cvfem_kernel_report.py)
+// reads whatever accumulated.
 struct CsvRow {
     const char *tag;
     const char *operation;
@@ -184,7 +184,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
 
     // The column set changes when options are added, and this file is opened for APPEND.
     // Writing a new row shape under an old header produces a csv whose columns silently
-    // shift partway down -- and report_cvfem_bench.py / plot_cvfem_bench.py read these by
+    // shift partway down -- and python/cvfem_kernel_report.py reads these by
     // name. So the existing header is compared against the one we would write, and a
     // mismatch is refused rather than appended to.
     std::string header =
@@ -381,7 +381,7 @@ int main(int argc, char **argv) {
                     "  --dense-flush  sumfact only: stage ke densely, then flush 64 contiguous\n"
                     "                 blocks (measured slower than direct scatter on Apple M1)\n"
                     "  --csv FILE     append one machine-readable row per run (header written if\n"
-                    "                 the file is new); pairs with report_cvfem_bench.py\n"
+                    "                 the file is new); pairs with python/cvfem_kernel_report.py\n"
                     "  --tag NAME     free-form label carried into the csv (e.g. the machine)\n"
                     "  --kernel NAME  residual/Jacobian micro-kernel variant (default sumfact)\n"
                     "  --geom NAME    affine (constant J) or isoparam (12 SCS trilinear J)\n"
