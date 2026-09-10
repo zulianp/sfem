@@ -466,4 +466,165 @@ static void cvfem_hex8_assemble_nodal_grad(MeshT                        &d,
     }
 }
 
+
+// ------------------------------------------------- the same reconstruction, over packs
+//
+// Same operator, same result to round-off, different sweep. The version above walks the
+// flat element table and accumulates with `#pragma omp atomic update` -- 24 atomics per
+// element into three global arrays that must first be zeroed. This one reuses the
+// arrangement the element sweep next to it already uses: stage the field into a per-pack
+// buffer, accumulate into a private per-pack buffer with plain `+=`, write the pack's owned
+// rows straight out, and reduce only the shared ghost rows afterwards.
+//
+// Three things follow from that, beyond the atomics:
+//
+//   * the three global arrays are WRITTEN rather than accumulated, because the packs
+//     partition the owned node range -- so their zero fills disappear;
+//   * the result is deterministic. The atomic version is not reproducible even against
+//     itself: the same input twice differs in the last bits, because the order in which a
+//     node's elements reach it is not fixed. Here the summation order is;
+//   * the source is read once per pack node instead of once per element-node incidence,
+//     which is eight times less, and contiguously for the owned majority -- so a field read
+//     with stride 4 out of an interleaved Krylov vector costs what a contiguous one costs.
+//
+// Scratch slots 5 and 6, which nothing else uses.
+template <typename MeshT, typename PackT>
+static void cvfem_hex8_assemble_nodal_grad_packed(MeshT                             &d,
+                                                  PackT                             &p,
+                                                  const int                          isoparam,
+                                                  const scalar_t *const SFEM_RESTRICT src,
+                                                  const int                          stride,
+                                                  std::vector<scalar_t>             &ogx,
+                                                  std::vector<scalar_t>             &ogy,
+                                                  std::vector<scalar_t>             &ogz) {
+    cvfem_hex8_build_grad_weight(d, isoparam);
+
+    // The owned ranges tile [0, nnodes) exactly, so every entry is written below and there
+    // is nothing to pre-zero. If that ever stopped holding, a node no pack owns would keep
+    // whatever was in the buffer, so it is checked rather than assumed.
+    const bool owns_all = p.n_packs > 0 && p.owned_nodes_ptr[0] == 0 && p.owned_nodes_ptr[p.n_packs] == d.nnodes;
+    if (owns_all && (ptrdiff_t)ogx.size() == d.nnodes) {
+        ogy.resize((size_t)d.nnodes);
+        ogz.resize((size_t)d.nnodes);
+    } else {
+        ogx.assign((size_t)d.nnodes, scalar_t(0));
+        ogy.assign((size_t)d.nnodes, scalar_t(0));
+        ogz.assign((size_t)d.nnodes, scalar_t(0));
+    }
+
+    scalar_t *const SFEM_RESTRICT gx_out = ogx.data();
+    scalar_t *const SFEM_RESTRICT gy_out = ogy.data();
+    scalar_t *const SFEM_RESTRICT gz_out = ogz.data();
+    const ptrdiff_t               node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_f   = thread_scratch<scalar_t>(5, (size_t)node_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(6, 3 * (size_t)node_n);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+            const ptrdiff_t e_start      = pack * p.n_elements_per_pack;
+            const ptrdiff_t e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+            const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
+            const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const smesh::idx_t *const SFEM_RESTRICT ghosts = &p.ghost_idx[p.ghost_ptr[pack]];
+            const ptrdiff_t                         ghost_off = p.ghost_ptr[pack];
+
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) pack_f[k] = src[(owned + k) * stride];
+            for (ptrdiff_t k = 0; k < n_ghost; ++k)
+                pack_f[n_contiguous + k] = src[(ptrdiff_t)ghosts[k] * stride];
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * 3 * sizeof(scalar_t));
+
+            for (ptrdiff_t e = e_start; e < e_end; ++e) {
+                scalar_t fe[CVFEM_HEX8_N_NODES], gx, gy, gz;
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) fe[a] = pack_f[p.elems[a][e]];
+
+                if (isoparam) {
+                    const auto *const px = d.points[0];
+                    const auto *const py = d.points[1];
+                    const auto *const pz = d.points[2];
+                    scalar_t x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        const smesh::idx_t g = pack_local_to_global(p, pack, n_contiguous, p.elems[a][e]);
+                        x[a]                 = scalar_t(px[g]);
+                        y[a]                 = scalar_t(py[g]);
+                        z[a]                 = scalar_t(pz[g]);
+                    }
+                    scalar_t dN[CVFEM_HEX8_N_NODES][3], adj[9], det;
+                    cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
+                    cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
+                    if (std::fabs(det) < scalar_t(1e-30)) continue;
+                    scalar_t dr = 0, ds = 0, dt = 0;
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        dr += fe[a] * dN[a][0];
+                        ds += fe[a] * dN[a][1];
+                        dt += fe[a] * dN[a][2];
+                    }
+                    cvfem_hex8_pushforward(adj, det > scalar_t(0) ? scalar_t(1) : scalar_t(-1), dr, ds, dt, gx, gy, gz);
+                } else {
+                    scalar_t adj[9], det;
+                    load_hex8_adj(d, e, adj, &det);
+                    if (std::fabs(det) < scalar_t(1e-30)) continue;
+                    scalar_t dr, ds, dt;
+                    cvfem_hex8_face_diff(fe, dr, ds, dt);
+                    cvfem_hex8_pushforward(adj, det > scalar_t(0) ? scalar_t(1) : scalar_t(-1), dr, ds, dt, gx, gy, gz);
+                }
+
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                    scalar_t *const SFEM_RESTRICT o = pack_out + (ptrdiff_t)p.elems[a][e] * 3;
+                    o[0] += gx;
+                    o[1] += gy;
+                    o[2] += gz;
+                }
+            }
+
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                gx_out[owned + k] = pack_out[k * 3 + 0];
+                gy_out[owned + k] = pack_out[k * 3 + 1];
+                gz_out[owned + k] = pack_out[k * 3 + 2];
+            }
+            scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT bz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT o = pack_out + (n_contiguous + k) * 3;
+                bx[ghost_off + k]                     = o[0];
+                by[ghost_off + k]                     = o[1];
+                bz[ghost_off + k]                     = o[2];
+            }
+        }
+    }
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        scalar_t           sx = 0, sy = 0, sz = 0;
+        const scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
+        const scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
+        const scalar_t *const SFEM_RESTRICT bz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+        for (ptrdiff_t j = begin; j < end; ++j) {
+            const ptrdiff_t idx = p.ghost_reduce_idx[j];
+            sx += bx[idx];
+            sy += by[idx];
+            sz += bz[idx];
+        }
+        gx_out[dest] += sx;
+        gy_out[dest] += sy;
+        gz_out[dest] += sz;
+    }
+
+    const scalar_t *const SFEM_RESTRICT w = d.grad_w_inv.data();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        gx_out[i] *= w[i];
+        gy_out[i] *= w[i];
+        gz_out[i] *= w[i];
+    }
+}
+
 #endif  // CVFEM_HEX8_PACK_HELPERS_HPP

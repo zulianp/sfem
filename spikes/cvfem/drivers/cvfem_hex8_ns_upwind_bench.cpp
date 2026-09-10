@@ -44,6 +44,22 @@ static void bsr4_spmv(const BSR4 &b, const ptrdiff_t nnodes, const scalar_t *con
     }
 }
 
+// One dispatch point for the reconstruction, so the four call sites cannot drift about
+// which sweep they used. Over packs when there is a pack to sweep -- same operator, no
+// atomics, deterministic -- and over the flat element table otherwise, or when
+// --qgrad-atomic asks for it as a measurement escape hatch.
+static int g_qgrad_atomic = 0;
+
+static void bench_nodal_grad(MeshData &d, PackedData &p, const GeomKind geom_kind,
+                             const scalar_t *const SFEM_RESTRICT src, const int stride,
+                             std::vector<scalar_t> &ox, std::vector<scalar_t> &oy, std::vector<scalar_t> &oz) {
+    const int iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+    if (p.n_packs > 0 && !g_qgrad_atomic)
+        cvfem_hex8_assemble_nodal_grad_packed(d, p, iso, src, stride, ox, oy, oz);
+    else
+        cvfem_hex8_assemble_nodal_grad(d, iso, src, stride, ox, oy, oz);
+}
+
 static scalar_t max_abs_diff(const scalar_t *const a, const scalar_t *const b, const ptrdiff_t n) {
     scalar_t m = 0;
     for (ptrdiff_t i = 0; i < n; ++i) m = std::max(m, std::fabs(a[i] - b[i]));
@@ -351,6 +367,8 @@ int main(int argc, char **argv) {
             boundary = 1;
         else if (arg == "--pgrad-per-apply")
             pgrad_per_apply = 1;
+        else if (arg == "--qgrad-atomic")
+            g_qgrad_atomic = 1;
         else if (arg == "--live-vectors" && i + 1 < argc)
             live_vectors = std::atoi(argv[++i]);
         else if (arg == "--transient" && i + 1 < argc)
@@ -403,6 +421,10 @@ int main(int argc, char **argv) {
                     "                 no Rhie-Chow term. Off by default: without it there is no\n"
                     "                 pressure-pressure coupling at all, which is a smaller and\n"
                     "                 faster operator than the one the solver runs.\n"
+                    "  --qgrad-atomic   reconstruct the nodal gradient with the flat atomic sweep\n"
+                    "                 instead of over packs. Same operator; the packed one has no\n"
+                    "                 atomics and is deterministic. Here to measure the difference,\n"
+                    "                 not as a mode to run in.\n"
                     "  --transient DT   make the operator unsteady with timestep DT: the BDF mass\n"
                     "                 term rho V a0 / dt on the velocity diagonal, applied as a\n"
                     "                 per-node post-pass because in a control-volume scheme the mass\n"
@@ -809,8 +831,7 @@ int main(int argc, char **argv) {
         // an apply, and caching it is worth 1.26x off the whole linear solve
         // (docs/README_alps.md). Exposing both is the point of a cascade and is the next
         // step here; until it exists, a --rhie-chow number is the hoisted figure.
-        cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, d.p.data(), 1,
-                                       d.pgx, d.pgy, d.pgz);
+        bench_nodal_grad(d, packed, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
         std::printf("rhie_chow: scale %g, nodal gradient %s\n", (double)rc_scale,
                     pgrad_per_apply ? "rebuilt per apply" : "hoisted out of the timed loop");
     }
@@ -1026,8 +1047,7 @@ int main(int argc, char **argv) {
     // here rather than inside each layout means --boundary works for all four.
     auto apply_fn = [&]() {
         if (pgrad_per_apply)
-            cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, d.p.data(), 1,
-                                           d.pgx, d.pgy, d.pgz);
+            bench_nodal_grad(d, packed, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
         if (geom_kind == GeomKind::Isoparam) {
             if (layout == "colored")
                 apply_residual_colored(d, packed, colors, rho, mu, kernel_kind, GeomKind::Isoparam);
@@ -1184,8 +1204,7 @@ int main(int argc, char **argv) {
         last_dir                    = dir_v;
         if (with_qgrad) {
             const double t0 = wall_time();
-            cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, dir_v + 3, N_FIELDS,
-                                           d.qgx, d.qgy, d.qgz);
+            bench_nodal_grad(d, packed, geom_kind, dir_v + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
             const double dt_qg = wall_time() - t0;
             qgrad_seconds += dt_qg;
             // Also into the phase table, so the pass that dominates this matvec appears
@@ -1254,8 +1273,7 @@ int main(int argc, char **argv) {
         // direction's pressure needs the same reconstruction. Without this the three sweeps
         // would agree in the frozen form and the exact term would go unchecked.
         if (rhie_chow)
-            cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, jac_dir.data() + 3, N_FIELDS,
-                                           d.qgx, d.qgy, d.qgz);
+            bench_nodal_grad(d, packed, geom_kind, jac_dir.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
         if (vs_matrix) bsr4_spmv(bsr, d.nnodes, jac_dir.data(), jv_spmv.data());
         apply_jacobian_action_packed(d, packed, rho, mu, jac_dir.data(), jv_mf.data(), geom_kind);
         if (geom_kind == GeomKind::Isoparam)
