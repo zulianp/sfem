@@ -356,8 +356,6 @@ template <typename s_t>
 struct {function}_reference_data {{
   static constexpr int NS = {n_shape};
   static constexpr int NQ = {n_qp};
-  static constexpr int REF_DIM = {ref_dim};
-  static constexpr int PHYSICAL_DIM = {physical_dim};
 
   static const s_t *shape() {{
     static const s_t data[{shape_count}] = {{
@@ -776,13 +774,6 @@ namespace codegen {{
 
 template <typename s_t>
 struct {function}_reference_data {{
-  static constexpr int NS1 = {n_shape_1d};
-  static constexpr int NQ1 = {n_qp_1d};
-  static constexpr int NS = {n_shape};
-  static constexpr int NQ = {n_qp};
-  static constexpr int REF_DIM = 2;
-  static constexpr int PHYSICAL_DIM = 3;
-
   static const s_t *shape_1d() {{
     static const s_t data[{shape_1d_count}] = {{
 {shape_1d_values}

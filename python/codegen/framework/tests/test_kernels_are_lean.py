@@ -47,7 +47,10 @@ def _generated_tree():
 #: the mixed local bodies map a physical gradient per field rather than per
 #: component read (56), and their geometry preamble is still unconditional
 #: (42).  A ratchet to drive down, not a target that has been met.
-DEAD_ASSIGNMENT_BUDGET = 127
+#:
+#: 127 -> 87 when the `(void)name;` discards went: the scan counts a mention as
+#: a read, so every discard was keeping its own subject alive.
+DEAD_ASSIGNMENT_BUDGET = 87
 
 #: Runs of back-to-back single-statement `#pragma omp simd` lane loops.  A run
 #: longer than one is N loops and N pragmas where one loop with N statements
@@ -57,6 +60,31 @@ DEAD_ASSIGNMENT_BUDGET = 127
 #: same values a different way.  A ratchet, not a target that has been met.
 LONGEST_LANE_LOOP_RUN = 9
 LANE_LOOP_RUNS_LONGER_THAN_ONE = 32
+
+#: `(void)name;` statements, and the declarations that made them necessary.
+#:
+#: A discard exists to stop `-Wextra -Werror` -- which `SFEM_ENABLE_DEV_MODE`
+#: turns on -- complaining about a name nothing reads, so its presence says the
+#: declaration was the mistake.  There were 463 discards and 648 constants that
+#: no kernel read: `ND` in every kernel handed an adjugate it never
+#: differentiates, `NQ1`/`NS1` wherever the point count is a literal rather than
+#: an `integer_root`, `N_FIELD_STREAMS` in every local body, and `nnodes`, which
+#: no kernel in the tree has ever read.
+#:
+#: Both are zero and must stay zero: the emitters now compose a prologue from
+#: the names their own body mentions, and a parameter the body ignores is
+#: emitted without a name -- which is what the boundary emitter always did.
+VOID_DISCARD_BUDGET = 0
+UNUSED_CONSTANT_BUDGET = 0
+
+#: Named parameters no body reads, with no discard to excuse them.  This is
+#: what `-Wextra` rejects and it is unchanged by the work that cleared the two
+#: budgets above -- these were never marked, so nothing pointed at them.  Almost
+#: all are one shape: the matrix-assembly kernel takes every sparse format's
+#: parameters and emits only the selected format's branch, so `diag_offsets`,
+#: `ndiag` and the five `coo_*` arrays go unread in 15 kernels each.  A ratchet
+#: to drive down, not a target that has been met.
+UNUSED_PARAMETER_BUDGET = 179
 
 #: `extern "C"` wrappers around a `KernelDiagnostics` free function.  There
 #: were 1400 of them and nothing referenced any.
@@ -91,6 +119,31 @@ class KernelsAreLeanTest(unittest.TestCase):
             LANE_LOOP_RUNS_LONGER_THAN_ONE,
             "%d places open a fresh lane loop per component; one loop with that "
             "many statements does the same stores in one SIMD region" % long_runs,
+        )
+
+    def test_nothing_is_declared_that_nothing_reads(self):
+        discards = self.survey["void_discards"]
+        self.assertLessEqual(
+            len(discards),
+            VOID_DISCARD_BUDGET,
+            "these kernels discard a name instead of not declaring it:\n%s"
+            % "\n".join("  %s: (void)%s;" % row for row in discards[:20]),
+        )
+        constants = self.survey["unused_constants"]
+        self.assertLessEqual(
+            len(constants),
+            UNUSED_CONSTANT_BUDGET,
+            "these constants are declared and never read:\n%s"
+            % "\n".join("  %s:%d: %s" % (row[0], row[2], row[1]) for row in constants[:20]),
+        )
+
+    def test_no_kernel_names_a_parameter_it_ignores(self):
+        parameters = self.survey["unused_parameters"]
+        self.assertLessEqual(
+            len(parameters),
+            UNUSED_PARAMETER_BUDGET,
+            "these parameters are named and never read:\n%s"
+            % "\n".join("  %s: %s" % row for row in parameters[:20]),
         )
 
     def test_no_kernel_wraps_a_shared_diagnostics_helper(self):

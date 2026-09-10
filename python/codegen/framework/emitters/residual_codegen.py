@@ -2,6 +2,13 @@ from dataclasses import dataclass
 
 import sympy as sp
 
+from codegen.framework.emitters.kernel_prologue import (
+    discard_unused,
+    kernel_constant,
+    resolve_dead_parameters,
+    resolve_kernel_constants,
+    retag_constants,
+)
 from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name, restrict_prelude
 
 #: The staged-buffer and per-thread-scratch prefixes, from the one
@@ -754,13 +761,13 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
             for field in system.fields
         )
         body = [
-                "  static constexpr int ND = %d;" % system.dim,
-                "  static constexpr int NQ = %d;" % rule.n_qp,
-                "  static constexpr int NS = %d;" % rule.n_shape,
-                "  (void)ND;",
-                "  (void)NQ;",
-                "  (void)NS;",
-                "  (void)nnodes;",
+                kernel_constant("ND", system.dim, indent="  "),
+                kernel_constant("NQ", rule.n_qp, indent="  "),
+                kernel_constant("NS", rule.n_shape, indent="  "),
+                discard_unused("ND", indent="  "),
+                discard_unused("NQ", indent="  "),
+                discard_unused("NS", indent="  "),
+                discard_unused("nnodes", indent="  "),
                 "  if (%s == 1 && out_stride == 1) {" % input_stride,
                 "    if ((%s) == s_t(1)) {" % scale,
                 *_simplex_metric_scalar_affine_loop_lines(
@@ -841,7 +848,7 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
                 for field in system.fields
             )
             unit_body = [
-                    "  (void)nnodes;",
+                    discard_unused("nnodes", indent="  "),
                     *_simplex_metric_scalar_affine_loop_lines(
                         system,
                         rule,
@@ -2115,7 +2122,7 @@ def _local_header(
     lines.extend(
         ["", "} // namespace codegen", "} // namespace sfem", "", "#endif", ""]
     )
-    return "\n".join(lines)
+    return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
 def _constant_p1_affine_specialized_local(local_prefix, specialization):
@@ -2236,16 +2243,13 @@ def _mixed_local_function(
     lines.extend(
         [
             ") {",
-            "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NC = %d;" % layout.n_reference_fields,
-            "  static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
-            "  (void)CELL_NS;",
-            "  (void)N_FIELD_STREAMS;",
+            kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NC", layout.n_reference_fields, indent="  "),
+            kernel_constant("N_FIELD_STREAMS", layout.total_streams, indent="  "),
         ]
     )
     lines.extend(
-        "  static constexpr int %s_NS = %d;"
-        % (group.name.upper(), group.shape_count)
+        kernel_constant("%s_NS" % group.name.upper(), group.shape_count)
         for group in layout.groups
     )
     if _is_tensor_product_family(rule, basis_family):
@@ -2353,7 +2357,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     uses_determinant = uses_geometry_offset = uses_geometry_values(dependencies)
 
     lines = [
-        "  static constexpr int NQ1 = integer_root(NQ, ND);",
+        kernel_constant("NQ1", "integer_root(NQ, ND)", indent="  "),
         "  static_assert(ipow(NQ1, ND) == NQ, \"NQ must be tensor-product compatible\");",
     ]
     for group in layout.groups:
@@ -2361,8 +2365,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         shape_1d_name = "%s_NS1" % group.name.upper()
         lines.extend(
             [
-                "  static constexpr int %s = integer_root(%s, ND);"
-                % (shape_1d_name, shape_name),
+                kernel_constant(shape_1d_name, "integer_root(%s, ND)" % shape_name),
                 "  static_assert(ipow(%s, ND) == %s, \"%s must be tensor-product compatible\");"
                 % (shape_1d_name, shape_name, shape_name),
             ]
@@ -2935,7 +2938,7 @@ def _print_kernel_function(node):
     target = _target()
     policy = target.loop_lowering_policy()
     pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
-    return list(
+    return retag_constants(
         render_kernel_ast_lines(
             node.name,
             (node,),
@@ -4311,8 +4314,8 @@ def _operator_source(
             if gradient_metric is not None:
                 pre_call_lines.extend(
                     [
-                        "  static constexpr int NQ = %d;" % n_qp,
-                        "  static constexpr int VS = %d;" % vector_size,
+                        kernel_constant("NQ", n_qp, indent="  "),
+                        kernel_constant("VS", vector_size, indent="  "),
                         "  %s geom_metric_data[%d][NQ * VS];"
                         % (scalar_type, gradient_metric.metric_components),
                         "  const %s *const geom_metric[%d] = %s;"
@@ -4444,7 +4447,7 @@ def _operator_source(
             matrix_format_plan,
         )
     )
-    return "\n".join(lines)
+    return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
 def _mixed_operator_source(
@@ -4556,7 +4559,7 @@ def _mixed_operator_source(
                 geometry_family,
             )
         )
-    return "\n".join(lines)
+    return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
 def _mixed_reference_data(cell_rule, system, field_element_types, basis_family=None):
@@ -4706,14 +4709,14 @@ def _mixed_affine_function(
     lines.extend(
         [
             ") {",
-            "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % cell_rule.n_qp,
-            "  static constexpr int CELL_NS = %d;" % cell_rule.n_shape,
-            "  static constexpr int NS = CELL_NS;",
-            "  static constexpr int NC = %d;" % layout.n_reference_fields,
-            "  static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
-            "  static constexpr int VS = %d;" % vector_size,
-            "  (void)nnodes;",
+            kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", cell_rule.n_qp, indent="  "),
+            kernel_constant("CELL_NS", cell_rule.n_shape, indent="  "),
+            kernel_constant("NS", "CELL_NS", indent="  "),
+            kernel_constant("NC", layout.n_reference_fields, indent="  "),
+            kernel_constant("N_FIELD_STREAMS", layout.total_streams, indent="  "),
+            kernel_constant("VS", vector_size, indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     if not publishes_kernel(dependencies):
@@ -4894,14 +4897,14 @@ def _mixed_isoparametric_function(
     lines.extend(
         [
             ") {",
-            "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % cell_rule.n_qp,
-            "  static constexpr int CELL_NS = %d;" % cell_rule.n_shape,
-            "  static constexpr int NS = CELL_NS;",
-            "  static constexpr int NC = %d;" % layout.n_reference_fields,
-            "  static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
-            "  static constexpr int VS = %d;" % vector_size,
-            "  (void)nnodes;",
+            kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", cell_rule.n_qp, indent="  "),
+            kernel_constant("CELL_NS", cell_rule.n_shape, indent="  "),
+            kernel_constant("NS", "CELL_NS", indent="  "),
+            kernel_constant("NC", layout.n_reference_fields, indent="  "),
+            kernel_constant("N_FIELD_STREAMS", layout.total_streams, indent="  "),
+            kernel_constant("VS", vector_size, indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     if not publishes_kernel(dependencies):
@@ -5440,12 +5443,12 @@ def _mesh_operator_source(
     lines.extend(
         [
             ") {",
-            "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NS = %d;" % n_shape,
-            "  static constexpr int NC = %d;" % n_fields,
-            "  static constexpr int VS = %d;" % vector_size,
-            "  (void)nnodes;",
+            kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NS", n_shape, indent="  "),
+            kernel_constant("NC", n_fields, indent="  "),
+            kernel_constant("VS", vector_size, indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     fast_path_body = _simplex_metric_scalar_affine_fast_path_body(
@@ -5979,7 +5982,7 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
         "    const count_t *const RSTR %s," % row_pointer,
         "    const idx_t *const RSTR %s," % column_index,
         "    s_t *const RSTR values) {",
-        "  static constexpr int NS = %d;" % n_shape,
+        kernel_constant("NS", n_shape, indent="  "),
         "  count_t entries[NS * NS];",
         "  idx_t ks[NS];",
         "  for (int i = 0; i < NS; ++i) {",
@@ -6013,10 +6016,10 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
         "    const count_t *const RSTR rowptr,",
         "    const idx_t *const RSTR colidx,",
         "    s_t *const RSTR values) {",
-        "  static constexpr int NS = %d;" % n_shape,
-        "  static constexpr int NC = %d;" % n_fields,
-        "  static constexpr int N_ROW_STREAMS = %d;" % len(row_streams),
-        "  static constexpr int N_COL_STREAMS = %d;" % len(column_streams),
+        kernel_constant("NS", n_shape, indent="  "),
+        kernel_constant("NC", n_fields, indent="  "),
+        kernel_constant("N_ROW_STREAMS", len(row_streams), indent="  "),
+        kernel_constant("N_COL_STREAMS", len(column_streams), indent="  "),
         "  static constexpr int ROW_COMPONENT[%d] = {%s};"
         % (
             len(row_streams),
@@ -6082,7 +6085,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
         "    const count_t *const RSTR rowptr,",
         "    const idx_t *const RSTR colidx,",
         "    count_t *const RSTR entries) {",
-        "  static constexpr int NS = %d;" % n_shape,
+        kernel_constant("NS", n_shape, indent="  "),
         "  idx_t ks[NS];",
         "  for (int i = 0; i < NS; ++i) {",
         "    const count_t row_begin = rowptr[ev[i]];",
@@ -6104,7 +6107,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
                 "    const s_t *const RSTR element_matrix,",
                 "    const count_t *const RSTR entries,",
                 "    s_t *const RSTR values) {",
-                "  static constexpr int NS = %d;" % n_shape,
+                kernel_constant("NS", n_shape, indent="  "),
                 "  for (int i = 0; i < NS; ++i) {",
                 "    for (int j = 0; j < NS; ++j) {",
                 _atomic_update_pragma(),
@@ -6126,10 +6129,10 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
             "    const s_t *const RSTR element_matrix,",
             "    const count_t *const RSTR entries,",
             "    s_t *const RSTR values) {",
-            "  static constexpr int NS = %d;" % n_shape,
-            "  static constexpr int NC = %d;" % n_fields,
-            "  static constexpr int N_ROW_STREAMS = %d;" % len(row_streams),
-            "  static constexpr int N_COL_STREAMS = %d;" % len(column_streams),
+            kernel_constant("NS", n_shape, indent="  "),
+            kernel_constant("NC", n_fields, indent="  "),
+            kernel_constant("N_ROW_STREAMS", len(row_streams), indent="  "),
+            kernel_constant("N_COL_STREAMS", len(column_streams), indent="  "),
             "  static constexpr int ROW_COMPONENT[%d] = {%s};"
             % (
                 len(row_streams),
@@ -6461,13 +6464,13 @@ def _scalar_crs_matrix_assembly_source(
     lines.extend(
         [
             ") {",
-            "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NS = %d;" % n_shape,
-            "  static constexpr int NC = %d;" % n_fields,
-            "  static constexpr int N_STREAMS = NC * NS;",
-            "  static constexpr int VS = 1;",
-            "  (void)nnodes;",
+            kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NS", n_shape, indent="  "),
+            kernel_constant("NC", n_fields, indent="  "),
+            kernel_constant("N_STREAMS", "NC * NS", indent="  "),
+            kernel_constant("VS", "1", indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
@@ -6754,10 +6757,10 @@ def _scalar_crs_matrix_assembly_source(
         lines.extend(
             [
                 ") {",
-                "  static constexpr int NS = %d;" % n_shape,
-                "  (void)nnodes;",
-                "  (void)max_nodes_per_pack;",
-                "  (void)n_shared_nodes;",
+                kernel_constant("NS", n_shape, indent="  "),
+                discard_unused("nnodes", indent="  "),
+                discard_unused("max_nodes_per_pack", indent="  "),
+                discard_unused("n_shared_nodes", indent="  "),
                 "#pragma omp parallel for schedule(static)",
                 "  for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
                 "    const ptrdiff_t e_start = pack * n_elements_per_pack;",
@@ -6783,14 +6786,14 @@ def _scalar_crs_matrix_assembly_source(
         lines.extend(
             [
                 ") {",
-                "  static constexpr int ND = %d;" % dim,
-                "  static constexpr int NQ = %d;" % n_qp,
-                "  static constexpr int NS = %d;" % n_shape,
-                "  static constexpr int NC = %d;" % n_fields,
-                "  static constexpr int N_STREAMS = NC * NS;",
-                "  static constexpr int VS = 1;",
-                "  (void)nnodes;",
-                "  (void)n_shared_nodes;",
+                kernel_constant("ND", dim, indent="  "),
+                kernel_constant("NQ", n_qp, indent="  "),
+                kernel_constant("NS", n_shape, indent="  "),
+                kernel_constant("NC", n_fields, indent="  "),
+                kernel_constant("N_STREAMS", "NC * NS", indent="  "),
+                kernel_constant("VS", "1", indent="  "),
+                discard_unused("nnodes", indent="  "),
+                discard_unused("n_shared_nodes", indent="  "),
             ]
         )
         lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
@@ -7163,12 +7166,12 @@ def _isoparametric_mesh_operator_source(
     lines.extend(
         [
             ") {",
-            "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NS = %d;" % n_shape,
-            "  static constexpr int NC = %d;" % n_fields,
-            "  static constexpr int VS = %d;" % vector_size,
-            "  (void)nnodes;",
+            kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NS", n_shape, indent="  "),
+            kernel_constant("NC", n_fields, indent="  "),
+            kernel_constant("VS", vector_size, indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
@@ -7476,13 +7479,13 @@ def _scalar_packed_jacobian_action_source(
     lines.extend(
         [
             ") {",
-            "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NS = %d;" % n_shape,
-            "  static constexpr int NC = %d;" % n_fields,
-            "  static constexpr int N_STREAMS = NC * NS;",
-            "  static constexpr int VS = %d;" % specialization.vector_size,
-            "  (void)nnodes;",
+            kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NS", n_shape, indent="  "),
+            kernel_constant("NC", n_fields, indent="  "),
+            kernel_constant("N_STREAMS", "NC * NS", indent="  "),
+            kernel_constant("VS", specialization.vector_size, indent="  "),
+            discard_unused("nnodes", indent="  "),
         ]
     )
     lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
@@ -7824,9 +7827,9 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
     lines.extend(
         [
             ") {",
-            "  static constexpr int VS = 64;",
-            "  (void)nnodes;",
-            "  (void)max_nodes_per_pack;",
+            kernel_constant("VS", "64", indent="  "),
+            discard_unused("nnodes", indent="  "),
+            discard_unused("max_nodes_per_pack", indent="  "),
             "",
             "#pragma omp parallel",
             "  {",
@@ -8016,9 +8019,9 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
     lines.extend(
         [
             ") {",
-            "  static constexpr int VS = %d;" % vector_size,
-            "  (void)nnodes;",
-            "  (void)max_nodes_per_pack;",
+            kernel_constant("VS", vector_size, indent="  "),
+            discard_unused("nnodes", indent="  "),
+            discard_unused("max_nodes_per_pack", indent="  "),
             "",
             "#pragma omp parallel",
             "  {",
@@ -8245,11 +8248,11 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
     lines.extend(
         [
             ") {",
-            "  static constexpr int VS = %d;" % vector_size,
-            "  (void)nnodes;",
-            "  (void)max_nodes_per_pack;",
-            "  (void)direction_stride;",
-            "  (void)out_stride;",
+            kernel_constant("VS", vector_size, indent="  "),
+            discard_unused("nnodes", indent="  "),
+            discard_unused("max_nodes_per_pack", indent="  "),
+            discard_unused("direction_stride", indent="  "),
+            discard_unused("out_stride", indent="  "),
             "",
             "#pragma omp parallel",
             "  {",
@@ -8599,14 +8602,14 @@ def _scalar_packed_affine_jacobian_action_source(
     lines.extend(
         [
             ") {",
-            "  static constexpr int ND = %d;" % dim,
-            "  static constexpr int NQ = %d;" % n_qp,
-            "  static constexpr int NS = %d;" % n_shape,
-            "  static constexpr int NC = %d;" % n_fields,
-            "  static constexpr int N_STREAMS = NC * NS;",
-            "  static constexpr int VS = %d;" % vector_size,
-            "  (void)nnodes;",
-            "  (void)max_nodes_per_pack;",
+            kernel_constant("ND", dim, indent="  "),
+            kernel_constant("NQ", n_qp, indent="  "),
+            kernel_constant("NS", n_shape, indent="  "),
+            kernel_constant("NC", n_fields, indent="  "),
+            kernel_constant("N_STREAMS", "NC * NS", indent="  "),
+            kernel_constant("VS", vector_size, indent="  "),
+            discard_unused("nnodes", indent="  "),
+            discard_unused("max_nodes_per_pack", indent="  "),
         ]
     )
     lines.extend(

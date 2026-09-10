@@ -82,6 +82,106 @@ def function_bodies(source):
         yield match.group(1), source[open_brace : index + 1]
 
 
+_CONSTANT = re.compile(r"^\s*static constexpr int (\w+)\s*=")
+_SIGNATURE = re.compile(
+    r"\n(?:template <[^>]*>\n)?(?:static )?(?:SFEM_INLINE )?"
+    r"[\w:<>,\*& ]+\s+\w+\((?P<params>[^;]*?)\)\s*\{"
+)
+_PARAMETER = re.compile(r"(\w+)\s*(?:\[[^\]]*\])?\s*$")
+#: The trailing identifier of an *unnamed* parameter is its type, and a local
+#: declaration picked up by the signature pattern carries an initializer, so
+#: neither is a named parameter that nothing reads.
+_TYPE_NAMES = frozenset(
+    """void bool char short int long float double unsigned signed size_t
+    ptrdiff_t idx_t geom_t real_t count_t element_idx_t int16_t uint16_t
+    s_t g_t compressed_t metric_tensor_t""".split()
+)
+
+
+def _block_depths(lines):
+    """The brace depth entering and leaving each line."""
+    entering, leaving, depth = [], [], 0
+    for line in lines:
+        entering.append(depth)
+        depth += line.count("{") - line.count("}")
+        leaving.append(depth)
+    return entering, leaving
+
+
+def unused_constants(source):
+    """`static constexpr int` declarations nothing in their own block reads.
+
+    The block ends at the line whose own brace takes the depth back below the
+    declaration's, so a later function's use of the same name does not keep a
+    dead one alive.  A name read through a qualified reference -- the boundary
+    reference-data structs publish `NS` and `NQ` and are read as
+    `<struct><s_t>::NS` from outside -- is a class member, not a dead local.
+    """
+    lines = source.split("\n")
+    entering, leaving = _block_depths(lines)
+    for index, line in enumerate(lines):
+        match = _CONSTANT.match(line)
+        if match is None:
+            continue
+        name = match.group(1)
+        if re.search(r"::%s\b" % re.escape(name), source):
+            continue
+        end = len(lines)
+        for following in range(index + 1, len(lines)):
+            if leaving[following] < entering[index]:
+                end = following
+                break
+        if not re.search(r"\b%s\b" % re.escape(name), "\n".join(lines[index + 1 : end])):
+            yield name, index + 1
+
+
+def unused_parameters(source):
+    """Named parameters of a definition that its body never reads.
+
+    This is what `-Wextra -Werror` rejects under `SFEM_ENABLE_DEV_MODE`, and
+    what the `(void)name;` discards used to hide.  Naming nothing instead says
+    the same thing to the compiler without a statement to carry it.
+    """
+    for match in _SIGNATURE.finditer(source):
+        open_brace = source.index("{", match.start())
+        depth, index = 0, open_brace
+        while index < len(source):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            index += 1
+        body = source[open_brace : index + 1]
+        for parameter in match.group("params").split(","):
+            parameter = parameter.strip()
+            if "=" in parameter or len(parameter.split()) < 2:
+                continue
+            declared = _PARAMETER.search(parameter)
+            if declared is None:
+                continue
+            name = declared.group(1)
+            if name in _KEYWORDS or name in _TYPE_NAMES:
+                continue
+            if not re.search(r"\b%s\b" % re.escape(name), body):
+                yield name
+
+
+_DISCARD = re.compile(r"^\s*\(void\)(\w+);\s*$", re.M)
+
+
+def void_discards(source):
+    """`(void)name;` statements: a kernel apologising for what it declares.
+
+    The statement exists only to stop `-Wextra -Werror` complaining about a
+    name nothing reads, which means the declaration was the mistake.  A
+    parameter that is part of the ABI and genuinely unread should carry no
+    name; a constant nothing reads should not be declared.
+    """
+    return [match.group(1) for match in _DISCARD.finditer(source)]
+
+
 def dead_assignments(body):
     """Assignments in this body whose result nothing reads, transitively.
 
@@ -172,6 +272,9 @@ def survey(generated):
     dead = []
     runs = collections.Counter()
     wrappers = []
+    constants = []
+    parameters = []
+    discards = []
     for path in source_files(generated):
         with open(path, encoding="utf-8") as stream:
             source = stream.read()
@@ -179,10 +282,22 @@ def survey(generated):
         for name, body in function_bodies(source):
             for symbol, statement in dead_assignments(body):
                 dead.append((relative, name, symbol, statement))
+        constants.extend(
+            (relative, name, line) for name, line in unused_constants(source)
+        )
+        parameters.extend((relative, name) for name in unused_parameters(source))
+        discards.extend((relative, name) for name in void_discards(source))
         for length in lane_loop_runs(source):
             runs[length] += 1
         wrappers.extend((relative, name) for name in wrapped_helper_entry_points(source))
-    return {"dead": dead, "lane_loop_runs": runs, "wrapped_helpers": wrappers}
+    return {
+        "dead": dead,
+        "lane_loop_runs": runs,
+        "wrapped_helpers": wrappers,
+        "unused_constants": constants,
+        "unused_parameters": parameters,
+        "void_discards": discards,
+    }
 
 
 def main(argv=None):
@@ -192,6 +307,15 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     result = survey(args.generated)
+    print("(void) discards:              %d" % len(result["void_discards"]))
+    for row in result["void_discards"][: args.limit]:
+        print("    %s: %s" % row)
+    print("unused constants:            %d" % len(result["unused_constants"]))
+    for row in result["unused_constants"][: args.limit]:
+        print("    %s:%d: %s" % (row[0], row[2], row[1]))
+    print("unused parameters:           %d" % len(result["unused_parameters"]))
+    for row in result["unused_parameters"][: args.limit]:
+        print("    %s: %s" % row)
     print("dead assignments:            %d" % len(result["dead"]))
     for row in result["dead"][: args.limit]:
         print("    %s: %s: %s" % (row[0], row[1], row[3][:90]))
