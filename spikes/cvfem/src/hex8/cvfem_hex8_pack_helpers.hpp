@@ -512,10 +512,11 @@ static void cvfem_hex8_assemble_nodal_grad_packed(MeshT                         
         ogz.assign((size_t)d.nnodes, scalar_t(0));
     }
 
-    scalar_t *const SFEM_RESTRICT gx_out = ogx.data();
-    scalar_t *const SFEM_RESTRICT gy_out = ogy.data();
-    scalar_t *const SFEM_RESTRICT gz_out = ogz.data();
-    const ptrdiff_t               node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+    scalar_t *const SFEM_RESTRICT       gx_out = ogx.data();
+    scalar_t *const SFEM_RESTRICT       gy_out = ogy.data();
+    scalar_t *const SFEM_RESTRICT       gz_out = ogz.data();
+    const scalar_t *const SFEM_RESTRICT w      = d.grad_w_inv.data();
+    const ptrdiff_t node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
 
 #pragma omp parallel
     {
@@ -581,10 +582,15 @@ static void cvfem_hex8_assemble_nodal_grad_packed(MeshT                         
                 }
             }
 
+            // The denominator is applied here and again in the ghost reduction rather than
+            // in a pass of its own, because the average is linear in its numerator:
+            // (owned + ghost) * w is owned * w + ghost * w. That removes a full read-modify-
+            // write over three nodal arrays from every matvec.
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                gx_out[owned + k] = pack_out[k * 3 + 0];
-                gy_out[owned + k] = pack_out[k * 3 + 1];
-                gz_out[owned + k] = pack_out[k * 3 + 2];
+                const scalar_t wi = w[owned + k];
+                gx_out[owned + k] = pack_out[k * 3 + 0] * wi;
+                gy_out[owned + k] = pack_out[k * 3 + 1] * wi;
+                gz_out[owned + k] = pack_out[k * 3 + 2] * wi;
             }
             scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
             scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
@@ -613,17 +619,10 @@ static void cvfem_hex8_assemble_nodal_grad_packed(MeshT                         
             sy += by[idx];
             sz += bz[idx];
         }
-        gx_out[dest] += sx;
-        gy_out[dest] += sy;
-        gz_out[dest] += sz;
-    }
-
-    const scalar_t *const SFEM_RESTRICT w = d.grad_w_inv.data();
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        gx_out[i] *= w[i];
-        gy_out[i] *= w[i];
-        gz_out[i] *= w[i];
+        const scalar_t wd = w[dest];
+        gx_out[dest] += sx * wd;
+        gy_out[dest] += sy * wd;
+        gz_out[dest] += sz * wd;
     }
 }
 
