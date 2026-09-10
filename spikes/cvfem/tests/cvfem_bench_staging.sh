@@ -108,6 +108,37 @@ differs "assemble, affine split"               --assemble --kernel split
 differs "block diagonal, affine"               --assemble-diag
 differs "block diagonal, isoparam"             --assemble-diag --geom isoparam
 
+# The assembled matrix with Rhie-Chow on, across layouts. There is no external reference
+# that carries the term, so the check is that the four layouts produce the same matrix: they
+# all run the same scalar element kernel and differ only in how the result is scattered.
+# The checksums agree to about 1e-15 relative rather than exactly, because the scatter order
+# differs -- so this compares numerically, not as strings.
+same_across_layouts() {
+    desc="$1"; shift
+    ref=""
+    for lay in atomic packed colored store; do
+        v=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout "$lay" "$@" 2>&1 | sed -n 's/^ *checksum: //p')
+        if [ -z "$v" ]; then
+            printf '%-62s FAIL (--layout %s produced no checksum)\n' "$desc" "$lay"
+            FAIL=$((FAIL + 1))
+            return
+        fi
+        if [ -z "$ref" ]; then ref="$v"; continue; fi
+        if ! awk -v a="$ref" -v b="$v" 'BEGIN{d=a-b; if(d<0)d=-d; s=a; if(s<0)s=-s; if(s==0)s=1; exit !(d <= 1e-12*s)}'; then
+            printf '%-62s FAIL (--layout %s gave %s, atomic gave %s)\n' "$desc" "$lay" "$v" "$ref"
+            FAIL=$((FAIL + 1))
+            return
+        fi
+    done
+    printf '%-62s OK   four layouts agree on %s\n' "$desc" "$ref"
+}
+
+echo "== Rhie-Chow in the assembled matrix, on every layout"
+same_across_layouts "assemble + rc"                --assemble --rhie-chow
+same_across_layouts "assemble + rc + boundary"     --assemble --rhie-chow --boundary
+same_across_layouts "assemble + rc + transient"    --assemble --rhie-chow --transient 0.01
+same_across_layouts "assemble, no terms"           --assemble
+
 echo "== Rhie-Chow on the pack-based layouts"
 # The oracle is this driver's own implementations against each other: packed, colored and
 # atomic are three spellings of one matrix-free operator, so with the term on they must
@@ -161,8 +192,10 @@ refused "residual + rc, current"               --rhie-chow --kernel current
 refused "residual + rc, isoparam packed"       --rhie-chow --geom isoparam --kernel current --layout packed
 refused "jac-action + rc, isoparam packed"     --rhie-chow --jac-action --geom isoparam --layout packed
 # Assembly on the pack-based layouts has no Rhie-Chow staging at all yet.
-refused "assemble + rc, packed"                --assemble --rhie-chow --layout packed
-refused "assemble + rc, colored"               --assemble --rhie-chow --layout colored
+# Isoparametric residual and action on a pack-based layout run the SIMD kernels, which
+# carry no term. Assembly there is scalar and does, which is why only these two are refused.
+refused "residual + rc, isoparam store"        --rhie-chow --geom isoparam --kernel current --layout store
+refused "jac-action + rc, isoparam colored"    --rhie-chow --jac-action --geom isoparam --layout colored
 # The generated action arrangements carry no boundary or Rhie-Chow term.
 refused "jac-action + rc, sympy_action"        --jac-action --rhie-chow --kernel sympy_action
 

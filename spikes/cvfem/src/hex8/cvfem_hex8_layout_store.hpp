@@ -150,6 +150,10 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.st_max_local_nnz, 1);
 
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
+    // As in assemble_jacobian_packed: this sweep is scalar per element, so Rhie-Chow enters
+    // through a Hex8RhieChow built from pack data. Only the two hand-written kernels take
+    // it; the generated ones are refused with the term rather than measured without it.
+    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
     {
@@ -157,11 +161,16 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
         scalar_t *const SFEM_RESTRICT pack_u     = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals = thread_scratch<scalar_t>(2, bsr_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                geom_kind == GeomKind::Isoparam ? thread_scratch<scalar_t>(3, packed_xyz_n(p)) : nullptr;
+                (geom_kind == GeomKind::Isoparam || with_rc)
+                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
+                        : nullptr;
         const ptrdiff_t               xyz_n  = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
 
 #pragma omp for schedule(dynamic, 1)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
@@ -179,6 +188,9 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
 
             fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
+                                               pack_pgx, pack_pgy, pack_pgz);
             if (geom_kind == GeomKind::Isoparam)
                 fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
@@ -194,11 +206,20 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
                 }
                 const int *const SFEM_RESTRICT slots = p.st_element_slot.data() + (size_t)e * 64;
 
+                scalar_t     rc_x[8], rc_y[8], rc_z[8], rc_pgx[8], rc_pgy[8], rc_pgz[8];
+                Hex8RhieChow rc{};
+                if (with_rc) {
+                    gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, rc_x, rc_y, rc_z);
+                    gather_hex8_coords_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz, e, rc_pgx, rc_pgy, rc_pgz);
+                    rc = Hex8RhieChow{rc_x, rc_y, rc_z, rc_pgx, rc_pgy, rc_pgz, d.rhie_chow_scale};
+                }
+                const scalar_t *const rc_p = with_rc ? p_e : nullptr;
+
                 if (geom_kind == GeomKind::Isoparam) {
                     scalar_t x[8], y[8], z[8];
                     gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, x, y, z);
                     cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
-                            rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, local_vals);
+                            rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
                 } else {
                     scalar_t adj[9], det;
                     load_hex8_adj(d, e, adj, &det);
@@ -223,11 +244,11 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
                             if (g_dense_flush) {
                                 alignas(ALIGN_BYTES) scalar_t ke[64 * 16] = {};
                                 cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                        rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke);
+                                        rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke, rc, rc_p);
                                 hex8_blocks_to_slots(slots, ke, local_vals);
                             } else {
                                 cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                        rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
+                                        rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
                             }
                             break;
                         default: {
