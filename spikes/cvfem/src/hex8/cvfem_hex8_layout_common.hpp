@@ -209,6 +209,16 @@ struct MeshData {
     scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
 
     std::vector<uint8_t>  face_mask;       // per element, bits 0..5 = the six CVFEM faces
+
+    // The effective boundary face mask -- see cvfem_hex8_build_face_mask_eff. Built once so
+    // the boundary sweeps can skip the elements that have no boundary face at all, which on
+    // any refined mesh is nearly all of them.
+    std::vector<uint8_t> face_mask_eff;
+    bool                 face_mask_eff_valid{false};
+    scalar_t             face_mask_eff_lx{0}, face_mask_eff_ly{0}, face_mask_eff_lz{0};
+    // The subset of elements face_mask_eff marks, compacted so the boundary sweeps are
+    // load balanced rather than merely short.
+    std::vector<ptrdiff_t> bnd_elems;
     scalar_t              Lx{0}, Ly{0}, Lz{0};
 };
 
@@ -414,10 +424,15 @@ static SFEM_INLINE void gather_element_coords(const MeshData               &d,
 static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const scalar_t rho, const scalar_t mu,
                                                            const int isoparam) {
     if (d.face_mask.empty()) return;
+    // Over the listed boundary elements, not over the mesh with a filter -- the shell
+    // clusters into a few static chunks, so filtering cuts the work without cutting the
+    // wall time. See cvfem_hex8_compact_boundary_elems.
+    cvfem_hex8_build_face_mask_eff(d);
+    const ptrdiff_t n_bnd = (ptrdiff_t)d.bnd_elems.size();
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        const int fmask = (int)d.face_mask[(size_t)e];
-        if (!fmask) continue;
+    for (ptrdiff_t i = 0; i < n_bnd; ++i) {
+        const ptrdiff_t e     = d.bnd_elems[(size_t)i];
+        const int       fmask = (int)d.face_mask_eff[(size_t)e];
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
         gather_element_coords(d, e, x, y, z);
         gather_element_fields(d, e, ux, uy, uz, p);
@@ -441,10 +456,15 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
                                                                   const scalar_t *const SFEM_RESTRICT dir,
                                                                   scalar_t *const SFEM_RESTRICT       jv) {
     if (d.face_mask.empty()) return;
+    // Over the listed boundary elements, not over the mesh with a filter -- the shell
+    // clusters into a few static chunks, so filtering cuts the work without cutting the
+    // wall time. See cvfem_hex8_compact_boundary_elems.
+    cvfem_hex8_build_face_mask_eff(d);
+    const ptrdiff_t n_bnd = (ptrdiff_t)d.bnd_elems.size();
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        const int fmask = (int)d.face_mask[(size_t)e];
-        if (!fmask) continue;
+    for (ptrdiff_t i = 0; i < n_bnd; ++i) {
+        const ptrdiff_t e     = d.bnd_elems[(size_t)i];
+        const int       fmask = (int)d.face_mask_eff[(size_t)e];
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
         gather_element_coords(d, e, x, y, z);
         gather_element_fields(d, e, ux, uy, uz, p);

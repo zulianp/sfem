@@ -142,6 +142,90 @@ static SFEM_INLINE SFEM_HOST_DEVICE int hex8_face_on_domain(const int f, const s
     return 1;
 }
 
+// The elements that actually have a boundary face, listed rather than filtered.
+//
+// Testing the mask inside a full sweep is not enough, and the reason is worth recording
+// because it is invisible in the work count. The boundary elements are the shell of the
+// mesh, so under `schedule(static)` they land in a few threads' chunks: skipping the
+// interior cut the WORK by an order of magnitude and left the WALL TIME unchanged, because
+// the pass is bound by whichever thread owns the shell. Measured on Grace at 1,853,572 dof:
+// 1058 us/call before the skip, 1070 us/call after -- no change at all, for ~91% less work.
+//
+// Iterating a compacted list restores the balance: every thread gets an equal share of the
+// elements that do something, and the interior is not visited at all.
+template <typename MeshT>
+static void cvfem_hex8_compact_boundary_elems(MeshT &d) {
+    d.bnd_elems.clear();
+    for (ptrdiff_t e = 0; e < d.nelements; ++e)
+        if (d.face_mask_eff[(size_t)e]) d.bnd_elems.push_back(e);
+}
+
+// ------------------------------------------------- effective boundary face mask
+//
+// Which of an element's six faces lie on the domain boundary, as a single per-element
+// bitfield: the mask the operator compiled from a sideset where there is one, and
+// otherwise the same bounding-box test the kernels above would run face by face -- which
+// is the default, since d.face_mask is only built under SFEM_BOUNDARY_MASK=1.
+//
+// Evaluating it here is not about the test, which is cheap. It is about letting the caller
+// skip the element outright. The boundary closure is a second sweep over the WHOLE mesh
+// that gathers coordinates, fields and, for the Jacobian, the direction -- 88 doubles per
+// element -- in order to do work on the boundary layer alone. At n=140 that is 2% of the
+// elements paying for 100% of the gathers.
+//
+// The skip is exact, not an approximation: fmask is read in exactly one place in each of
+// the three kernels above, the per-face inclusion test, so an element whose effective mask
+// is zero contributes nothing at all. tests/cvfem_boundary_mask_test.cpp asserts precisely
+// that ("fmask 0 contributes nothing"), and it also asserts that the six single-face
+// contributions sum to the all-face one, which is what makes a per-face precomputation
+// equivalent to the per-face test it replaces.
+template <typename MeshT>
+static void cvfem_hex8_build_face_mask_eff(MeshT &d) {
+    // The bounding-box branch below reads Lx/Ly/Lz, so they are part of the key: a
+    // MeshData reused for a different domain would otherwise keep a mask describing the
+    // old one, and a wrong face mask is silent -- it leaves a control volume open and the
+    // solve converges to the wrong answer rather than failing.
+    if (d.face_mask_eff_valid && (ptrdiff_t)d.face_mask_eff.size() == d.nelements &&
+        d.face_mask_eff_lx == d.Lx && d.face_mask_eff_ly == d.Ly && d.face_mask_eff_lz == d.Lz)
+        return;
+    d.face_mask_eff.assign((size_t)d.nelements, 0);
+    d.face_mask_eff_valid = true;
+    d.face_mask_eff_lx    = d.Lx;
+    d.face_mask_eff_ly    = d.Ly;
+    d.face_mask_eff_lz    = d.Lz;
+    if (!d.face_mask.empty()) {
+        for (ptrdiff_t e = 0; e < d.nelements; ++e) d.face_mask_eff[(size_t)e] = d.face_mask[(size_t)e];
+        cvfem_hex8_compact_boundary_elems(d);
+        return;
+    }
+    const auto *const px = d.points[0];
+    const auto *const py = d.points[1];
+    const auto *const pz = d.points[2];
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const auto g = d.elems[a][e];
+            x[a]         = scalar_t(px[g]);
+            y[a]         = scalar_t(py[g]);
+            z[a]         = scalar_t(pz[g]);
+        }
+        int m = 0;
+        for (int f = 0; f < 6; ++f)
+            if (hex8_face_on_domain(f, x, y, z, d.Lx, d.Ly, d.Lz)) m |= 1 << f;
+        d.face_mask_eff[(size_t)e] = (uint8_t)m;
+    }
+    cvfem_hex8_compact_boundary_elems(d);
+}
+
+// The mask to hand the kernels for element e: the effective one when it has been built,
+// and otherwise the original convention, -1 for "decide from the bounding box".
+template <typename MeshT>
+static SFEM_INLINE int cvfem_hex8_face_mask_of(const MeshT &d, const ptrdiff_t e) {
+    if (!d.face_mask_eff.empty()) return (int)d.face_mask_eff[(size_t)e];
+    return d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e];
+}
+
 template <bool Atomic, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void hex8_visc_jac_row(const scalar_t mu, const scalar_t ax, const scalar_t ay, const scalar_t az,
                                           const scalar_t w[][3], const int row, const smesh::count_t *const SFEM_RESTRICT slots,
