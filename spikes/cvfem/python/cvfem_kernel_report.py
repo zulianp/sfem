@@ -42,10 +42,30 @@ TERMS = [
                                               "frozen": "frozen by design"}.get(r.get("ran_rc", "off"), "?")),
     ("exact_rc",     "exact-RC J", lambda r: "carried" if r.get("exact_rc") == "1"
                                    else ("frozen by design" if r.get("ran_rc") == "frozen" else "–")),
+    # Whether the nodal pressure gradient is part of the apply or hoisted out of the whole
+    # Krylov solve. Not a decoration: rebuilding it per apply is a full element sweep, and
+    # it is a stage of the cascade in its own right -- so it belongs among the terms rather
+    # than as a footnote, and without it here the two rows would collapse into one and the
+    # dearer of them would disappear.
+    ("pgrad_per_apply", "state ∇p", lambda r: "per apply" if r.get("pgrad_per_apply") == "1"
+                                    else ("hoisted" if r.get("ran_rc", "off") != "off" else "–")),
     ("ran_boundary", "boundary",   lambda r: "carried" if r.get("ran_boundary") == "on" else "–"),
     ("upwind_eps",   "upwind band", lambda r: "–" if float(r.get("upwind_eps", 0) or 0) == 0 else "carried"),
     ("transient",    "transient",  lambda r: "carried" if r.get("transient") == "1" else "–"),
 ]
+
+
+def condition(r):
+    """How the measurement was taken, as opposed to what it computed.
+
+    Only one so far: --live-vectors keeps N extra vectors of the solution size resident and
+    takes the direction from them in rotation, which is what a Krylov iteration does and
+    what the default -- an apply replayed on a warm, small working set -- does not. It
+    changes the number materially, so two rows that differ only in this are different
+    measurements and must not reduce to their best.
+    """
+    n = r.get("live_vectors", "0") or "0"
+    return "cold, %s live" % n if n not in ("0", "") else "warm"
 
 
 def variant(r):
@@ -98,7 +118,7 @@ def read_rows(paths):
                 except (KeyError, TypeError, ValueError):
                     skipped += 1
                     continue
-                key = (raw["operation"], variant(raw),
+                key = (raw["operation"], variant(raw), condition(raw),
                        tuple(f(raw) for _, _, f in TERMS), raw["dofs"])
                 if key not in best or rate > float(best[key]["MDOF_s"]):
                     best[key] = raw
@@ -107,9 +127,14 @@ def read_rows(paths):
 
 def section_coverage(rows):
     """What each variant computes. First, because it is what makes the rest readable."""
+    # Keyed on the terms as well as the variant, not on the variant alone. The same code
+    # path measured with and without Rhie-Chow is two different operators and this table's
+    # whole subject is which terms ran -- collapsing them showed one row and hid the rest,
+    # so a block diagonal measured four ways appeared here once.
     seen, out = set(), []
-    for r in sorted(rows, key=lambda r: (r["operation"], variant(r))):
-        key = (r["operation"], variant(r))
+    for r in sorted(rows, key=lambda r: (r["operation"], variant(r),
+                                         tuple(f(r) for _, _, f in TERMS))):
+        key = (r["operation"], variant(r), tuple(f(r) for _, _, f in TERMS))
         if key in seen:
             continue
         seen.add(key)
@@ -131,21 +156,28 @@ def section_throughput(rows):
     out = []
     for r in sorted(rows, key=lambda r: (r["operation"], -float(r["MDOF_s"]))):
         out.append([r["operation"], variant(r), "{:,}".format(r["dofs"]),
-                    "%.0f" % float(r["MDOF_s"]), completeness(r), r.get("threads", "?")])
+                    "%.0f" % float(r["MDOF_s"]), completeness(r), condition(r), r.get("threads", "?")])
     if not out:
         return ""
     return ("## Throughput\n\n"
             "Best observed rate per configuration, in MDOF/s. Best rather than mean because\n"
             "background load can only make a run slower. The completeness column is the one\n"
             "from the table above: two rows are comparable only when it matches.\n\n"
-            + table(["operation", "variant", "dof", "MDOF/s", "completeness", "threads"], out))
+            + table(["operation", "variant", "dof", "MDOF/s", "completeness", "working set", "threads"], out))
 
 
 def section_cascade(rows):
     """What each term costs, on one layout, at one size, for one operation at a time."""
     body = []
     for op in ("residual", "jac_action"):
-        pool = [r for r in rows if r["operation"] == op and r["layout"] in ("packed", "store")]
+        # One variant, not one layout. A cascade is a table in which only the OPERATOR
+        # varies, so mixing kernels or geometries into it puts two effects in one column --
+        # which it did: the bare `element kernel` row appeared eight times, once per member
+        # of the variant sweep, and none of them was a stage of anything.
+        pool = [r for r in rows
+                if r["operation"] == op and r["layout"] == "packed"
+                and r.get("geom", "affine") == "affine"
+                and r.get("ran_kernel") in ("sumfact", "n/a")]
         if not pool:
             continue
         # One size only: a cascade across sizes is two effects at once.
@@ -158,10 +190,13 @@ def section_cascade(rows):
         out = []
         for r in sorted(pool, key=lambda r: -float(r["MDOF_s"])):
             rate = float(r["MDOF_s"])
-            out.append([completeness(r), variant(r), "%.0f" % rate,
+            terms = ", ".join("%s (%s)" % (h, f(r)) if f(r) not in ("carried",) else h
+                              for _, h, f in TERMS if f(r) not in ("–", "?"))
+            out.append([completeness(r), terms or "none", condition(r), "%.0f" % rate,
                         "%.2fx" % (ref / rate) if rate > 0 else "–"])
         body.append("### %s, %s dof\n\n" % (op, "{:,}".format(size)) +
-                    table(["operator", "variant", "MDOF/s", "cost vs bare kernel"], out))
+                    table(["operator", "terms carried", "working set", "MDOF/s",
+                           "cost vs bare kernel"], out))
     if not body:
         return ""
     return ("## What the physics costs\n\n"
