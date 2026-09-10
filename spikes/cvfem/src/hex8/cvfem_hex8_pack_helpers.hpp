@@ -337,27 +337,76 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_qgrad(const PackT                  
 // the geometry is selected by a plain `isoparam` int -- the same convention
 // boundary_scs_add_residual already uses. Everything else it calls is either dependent on
 // MeshT (and so looked up at instantiation) or comes from the kernel headers above.
+// The denominator of that average, 1 / sum_e |det J_e| at each node.
+//
+// It is pure geometry and constant for the whole solve, and it was being rebuilt inside
+// every reconstruction: a fresh nnodes-sized heap allocation, a zero fill, one atomic per
+// node per element -- an eighth of the sweep's 32 atomics per element -- and a read of the
+// result in the normalisation pass. All of that on the critical path of the largest pass in
+// the matvec, for a number that cannot change unless the mesh moves.
+//
+// Built serially rather than with atomics, deliberately. It is a setup cost paid once, and
+// a serial accumulation is reproducible where the atomic one is not, so the reconstruction
+// stops inheriting run-to-run variation in its last bits from a quantity that has no reason
+// to vary at all.
 template <typename MeshT>
-static void cvfem_hex8_assemble_nodal_grad(const MeshT                  &d,
+static void cvfem_hex8_build_grad_weight(MeshT &d, const int isoparam) {
+    if ((ptrdiff_t)d.grad_w_inv.size() == d.nnodes && d.grad_w_isoparam == isoparam &&
+        d.grad_w_nelements == d.nelements)
+        return;
+    d.grad_w_inv.assign((size_t)d.nnodes, scalar_t(0));
+    scalar_t *const SFEM_RESTRICT w = d.grad_w_inv.data();
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t det;
+        if (isoparam) {
+            const auto *const px = d.points[0];
+            const auto *const py = d.points[1];
+            const auto *const pz = d.points[2];
+            scalar_t          x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES], adj[9];
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                x[a]                 = scalar_t(px[g]);
+                y[a]                 = scalar_t(py[g]);
+                z[a]                 = scalar_t(pz[g]);
+            }
+            cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
+        } else {
+            det = d.jacobian_determinant[(size_t)e];
+        }
+        const scalar_t vol = std::fabs(det);
+        // The same skip the sweep makes, so the weight counts exactly the elements that
+        // contribute. Without it a degenerate element would be in the denominator and not
+        // in the numerator.
+        if (vol < scalar_t(1e-30)) continue;
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) w[d.elems[a][e]] += vol;
+    }
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+        w[i] = w[i] > scalar_t(0) ? scalar_t(1) / w[i] : scalar_t(0);
+    d.grad_w_isoparam  = isoparam;
+    d.grad_w_nelements = d.nelements;
+}
+
+template <typename MeshT>
+static void cvfem_hex8_assemble_nodal_grad(MeshT                        &d,
                                            const int                     isoparam,
                                            const scalar_t *const SFEM_RESTRICT src,
                                            const int                     stride,
                                            std::vector<scalar_t>        &ogx,
                                            std::vector<scalar_t>        &ogy,
                                            std::vector<scalar_t>        &ogz) {
+    cvfem_hex8_build_grad_weight(d, isoparam);
     ogx.assign((size_t)d.nnodes, scalar_t(0));
     ogy.assign((size_t)d.nnodes, scalar_t(0));
     ogz.assign((size_t)d.nnodes, scalar_t(0));
-    std::vector<scalar_t> w((size_t)d.nnodes, scalar_t(0));
 
     scalar_t *const SFEM_RESTRICT pgx = ogx.data();
     scalar_t *const SFEM_RESTRICT pgy = ogy.data();
     scalar_t *const SFEM_RESTRICT pgz = ogz.data();
-    scalar_t *const SFEM_RESTRICT pw  = w.data();
+    const scalar_t *const SFEM_RESTRICT pw = d.grad_w_inv.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t f[CVFEM_HEX8_N_NODES], gx, gy, gz, vol;
+        scalar_t f[CVFEM_HEX8_N_NODES], gx, gy, gz;
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) f[a] = src[(ptrdiff_t)d.elems[a][e] * stride];
 
         if (isoparam) {
@@ -374,43 +423,43 @@ static void cvfem_hex8_assemble_nodal_grad(const MeshT                  &d,
             scalar_t dN[CVFEM_HEX8_N_NODES][3], adj[9], det;
             cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
             cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
-            vol = std::fabs(det);
-            if (vol < scalar_t(1e-30)) continue;
+            if (std::fabs(det) < scalar_t(1e-30)) continue;
             scalar_t dr = 0, ds = 0, dt = 0;
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                 dr += f[a] * dN[a][0];
                 ds += f[a] * dN[a][1];
                 dt += f[a] * dN[a][2];
             }
-            cvfem_hex8_pushforward(adj, scalar_t(1) / det, dr, ds, dt, gx, gy, gz);
+            // sgn, not 1/det. What this sweep accumulates is |det| times the gradient, and
+            // the gradient is A^T d / det -- so the determinant cancels and only its sign
+            // survives. One division and three multiplies per element go with it, and the
+            // result is one rounding closer to exact.
+            cvfem_hex8_pushforward(adj, det > scalar_t(0) ? scalar_t(1) : scalar_t(-1), dr, ds, dt, gx, gy, gz);
         } else {
             scalar_t adj[9], det;
             load_hex8_adj(d, e, adj, &det);
-            vol = std::fabs(det);
-            if (vol < scalar_t(1e-30)) continue;
-            // This is cvfem_hex8_grad_scalar spelled out. That function lives in
-            // cvfem_hex8_boundary_scs.hpp, which both families include *after* this
-            // header, so it cannot be called from here -- and it is itself only these two
-            // lines over cvfem_hex8_face_diff and cvfem_hex8_pushforward, both of which
-            // come from the kernel header above and are in scope.
+            if (std::fabs(det) < scalar_t(1e-30)) continue;
+            // This is cvfem_hex8_grad_scalar spelled out, with the same det cancellation as
+            // above. That function lives in cvfem_hex8_boundary_scs.hpp, which both families
+            // include *after* this header, so it cannot be called from here -- and it is
+            // itself only these two lines over cvfem_hex8_face_diff and
+            // cvfem_hex8_pushforward, both of which come from the kernel header above.
             scalar_t dr, ds, dt;
             cvfem_hex8_face_diff(f, dr, ds, dt);
-            cvfem_hex8_pushforward(adj, scalar_t(1) / det, dr, ds, dt, gx, gy, gz);
+            cvfem_hex8_pushforward(adj, det > scalar_t(0) ? scalar_t(1) : scalar_t(-1), dr, ds, dt, gx, gy, gz);
         }
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t id = d.elems[a][e];
-            CVFEM_ATOMIC_ADD(pgx[id], vol * gx);
-            CVFEM_ATOMIC_ADD(pgy[id], vol * gy);
-            CVFEM_ATOMIC_ADD(pgz[id], vol * gz);
-            CVFEM_ATOMIC_ADD(pw[id], vol);
+            CVFEM_ATOMIC_ADD(pgx[id], gx);
+            CVFEM_ATOMIC_ADD(pgy[id], gy);
+            CVFEM_ATOMIC_ADD(pgz[id], gz);
         }
     }
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        if (pw[i] <= scalar_t(0)) continue;
-        const scalar_t inv = scalar_t(1) / pw[i];
+        const scalar_t inv = pw[i];
         pgx[i] *= inv;
         pgy[i] *= inv;
         pgz[i] *= inv;

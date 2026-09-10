@@ -268,6 +268,14 @@ struct MeshData {
     int                   bdf_order{1};
     std::vector<scalar_t> u_prev, u_prev2;  // 3 * nnodes, interleaved
     std::vector<scalar_t> node_vol;
+    // The reconstruction's denominator: 1 / sum_{e in i} |det J_e|, one scalar per node.
+    // Pure geometry, so it is constant for the whole solve -- and it was being rebuilt from
+    // scratch on every matvec, with its own heap allocation and one atomic per node per
+    // element, inside the pass that is 69% of that matvec. Keyed on the mesh and the
+    // geometry rule, because the affine and isoparametric sweeps evaluate det differently.
+    std::vector<scalar_t> grad_w_inv;
+    int                   grad_w_isoparam{-1};
+    ptrdiff_t             grad_w_nelements{0};
 };
 
 struct BSR4 {
