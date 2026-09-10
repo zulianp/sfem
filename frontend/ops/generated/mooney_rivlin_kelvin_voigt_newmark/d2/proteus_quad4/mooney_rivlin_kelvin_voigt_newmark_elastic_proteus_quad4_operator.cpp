@@ -152,10 +152,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     const g_t *const coordinate_components[ND] = {x, y};
 
     for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev[shape * VS + lane]];
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
@@ -168,10 +169,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     }
 
     for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          const idx_t node = ev[shape * VS + lane];
+          const idx_t node = ev_shape[lane];
           bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
           bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
         }
@@ -359,20 +361,22 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     const g_t *const coordinate_components[ND] = {x, y};
 
     for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev[shape * VS + lane]];
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
     const s_t *const u_components[NC] = {ux, uy};
 
     for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          const idx_t node = ev[shape * VS + lane];
+          const idx_t node = ev_shape[lane];
           bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
         }
       }
@@ -410,11 +414,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     s_t *const out_components[NC] = {outx, outy};
 
     for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
           }
         }
       }
@@ -567,10 +572,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     const g_t *const coordinate_components[ND] = {x, y};
 
     for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev[shape * VS + lane]];
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
@@ -578,10 +584,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     const s_t *const h_components[NC] = {hx, hy};
 
     for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          const idx_t node = ev[shape * VS + lane];
+          const idx_t node = ev_shape[lane];
           bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
           bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
         }
@@ -624,11 +631,12 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
     s_t *const out_components[NC] = {outx, outy};
 
     for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev[shape * VS + scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
           }
         }
       }
