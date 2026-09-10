@@ -9407,16 +9407,29 @@ def _sfem_soa_element_api_alias_function_lines(
             kernel_constant("NS", n_nodes, indent="  "),
             kernel_constant("NQ", n_qp, indent="  "),
             kernel_constant("NDOFS", "NC * NS", indent="  "),
-            "  static constexpr int SHAPE_ORDER[NS] = {%s};" % ", ".join(str(i) for i in shape_order),
         ]
     )
     param_names = [_cpp_argument_name(param) for param in params]
+    if "matrix_streams" in param_names:
+        # The matrix variant still walks a table: flat would be NDOFS * NDOFS
+        # entries -- 576 for a three-component HEX8 -- which is not leaner than
+        # the loop that fills it, only longer.
+        lines.append(
+            "  static constexpr int SHAPE_ORDER[NS] = {%s};"
+            % ", ".join(str(i) for i in shape_order)
+        )
     if "coords" in param_names:
-        lines.extend(_sfem_soa_element_api_alias_stream_lines("coords", "ordered_coords", "const s_t *", False))
+        lines.extend(_sfem_soa_element_api_alias_stream_lines(
+            "coords", "ordered_coords", "const s_t *", False, shape_order, n_field_components
+        ))
     if "u_streams" in param_names:
-        lines.extend(_sfem_soa_element_api_alias_stream_lines("u_streams", "ordered_u_streams", "const s_t *", False))
+        lines.extend(_sfem_soa_element_api_alias_stream_lines(
+            "u_streams", "ordered_u_streams", "const s_t *", False, shape_order, n_field_components
+        ))
     if "out_streams" in param_names:
-        lines.extend(_sfem_soa_element_api_alias_stream_lines("out_streams", "ordered_out_streams", "s_t *", False))
+        lines.extend(_sfem_soa_element_api_alias_stream_lines(
+            "out_streams", "ordered_out_streams", "s_t *", False, shape_order, n_field_components
+        ))
     if "matrix_streams" in param_names:
         lines.extend(_sfem_soa_element_api_alias_stream_lines("matrix_streams", "ordered_matrix_streams", "s_t *", True))
 
@@ -9437,7 +9450,31 @@ def _sfem_soa_element_api_alias_function_lines(
     return lines
 
 
-def _sfem_soa_element_api_alias_stream_lines(source_name, ordered_name, pointer_type, matrix):
+def _sfem_soa_element_api_alias_stream_lines(
+    source_name,
+    ordered_name,
+    pointer_type,
+    matrix,
+    shape_order=None,
+    n_field_components=None,
+):
+    if not matrix:
+        # One flat initializer, the shape the C ABI wrappers already use for
+        # `proteus_elements`.  A table plus a loop said the same thing with a
+        # runtime indirection in between, and this is a pointer shuffle at the
+        # element API boundary, not work a kernel should be doing.
+        return [
+            "  %sconst %s[NDOFS] = {%s};"
+            % (
+                pointer_type,
+                ordered_name,
+                ", ".join(
+                    "%s[%d]" % (source_name, source * n_field_components + component)
+                    for source in shape_order
+                    for component in range(n_field_components)
+                ),
+            )
+        ]
     lines = ["  %s%s[NDOFS%s];" % (pointer_type, ordered_name, " * NDOFS" if matrix else "")]
     if matrix:
         lines.extend(
@@ -9455,17 +9492,6 @@ def _sfem_soa_element_api_alias_stream_lines(source_name, ordered_name, pointer_
                 "          %s[row * NDOFS + col] = %s[source_row * NDOFS + source_col];" % (ordered_name, source_name),
                 "        }",
                 "      }",
-                "    }",
-                "  }",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "  for (int shape = 0; shape < NS; ++shape) {",
-                "    const int source_shape = SHAPE_ORDER[shape];",
-                "    for (int component = 0; component < NC; ++component) {",
-                "      %s[shape * NC + component] = %s[source_shape * NC + component];" % (ordered_name, source_name),
                 "    }",
                 "  }",
             ]
