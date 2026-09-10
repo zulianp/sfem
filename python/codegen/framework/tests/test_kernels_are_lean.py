@@ -37,10 +37,17 @@ def _generated_tree():
 #: This was 1557 before the emitters started asking, per field rather than per
 #: system, which of a field's value and gradient a form reads -- and before
 #: `plans/dependencies.py` kept the symbols it was already computing and then
-#: discarding in an `any(...)`.  375 remain, in paths that stage from a
-#: different plan; the number is a ratchet to drive down, not a target that has
-#: been met.
-DEAD_ASSIGNMENT_BUDGET = 375
+#: discarding in an `any(...)`.  Then the geometry preamble stopped being
+#: declared unconditionally by four sites that could have asked
+#: `local_geometry_quantities`, and the test value stopped being declared by a
+#: form that contracts only test gradients: 375 -> 127.
+#:
+#: What is left is three paths, each wanting the same kind of fix: the
+#: inexact-apply tangent gathers connectivity it never scatters through (29),
+#: the mixed local bodies map a physical gradient per field rather than per
+#: component read (56), and their geometry preamble is still unconditional
+#: (42).  A ratchet to drive down, not a target that has been met.
+DEAD_ASSIGNMENT_BUDGET = 127
 
 #: Runs of back-to-back single-statement `#pragma omp simd` lane loops.  A run
 #: longer than one is N loops and N pragmas where one loop with N statements

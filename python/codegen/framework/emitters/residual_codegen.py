@@ -18,6 +18,7 @@ from codegen.framework.emitters.runtime_typed_abi import (
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
+    contracted_test_quantities,
     assembled_matrix_dependencies,
     jacobian_action_dependencies,
     residual_codegen_dependencies,
@@ -3058,38 +3059,19 @@ def _simplex_local_body(
 
     # TRANSFORM_REFERENCE: read the staged values back and take them to the
     # physical element.
-    transform = [
-        BufferDeclNode(
-            "const ptrdiff_t",
-            "goff",
-            (),
-            expr_ref("q * geometry_stride + lane"),
-        ),
-        BufferDeclNode(
-            "const s_t", "det", (), expr_ref("determinant[goff]")
-        ),
-    ]
-    transform.extend(
-        BufferDeclNode(
-            "const s_t",
-            "adj%d" % i,
-            (),
-            expr_ref("adjugate[%d][goff]" % i),
-        )
-        for i in _adjugate_components(dependencies, dim)
-    )
+    transform_values = []
     for field in system.fields:
         for group in groups:
             stem = field.name + group.symbol_suffix
             read = usage[(field.name, group.name)]
             if read.uses_value:
-                transform.append(
+                transform_values.append(
                     BufferDeclNode(
                         "const s_t", stem, (), expr_ref("%s_values[lane]" % stem)
                     )
                 )
             if read.uses_gradient:
-                transform.extend(
+                transform_values.extend(
                     BufferDeclNode(
                         "const s_t",
                         "%s_grad_%d_ref" % (stem, d),
@@ -3098,7 +3080,16 @@ def _simplex_local_body(
                     )
                     for d in range(dim)
                 )
-                transform.extend(_physical_gradient_nodes(stem, dim))
+                transform_values.extend(_physical_gradient_nodes(stem, dim))
+
+    # The geometry is prepended only when something reads it, and the phase
+    # is dropped entirely when it has no content: an empty lane scope holding
+    # nothing but an offset and a determinant is a scope for nothing.
+    transform = (
+        tuple(_geometry_value_nodes(dependencies, dim)) + tuple(transform_values)
+        if transform_values
+        else ()
+    )
 
     # EVALUATE_MATERIAL: the constitutive evaluation, staged for the contraction.
     material = []
@@ -3123,29 +3114,8 @@ def _simplex_local_body(
         )
 
     # Contract the staged coefficients against each test function.
-    test_body = [
-        BufferDeclNode(
-            "const ptrdiff_t",
-            "goff",
-            (),
-            expr_ref("q * geometry_stride + lane"),
-        ),
-        BufferDeclNode(
-            "const s_t", "det", (), expr_ref("determinant[goff]")
-        ),
-        BufferDeclNode(
-            "const s_t", "test_value", (), expr_ref("shape[q * NS + test]")
-        ),
-    ]
-    test_body.extend(
-        BufferDeclNode(
-            "const s_t",
-            "adj%d" % i,
-            (),
-            expr_ref("adjugate[%d][goff]" % i),
-        )
-        for i in _adjugate_components(dependencies, dim)
-        )
+    test_body = list(_geometry_value_nodes(dependencies, dim))
+    test_body.extend(_test_value_nodes(dependencies))
     for d in range(dim):
         if not any(row[d] for row in dependencies.gradient_coefficients):
             continue
@@ -3248,26 +3218,7 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
     n_fields = len(system.fields)
     groups = _dependency_stream_groups(dependencies)
 
-    body = [
-        BufferDeclNode(
-            "const ptrdiff_t",
-            "goff",
-            (),
-            expr_ref("q * geometry_stride + lane"),
-        ),
-        BufferDeclNode(
-            "const s_t", "det", (), expr_ref("determinant[goff]")
-        ),
-    ]
-    body.extend(
-        BufferDeclNode(
-            "const s_t",
-            "adj%d" % i,
-            (),
-            expr_ref("adjugate[%d][goff]" % i),
-        )
-        for i in _adjugate_components(dependencies, dim)
-    )
+    body = list(_geometry_value_nodes(dependencies, dim))
 
     # Asked once, up front, rather than inside the loop: the answer is a
     # property of the plan and the field, not of where emission happens to be.
@@ -3383,6 +3334,70 @@ def _assemble_mesh_phases(sections):
     for phase_plan in residual_mesh_phase_plans(()):
         ordered.extend(sections.get(phase_plan.phase, ()))
     return ordered
+
+
+def _test_value_nodes(dependencies):
+    """The test function's value, when the form contracts one.
+
+    `value_coefficients` already records that per row, and it was simply not
+    consulted at the declaration, so a form contracting only test gradients
+    still opened its contraction with a shape lookup it never read.
+
+    Returned as nodes rather than answered as a boolean for the same reason
+    `_geometry_value_nodes` is: a branch in emission that tests the plan is
+    emission deciding what to emit, and handing back a possibly-empty list
+    leaves the decision where it belongs.
+    """
+    nodes = []
+    for quantity in contracted_test_quantities(dependencies):
+        if quantity == "value":
+            nodes.append(
+                BufferDeclNode(
+                    "const s_t", "test_value", (), expr_ref("shape[q * NS + test]")
+                )
+            )
+    return nodes
+
+
+def _geometry_value_nodes(dependencies, dim):
+    """The per-point geometry a body reads, from the plan that decides it.
+
+    `plans.geometry_quantities.local_geometry_quantities` already says which of
+    the offset, the determinant and the adjugate a kernel needs, and two sites
+    in this emitter consult it.  Four others opened their scope with the offset
+    and the determinant unconditionally, so a body that reads neither still
+    declared both -- and where the rest of the body was empty as well, the
+    scope existed for nothing.  That accounted for 234 of the 375 assignments
+    the lean audit found nothing reads.
+    """
+    nodes = []
+    for quantity in local_geometry_quantities(dependencies, dim):
+        if quantity.name == "goff":
+            nodes.append(
+                BufferDeclNode(
+                    "const ptrdiff_t",
+                    "goff",
+                    (),
+                    expr_ref("q * geometry_stride + lane"),
+                )
+            )
+        elif quantity.name == "determinant":
+            nodes.append(
+                BufferDeclNode(
+                    "const s_t", "det", (), expr_ref("determinant[goff]")
+                )
+            )
+        else:
+            nodes.extend(
+                BufferDeclNode(
+                    "const s_t",
+                    "adj%d" % i,
+                    (),
+                    expr_ref("adjugate[%d][goff]" % i),
+                )
+                for i in _adjugate_components(dependencies, dim)
+            )
+    return nodes
 
 
 def _assemble_local_phases(sections):

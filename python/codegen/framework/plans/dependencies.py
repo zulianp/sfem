@@ -71,6 +71,30 @@ class ResidualCodegenDependencies:
         return self.uses_reference_gradients
 
 
+#: The order the test function's quantities are declared in, which is the order
+#: the generated contraction bodies have always used.
+TEST_QUANTITY_ORDER = ("value", "gradient")
+
+
+def contracted_test_quantities(dependencies):
+    """Which of the test function's value and gradient the form contracts.
+
+    The same shape as `plans.geometry_quantities.local_geometry_quantities`,
+    and for the same reason: a form that contracts only test gradients still
+    opened its contraction with a shape lookup for a value it never read, and
+    the fix is for emission to iterate what the plan returns rather than to
+    branch on the plan itself.  `uses_test_coefficients` above is the
+    disjunction of these two; this keeps them apart, which is what a
+    declaration needs.
+    """
+    quantities = []
+    if any(dependencies.value_coefficients):
+        quantities.append("value")
+    if dependencies.uses_test_gradients:
+        quantities.append("gradient")
+    return tuple(quantities)
+
+
 def residual_codegen_dependencies(system, coefficients, dependencies):
     free_symbols = set()
     for coefficient in coefficients:
