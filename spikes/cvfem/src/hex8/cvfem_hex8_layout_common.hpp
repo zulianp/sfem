@@ -297,9 +297,28 @@ static int g_breakdown = 0;
 static int g_dense_flush = 0;  // --dense-flush: stage ke densely, then flush 64 contiguous blocks
 static int g_kernel_only = 0;  // --kernel-only: element kernel writes to a dense stack buffer (no scatter)
 static int g_identity_slots[64];
-enum PhaseId { PH_ZERO = 0, PH_LOCAL_MEMSET, PH_GATHER, PH_KERNEL, PH_LOCAL_TO_GLOBAL, PH_GHOST, PH_N };
-static const char *const g_phase_name[PH_N] = {
-        "zero_global", "zero_local", "gather_u", "element_kernel", "local_to_global", "ghost_reduce"};
+// PH_QGRAD is not a phase of an element sweep like the others: it is the separate
+// reconstruction pass that the exact Rhie-Chow Jacobian action runs before the sweep, and it
+// is the largest single item in that matvec -- 5.06 ms of 7.34 at 4,121,204 dof on Grace,
+// 69%. It was invisible here because the breakdown covered packed *assembly* and the
+// *colored* matvec but neither packed action, so the pass that dominates had no phase at all.
+enum PhaseId {
+    PH_ZERO = 0,
+    PH_LOCAL_MEMSET,
+    PH_GATHER,
+    PH_KERNEL,
+    PH_LOCAL_TO_GLOBAL,
+    PH_GHOST,
+    PH_QGRAD,
+    PH_N
+};
+static const char *const g_phase_name[PH_N] = {"zero_global",
+                                               "zero_local",
+                                               "gather_u",
+                                               "element_kernel",
+                                               "local_to_global",
+                                               "ghost_reduce",
+                                               "qgrad"};
 static double g_phase[PH_N] = {0};
 struct PhaseAcc {
     double t[PH_N] = {0};
@@ -315,17 +334,25 @@ static void phase_reset() {
 }
 static void phase_report(const char *tag, const int repeat, const int nthreads) {
     if (!g_breakdown) return;
+    // PH_QGRAD is WALL time for a whole pass; every other phase is thread time summed over
+    // the team. Putting them in one percentage column would divide a wall-clock number by a
+    // thread-summed total and report the largest pass in the matvec as a rounding error, so
+    // it is kept out of the total and printed on its own terms.
     double total = 0;
-    for (int i = 0; i < PH_N; ++i) total += g_phase[i];
+    for (int i = 0; i < PH_N; ++i)
+        if (i != PH_QGRAD) total += g_phase[i];
     std::printf("  breakdown_%s (ms/call, summed over %d threads):\n", tag, nthreads);
     for (int i = 0; i < PH_N; ++i) {
-        if (g_phase[i] == 0) continue;
+        if (g_phase[i] == 0 || i == PH_QGRAD) continue;
         std::printf("    %-16s %8.3f  (%5.1f%%)\n",
                     g_phase_name[i],
                     1000.0 * g_phase[i] / double(repeat),
                     100.0 * g_phase[i] / total);
     }
     std::printf("    %-16s %8.3f\n", "TOTAL", 1000.0 * total / double(repeat));
+    if (g_phase[PH_QGRAD] != 0)
+        std::printf("    %-16s %8.3f  (wall, one pass, not thread-summed)\n",
+                    g_phase_name[PH_QGRAD], 1000.0 * g_phase[PH_QGRAD] / double(repeat));
 }
 
 

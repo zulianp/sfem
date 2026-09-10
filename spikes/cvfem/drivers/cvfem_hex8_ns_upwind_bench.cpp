@@ -176,6 +176,12 @@ struct CsvRow {
     int         live_vectors;
     double      upwind_eps;    // always 0 in this driver; recorded so the column is not silently absent
     int         transient;     // 1 when --transient made the operator unsteady
+    // Wall seconds per call spent in the direction-gradient reconstruction, and its share of
+    // the matvec. Measured whenever the exact Rhie-Chow Jacobian runs, --breakdown or not,
+    // because it is the largest pass in that operator and a CSV that omits it invites the
+    // reader to attribute the whole matvec to the element kernel. -1 where it does not apply.
+    double      qgrad_seconds;
+    double      qgrad_frac;
     const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
 };
 
@@ -194,7 +200,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
             "n_colors,packs_per_color_min,packs_per_color_max,checksum,"
             "rhie_chow,rhie_chow_scale,boundary,"
             "ran_kernel,ran_rc,ran_boundary,exact_rc,pgrad_per_apply,live_vectors,"
-            "upwind_eps,transient";
+            "upwind_eps,transient,s_qgrad,frac_qgrad";
     for (int i = 0; i < PH_N; ++i) header += std::string(",ms_") + g_phase_name[i];
 
     bool need_header = true;
@@ -240,6 +246,10 @@ static void csv_write(const std::string &path, const CsvRow &r) {
     std::fprintf(f, ",%d,%.6f,%d", r.rhie_chow, r.rhie_chow_scale, r.boundary);
     std::fprintf(f, ",%s,%s,%s,%d,%d,%d,%.6g,%d", r.ran_kernel, r.ran_rc, r.ran_boundary,
                  r.exact_rc, r.pgrad_per_apply, r.live_vectors, r.upwind_eps, r.transient);
+    if (r.qgrad_seconds >= 0)
+        std::fprintf(f, ",%.9e,%.6f", r.qgrad_seconds, r.qgrad_frac);
+    else
+        std::fprintf(f, ",,");
     for (int i = 0; i < PH_N; ++i) {
         if (r.phase)
             std::fprintf(f, ",%.6f", 1000.0 * r.phase[i] / double(r.repeat));
@@ -1176,7 +1186,11 @@ int main(int argc, char **argv) {
             const double t0 = wall_time();
             cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, dir_v + 3, N_FIELDS,
                                            d.qgx, d.qgy, d.qgz);
-            qgrad_seconds += wall_time() - t0;
+            const double dt_qg = wall_time() - t0;
+            qgrad_seconds += dt_qg;
+            // Also into the phase table, so the pass that dominates this matvec appears
+            // beside the phases of the sweep it precedes rather than only in a stdout line.
+            if (g_breakdown) g_phase[PH_QGRAD] += dt_qg;
         }
         if (layout == "colored")
             apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
@@ -1692,6 +1706,8 @@ int main(int argc, char **argv) {
         // solver scope needs to see that, and a zero that is present says it.
         row.upwind_eps      = 0.0;
         row.transient       = dt > scalar_t(0) ? 1 : 0;
+        row.qgrad_seconds   = with_qgrad ? qgrad_seconds / double(repeat) : -1.0;
+        row.qgrad_frac      = with_qgrad ? qgrad_seconds / seconds : -1.0;
         row.phase                = g_breakdown ? g_phase : nullptr;
         csv_write(csv_path, row);
     }

@@ -477,6 +477,10 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
 
 #pragma omp parallel
     {
+        // The breakdown covered packed assembly and the colored matvec but not this one --
+        // the operator the solver's Krylov loop actually applies. Without it nothing here
+        // could be attributed to a phase.
+        PhaseAcc                      acc;
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
@@ -505,7 +509,9 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
             const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
+            double _t = phase_now();
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
 
             fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
             fill_pack_interleaved(p, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
@@ -522,6 +528,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                 cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
             if (geom_kind == GeomKind::Isoparam)
                 fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
+
             for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                 if (geom_kind == GeomKind::Isoparam) {
@@ -591,6 +599,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                 }
                 scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
             }
+            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
 
             std::memcpy(jv + owned * N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)N_FIELDS * sizeof(scalar_t));
 
@@ -605,9 +614,12 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                 gz[ghost_off + k]                       = out[2];
                 gc[ghost_off + k]                       = out[3];
             }
+            if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
         }
+        acc.flush();
     }
 
+    const double _tg = phase_now();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
         const smesh::idx_t dest  = p.ghost_reduce_dest[row];
@@ -621,6 +633,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
             out[f] += sum;
         }
     }
+    if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
 }
 
 #endif  // CVFEM_HEX8_LAYOUT_PACKED_HPP
