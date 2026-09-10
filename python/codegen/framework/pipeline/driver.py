@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass, replace
 from enum import Enum
 
@@ -2160,12 +2161,31 @@ def _merge_files(outputs, files):
 
 
 def _write_files(out_dir, files):
+    """Write the generated sources, each appearing complete or not at all.
+
+    Written to a temporary name in the same directory and renamed into place,
+    because `os.replace` is atomic within a filesystem.  Every material writes
+    the shared primitive headers -- `kernel_math.hpp` and its four siblings --
+    with identical content, so two materials generating at once could otherwise
+    interleave inside one of them and leave a reader with a half-written file.
+    Materials are independent processes and there is no reason to run them one
+    at a time; this is what makes running them together safe.
+    """
     paths = []
     for filename, source in sorted(files.items()):
         path = os.path.join(out_dir, filename)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as output:
-            output.write(source.rstrip() + "\n")
+        handle, temporary = tempfile.mkstemp(
+            dir=os.path.dirname(path), prefix=".%s." % os.path.basename(path)
+        )
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as output:
+                output.write(source.rstrip() + "\n")
+            os.replace(temporary, path)
+        except BaseException:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+            raise
         paths.append(path)
     return tuple(paths)
 
@@ -2186,16 +2206,13 @@ def _clean_outputs(out_dir, name):
         "%s*.o" % name,
         "%s_*_summary.md" % name,
         "%s_*_reduced_outputs.txt" % name,
-        "kernel_math.hpp",
-        "kernel_math.cuh",
-        "kernel_diagnostics.hpp",
-        "kernel_diagnostics.cuh",
-        "matrix_formats.hpp",
-        "packed_thread_scratch.hpp",
-        "tensor_product_kernels.hpp",
-        "tensor_product_kernels.cuh",
-        "geometry_kernels.hpp",
-        "geometry_kernels.cuh",
+        # The shared primitive headers are deliberately absent.  Every material
+        # rewrites them with identical content, so removing them here achieved
+        # nothing -- and with materials generating concurrently it is a race:
+        # one can delete the header another has just written and is about to be
+        # compiled against.  A stale one cannot survive unnoticed, because
+        # `tools/codegen_snapshot.py check-tree` compares the committed tree
+        # against a fresh generation and reports anything extra.
     )
     for pattern in patterns:
         for path in glob.glob(os.path.join(out_dir, pattern)):
