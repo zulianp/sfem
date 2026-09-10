@@ -31,9 +31,11 @@ FAIL=0
 # A configuration that must run and pass every check the driver makes.
 ok() {
     desc="$1"; shift
+    # --layout atomic comes first so a case that wants another layout can say so in "$@"
+    # and win: the parser assigns on every match, so the last one holds.
     if out=$("$BENCH" --n 8 --repeat 1 --warmup 0 --verify-jac --layout atomic "$@" 2>&1); then
         printf '%-62s OK   %s\n' "$desc" \
-            "$(printf '%s\n' "$out" | grep -oE 'verify_(jac_spmv_vs_fd_rel|diag_vs_full_assembly_rel|split_isoparam_vs_full_rel): [0-9.e+-]*' | tr '\n' ' ')"
+            "$(printf '%s\n' "$out" | grep -oE 'verify_(jac_spmv_vs_fd_rel|diag_vs_full_assembly_rel|split_isoparam_vs_full_rel|rc_colored_residual_vs_atomic_abs|jac_mf_colored_action_vs_packed_abs): [0-9.e+-]*' | tr '\n' ' ')"
     else
         printf '%-62s FAIL\n' "$desc"
         printf '%s\n' "$out" | sed 's/^/    /'
@@ -105,6 +107,17 @@ differs "assemble, isoparam split"             --assemble --geom isoparam --kern
 differs "assemble, affine split"               --assemble --kernel split
 differs "block diagonal, affine"               --assemble-diag
 differs "block diagonal, isoparam"             --assemble-diag --geom isoparam
+
+echo "== Rhie-Chow on the pack-based layouts"
+# The oracle is this driver's own implementations against each other: packed, colored and
+# atomic are three spellings of one matrix-free operator, so with the term on they must
+# agree to round-off. That is the only check that says the colored sweep stages Rhie-Chow
+# the way the packed one does -- there is no external reference that carries the term.
+ok "residual + rc, packed"                     --rhie-chow --layout packed
+ok "residual + rc, colored"                    --rhie-chow --layout colored
+ok "residual + rc, store"                      --rhie-chow --layout store
+ok "jac-action + rc, packed"                   --rhie-chow --jac-action --layout packed
+ok "jac-action + rc, colored"                  --rhie-chow --jac-action --layout colored
 
 echo "== the transient term, on every operation"
 # tests/cvfem_bench_transient_test pins the term itself against closed forms. What is

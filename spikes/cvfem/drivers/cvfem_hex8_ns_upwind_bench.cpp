@@ -455,9 +455,14 @@ int main(int argc, char **argv) {
     // packed/store SIMD sumfact path. The colored sweep and the assembled Jacobian on the
     // packed layouts still need their staging extended, so those combinations are refused
     // rather than measured without it.
+    // Assembly on the pack-based layouts is the one that is still missing: those sweeps
+    // build the matrix through per-element slot arrays and no Rhie-Chow staging exists for
+    // them. The residual and the Jacobian action carry it on all four layouts -- colored
+    // stages it exactly as packed does, which is checked by comparing the two.
     const bool rc_layout_ok =
             layout == "atomic" ||
-            ((layout == "packed" || layout == "store") && !assemble && !assemble_diag && !bsr_apply);
+            ((layout == "packed" || layout == "store" || layout == "colored") && !assemble && !assemble_diag &&
+             !bsr_apply);
     // (--assemble-diag is always the atomic diagonal, refused for any other --layout below,
     // and it now carries both terms.)
     if (rhie_chow && !rc_layout_ok) {
@@ -558,16 +563,12 @@ int main(int argc, char **argv) {
     // reference -- both sides carry whatever the run asked for. That check is the only
     // thing that can show the new staging is right, so it must be allowed to run with the
     // term on. The chains that cannot are skipped rather than refused; see below.
-    const bool verify_jac_slot_only = verify_jac && (assemble_diag || kernel_kind == KernelKind::Split);
-    if (rhie_chow && (verify || (verify_jac && !verify_jac_slot_only))) {
-        std::fprintf(stderr,
-                     "--verify/--verify-jac cannot run with --rhie-chow: the reference "
-                     "kernels carry no Rhie-Chow term, so the comparison fails by "
-                     "construction (--assemble-diag and --kernel split are the exception -- "
-                     "they check against this driver's own assembly)\n");
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
+    // Each verification block now decides for itself which of its comparisons Rhie-Chow
+    // invalidates and skips those, rather than the whole run being refused: the checks that
+    // go against a Rhie-Chow-free reference are skipped, and the ones that go across this
+    // driver's own implementations -- packed against atomic against colored, the block
+    // diagonal against the full assembly, linear-plus-nonlinear against the whole -- run
+    // with the term on, which is what makes them the oracle for the staging work.
 
     // Read only inside the sumfact branch of the colored and store assemblies.
     if (g_dense_flush && !(assemble && kernel_kind == KernelKind::Sumfact &&
@@ -864,7 +865,35 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (verify) {
+    // With Rhie-Chow on, the chain below cannot run: most of its references are kernels
+    // that carry no such term, so every comparison would report the term as the error.
+    // What can be checked -- and, since the colored sweep learned to stage Rhie-Chow, is
+    // the only thing that says it stages it the way the packed sweep does -- is that the
+    // three matrix-free residual sweeps agree with each other. All three run the same
+    // sum-factorised kernel with the same per-pack staging; a difference here is a staging
+    // bug and nothing else.
+    if (rhie_chow && (verify || verify_jac)) {
+        apply_residual_atomic_sumfact(d, rho, mu);
+        std::vector<scalar_t> atomic_r;
+        pack_residual(d, atomic_r);
+        apply_residual_packed(d, packed, rho, mu, KernelKind::Sumfact, GeomKind::Affine);
+        std::vector<scalar_t> packed_r;
+        pack_residual(d, packed_r);
+        apply_residual_colored(d, packed, colors, rho, mu, KernelKind::Sumfact, GeomKind::Affine);
+        std::vector<scalar_t> colored_r;
+        pack_residual(d, colored_r);
+        const scalar_t packed_err  = max_abs_diff(atomic_r.data(), packed_r.data(), (ptrdiff_t)atomic_r.size());
+        const scalar_t colored_err = max_abs_diff(atomic_r.data(), colored_r.data(), (ptrdiff_t)atomic_r.size());
+        std::printf("verify_rc_packed_residual_vs_atomic_abs: %.6e\n", packed_err);
+        std::printf("verify_rc_colored_residual_vs_atomic_abs: %.6e\n", colored_err);
+        if (packed_err > 1.0e-10 || colored_err > 1.0e-10) {
+            std::fprintf(stderr, "HEX8 Rhie-Chow residual mismatch across layouts\n");
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+    }
+
+    if (verify && !rhie_chow) {
         apply_residual_atomic(d, rho, mu);
         std::vector<scalar_t> current_r;
         pack_residual(d, current_r);
@@ -1205,24 +1234,36 @@ int main(int argc, char **argv) {
     }
     auto bsr_apply_fn = [&]() { bsr_apply_op->apply(jac_dir.data(), jac_out.data()); };
 
-    // Not with Rhie-Chow: the finite difference below differences the residual, which
-    // carries the term in its exact form, while the assembly carries the frozen one. The
-    // gap between them is the deliberate design decision recorded in ran_rc, not a defect,
-    // so measuring it here would fail every run. The slot-array check further down is the
-    // one that runs with the term on.
-    if (verify_jac && !rhie_chow) {
-        jac_fn();
-        const scalar_t rel = verify_jacobian_fd(d, bsr, rho, mu, geom_kind);
-        std::printf("verify_jac_spmv_vs_fd_rel: %.6e\n", rel);
-        if (rel > 1.0e-6) {
-            std::fprintf(stderr, "HEX8 BSR Jacobian mismatch\n");
-            if (own_mpi) MPI_Finalize();
-            return 1;
+    // Two comparisons here go against the ASSEMBLED matrix and one goes across the
+    // matrix-free implementations, and Rhie-Chow separates them. The assembled Jacobian
+    // carries the frozen form by design while the action carries the exact one, so with the
+    // term on the first two would fail by construction and are skipped -- that gap is the
+    // decision recorded in ran_rc, not a defect. The third is unaffected: packed, atomic
+    // and colored are three spellings of the same matrix-free operator whatever terms are
+    // on, and with Rhie-Chow on it is the ONLY check that says the colored sweep stages the
+    // term the same way the packed one does.
+    if (verify_jac) {
+        const bool vs_matrix = !rhie_chow;
+        if (vs_matrix) {
+            jac_fn();
+            const scalar_t rel = verify_jacobian_fd(d, bsr, rho, mu, geom_kind);
+            std::printf("verify_jac_spmv_vs_fd_rel: %.6e\n", rel);
+            if (rel > 1.0e-6) {
+                std::fprintf(stderr, "HEX8 BSR Jacobian mismatch\n");
+                if (own_mpi) MPI_Finalize();
+                return 1;
+            }
         }
 
         std::vector<scalar_t> jv_spmv((size_t)d.nnodes * N_FIELDS), jv_mf((size_t)d.nnodes * N_FIELDS),
                 jv_mf_atomic((size_t)d.nnodes * N_FIELDS), jv_mf_colored((size_t)d.nnodes * N_FIELDS);
-        bsr4_spmv(bsr, d.nnodes, jac_dir.data(), jv_spmv.data());
+        // The exact form differentiates through the nodal gradient reconstruction, so the
+        // direction's pressure needs the same reconstruction. Without this the three sweeps
+        // would agree in the frozen form and the exact term would go unchecked.
+        if (rhie_chow)
+            cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, jac_dir.data() + 3, N_FIELDS,
+                                           d.qgx, d.qgy, d.qgz);
+        if (vs_matrix) bsr4_spmv(bsr, d.nnodes, jac_dir.data(), jv_spmv.data());
         apply_jacobian_action_packed(d, packed, rho, mu, jac_dir.data(), jv_mf.data(), geom_kind);
         if (geom_kind == GeomKind::Isoparam)
             apply_jacobian_action_atomic_isoparam(d, rho, mu, jac_dir.data(), jv_mf_atomic.data());
@@ -1245,13 +1286,29 @@ int main(int argc, char **argv) {
         apply_transient_action_pass(d, rho, jac_dir.data(), jv_mf_atomic.data());
         if (colors.n_colors > 0)
             apply_transient_action_pass(d, rho, jac_dir.data(), jv_mf_colored.data());
-        const scalar_t mf_err      = max_abs_diff(jv_spmv.data(), jv_mf.data(), d.nnodes * N_FIELDS);
-        const scalar_t atomic_err  = max_abs_diff(jv_mf.data(), jv_mf_atomic.data(), d.nnodes * N_FIELDS);
+        // The atomic sweep runs the SCALAR isoparametric kernel, which takes a
+        // Hex8RhieChow; the packed and colored sweeps run the SIMD one, which does not. So
+        // with Rhie-Chow on and isoparametric geometry the two sides are honestly different
+        // operators and this comparison would report 3.2e-2 -- the term itself. That is the
+        // remaining staging gap in this family, and it is refused for a RUN
+        // (--rhie-chow --geom isoparam needs --layout atomic); here it only means there is
+        // nothing to compare the atomic action against. Packed against colored still holds,
+        // since both lack the term equally.
+        const bool     atomic_comparable = !(rhie_chow && geom_kind == GeomKind::Isoparam);
+        const scalar_t mf_err      = vs_matrix ? max_abs_diff(jv_spmv.data(), jv_mf.data(), d.nnodes * N_FIELDS)
+                                                : scalar_t(0);
+        const scalar_t atomic_err  = atomic_comparable
+                                             ? max_abs_diff(jv_mf.data(), jv_mf_atomic.data(), d.nnodes * N_FIELDS)
+                                             : scalar_t(0);
         const scalar_t colored_err = colors.n_colors > 0
                                              ? max_abs_diff(jv_mf.data(), jv_mf_colored.data(), d.nnodes * N_FIELDS)
                                              : scalar_t(0);
-        std::printf("verify_jac_mf_action_vs_spmv_abs: %.6e\n", mf_err);
-        std::printf("verify_jac_mf_atomic_action_vs_packed_abs: %.6e\n", atomic_err);
+        if (vs_matrix) std::printf("verify_jac_mf_action_vs_spmv_abs: %.6e\n", mf_err);
+        if (atomic_comparable)
+            std::printf("verify_jac_mf_atomic_action_vs_packed_abs: %.6e\n", atomic_err);
+        else
+            std::printf("verify_jac_mf_atomic_action_vs_packed_abs: skipped (the isoparametric SIMD "
+                        "kernel carries no Rhie-Chow term)\n");
         if (colors.n_colors > 0) std::printf("verify_jac_mf_colored_action_vs_packed_abs: %.6e\n", colored_err);
         if (colored_err > 1.0e-12) {
             std::fprintf(stderr, "HEX8 colored Jacobian-action mismatch\n");
