@@ -751,13 +751,13 @@ static int neohookean_ogden_proteus_quad4_hessian_i_msoa_assemble_impl(
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
     s_t *const RSTR values,
-    const int *const RSTR diag_offsets,
-    const ptrdiff_t ndiag,
-    const ptrdiff_t coo_nnz,
-    const idx_t *const RSTR coo_rows,
-    const idx_t *const RSTR coo_cols,
-    idx_t *const RSTR coo_triplet_rows,
-    idx_t *const RSTR coo_triplet_cols) {
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
   static constexpr int NC = 2;
   static constexpr int ND = 2;
   static constexpr int NQ = 4;
