@@ -37,8 +37,23 @@ mkdir -p "$OUT"
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-72} OMP_PROC_BIND=true OMP_PLACES=cores
 U=$(grep '^uenv start' ~/init.sh | sed 's/^uenv start //')
 
-REPEAT=${REPEAT:-5}
-WARMUP=${WARMUP:-2}
+# Ten timed applies after five warmups. The Rhie-Chow configurations spread 20-32% across
+# passes at 5/2 -- enough to put an inversion in the cascade, where the operator with an
+# extra term read faster than the one without it -- and the per-run cost here is dominated
+# by mesh construction, not by the applies, so converging each reading properly is close to
+# free.
+REPEAT=${REPEAT:-10}
+WARMUP=${WARMUP:-5}
+# Passes over the whole sweep, not repeats inside one run. The report reduces repeated
+# measurements of a configuration to the best observed, which is the right estimator on a
+# shared machine -- background load can only make a run slower -- but it needs more than
+# one to reduce. With a single pass it had nothing to work with and the cascade came out
+# non-monotone: the residual with Rhie-Chow and the boundary read 928 MDOF/s against 1394
+# for the same operator plus the transient term, which cannot be true of the arithmetic and
+# was a bad reading standing alone. Three passes in the one allocation also spread each
+# configuration across three positions in the run order, which is the other effect that
+# cannot be averaged out of a single sequence.
+PASSES=${PASSES:-3}
 BIG=${BIG:-100}      # 4,121,204 dof
 SMALL=${SMALL:-64}   # 1,098,500 dof
 
@@ -56,6 +71,7 @@ run() {  # run <tag> <n> <flags...>
     fi
 }
 
+sweep() {
 # ---------------------------------------------------------------- the two cascades
 #
 # The element kernel alone, then the same kernel carrying each thing the solver needs. The
@@ -81,7 +97,20 @@ run jac_rc              $BIG --layout packed --jac-action --rhie-chow
 run jac_rc_bnd          $BIG --layout packed --jac-action --rhie-chow --boundary
 run jac_rc_bnd_dt       $BIG --layout packed --jac-action --rhie-chow --boundary --transient 0.01
 run jac_live7           $BIG --layout packed --jac-action --rhie-chow --boundary --live-vectors 7
+
+# The other way to apply the Jacobian: an SpMV of the assembled BSR. One row per problem
+# size is enough, because the cost does not depend on the physics -- the sparsity pattern is
+# the mesh's node-to-node graph whatever terms the values carry, and it stays that way by
+# design: the exact Rhie-Chow term is deliberately kept out of the assembled matrix
+# precisely because it would couple pressures beyond nearest neighbours and widen the
+# pattern (cvfem_hex8_ns_upwind_kernels.hpp:135).
+#
+# That is an argument, not a measurement, so the two control rows below make it one. If
+# they ever stop agreeing, the pattern has widened and something more interesting than a
+# throughput has changed.
 run spmv                $BIG --layout packed --bsr-apply
+run spmv_rc             $BIG --layout packed --bsr-apply --rhie-chow
+run spmv_rc_bnd         $BIG --layout packed --bsr-apply --rhie-chow --boundary
 
 echo
 echo "== the residual cascade on atomic, for the layout comparison =="
@@ -102,6 +131,7 @@ run res_bare            $SMALL --layout packed
 run res_rc_bnd          $SMALL --layout packed --rhie-chow --boundary
 run jac_bare            $SMALL --layout packed --jac-action
 run jac_rc_bnd          $SMALL --layout packed --jac-action --rhie-chow --boundary
+run spmv                $SMALL --layout packed --bsr-apply
 
 # ------------------------------------------------------------- the variant sweep
 echo
@@ -144,6 +174,14 @@ run diag_rc              $BIG --layout atomic --assemble-diag --rhie-chow
 run diag_rc_bnd          $BIG --layout atomic --assemble-diag --rhie-chow --boundary
 run diag_solver          $BIG --layout atomic --assemble-diag --rhie-chow --boundary --transient 0.01
 run diag_isoparam        $BIG --layout atomic --assemble-diag --geom isoparam --rhie-chow --boundary
+
+}
+
+for pass in $(seq 1 "$PASSES"); do
+    echo
+    echo "################ pass $pass of $PASSES ################"
+    sweep
+done
 
 echo
 echo "rows: $(( $(wc -l < "$CSV") - 1 ))"

@@ -294,6 +294,28 @@ exists only to build the preconditioner.</p>
 <tr>
 <td>bsr_apply</td>
 <td>packed / (kernel n/a)</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>frozen-RC</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -772,7 +794,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble</td>
 <td>colored / sympy_block</td>
 <td>4,121,204</td>
-<td>76</td>
+<td>77</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -781,7 +803,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble</td>
 <td>store / sumfact</td>
 <td>4,121,204</td>
-<td>72</td>
+<td>70</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -790,7 +812,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble</td>
 <td>store / sympy</td>
 <td>4,121,204</td>
-<td>71</td>
+<td>70</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -799,7 +821,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble</td>
 <td>store / sympy_block</td>
 <td>4,121,204</td>
-<td>71</td>
+<td>69</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -826,7 +848,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble</td>
 <td>packed / sumfact</td>
 <td>4,121,204</td>
-<td>55</td>
+<td>54</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -835,7 +857,16 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble</td>
 <td>packed / sympy</td>
 <td>4,121,204</td>
-<td>55</td>
+<td>54</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sympy_block</td>
+<td>4,121,204</td>
+<td>54</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -871,7 +902,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble</td>
 <td>atomic / sumfact</td>
 <td>4,121,204</td>
-<td>33</td>
+<td>34</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -890,15 +921,6 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>atomic / fd</td>
 <td>4,121,204</td>
 <td>21</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>packed / sympy_block</td>
-<td>4,121,204</td>
-<td>20</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -925,7 +947,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble_diag</td>
 <td>atomic / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>93</td>
+<td>92</td>
 <td>frozen-RC</td>
 <td>warm</td>
 <td>72</td>
@@ -934,16 +956,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>assemble_diag</td>
 <td>atomic / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>92</td>
-<td>partial</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>assemble_diag</td>
-<td>atomic / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>90</td>
+<td>77</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -958,11 +971,47 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>72</td>
 </tr>
 <tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>63</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>487</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
 <td>bsr_apply</td>
 <td>packed / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>449</td>
+<td>462</td>
 <td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>461</td>
+<td>frozen-RC</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>457</td>
+<td>partial</td>
 <td>warm</td>
 <td>72</td>
 </tr>
@@ -970,7 +1019,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>store / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>2044</td>
+<td>2077</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -979,7 +1028,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>packed / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>2036</td>
+<td>2067</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -988,7 +1037,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>packed / (kernel n/a)</td>
 <td>1,098,500</td>
-<td>1991</td>
+<td>2009</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -997,7 +1046,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>colored / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>925</td>
+<td>910</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1006,7 +1055,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>atomic / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>840</td>
+<td>835</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1015,7 +1064,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>packed / (kernel n/a) / isoparam</td>
 <td>4,121,204</td>
-<td>807</td>
+<td>809</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1024,7 +1073,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>packed / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>618</td>
+<td>605</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -1033,7 +1082,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>packed / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>584</td>
+<td>579</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1042,7 +1091,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>packed / (kernel n/a)</td>
 <td>4,121,204</td>
-<td>575</td>
+<td>573</td>
 <td>solver operator</td>
 <td>cold, 7 live</td>
 <td>72</td>
@@ -1050,8 +1099,8 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>jac_action</td>
 <td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>571</td>
+<td>1,098,500</td>
+<td>572</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1059,8 +1108,8 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>jac_action</td>
 <td>packed / (kernel n/a)</td>
-<td>1,098,500</td>
-<td>570</td>
+<td>4,121,204</td>
+<td>561</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1069,7 +1118,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>atomic / sympy_action_geomface</td>
 <td>4,121,204</td>
-<td>479</td>
+<td>475</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1078,7 +1127,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>atomic / sympy_action_face</td>
 <td>4,121,204</td>
-<td>429</td>
+<td>422</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1087,7 +1136,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>atomic / (kernel n/a) / isoparam</td>
 <td>4,121,204</td>
-<td>398</td>
+<td>386</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1105,7 +1154,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>atomic / sympy_action_geom</td>
 <td>4,121,204</td>
-<td>360</td>
+<td>353</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1114,7 +1163,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>atomic / sympy_action_node</td>
 <td>4,121,204</td>
-<td>335</td>
+<td>333</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1123,7 +1172,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>atomic / sympy_action_comp</td>
 <td>4,121,204</td>
-<td>329</td>
+<td>328</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1132,7 +1181,16 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>jac_action</td>
 <td>atomic / sympy_action</td>
 <td>4,121,204</td>
-<td>309</td>
+<td>307</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>2945</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1141,16 +1199,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>store / sumfact</td>
 <td>4,121,204</td>
-<td>2931</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>packed / sumfact</td>
-<td>4,121,204</td>
-<td>2916</td>
+<td>2940</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1159,7 +1208,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sumfact</td>
 <td>1,098,500</td>
-<td>2664</td>
+<td>2745</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1168,7 +1217,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / current</td>
 <td>4,121,204</td>
-<td>2232</td>
+<td>2212</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1177,7 +1226,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>store / current</td>
 <td>4,121,204</td>
-<td>2193</td>
+<td>2211</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1186,7 +1235,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sympy</td>
 <td>4,121,204</td>
-<td>2132</td>
+<td>2147</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1195,7 +1244,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>store / sympy</td>
 <td>4,121,204</td>
-<td>2116</td>
+<td>2142</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1213,7 +1262,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sumfact</td>
 <td>4,121,204</td>
-<td>1556</td>
+<td>1559</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1222,7 +1271,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sumfact</td>
 <td>1,098,500</td>
-<td>1490</td>
+<td>1516</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1231,7 +1280,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sumfact</td>
 <td>4,121,204</td>
-<td>1445</td>
+<td>1436</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1240,7 +1289,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>colored / sumfact</td>
 <td>4,121,204</td>
-<td>1285</td>
+<td>1283</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1249,7 +1298,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>colored / current</td>
 <td>4,121,204</td>
-<td>990</td>
+<td>983</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1258,7 +1307,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>colored / sympy</td>
 <td>4,121,204</td>
-<td>950</td>
+<td>949</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1267,7 +1316,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>atomic / current</td>
 <td>4,121,204</td>
-<td>896</td>
+<td>901</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1276,7 +1325,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / isoparam_simd / isoparam</td>
 <td>4,121,204</td>
-<td>888</td>
+<td>884</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1285,7 +1334,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>atomic / sumfact</td>
 <td>4,121,204</td>
-<td>881</td>
+<td>883</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1303,7 +1352,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sumfact</td>
 <td>4,121,204</td>
-<td>741</td>
+<td>729</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -1312,7 +1361,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>atomic / sumfact</td>
 <td>4,121,204</td>
-<td>706</td>
+<td>703</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -1321,7 +1370,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>atomic / sumfact</td>
 <td>4,121,204</td>
-<td>677</td>
+<td>675</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1330,7 +1379,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sumfact</td>
 <td>4,121,204</td>
-<td>585</td>
+<td>667</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1348,7 +1397,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>atomic / sumfact</td>
 <td>4,121,204</td>
-<td>442</td>
+<td>439</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -1357,7 +1406,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>atomic / current / isoparam</td>
 <td>4,121,204</td>
-<td>401</td>
+<td>412</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1369,6 +1418,10 @@ from the table above: two rows are comparable only when it matches.</p>
 needs, one operation and one size at a time so that only the operator varies.
 The bare-kernel row is the number the regression gate tracks and the one every
 quoted figure has historically meant; the solver does not run it.</p>
+<p><code>spread</code> is how far apart that configuration's repeated measurements were, as a
+percentage of the best. Two rows differ meaningfully only when the gap between
+them is larger than that -- which is not true of every pair here, and saying so
+is cheaper than inviting the reader to over-read a 3% difference.</p>
 <h3>residual, 4,121,204 dof</h3>
 <table>
 <thead>
@@ -1377,6 +1430,7 @@ quoted figure has historically meant; the solver does not run it.</p>
 <th>terms carried</th>
 <th>working set</th>
 <th>MDOF/s</th>
+<th>spread</th>
 <th>cost vs bare kernel</th>
 </tr>
 </thead>
@@ -1385,7 +1439,8 @@ quoted figure has historically meant; the solver does not run it.</p>
 <td>element kernel</td>
 <td>none</td>
 <td>warm</td>
-<td>2916</td>
+<td>2945</td>
+<td>2% of 6</td>
 <td>1.00x</td>
 </tr>
 <tr>
@@ -1393,35 +1448,40 @@ quoted figure has historically meant; the solver does not run it.</p>
 <td>Rhie-Chow, state ∇p (hoisted)</td>
 <td>warm</td>
 <td>1759</td>
-<td>1.66x</td>
+<td>1% of 3</td>
+<td>1.67x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, state ∇p (hoisted), boundary</td>
 <td>warm</td>
-<td>1556</td>
-<td>1.87x</td>
+<td>1559</td>
+<td>0% of 3</td>
+<td>1.89x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
 <td>warm</td>
-<td>1445</td>
-<td>2.02x</td>
+<td>1436</td>
+<td>3% of 3</td>
+<td>2.05x</td>
 </tr>
 <tr>
 <td>partial</td>
 <td>Rhie-Chow, state ∇p (per apply)</td>
 <td>warm</td>
-<td>741</td>
-<td>3.94x</td>
+<td>729</td>
+<td>1% of 3</td>
+<td>4.04x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, state ∇p (per apply), boundary, transient</td>
 <td>warm</td>
-<td>585</td>
-<td>4.98x</td>
+<td>667</td>
+<td>1% of 3</td>
+<td>4.41x</td>
 </tr>
 </tbody>
 </table>
@@ -1433,6 +1493,7 @@ quoted figure has historically meant; the solver does not run it.</p>
 <th>terms carried</th>
 <th>working set</th>
 <th>MDOF/s</th>
+<th>spread</th>
 <th>cost vs bare kernel</th>
 </tr>
 </thead>
@@ -1441,36 +1502,49 @@ quoted figure has historically meant; the solver does not run it.</p>
 <td>element kernel</td>
 <td>none</td>
 <td>warm</td>
-<td>2036</td>
+<td>2067</td>
+<td>8% of 6</td>
 <td>1.00x</td>
 </tr>
 <tr>
 <td>partial</td>
 <td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
 <td>warm</td>
-<td>618</td>
-<td>3.29x</td>
+<td>605</td>
+<td>1% of 3</td>
+<td>3.42x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
 <td>warm</td>
-<td>584</td>
-<td>3.49x</td>
+<td>579</td>
+<td>1% of 3</td>
+<td>3.57x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
 <td>cold, 7 live</td>
-<td>575</td>
-<td>3.54x</td>
+<td>573</td>
+<td>1% of 3</td>
+<td>3.60x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary, transient</td>
 <td>warm</td>
-<td>571</td>
-<td>3.57x</td>
+<td>561</td>
+<td>1% of 3</td>
+<td>3.68x</td>
+</tr>
+<tr>
+<td>assembled matrix</td>
+<td>SpMV of the assembled BSR — 3 term sets, 1.1% apart</td>
+<td>warm</td>
+<td>462</td>
+<td>n=3</td>
+<td>4.47x</td>
 </tr>
 </tbody>
 </table>
@@ -1481,35 +1555,30 @@ around it, which is how a change to the arithmetic is seen without the rest of t
 moving underneath it — but it is not the cost of an apply in the Newton loop.
 <code>src/hex8/cvfem_hex8_ns_core.hpp:5</code> says the two families "differ in physics, not just in
 layout"; the tables above are what that sentence costs.</p>
-<p><strong>The residual's headline overstates the real operator by 2.0x.</strong> 2916 MDOF/s is the
+<p><strong>The residual's headline overstates the real operator by 2.05x.</strong> 2945 MDOF/s is the
 element kernel on the packed layout; the same kernel carrying Rhie–Chow, the boundary
-closure and the transient term is 1445. Quoting the first as the operator's throughput is
+closure and the transient term is 1436. Quoting the first as the operator's throughput is
 not wrong, but it needs the qualifier, and this report is what the qualifier should point
 at.</p>
-<p><strong>For the Jacobian action the factor is 3.6x, not 2.0x</strong>, and that asymmetry is the thing
-worth taking away. 2032 bare against 571 for the operator the Krylov loop evaluates. The
+<p><strong>For the Jacobian action the factor is 3.68x, not 2.05x</strong>, and that asymmetry is the thing
+worth taking away. 2066 bare against 561 for the operator the Krylov loop evaluates. The
 action pays for something the residual has no analogue of: the <em>exact</em> Rhie–Chow Jacobian
 differentiates through the nodal pressure-gradient reconstruction, so every matvec rebuilds
 that reconstruction for the Krylov direction — a full element sweep that cannot be hoisted
 out of anything, because the direction changes with every iteration. Turning the term on
-alone takes the action from 2032 to 618; everything after that is comparatively cheap.</p>
+alone takes the action from 2066 to 605; everything after that is comparatively cheap.</p>
 <p>An earlier version of this analysis reported ~1.9x and measured the residual only, because
 no benchmark row for the action with Rhie–Chow existed to measure. It does now, and the
 number it produces is nearly twice as large. The residual figure it gave, 2579 against
-1377, agrees with the 1.87x this run reads for the same two rows.</p>
-<p><strong>Where the assembled matrix sits.</strong> The SpMV of the assembled Jacobian runs at 449 MDOF/s
-against 584 for the matrix-free action carrying the same physics, so matrix-free wins by
-1.3x on the apply alone — before counting the assembly that produced the matrix, which
-costs 39 MDOF/s on the atomic layout. The assembled operator earns its place as a
-preconditioner, not as an apply.</p>
+1377, agrees with the 1.89x this run reads for the same two rows.</p>
 <h2>Caching the nodal pressure gradient is worth 2.4x on the apply</h2>
-<p>1759 MDOF/s with the gradient hoisted out of the timed loop against 741 with it rebuilt
-inside every apply, on the packed residual. That is the apply alone;
+<p>1759 MDOF/s with the gradient hoisted out of the timed loop against 729 with it rebuilt
+inside every apply, on the packed residual — a factor of 2.41. That is the apply alone;
 <code>docs/README_alps.md</code> records the same option (<code>SFEM_PGRAD_CACHE</code>) as 1.26x off the whole
-linear solve, which is consistent — a solve is more than its applies. Anything that forces
+linear solve, which is consistent: a solve is more than its applies. Anything that forces
 the gradient to be rebuilt per apply gives back more than half the operator.</p>
 <p>The effect is a layout property as much as a physics one: on the atomic layout the same
-pair reads 706 against 442, a factor of 1.60. The cache is worth most exactly where the
+pair reads 703 against 439, a factor of 1.60. The cache is worth most exactly where the
 element sweep is fastest, because it is a fixed extra sweep and the kernel it is added to
 is what varies.</p>
 <p>This is the one term in the cascade that is a scheduling decision rather than a
@@ -1530,32 +1599,32 @@ choose, and choosing wrongly is the largest single number in this report.</p>
 <tbody>
 <tr>
 <td>element kernel only</td>
-<td align="right">2916</td>
+<td align="right">2945</td>
 <td align="right">881</td>
-<td align="right"><strong>3.31x</strong></td>
+<td align="right"><strong>3.34x</strong></td>
 </tr>
 <tr>
 <td>+ Rhie–Chow, gradient hoisted</td>
 <td align="right">1759</td>
-<td align="right">706</td>
-<td align="right">2.49x</td>
+<td align="right">703</td>
+<td align="right">2.50x</td>
 </tr>
 <tr>
 <td>+ Rhie–Chow + boundary</td>
-<td align="right">1556</td>
-<td align="right">677</td>
-<td align="right">2.30x</td>
+<td align="right">1559</td>
+<td align="right">675</td>
+<td align="right">2.31x</td>
 </tr>
 <tr>
 <td>+ Rhie–Chow, gradient per apply</td>
-<td align="right">741</td>
-<td align="right">442</td>
-<td align="right">1.68x</td>
+<td align="right">729</td>
+<td align="right">439</td>
+<td align="right">1.66x</td>
 </tr>
 </tbody>
 </table>
-<p>and on the Jacobian action, 2.42x on the bare kernel against 1.55x with Rhie–Chow and the
-boundary closure.</p>
+<p>and on the Jacobian action, 2.47x on the bare kernel (2066 against 835) against 1.54x with
+Rhie–Chow and the boundary closure (579 against 376).</p>
 <p>The packed layout is still the right choice — it wins in every row — but a layout
 comparison made on the bare kernel overstates the margin by about two. The reason is
 structural rather than incidental: packing buys its advantage in the element sweep, through
@@ -1565,7 +1634,40 @@ gradient reconstruction) or arithmetic that does not vectorise as well (the Rhie
 coefficient). None of those is helped by the pack, so each one dilutes what the pack is
 for.</p>
 <p>The same caution applies to any two rows in the tables above: they are comparable only when
-the completeness column matches.</p>
+the completeness column matches, and only when the gap between them exceeds the <code>spread</code>
+each was measured with.</p>
+<h2>The other way to apply the Jacobian</h2>
+<p>An SpMV of the assembled BSR is the alternative to the matrix-free action, so it belongs in
+the cascade rather than in a table of its own — the question "what does a matvec cost" has
+two answers and only one of them is matrix-free.</p>
+<p><strong>462 MDOF/s at 4,121,204 dof, against 579 for the matrix-free action carrying the same
+physics.</strong> Matrix-free wins by 1.25x on the apply alone, and that is before counting the
+assembly that produced the matrix: 87 MDOF/s on the colored layout and 39 on the atomic
+one, which is 5 and 12 SpMVs' worth of work respectively, spent to build something that is
+then slower to apply than not building it at all. The assembled operator earns its place as
+a preconditioner — it is what block-Jacobi and the Schur diagonal are read out of — and not
+as an apply.</p>
+<p><strong>One row per problem size is enough, because the cost does not depend on the physics.</strong>
+The sparsity pattern is the mesh's node-to-node graph whatever terms the values carry, and
+it stays that way by design: the exact Rhie–Chow term is deliberately kept out of the
+assembled matrix precisely because it would couple pressures beyond nearest neighbours and
+widen the pattern (<code>cvfem_hex8_ns_upwind_kernels.hpp:135</code>). That is an argument, though, not
+a measurement, so the job measures it — bare, with Rhie–Chow, and with Rhie–Chow and the
+boundary closure — and the three read 462, 461 and 457 MDOF/s, 1.1% apart. If they ever
+stop agreeing, the pattern has widened and something more interesting than a throughput has
+changed.</p>
+<p>It varies mildly with size — 487 MDOF/s at 1,098,500 dof against 462 at 4,121,204 — and
+that gap is 5%, only just outside the 3% these readings spread over, so it is worth
+noticing and not worth explaining. What can be said is what it is <em>not</em>: the values are
+about 840 bytes per dof at both sizes (878 MiB and 3329 MiB), so both matrices are far past
+the 117 MiB of L3 and the SpMV is streaming from DRAM in both cases. Whatever the remaining
+5% is, it is not a cache-residency effect.</p>
+<p>That 840 bytes per dof is the durable point about this operator. The matrix-free action
+reads the state and the mesh and recomputes everything else, so it moves a small constant
+per dof no matter how much physics it carries; the SpMV moves the whole matrix every time.
+That is why the SpMV's cost is flat across the physics — the traffic is the same — and why
+adding arithmetic to the matrix-free operator narrowed the gap between them from 4.5x on
+the bare kernel to 1.25x, without ever closing it.</p>
 <h2>Provenance</h2>
 <table>
 <thead>
@@ -1577,15 +1679,15 @@ the completeness column matches.</p>
 <tbody>
 <tr>
 <td>generated</td>
-<td>2026-09-10 12:48:01</td>
+<td>2026-09-10 14:02:39</td>
 </tr>
 <tr>
 <td>rows</td>
-<td>68</td>
+<td>71</td>
 </tr>
 <tr>
 <td>machines</td>
-<td>nid006547</td>
+<td>nid006548</td>
 </tr>
 <tr>
 <td>sources</td>
