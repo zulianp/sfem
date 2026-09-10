@@ -130,7 +130,11 @@ enum class KernelKind {
     // these, so this axis has never been measured for it.
     SympyAction,
     SympyActionNode,
-    SympyActionComp
+    SympyActionComp,
+    // The finest cut: one sub-control surface per scope. Face-wise lost badly as an
+    // ASSEMBLY arrangement, but for a reason that does not exist here -- it issued
+    // 2016 atomic adds against flat's 768, and the action accumulates into a local.
+    SympyActionFace
 };
 
 static KernelKind parse_kernel(const std::string &name) {
@@ -149,6 +153,7 @@ static KernelKind parse_kernel(const std::string &name) {
     if (name == "sympy_action") return KernelKind::SympyAction;
     if (name == "sympy_action_node") return KernelKind::SympyActionNode;
     if (name == "sympy_action_comp") return KernelKind::SympyActionComp;
+    if (name == "sympy_action_face") return KernelKind::SympyActionFace;
     return KernelKind::Sumfact;
 }
 
@@ -159,13 +164,15 @@ static bool kernel_uses_sympy_residual(const KernelKind k) {
 static bool kernel_is_valid(const std::string &name) {
     return name == "current" || name == "fd" || name == "sumfact" || name == "sympy" || name == "sympy_block" ||
            name == "sympy_row" || name == "sympy_face" || name == "split" || name == "sympy_action" ||
-           name == "sympy_action_node" || name == "sympy_action_comp";
+           name == "sympy_action_node" || name == "sympy_action_comp" ||
+           name == "sympy_action_face";
 }
 
 // The three generated Jacobian-action CSE arrangements, which are the only kernels the
 // action dispatches on. Everything else ignores --kernel for that operation.
 static bool kernel_is_action_only(const KernelKind k) {
-    return k == KernelKind::SympyAction || k == KernelKind::SympyActionNode || k == KernelKind::SympyActionComp;
+    return k == KernelKind::SympyAction || k == KernelKind::SympyActionNode ||
+           k == KernelKind::SympyActionComp || k == KernelKind::SympyActionFace;
 }
 
 enum class GeomKind { Affine, Isoparam };

@@ -21,6 +21,12 @@
 #   sympy_action        all 32 outputs in one scope   1295 temporaries
 #   sympy_action_node   the 4 dofs of one node, x8    1597 temporaries
 #   sympy_action_comp   one component across nodes,x4 1411 temporaries
+#   sympy_action_face   one sub-control surface,     x12
+#
+# Face-wise is here because the assembly verdict against it does not carry over: it lost
+# there by issuing 2016 atomic adds against flat's 768, and the action accumulates into a
+# local r[] where those are register or stack traffic instead. It is also the finest cut,
+# and cutting the scope is what helped in the first round.
 #
 # Reuse against live ranges. Two sizes, because an arrangement that wins only below
 # saturation has won nothing -- and because writing one off on a single sample is how the
@@ -35,7 +41,7 @@ printf "%-10s %-22s %-12s %-12s %s\n" size kernel "MDOF/s" "vs handwritten" chec
 
 for n in 64 100; do
   ref=""
-  for k in sumfact sympy_action sympy_action_node sympy_action_comp; do
+  for k in sumfact sympy_action sympy_action_node sympy_action_comp sympy_action_face; do
     best=""; cs=""; dofs=""
     for r in 1 2 3; do
       log="$OUT/n${n}_${k}_$r.log"

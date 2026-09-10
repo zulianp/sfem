@@ -3,7 +3,8 @@
 // HEX8 had no generated Jacobian action until now: the four `sympy*` kernel names covered
 // the residual and the assembly, and no `apply_jacobian_action_*` took a kernel selector,
 // so no CSE arrangement had ever been measured for the operation a Krylov solve spends
-// its time in. Three now exist, differing only in the scope each `sp.cse` call was given.
+// its time in. Four now exist, differing only in the scope each `sp.cse` call was given:
+// the whole kernel, one node, one component, or one sub-control surface.
 //
 // They are only worth measuring if they are the same operator, and "the same operator" is
 // a stronger claim than it looks. The generated kernels treat the upwind sign as a frozen
@@ -16,7 +17,7 @@
 // Three separate things are checked, because passing the first two is easy by accident:
 //
 //   * each arrangement agrees with the hand-written action on a general state;
-//   * the three arrangements agree with EACH OTHER to round-off -- they are one
+//   * the arrangements agree with EACH OTHER to round-off -- they are one
 //     expression tree cut into different CSE scopes, so any disagreement is a generator
 //     bug rather than a slow variant;
 //   * the action really is linear in the direction, which no comparison against another
@@ -89,12 +90,13 @@ int main() {
     const scalar_t rho = 1.0, mu = 0.037;
 
     scalar_t ref[CVFEM_HEX8_N_DOF], flat[CVFEM_HEX8_N_DOF], nodew[CVFEM_HEX8_N_DOF],
-            compw[CVFEM_HEX8_N_DOF];
+            compw[CVFEM_HEX8_N_DOF], facew[CVFEM_HEX8_N_DOF];
 
     cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, ref);
     cvfem_hex8_ns_upwind_sympy_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, flat);
     cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, nodew);
     cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, compw);
+    cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, facew);
 
     const scalar_t scale = max_abs(ref, CVFEM_HEX8_N_DOF);
     check(scale > scalar_t(1e-6), "the reference action is not trivially zero", (double)scale);
@@ -113,13 +115,20 @@ int main() {
           "component-wise CSE agrees with the hand-written action",
           (double)max_abs_diff(ref, compw, CVFEM_HEX8_N_DOF));
 
-    // The arrangements against each other. One expression tree, three cuts.
+    check(max_abs_diff(ref, facew, CVFEM_HEX8_N_DOF) <= tol,
+          "face-wise CSE agrees with the hand-written action",
+          (double)max_abs_diff(ref, facew, CVFEM_HEX8_N_DOF));
+
+    // The arrangements against each other. One expression tree, four cuts.
     check(max_abs_diff(flat, nodew, CVFEM_HEX8_N_DOF) <= tol,
           "flat and node-wise agree with each other",
           (double)max_abs_diff(flat, nodew, CVFEM_HEX8_N_DOF));
     check(max_abs_diff(flat, compw, CVFEM_HEX8_N_DOF) <= tol,
           "flat and component-wise agree with each other",
           (double)max_abs_diff(flat, compw, CVFEM_HEX8_N_DOF));
+    check(max_abs_diff(flat, facew, CVFEM_HEX8_N_DOF) <= tol,
+          "flat and face-wise agree with each other",
+          (double)max_abs_diff(flat, facew, CVFEM_HEX8_N_DOF));
 
     // Linearity in the direction. The action is J(u) v with u fixed, so doubling v must
     // double the result exactly -- and a kernel that accidentally read the state where it
