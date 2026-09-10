@@ -108,6 +108,13 @@ def build_symbols() -> dict[str, object]:
         "uz": sp.symbols("uz0:8"),
         "p": sp.symbols("p0:8"),
         "sgn": sp.symbols("sgn0:12"),
+        # The Krylov direction, for the Jacobian ACTION. The action is the Jacobian
+        # contracted with it, so these appear linearly and CSE sees them as ordinary
+        # inputs -- the same way ux/uy/uz do.
+        "vx": sp.symbols("vx0:8"),
+        "vy": sp.symbols("vy0:8"),
+        "vz": sp.symbols("vz0:8"),
+        "q": sp.symbols("q0:8"),
     }
 
 
@@ -184,6 +191,81 @@ def residual_exprs(sym: dict[str, object], isoparam: bool = False) -> tuple[list
         for i in range(N_DOF):
             r[i] += fr[i]
     return r, mdots
+
+
+def direction_symbols(sym: dict[str, object]) -> list[sp.Expr]:
+    """The direction, ordered to match the Jacobian's columns."""
+    d = []
+    for a in range(N_NODE):
+        d.extend((sym["vx"][a], sym["vy"][a], sym["vz"][a], sym["q"][a]))
+    return d
+
+
+def action_exprs(jac: list[sp.Expr], sym: dict[str, object]) -> list[sp.Expr]:
+    """The Jacobian action, J(u) v, as N_DOF expressions.
+
+    This is the directional derivative of the residual, which is the Jacobian contracted
+    with the direction. Building it from ``jac`` rather than by substituting u -> u + t v
+    and differentiating in t costs nothing extra -- ``jac`` is already built for the
+    assembly -- and it keeps the two kernels demonstrably the same operator.
+
+    Why this exists at all: HEX8 has had no generated Jacobian action. The four `sympy*`
+    kernel names cover the residual and the assembly only, and no `apply_jacobian_action_*`
+    takes a kernel selector, so every CSE arrangement is unmeasured for the operation a
+    Krylov solve spends its time in. TET4 has had one since it was written.
+    """
+    v = direction_symbols(sym)
+    n = len(v)
+    out = []
+    for i in range(N_DOF):
+        row = jac[i * n:(i + 1) * n]
+        out.append(sp.Add(*[c * vj for c, vj in zip(row, v) if c != 0]))
+    return out
+
+
+def action_outputs() -> list[str]:
+    return [f"r[{i}]" for i in range(N_DOF)]
+
+
+def direction_locals() -> str:
+    lines = []
+    for name in ("vx", "vy", "vz"):
+        for i in range(N_NODE):
+            lines.append(f"    const scalar_t {name}{i} = {name}[{i}];")
+    for i in range(N_NODE):
+        lines.append(f"    const scalar_t q{i} = q[{i}];")
+    return "\n".join(lines)
+
+
+def cse_action_code(action: list[sp.Expr], scope: str) -> str:
+    """Emit the action under one CSE arrangement.
+
+    ``scope`` is the only thing that distinguishes the arrangements, because an
+    arrangement IS the set of expressions handed to one sp.cse call:
+
+    ``flat``       all N_DOF outputs in one scope -- maximum reuse, longest live ranges
+    ``node``       the four dofs of one node per scope -- 8 scopes
+    ``component``  one component across all nodes per scope -- 4 scopes, and the grouping
+                   the momentum/continuity split suggests
+    """
+    outs = action_outputs()
+    if scope == "flat":
+        return cse_code(action, outs, op="+=")
+    body = []
+    if scope == "node":
+        groups = [(a, list(range(a * 4, a * 4 + 4))) for a in range(N_NODE)]
+    elif scope == "component":
+        groups = [(c, list(range(c, N_DOF, 4))) for c in range(4)]
+    else:
+        raise ValueError("unknown action CSE scope: %s" % scope)
+    for _tag, idx in groups:
+        exprs = [action[i] for i in idx]
+        if all(e == 0 for e in exprs):
+            continue
+        body.append("    {")
+        body.append(cse_code(exprs, [outs[i] for i in idx], indent="        ", op="+="))
+        body.append("    }")
+    return "\n".join(body)
 
 
 def cse_code(exprs: list[sp.Expr], outputs: list[str], indent: str = "    ", op: str = "=") -> str:
@@ -332,6 +414,11 @@ def generate() -> str:
     iso_residual, iso_mdots = residual_exprs(sym, isoparam=True)
     iso_jac = [sp.diff(row, col) for row in iso_residual for col in q]
 
+    # The Jacobian action, which HEX8 has never had in generated form. Three CSE
+    # arrangements over the same expressions, so the scope question can finally be asked
+    # of the operation a Krylov solve actually spends its time in.
+    action = action_exprs(jac, sym)
+
     return f"""#ifndef CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP
 #define CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP
 
@@ -358,6 +445,76 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_residual(con
 {input_locals(include_pressure=True)}
 {sign_locals(mdots)}
 {cse_code(residual, residual_outputs(), op="+=")}
+}}
+
+// ---------------------------------------------------------------- Jacobian action
+//
+// J(u) v, generated. The three differ only in the scope each sp.cse call was given:
+// `flat` sees all 32 outputs at once and has the most to reuse; `node` sees the four dofs
+// of one node; `component` sees one component across all eight nodes. Which wins is a
+// question about live ranges against reuse, and it is not answerable by inspection.
+//
+// The signs are inputs here exactly as they are in the residual and the assembly: the
+// upwind switch is evaluated by the caller and enters as sgn0..sgn11, which is what makes
+// the flux algebra differentiable and this kernel generatable at all.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_action(const scalar_t rho,
+                                                            const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                                            const scalar_t *const SFEM_RESTRICT ux,
+                                                            const scalar_t *const SFEM_RESTRICT uy,
+                                                            const scalar_t *const SFEM_RESTRICT uz,
+                                                            const scalar_t *const SFEM_RESTRICT vx,
+                                                            const scalar_t *const SFEM_RESTRICT vy,
+                                                            const scalar_t *const SFEM_RESTRICT vz,
+                                                            const scalar_t *const SFEM_RESTRICT q,
+                                                            scalar_t *const SFEM_RESTRICT r) {{
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+{geom_locals()}
+{input_locals(include_pressure=False)}
+{direction_locals()}
+{sign_locals(mdots)}
+{cse_action_code(action, "flat")}
+}}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise(const scalar_t rho,
+                                                            const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                                            const scalar_t *const SFEM_RESTRICT ux,
+                                                            const scalar_t *const SFEM_RESTRICT uy,
+                                                            const scalar_t *const SFEM_RESTRICT uz,
+                                                            const scalar_t *const SFEM_RESTRICT vx,
+                                                            const scalar_t *const SFEM_RESTRICT vy,
+                                                            const scalar_t *const SFEM_RESTRICT vz,
+                                                            const scalar_t *const SFEM_RESTRICT q,
+                                                            scalar_t *const SFEM_RESTRICT r) {{
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+{geom_locals()}
+{input_locals(include_pressure=False)}
+{direction_locals()}
+{sign_locals(mdots)}
+{cse_action_code(action, "node")}
+}}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise(const scalar_t rho,
+                                                            const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                                            const scalar_t *const SFEM_RESTRICT ux,
+                                                            const scalar_t *const SFEM_RESTRICT uy,
+                                                            const scalar_t *const SFEM_RESTRICT uz,
+                                                            const scalar_t *const SFEM_RESTRICT vx,
+                                                            const scalar_t *const SFEM_RESTRICT vy,
+                                                            const scalar_t *const SFEM_RESTRICT vz,
+                                                            const scalar_t *const SFEM_RESTRICT q,
+                                                            scalar_t *const SFEM_RESTRICT r) {{
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+{geom_locals()}
+{input_locals(include_pressure=False)}
+{direction_locals()}
+{sign_locals(mdots)}
+{cse_action_code(action, "component")}
 }}
 
 template <typename scalar_t>
