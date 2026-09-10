@@ -21,7 +21,14 @@
 #   sympy_action        all 32 outputs in one scope   1295 temporaries
 #   sympy_action_node   the 4 dofs of one node, x8    1597 temporaries
 #   sympy_action_comp   one component across nodes,x4 1411 temporaries
-#   sympy_action_face   one sub-control surface,     x12
+#   sympy_action_face   one sub-control surface,     x12   1497 temporaries
+#   sympy_action_geom      two-level, flat second stage    1299 (225 geometry)
+#   sympy_action_geomface  two-level, face-wise second     1035 (189 geometry)
+#
+# The last two hoist the geometry-only subexpressions into their own CSE pass. That is
+# aimed squarely at what scope-cutting costs: twelve face scopes each re-derive the shared
+# adjugate independently, and hoisting gives that reuse back -- face-wise drops from 1497
+# temporaries to 1035, a 31% cut, without lengthening any field live range.
 #
 # Face-wise is here because the assembly verdict against it does not carry over: it lost
 # there by issuing 2016 atomic adds against flat's 768, and the action accumulates into a
@@ -41,7 +48,8 @@ printf "%-10s %-22s %-12s %-12s %s\n" size kernel "MDOF/s" "vs handwritten" chec
 
 for n in 64 100; do
   ref=""
-  for k in sumfact sympy_action sympy_action_node sympy_action_comp sympy_action_face; do
+  for k in sumfact sympy_action sympy_action_node sympy_action_comp sympy_action_face \
+           sympy_action_geom sympy_action_geomface; do
     best=""; cs=""; dofs=""
     for r in 1 2 3; do
       log="$OUT/n${n}_${k}_$r.log"

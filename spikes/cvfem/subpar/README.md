@@ -118,44 +118,53 @@ Four arrangements over one expression tree, differing only in the scope handed t
 `sp.cse` call.
 
 **Why they lost — and by how much less than they might have.** Grace, one socket, 72
-cores, `--exclusive`, `OMP_PROC_BIND=true`, `--layout atomic --jac-action`, best of three:
+cores, `--exclusive`, `OMP_PROC_BIND=true`, `--layout atomic --jac-action`, best of three.
+The `sumfact` row is the hand-written scalar action:
 
-| kernel | scope | temporaries | 1,098,500 dof | 4,121,204 dof |
-|---|---|---:|---:|---:|
-| `sumfact` — hand-written scalar action | — | — | **788.3** | **865.1** |
-| `sympy_action` | all 32 outputs at once | 1295 | 304.3 (0.39x) | 312.7 (0.36x) |
-| `sympy_action_node` | 4 dofs of a node, x8 | 1597 | 329.1 (0.42x) | 340.9 (0.39x) |
-| `sympy_action_comp` | one component, x4 | 1411 | 325.6 (0.41x) | 332.9 (0.38x) |
-| `sympy_action_face` | one sub-control surface, x12 | 1497 | 419.2 (0.53x) | **438.2 (0.51x)** |
+| arrangement | scope | temporaries | of which geometry | 1,098,500 dof | 4,121,204 dof | vs flat |
+|---|---|---:|---:|---:|---:|---:|
+| `sumfact` | hand-written | — | — | **772.0** | **760.8** | — |
+| `sympy_action` | all 32 outputs at once | 1295 | 0 | 285.8 | 284.9 | 1.00x |
+| `sympy_action_comp` | one component, x4 | 1411 | 0 | 298.7 | 305.8 | 1.07x |
+| `sympy_action_node` | 4 dofs of a node, x8 | 1597 | 0 | 308.9 | 309.5 | 1.09x |
+| `sympy_action_geom` | flat, geometry hoisted | 1299 | 225 | 328.6 | 332.3 | 1.17x |
+| `sympy_action_face` | one sub-control surface, x12 | 1497 | 0 | 388.2 | 394.8 | 1.39x |
+| `sympy_action_geomface` | face-wise, geometry hoisted | 1035 | 189 | **420.8** | **429.3** | **1.51x** |
 
-All four lose to the hand-written kernel, so generated CSE does not pay for this
-operator. But the arrangement is worth **1.40x among themselves** — face-wise against
-flat, at both sizes — which is far too large to leave unrecorded.
+All six lose to the hand-written kernel, so generated CSE does not pay for this operator.
+But **the arrangement alone is worth 1.51x**, which is far too large to leave unrecorded,
+and the two effects behind it are separable and additive.
 
-**Two things this establishes, and they are the reason these are kept.**
+**Cutting the CSE scope is worth 1.39x, and the cut must follow the physics.** Flat sees
+all 32 outputs, has the most to factor and the *fewest* temporaries — and is the slowest
+of the six. Live ranges cost more here than reuse buys. But it is not simply "finer is
+better": node-wise cuts to four outputs per scope and still loses to face-wise at eight.
+A face is one flux and its algebra is self-contained; a node's four dofs are assembled
+from twelve different fluxes and share almost nothing. **Cut along the flux, not along the
+output index.**
 
-*The scope matters more than the reuse.* Flat CSE sees all 32 outputs at once and has the
-most to factor, with the fewest temporaries of the four. It is the **slowest**. Live
-ranges cost more here than reuse buys, and that is the opposite of what the affine
-assembly arrangements suggest — there CSE wins precisely because all twelve
-sub-control surfaces share one adjugate and there is a great deal to recover.
+**Hoisting the geometry is worth a further 1.09x on top of that, and 1.17x on its own.**
+The two-level arrangement factors the geometry-only subtrees in their own pass and then
+CSEs the field algebra with them reduced to atoms. It exists because cutting the scope
+*costs* cross-scope reuse: twelve face scopes each re-derive the shared adjugate
+independently, and hoisting hands that back — face-wise drops from 1497 temporaries to
+1035, a 31% cut, without lengthening a single field live range.
 
-*But it is not simply "finer is better".* Node-wise cuts to four outputs per scope and
-still loses to face-wise, which cuts to eight. What distinguishes them is not size but
-whether the cut follows the physics: a face is one flux, and its algebra is
-self-contained; a node's four dofs are assembled from twelve different fluxes and share
-little. Anyone revisiting CSE scope on any operator here should cut along the flux, not
-along the output index.
+**Temporary count predicts nothing.** It is worth stating plainly, because it is the
+number one reaches for first. Flat has the fewest temporaries of the unhoisted four and
+is the slowest. The hoist adds four net temporaries to flat (1295 to 1299) and gains 17%;
+it removes 462 from face-wise (1497 to 1035) and gains 9%. Whatever is being optimised
+here, it is not the count.
 
 **Why the action still loses overall.** The assembly has 1024 entries all sharing one
 adjugate; the action has 32 outputs and far less shared work to recover, while still
-paying the full price of the arrangement — roughly 1300-1600 fully-unrolled temporaries
+paying the full price of the arrangement — roughly a thousand fully-unrolled temporaries
 against a compact twelve-face loop.
 
 Note the assembly verdict against face-wise does **not** transfer: face-wise lost there
 at 24.0 against 54.3 MDOF/s because it issued 2016 `CVFEM_ATOMIC_ADD`s against flat's
 768, and the action accumulates into a local `r[]` where those are register traffic. It
-is the best of the four here for the same reason it was the worst there.
+is the best of the six here for the same reason it was the worst there.
 
 ### The `sp.cse` options, and why only one of them matters
 

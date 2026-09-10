@@ -90,13 +90,16 @@ int main() {
     const scalar_t rho = 1.0, mu = 0.037;
 
     scalar_t ref[CVFEM_HEX8_N_DOF], flat[CVFEM_HEX8_N_DOF], nodew[CVFEM_HEX8_N_DOF],
-            compw[CVFEM_HEX8_N_DOF], facew[CVFEM_HEX8_N_DOF];
+            compw[CVFEM_HEX8_N_DOF], facew[CVFEM_HEX8_N_DOF], geomw[CVFEM_HEX8_N_DOF],
+            geomf[CVFEM_HEX8_N_DOF];
 
     cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, ref);
     cvfem_hex8_ns_upwind_sympy_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, flat);
     cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, nodew);
     cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, compw);
     cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, facew);
+    cvfem_hex8_ns_upwind_sympy_jacobian_action_geom(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, geomw);
+    cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, geomf);
 
     const scalar_t scale = max_abs(ref, CVFEM_HEX8_N_DOF);
     check(scale > scalar_t(1e-6), "the reference action is not trivially zero", (double)scale);
@@ -119,7 +122,14 @@ int main() {
           "face-wise CSE agrees with the hand-written action",
           (double)max_abs_diff(ref, facew, CVFEM_HEX8_N_DOF));
 
-    // The arrangements against each other. One expression tree, four cuts.
+    check(max_abs_diff(ref, geomw, CVFEM_HEX8_N_DOF) <= tol,
+          "geometry-hoisted CSE agrees with the hand-written action",
+          (double)max_abs_diff(ref, geomw, CVFEM_HEX8_N_DOF));
+    check(max_abs_diff(ref, geomf, CVFEM_HEX8_N_DOF) <= tol,
+          "hoisted face-wise CSE agrees with the hand-written action",
+          (double)max_abs_diff(ref, geomf, CVFEM_HEX8_N_DOF));
+
+    // The arrangements against each other. One expression tree, six cuts.
     check(max_abs_diff(flat, nodew, CVFEM_HEX8_N_DOF) <= tol,
           "flat and node-wise agree with each other",
           (double)max_abs_diff(flat, nodew, CVFEM_HEX8_N_DOF));

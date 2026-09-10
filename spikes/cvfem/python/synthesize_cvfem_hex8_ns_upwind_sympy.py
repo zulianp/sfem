@@ -237,6 +237,88 @@ def direction_locals() -> str:
     return "\n".join(lines)
 
 
+def hoist_geometry(exprs: list[sp.Expr], sym: dict[str, object]) -> tuple[list[sp.Expr], list[tuple[sp.Symbol, sp.Expr]]]:
+    """Pull the maximal geometry-only subexpressions out into their own symbols.
+
+    On an affine element all twelve sub-control surfaces share one adjugate, and the
+    generator's own note says that is why the affine SymPy kernels beat the hand-written
+    ones: CSE has a great deal to factor out. But that sharing is left for `sp.cse` to
+    DISCOVER, across an expression set of a thousand terms in which the geometry is
+    tangled with the fields. This makes it explicit instead -- every subtree whose free
+    symbols are drawn only from cof0..8 and det becomes a `g` symbol, those are factored
+    in their own pass, and the field algebra is then CSE'd with the geometry already
+    reduced to atoms.
+
+    Maximal, not every: the scan stops descending as soon as a subtree qualifies, so a
+    geometry product is hoisted whole rather than as its factors.
+    """
+    geom = set(sym["cof"]) | {sym["det"]}
+    subs: dict[sp.Expr, sp.Symbol] = {}
+    gen = sp.numbered_symbols("g")
+
+    def scan(e: sp.Expr) -> sp.Expr:
+        if e.is_Atom:
+            return e
+        fs = e.free_symbols
+        # `fs` non-empty excludes pure rationals, which are cheaper inline than as a name.
+        if fs and fs <= geom:
+            if e not in subs:
+                subs[e] = next(gen)
+            return subs[e]
+        return e.func(*[scan(a) for a in e.args])
+
+    out = [scan(e) for e in exprs]
+    # Definition order is the order the symbols were created, so a later definition can
+    # never reference an earlier one it has not seen -- they are disjoint subtrees.
+    defs = sorted(subs.items(), key=lambda kv: int(str(kv[1])[1:]))
+    return out, [(v, k) for k, v in defs]
+
+
+def cse_action_geom_code(action: list[sp.Expr], sym: dict[str, object], facewise_jacs=None) -> str:
+    """The action with the geometry hoisted into a first CSE pass.
+
+    Two levels: the geometry-only subtrees are factored among themselves and emitted as
+    `g` locals, then the field-dependent remainder is factored with those as atoms. The
+    second level is either flat or face-wise, so the hoist can be measured both on its own
+    and on top of the arrangement that already won.
+    """
+    if facewise_jacs is None:
+        hoisted, defs = hoist_geometry(action, sym)
+        body = [cse_emit([e for _v, e in defs], [str(v) for v, _e in defs],
+                         mode="declare", prefix="gx")]
+        body.append(cse_code(hoisted, action_outputs(), op="+="))
+        return "\n".join(body)
+
+    v = direction_symbols(sym)
+    n = len(v)
+    per_face = []
+    for fj in facewise_jacs:
+        exprs, outs = [], []
+        for i in range(N_DOF):
+            row = fj[i * n:(i + 1) * n]
+            e = sp.Add(*[c * vj for c, vj in zip(row, v) if c != 0])
+            if e != 0:
+                exprs.append(e)
+                outs.append(f"r[{i}]")
+        per_face.append((exprs, outs))
+    # One geometry pass for the whole kernel, not one per face: the faces share the
+    # adjugate, which is the entire premise of hoisting it.
+    flat = [e for exprs, _o in per_face for e in exprs]
+    hoisted, defs = hoist_geometry(flat, sym)
+    body = [cse_emit([e for _v, e in defs], [str(v_) for v_, _e in defs],
+                     mode="declare", prefix="gx")]
+    k = 0
+    for exprs, outs in per_face:
+        if not exprs:
+            continue
+        chunk = hoisted[k:k + len(exprs)]
+        k += len(exprs)
+        body.append("    {")
+        body.append(cse_code(chunk, outs, indent="        ", op="+="))
+        body.append("    }")
+    return "\n".join(body)
+
+
 def cse_action_facewise_code(face_jacs: list[list[sp.Expr]], sym: dict[str, object]) -> str:
     """The action accumulated one sub-control surface at a time.
 
@@ -567,6 +649,50 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_act
 {direction_locals()}
 {sign_locals(mdots)}
 {cse_action_facewise_code(face_jacs, sym)}
+}}
+
+// Two-level: the geometry factored in its own pass, then the field algebra with the
+// geometry already reduced to `g` atoms. Emitted twice, flat and face-wise, so the hoist
+// can be read both on its own and on top of the arrangement that already won -- which is
+// the only way to tell "the hoist helps" from "the hoist helps where nothing else did".
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_action_geom(const scalar_t rho,
+                                                            const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                                            const scalar_t *const SFEM_RESTRICT ux,
+                                                            const scalar_t *const SFEM_RESTRICT uy,
+                                                            const scalar_t *const SFEM_RESTRICT uz,
+                                                            const scalar_t *const SFEM_RESTRICT vx,
+                                                            const scalar_t *const SFEM_RESTRICT vy,
+                                                            const scalar_t *const SFEM_RESTRICT vz,
+                                                            const scalar_t *const SFEM_RESTRICT q,
+                                                            scalar_t *const SFEM_RESTRICT r) {{
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+{geom_locals()}
+{input_locals(include_pressure=False)}
+{direction_locals()}
+{sign_locals(mdots)}
+{cse_action_geom_code(action, sym)}
+}}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface(const scalar_t rho,
+                                                            const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                                            const scalar_t *const SFEM_RESTRICT ux,
+                                                            const scalar_t *const SFEM_RESTRICT uy,
+                                                            const scalar_t *const SFEM_RESTRICT uz,
+                                                            const scalar_t *const SFEM_RESTRICT vx,
+                                                            const scalar_t *const SFEM_RESTRICT vy,
+                                                            const scalar_t *const SFEM_RESTRICT vz,
+                                                            const scalar_t *const SFEM_RESTRICT q,
+                                                            scalar_t *const SFEM_RESTRICT r) {{
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+{geom_locals()}
+{input_locals(include_pressure=False)}
+{direction_locals()}
+{sign_locals(mdots)}
+{cse_action_geom_code(action, sym, facewise_jacs=face_jacs)}
 }}
 
 template <typename scalar_t>

@@ -134,7 +134,14 @@ enum class KernelKind {
     // The finest cut: one sub-control surface per scope. Face-wise lost badly as an
     // ASSEMBLY arrangement, but for a reason that does not exist here -- it issued
     // 2016 atomic adds against flat's 768, and the action accumulates into a local.
-    SympyActionFace
+    SympyActionFace,
+    // Two-level: the geometry-only subexpressions factored in their own pass, then the
+    // field algebra with the geometry reduced to atoms. Emitted flat and face-wise so
+    // the hoist can be read on its own and on top of the best arrangement -- cutting
+    // the scope loses cross-scope reuse, and hoisting is what gives the shared
+    // adjugate back.
+    SympyActionGeom,
+    SympyActionGeomFace
 };
 
 static KernelKind parse_kernel(const std::string &name) {
@@ -154,6 +161,8 @@ static KernelKind parse_kernel(const std::string &name) {
     if (name == "sympy_action_node") return KernelKind::SympyActionNode;
     if (name == "sympy_action_comp") return KernelKind::SympyActionComp;
     if (name == "sympy_action_face") return KernelKind::SympyActionFace;
+    if (name == "sympy_action_geom") return KernelKind::SympyActionGeom;
+    if (name == "sympy_action_geomface") return KernelKind::SympyActionGeomFace;
     return KernelKind::Sumfact;
 }
 
@@ -165,14 +174,16 @@ static bool kernel_is_valid(const std::string &name) {
     return name == "current" || name == "fd" || name == "sumfact" || name == "sympy" || name == "sympy_block" ||
            name == "sympy_row" || name == "sympy_face" || name == "split" || name == "sympy_action" ||
            name == "sympy_action_node" || name == "sympy_action_comp" ||
-           name == "sympy_action_face";
+           name == "sympy_action_face" || name == "sympy_action_geom" ||
+           name == "sympy_action_geomface";
 }
 
 // The three generated Jacobian-action CSE arrangements, which are the only kernels the
 // action dispatches on. Everything else ignores --kernel for that operation.
 static bool kernel_is_action_only(const KernelKind k) {
     return k == KernelKind::SympyAction || k == KernelKind::SympyActionNode ||
-           k == KernelKind::SympyActionComp || k == KernelKind::SympyActionFace;
+           k == KernelKind::SympyActionComp || k == KernelKind::SympyActionFace ||
+           k == KernelKind::SympyActionGeom || k == KernelKind::SympyActionGeomFace;
 }
 
 enum class GeomKind { Affine, Isoparam };
