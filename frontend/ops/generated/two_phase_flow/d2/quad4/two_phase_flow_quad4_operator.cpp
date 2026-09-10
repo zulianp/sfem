@@ -1,24 +1,5 @@
 #include "../../op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
 
-extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -58,25 +39,6 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_i_msoa(
         const ptrdiff_t previous_stride,
         const void *const RSTR p_w_old,
         const void *const RSTR p_c_old,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
@@ -165,25 +127,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_i_mso
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
 );
-extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -223,25 +166,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_i_mso
         const ptrdiff_t direction_stride,
         const void *const RSTR p_w_direction,
         const void *const RSTR p_c_direction,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
@@ -287,25 +211,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_mso
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
 );
-extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -343,25 +248,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_mso
         const ptrdiff_t direction_stride,
         const void *const RSTR p_w_direction,
         const void *const RSTR p_c_direction,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
         const ptrdiff_t out_stride,
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
@@ -462,16 +348,6 @@ extern "C" int two_phase_flow_proteus_quad4_residual_i_msoa(
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
 );
-extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -504,16 +380,6 @@ extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_a_msoa(
         const ptrdiff_t previous_stride,
         const void *const RSTR p_w_old,
         const void *const RSTR p_c_old,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
@@ -588,16 +454,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_a_mso
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
 );
-extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -630,16 +486,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_a_mso
         const ptrdiff_t direction_stride,
         const void *const RSTR p_w_direction,
         const void *const RSTR p_c_direction,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
@@ -678,16 +524,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_a_mso
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
 );
-extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -718,16 +554,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_a_mso
         const ptrdiff_t direction_stride,
         const void *const RSTR p_w_direction,
         const void *const RSTR p_c_direction,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
         const ptrdiff_t out_stride,
         void *const RSTR p_w_out,
         void *const RSTR p_c_out
@@ -857,43 +683,6 @@ extern "C" const sfem::codegen::KernelDiagnostics * two_phase_flow_proteus_quad4
         void
 );
 
-extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, output);
-}
-
-extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, out_stride, p_w_out, p_c_out);
-}
-
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -953,43 +742,6 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_residual_i_msoa(
         elements[2]
     };
     return two_phase_flow_form_1_p_c_proteus_quad4_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
-}
-
-extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, output);
-}
-
-extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_i_maos(
@@ -1112,43 +864,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_i_msoa(
     return two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, output);
-}
-
-extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, out_stride, p_w_out, p_c_out);
-}
-
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -1210,43 +925,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_i_msoa(
     return two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, output);
-}
-
-extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, out_stride, p_w_out, p_c_out);
-}
-
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -1306,43 +984,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_i_msoa(
     return two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, output);
-}
-
-extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, out_stride, p_w_out, p_c_out);
-}
-
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -1400,43 +1041,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_msoa(
         elements[2]
     };
     return two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
-}
-
-extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_i_maos(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, output);
-}
-
-extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_quad4_jacobian_action_i_maos(
@@ -1571,25 +1175,6 @@ extern "C" int two_phase_flow_quad4_residual_i_msoa(
     return two_phase_flow_proteus_quad4_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
-}
-
 extern "C" int two_phase_flow_form_1_p_c_quad4_residual_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -1633,25 +1218,6 @@ extern "C" int two_phase_flow_form_1_p_c_quad4_residual_a_msoa(
         elements[2]
     };
     return two_phase_flow_form_1_p_c_proteus_quad4_residual_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out);
-}
-
-extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_1_p_w_quad4_residual_a_msoa(
@@ -1742,25 +1308,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_a_msoa(
     return two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
-}
-
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -1806,25 +1353,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_a_msoa(
     return two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
-}
-
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -1868,25 +1396,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_a_msoa(
     return two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
-extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
-}
-
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -1928,25 +1437,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_a_msoa(
         elements[2]
     };
     return two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
-}
-
-extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_a_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_quad4_jacobian_action_a_msoa(

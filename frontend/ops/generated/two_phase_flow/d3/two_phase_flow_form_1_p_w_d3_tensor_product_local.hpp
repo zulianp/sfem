@@ -230,31 +230,6 @@ static SFEM_INLINE void two_phase_flow_form_1_p_w_d3_tensor_product_residual_blo
       ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void two_phase_flow_form_1_p_w_d3_tensor_product_jacobian_action_block(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const s_t *const RSTR determinant,
-    const s_t *const RSTR shape_1d,
-    const s_t *const RSTR q_weight_1d,
-    s_t *const RSTR output[2 * NS]
-) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 2;
-}
-
-template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void two_phase_flow_form_1_p_w_d3_tensor_product_jacobian_action_block_contiguous(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const s_t *const RSTR determinant,
-    const s_t *const RSTR shape_1d,
-    const s_t *const RSTR q_weight_1d,
-    s_t output[2 * NS][VS]
-) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 2;
-}
 
 } // namespace codegen
 } // namespace sfem

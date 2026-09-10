@@ -166,60 +166,6 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int navier_stokes_form_2_u_p_tri6_tri3_residual_affine_mesh_mixed_impl(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const g_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    s_t *const RSTR u_out[2],
-    s_t *const RSTR p_out
-) {
-  static constexpr int ND = 2;
-  static constexpr int NQ = 6;
-  static constexpr int CELL_NS = 6;
-  static constexpr int NS = CELL_NS;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 15;
-  static constexpr int VS = 16;
-  (void)nnodes;
-  return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-template <typename s_t>
-static SFEM_INLINE int navier_stokes_form_2_u_p_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const ptrdiff_t out_stride,
-    s_t *const RSTR u_out[2],
-    s_t *const RSTR p_out
-) {
-  static constexpr int ND = 2;
-  static constexpr int NQ = 6;
-  static constexpr int CELL_NS = 6;
-  static constexpr int NS = CELL_NS;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 15;
-  static constexpr int VS = 16;
-  (void)nnodes;
-  return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,

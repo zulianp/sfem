@@ -33,56 +33,6 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, int NQ, int CELL_NS, int VS>
-static SFEM_INLINE void navier_stokes_form_2_p_u_d2_simplex_mixed_residual_block(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const s_t *const RSTR determinant,
-    const s_t *const RSTR field_shape[2],
-    const s_t *const RSTR q_weight,
-    s_t *const RSTR output[15]
-) {
-  static constexpr int ND = 2;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 15;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
-  static constexpr int U_NS = 6;
-  static constexpr int P_NS = 3;
-  for (int q = 0; q < NQ; ++q) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
-      const s_t det = determinant[goff];
-    }
-  }
-}
-
-template <typename s_t, int NQ, int CELL_NS, int VS>
-static SFEM_INLINE void navier_stokes_form_2_p_u_d2_simplex_mixed_residual_block_contiguous(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const s_t *const RSTR determinant,
-    const s_t *const RSTR field_shape[2],
-    const s_t *const RSTR q_weight,
-    s_t output[15][VS]
-) {
-  static constexpr int ND = 2;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 15;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
-  static constexpr int U_NS = 6;
-  static constexpr int P_NS = 3;
-  for (int q = 0; q < NQ; ++q) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
-      const s_t det = determinant[goff];
-    }
-  }
-}
-
-template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_2_p_u_d2_simplex_mixed_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,

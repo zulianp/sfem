@@ -33,81 +33,11 @@ typedef double geom_t;
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int two_phase_flow_form_1_p_c_jacobian_action_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_jacobian_action_2d_esoa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int two_phase_flow_form_1_p_c_jacobian_action_2d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_1_p_c_jacobian_action_2d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
-extern "C" int two_phase_flow_form_1_p_c_jacobian_action_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_jacobian_action_3d_esoa_diagnostics(
     const smesh::ElemType element_type);
-
-extern "C" int two_phase_flow_form_1_p_c_jacobian_action_3d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_1_p_c_jacobian_action_3d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 
 extern "C" int two_phase_flow_form_1_p_c_residual_2d_a_msoa(
         const smesh::ElemType element_type,
@@ -300,81 +230,11 @@ extern "C" int two_phase_flow_form_1_p_c_residual_3d_i_msoa(
         void *const RSTR p_c_out
 );
 
-extern "C" int two_phase_flow_form_1_p_w_jacobian_action_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_jacobian_action_2d_esoa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int two_phase_flow_form_1_p_w_jacobian_action_2d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_1_p_w_jacobian_action_2d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
-extern "C" int two_phase_flow_form_1_p_w_jacobian_action_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_jacobian_action_3d_esoa_diagnostics(
     const smesh::ElemType element_type);
-
-extern "C" int two_phase_flow_form_1_p_w_jacobian_action_3d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_1_p_w_jacobian_action_3d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 
 extern "C" int two_phase_flow_form_1_p_w_residual_2d_a_msoa(
         const smesh::ElemType element_type,
@@ -750,81 +610,11 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_i_msoa(
         void *const RSTR p_c_out
 );
 
-extern "C" int two_phase_flow_form_2_p_c_p_c_residual_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_residual_2d_esoa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int two_phase_flow_form_2_p_c_p_c_residual_2d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_2_p_c_p_c_residual_2d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
-extern "C" int two_phase_flow_form_2_p_c_p_c_residual_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_residual_3d_esoa_diagnostics(
     const smesh::ElemType element_type);
-
-extern "C" int two_phase_flow_form_2_p_c_p_c_residual_3d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_2_p_c_p_c_residual_3d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 
 extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
@@ -1017,81 +807,11 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_i_msoa(
         void *const RSTR p_c_out
 );
 
-extern "C" int two_phase_flow_form_2_p_c_p_w_residual_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_residual_2d_esoa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int two_phase_flow_form_2_p_c_p_w_residual_2d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_2_p_c_p_w_residual_2d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
-extern "C" int two_phase_flow_form_2_p_c_p_w_residual_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_residual_3d_esoa_diagnostics(
     const smesh::ElemType element_type);
-
-extern "C" int two_phase_flow_form_2_p_c_p_w_residual_3d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_2_p_c_p_w_residual_3d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
@@ -1276,81 +996,11 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_i_msoa(
         void *const RSTR p_c_out
 );
 
-extern "C" int two_phase_flow_form_2_p_w_p_c_residual_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_residual_2d_esoa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int two_phase_flow_form_2_p_w_p_c_residual_2d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_2_p_w_p_c_residual_2d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
-extern "C" int two_phase_flow_form_2_p_w_p_c_residual_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_residual_3d_esoa_diagnostics(
     const smesh::ElemType element_type);
-
-extern "C" int two_phase_flow_form_2_p_w_p_c_residual_3d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_2_p_w_p_c_residual_3d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 
 extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
@@ -1535,81 +1185,11 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_i_msoa(
         void *const RSTR p_c_out
 );
 
-extern "C" int two_phase_flow_form_2_p_w_p_w_residual_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_residual_2d_esoa_diagnostics(
     const smesh::ElemType element_type);
 
-extern "C" int two_phase_flow_form_2_p_w_p_w_residual_2d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_2_p_w_p_w_residual_2d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
-extern "C" int two_phase_flow_form_2_p_w_p_w_residual_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
-
 extern "C" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_residual_3d_esoa_diagnostics(
     const smesh::ElemType element_type);
-
-extern "C" int two_phase_flow_form_2_p_w_p_w_residual_3d_i_maos(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const void *const RSTR parameters,
-        void *const RSTR output
-);
-
-extern "C" int two_phase_flow_form_2_p_w_p_w_residual_3d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-);
 
 extern "C" int two_phase_flow_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,

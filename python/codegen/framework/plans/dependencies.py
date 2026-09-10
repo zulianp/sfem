@@ -76,6 +76,23 @@ class ResidualCodegenDependencies:
 TEST_QUANTITY_ORDER = ("value", "gradient")
 
 
+def publishes_kernel(dependencies):
+    """Whether this form contributes anything, and so has a kernel at all.
+
+    A block of a coupled system whose coefficients are all structurally zero
+    contracts nothing onto the test functions.  The kernel for it is an empty
+    loop nest over quadrature points, test functions and lanes, or a mesh
+    entry point whose whole body is `return SFEM_SUCCESS;` -- and an empty loop
+    nest is not a kernel, it is the absence of one written down.
+
+    So the answer here is not "emit a kernel that does nothing"; it is that
+    there is nothing to emit, and the local block, the element entry point, the
+    mesh kernels, their diagnostics record and their C ABI entries all follow
+    from that.
+    """
+    return dependencies.uses_test_coefficients
+
+
 def contracted_test_quantities(dependencies):
     """Which of the test function's value and gradient the form contracts.
 

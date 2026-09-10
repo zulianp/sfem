@@ -9,66 +9,6 @@ static_assert((int)smesh::SMESH_FLOAT64 == (int)sizeof(double),
 static_assert((int)smesh::SMESH_FLOAT32 == (int)sizeof(float),
               "the generated kernels select their scalar by width");
 
-extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_c_quad4_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_c_hex8_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_c_tet4_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -311,66 +251,6 @@ extern "C" int two_phase_flow_form_1_p_c_tet4_residual_a_msoa(
     const ptrdiff_t previous_stride,
     const void *const RSTR p_w_old,
     const void *const RSTR p_c_old,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_w_quad4_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_w_tri3_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_w_hex8_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_w_proteus_hex8_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_1_p_w_tet4_jacobian_action_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
     const ptrdiff_t out_stride,
     void *const RSTR p_w_out,
     void *const RSTR p_c_out
@@ -855,66 +735,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_tet4_jacobian_action_a_msoa(
     void *const RSTR p_w_out,
     void *const RSTR p_c_out
 );
-extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_c_tri3_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_c_tet4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -1161,66 +981,6 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_tet4_jacobian_action_a_msoa(
     void *const RSTR p_w_out,
     void *const RSTR p_c_out
 );
-extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_w_tri3_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_c_p_w_tet4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -1455,66 +1215,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tet4_jacobian_action_a_msoa(
     void *const RSTR p_w_out,
     void *const RSTR p_c_out
 );
-extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_c_tri3_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_c_tet4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -1745,66 +1445,6 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_a_msoa(
     const ptrdiff_t direction_stride,
     const void *const RSTR p_w_direction,
     const void *const RSTR p_c_direction,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_tri3_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
-    const ptrdiff_t out_stride,
-    void *const RSTR p_w_out,
-    void *const RSTR p_c_out
-);
-extern "C" int two_phase_flow_form_2_p_w_p_w_tet4_residual_a_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const RSTR g_det0,
     const ptrdiff_t out_stride,
     void *const RSTR p_w_out,
     void *const RSTR p_c_out
@@ -2362,64 +2002,6 @@ extern "C" int two_phase_flow_tet4_residual_a_msoa(
     void *const RSTR p_c_out
 );
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_jacobian_action_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_1_p_c_proteus_quad4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::QUAD4:
-      return two_phase_flow_form_1_p_c_quad4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TRI3:
-      return two_phase_flow_form_1_p_c_tri3_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_1_p_c_jacobian_action_2d_a_msoa", (int)element_type, (int)real_type);
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_jacobian_action_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::HEX8:
-      return two_phase_flow_form_1_p_c_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_1_p_c_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TET4:
-      return two_phase_flow_form_1_p_c_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_1_p_c_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
-}
-
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_residual_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -2538,64 +2120,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_c_residual_3d_a
   }
   return sfem::codegen::unsupported_dispatch(
       "two_phase_flow_form_1_p_c_residual_3d_a_msoa", (int)element_type, (int)real_type);
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_jacobian_action_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_1_p_w_proteus_quad4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::QUAD4:
-      return two_phase_flow_form_1_p_w_quad4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TRI3:
-      return two_phase_flow_form_1_p_w_tri3_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_1_p_w_jacobian_action_2d_a_msoa", (int)element_type, (int)real_type);
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_jacobian_action_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::HEX8:
-      return two_phase_flow_form_1_p_w_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_1_p_w_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TET4:
-      return two_phase_flow_form_1_p_w_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_1_p_w_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_1_p_w_residual_2d_a_msoa(
@@ -2834,64 +2358,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
       "two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_residual_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_2_p_c_p_c_proteus_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::QUAD4:
-      return two_phase_flow_form_2_p_c_p_c_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TRI3:
-      return two_phase_flow_form_2_p_c_p_c_tri3_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_2_p_c_p_c_residual_2d_a_msoa", (int)element_type, (int)real_type);
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_residual_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::HEX8:
-      return two_phase_flow_form_2_p_c_p_c_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_2_p_c_p_c_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TET4:
-      return two_phase_flow_form_2_p_c_p_c_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_2_p_c_p_c_residual_3d_a_msoa", (int)element_type, (int)real_type);
-}
-
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -3012,64 +2478,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
       "two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_residual_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_2_p_c_p_w_proteus_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::QUAD4:
-      return two_phase_flow_form_2_p_c_p_w_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TRI3:
-      return two_phase_flow_form_2_p_c_p_w_tri3_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_2_p_c_p_w_residual_2d_a_msoa", (int)element_type, (int)real_type);
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_residual_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::HEX8:
-      return two_phase_flow_form_2_p_c_p_w_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_2_p_c_p_w_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TET4:
-      return two_phase_flow_form_2_p_c_p_w_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_2_p_c_p_w_residual_3d_a_msoa", (int)element_type, (int)real_type);
-}
-
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -3186,64 +2594,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
       "two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_residual_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_2_p_w_p_c_proteus_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::QUAD4:
-      return two_phase_flow_form_2_p_w_p_c_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TRI3:
-      return two_phase_flow_form_2_p_w_p_c_tri3_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_2_p_w_p_c_residual_2d_a_msoa", (int)element_type, (int)real_type);
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_residual_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::HEX8:
-      return two_phase_flow_form_2_p_w_p_c_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_2_p_w_p_c_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TET4:
-      return two_phase_flow_form_2_p_w_p_c_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_2_p_w_p_c_residual_3d_a_msoa", (int)element_type, (int)real_type);
-}
-
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -3358,64 +2708,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
   }
   return sfem::codegen::unsupported_dispatch(
       "two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_residual_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_2_p_w_p_w_proteus_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::QUAD4:
-      return two_phase_flow_form_2_p_w_p_w_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TRI3:
-      return two_phase_flow_form_2_p_w_p_w_tri3_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_2_p_w_p_w_residual_2d_a_msoa", (int)element_type, (int)real_type);
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_residual_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_det0,
-        const ptrdiff_t out_stride,
-        void *const RSTR p_w_out,
-        void *const RSTR p_c_out
-) {
-  const enum smesh::PrimitiveType resolved_real_type =
-      (real_type == smesh::SMESH_DEFAULT)
-          ? smesh::TypeToEnum<real_t>::value()
-          : real_type;
-  switch (element_type) {
-    case smesh::HEX8:
-      return two_phase_flow_form_2_p_w_p_w_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_2_p_w_p_w_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    case smesh::TET4:
-      return two_phase_flow_form_2_p_w_p_w_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_det0, out_stride, p_w_out, p_c_out);
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch(
-      "two_phase_flow_form_2_p_w_p_w_residual_3d_a_msoa", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_2d_a_msoa(

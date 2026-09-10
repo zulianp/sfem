@@ -227,53 +227,6 @@ static SFEM_INLINE void navier_stokes_form_1_p_d3_tensor_product_mixed_residual_
       ne, field_shape_1d[1], p_value_coeff, output + 81);
 }
 
-template <typename s_t, int NQ, int CELL_NS, int VS>
-static SFEM_INLINE void navier_stokes_form_1_p_d3_tensor_product_mixed_jacobian_action_block(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const s_t *const RSTR determinant,
-    const s_t *const RSTR field_shape_1d[2],
-    const s_t *const RSTR q_weight_1d,
-    s_t *const RSTR output[89]
-) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 89;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
-  static constexpr int U_NS = 27;
-  static constexpr int P_NS = 8;
-  static constexpr int NQ1 = integer_root(NQ, ND);
-  static_assert(ipow(NQ1, ND) == NQ, "NQ must be tensor-product compatible");
-  static constexpr int U_NS1 = integer_root(U_NS, ND);
-  static_assert(ipow(U_NS1, ND) == U_NS, "U_NS must be tensor-product compatible");
-  static constexpr int P_NS1 = integer_root(P_NS, ND);
-  static_assert(ipow(P_NS1, ND) == P_NS, "P_NS must be tensor-product compatible");
-}
-
-template <typename s_t, int NQ, int CELL_NS, int VS>
-static SFEM_INLINE void navier_stokes_form_1_p_d3_tensor_product_mixed_jacobian_action_block_contiguous(
-    const int ne,
-    const ptrdiff_t geometry_stride,
-    const s_t *const RSTR determinant,
-    const s_t *const RSTR field_shape_1d[2],
-    const s_t *const RSTR q_weight_1d,
-    s_t output[89][VS]
-) {
-  static constexpr int ND = 3;
-  static constexpr int NC = 2;
-  static constexpr int N_FIELD_STREAMS = 89;
-  (void)CELL_NS;
-  (void)N_FIELD_STREAMS;
-  static constexpr int U_NS = 27;
-  static constexpr int P_NS = 8;
-  static constexpr int NQ1 = integer_root(NQ, ND);
-  static_assert(ipow(NQ1, ND) == NQ, "NQ must be tensor-product compatible");
-  static constexpr int U_NS1 = integer_root(U_NS, ND);
-  static_assert(ipow(U_NS1, ND) == U_NS, "U_NS must be tensor-product compatible");
-  static constexpr int P_NS1 = integer_root(P_NS, ND);
-  static_assert(ipow(P_NS1, ND) == P_NS, "P_NS must be tensor-product compatible");
-}
 
 } // namespace codegen
 } // namespace sfem
