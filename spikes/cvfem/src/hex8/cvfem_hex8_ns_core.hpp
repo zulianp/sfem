@@ -101,6 +101,14 @@ struct MeshData {
     // manufactured-solution case, where f = -(1/Re) lap(u) + (u.grad)u + grad(p).
     std::vector<scalar_t> fx, fy, fz;
     std::vector<scalar_t> node_vol;
+    // The reconstruction's denominator: 1 / sum_{e in i} |det J_e|, one scalar per node.
+    // Pure geometry, so it is constant for the whole solve -- and it was being rebuilt from
+    // scratch on every matvec, with its own heap allocation and one atomic per node per
+    // element, inside the pass that is 69% of that matvec. Keyed on the mesh and the
+    // geometry rule, because the affine and isoparametric sweeps evaluate det differently.
+    std::vector<scalar_t> grad_w_inv;
+    int                   grad_w_isoparam{-1};
+    ptrdiff_t             grad_w_nelements{0};
     // Transient term. dt <= 0 means steady, in which case nothing below is touched and the
     // residual is bit-identical to what it was before this existed -- which is what every
     // existing case and every recorded number depends on.
@@ -379,60 +387,18 @@ SFEM_INLINE void gather_element_coords(const MeshData               &d,
 // The reconstruction, over an arbitrary strided nodal scalar. It is linear in that scalar
 // and its weights depend only on geometry, so applying it to a perturbation q yields exactly
 // the derivative of applying it to p -- which is the term the Jacobian was missing.
+// The reconstruction itself lives in cvfem_hex8_pack_helpers.hpp, which this header already
+// includes and which exists precisely so the benchmark and the solver cannot drift on a
+// quantity both of them feed into the same element kernels. This was a second copy of it --
+// the thing that header's own comment warns against -- and is now a two-line forward that
+// keeps the trace scope, because the pass is 40-52% of every matvec in the solver's own
+// trace and has to stay separately attributable.
 inline void assemble_nodal_grad_strided(MeshData &d, const GeomKind geom_kind,
                                         const scalar_t *const SFEM_RESTRICT src, const int stride,
                                         std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
                                         std::vector<scalar_t> &ogz) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::nodal_grad_strided");
-    ogx.assign((size_t)d.nnodes, scalar_t(0));
-    ogy.assign((size_t)d.nnodes, scalar_t(0));
-    ogz.assign((size_t)d.nnodes, scalar_t(0));
-    std::vector<scalar_t> w((size_t)d.nnodes, scalar_t(0));
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t p[8], gx, gy, gz, vol;
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
-            p[a] = src[(ptrdiff_t)d.elems[a][e] * stride];
-        if (geom_kind == GeomKind::Isoparam) {
-            scalar_t x[8], y[8], z[8], dN[CVFEM_HEX8_N_NODES][3];
-            gather_element_coords(d, e, x, y, z);
-            cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
-            scalar_t adj[9], det;
-            cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
-            vol = std::fabs(det);
-            if (vol < scalar_t(1e-30)) continue;
-            scalar_t dr = 0, ds = 0, dt = 0;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                dr += p[a] * dN[a][0];
-                ds += p[a] * dN[a][1];
-                dt += p[a] * dN[a][2];
-            }
-            cvfem_hex8_pushforward(adj, scalar_t(1) / det, dr, ds, dt, gx, gy, gz);
-        } else {
-            scalar_t adj[9], det;
-            cvfem_hex8_load_adj(d, e, adj, &det);
-            vol = std::fabs(det);
-            if (vol < scalar_t(1e-30)) continue;
-            cvfem_hex8_grad_scalar(adj, det, p, gx, gy, gz);
-        }
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t id = d.elems[a][e];
-            atomic_add(ogx.data(), id, vol * gx);
-            atomic_add(ogy.data(), id, vol * gy);
-            atomic_add(ogz.data(), id, vol * gz);
-            atomic_add(w.data(), id, vol);
-        }
-    }
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        if (w[(size_t)i] <= scalar_t(0)) continue;
-        const scalar_t inv = scalar_t(1) / w[(size_t)i];
-        ogx[(size_t)i] *= inv;
-        ogy[(size_t)i] *= inv;
-        ogz[(size_t)i] *= inv;
-    }
+    cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, src, stride, ogx, ogy, ogz);
 }
 
 inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
