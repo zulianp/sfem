@@ -246,6 +246,62 @@ int main(int argc, char **argv) {
         check(velocity_grew, "the block diagonal's velocity entries grow with the time term");
     }
 
+    // 6. The ASSEMBLED matrix carries the term too, and carries the same one.
+    //
+    //    This is where it was missing. apply_jacobian_action_accumulate applied the
+    //    transient action and assemble_block_diag applied the transient diagonal, but
+    //    assemble_jacobian did not -- so in an unsteady run the assembled matrix was the
+    //    steady Jacobian while the operator it preconditions and the smoother built beside
+    //    it were the unsteady one. For a small timestep rho V a0 / dt is the dominant
+    //    diagonal, which is to say the preconditioner was missing its largest entry.
+    //
+    //    The check is that the diagonal blocks pulled out of the full assembly agree with
+    //    assemble_block_diag, which is true term for term whatever the operator carries and
+    //    would have caught this the moment it was written.
+    {
+        d.dt        = 0.05;
+        d.bdf_order = 1;
+        d.u_prev.assign((size_t)d.nnodes * 3, 0.25);
+
+        BSR4 b = make_bsr4(d.mesh);
+        precompute_element_bsr_slots(d, b);
+        assemble_jacobian(d, b, rho, mu, GeomKind::Affine);
+
+        std::vector<scalar_t> diag;
+        assemble_block_diag(d, rho, mu, GeomKind::Affine, diag);
+
+        const scalar_t *const values = b.data();
+        scalar_t              worst = 0, scale = 0;
+        for (ptrdiff_t r = 0; r < d.nnodes; ++r) {
+            const smesh::count_t j = b.diag_slots[(size_t)r];
+            for (int k = 0; k < 16; ++k) {
+                const scalar_t got = values[(ptrdiff_t)j * 16 + k];
+                const scalar_t want = diag[(size_t)r * 16 + (size_t)k];
+                scale = std::max(scale, std::fabs(want));
+                worst = std::max(worst, std::fabs(got - want));
+            }
+        }
+        check(scale > scalar_t(1e-6), "the unsteady block diagonal is not trivially zero");
+        check(worst <= scalar_t(1e-12) * scale,
+              "the assembled matrix's diagonal blocks are the block diagonal");
+
+        // And it really is the time term that is being checked: with dt = 0 the same
+        // entries must be smaller, or the comparison above would pass on a steady matrix.
+        const scalar_t dt_save = d.dt;
+        d.dt                   = 0;
+        BSR4 b0 = make_bsr4(d.mesh);
+        precompute_element_bsr_slots(d, b0);
+        assemble_jacobian(d, b0, rho, mu, GeomKind::Affine);
+        d.dt = dt_save;
+        bool grew = false;
+        for (ptrdiff_t r = 0; r < d.nnodes; ++r) {
+            const scalar_t with = values[(ptrdiff_t)b.diag_slots[(size_t)r] * 16];
+            const scalar_t without = b0.data()[(ptrdiff_t)b0.diag_slots[(size_t)r] * 16];
+            if (with > without) grew = true;
+        }
+        check(grew, "the assembled velocity diagonal grows with the time term");
+    }
+
     if (g_failures) {
         std::fprintf(stderr, "cvfem_transient_test: %d check(s) failed\n", g_failures);
         return 1;
