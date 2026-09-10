@@ -9,6 +9,10 @@
 #include "cvfem_hex8_layout_packed.hpp"
 #include "cvfem_hex8_layout_store.hpp"
 
+// Consumes the churn's reduction under --live-vectors so the compiler cannot delete the
+// memory traffic that option exists to create.
+static volatile double g_churn_sink = 0;
+
 static void pack_residual(const MeshData &d, std::vector<scalar_t> &r) {
     r.resize((size_t)d.nnodes * 4);
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -242,6 +246,7 @@ int main(int argc, char **argv) {
     // the timed loop. This is the difference SFEM_PGRAD_CACHE makes in the solver, and it
     // is the other half of the cascade: the gradient is a full element sweep.
     int         pgrad_per_apply = 0;
+    int         live_vectors    = 0;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -293,6 +298,8 @@ int main(int argc, char **argv) {
             boundary = 1;
         else if (arg == "--pgrad-per-apply")
             pgrad_per_apply = 1;
+        else if (arg == "--live-vectors" && i + 1 < argc)
+            live_vectors = std::atoi(argv[++i]);
         else if (arg == "--csv" && i + 1 < argc)
             csv_path = argv[++i];
         else if (arg == "--tag" && i + 1 < argc)
@@ -339,6 +346,14 @@ int main(int argc, char **argv) {
                     "                 no Rhie-Chow term. Off by default: without it there is no\n"
                     "                 pressure-pressure coupling at all, which is a smaller and\n"
                     "                 faster operator than the one the solver runs.\n"
+                    "  --live-vectors N   keep N extra vectors of the solution size resident and\n"
+                    "                     churned between applies, and take the direction from them in\n"
+                    "                     rotation. The default measures an apply replayed on a warm,\n"
+                    "                     small working set; a Krylov iteration evaluates the same\n"
+                    "                     kernel with its own vectors live and a different direction\n"
+                    "                     every time. BiCGStab holds about 7, which is what makes N=7\n"
+                    "                     the interesting value. Only the apply is timed -- the churn\n"
+                    "                     runs between applies, outside the clock.\n"
                     "  --pgrad-per-apply  rebuild the nodal pressure gradient inside every apply\n"
                     "                     (--jac-action always rebuilds the DIRECTION's gradient,\n"
                     "                      which cannot be hoisted, and reports it separately)\n"
@@ -418,6 +433,19 @@ int main(int argc, char **argv) {
     }
     if (pgrad_per_apply && !rhie_chow) {
         std::fprintf(stderr, "--pgrad-per-apply is meaningless without --rhie-chow\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // Refused rather than ignored: the working set only means something for an operation
+    // that a Krylov method actually repeats, and silently dropping it would report a
+    // warm-cache number under a flag that asked for a cold one.
+    if (live_vectors > 0 && !(jac_action || bsr_apply)) {
+        std::fprintf(stderr, "--live-vectors applies to --jac-action or --bsr-apply\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    if (live_vectors < 0) {
+        std::fprintf(stderr, "--live-vectors must be >= 0 (got %d)\n", live_vectors);
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -861,6 +889,62 @@ int main(int argc, char **argv) {
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) jac_dir[(size_t)i] = 1.0 + 0.01 * scalar_t(i % 7);
     }
+
+    // The Krylov working set, when --live-vectors asks for it.
+    //
+    // The default benchmark replays one apply on one direction, so after the first call the
+    // direction, the output and the pack staging are all warm and the measurement is of the
+    // kernel with the memory system on its side. A Krylov iteration is not that: it carries
+    // its own basis -- BiCGStab holds about seven vectors of the solution size -- touches
+    // every one of them between applies, and hands the operator a different direction each
+    // time. On Grace those seven are ~35 MB each against 117 MB of L3, so which of the two
+    // is being measured is not a detail.
+    //
+    // Only the apply is timed. The churn below runs between applies, outside the clock, so
+    // the number reported stays the apply's throughput and only its cache environment
+    // changes.
+    std::vector<std::vector<scalar_t>> live;
+    if (live_vectors > 0 && (jac_action || bsr_apply)) {
+        live.resize((size_t)live_vectors);
+        for (int k = 0; k < live_vectors; ++k) {
+            live[(size_t)k].resize((size_t)d.nnodes * N_FIELDS);
+            scalar_t *const SFEM_RESTRICT v = live[(size_t)k].data();
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i)
+                v[(size_t)i] = 1.0 + 0.01 * scalar_t((i + k) % 7);
+        }
+        std::printf("live_vectors: %d x %td dof (%.1f MiB total)\n", live_vectors,
+                    (ptrdiff_t)d.nnodes * N_FIELDS,
+                    double(live_vectors) * double(d.nnodes) * N_FIELDS * sizeof(scalar_t) / (1024.0 * 1024.0));
+    }
+    // The direction the last timed apply actually used, so the cross-layout check below
+    // compares like with like when the rotation is on.
+    const scalar_t *last_dir = jac_dir.data();
+    long            live_k   = 0;
+
+    // One Krylov iteration's worth of vector traffic: two axpys and a dot over the basis,
+    // which is the shape BiCGStab has and enough to evict what the apply would otherwise
+    // have kept. Deliberately not a real BiCGStab -- the point is the memory traffic, not
+    // the algorithm.
+    auto churn_fn = [&]() {
+        if (live.empty()) return;
+        const ptrdiff_t n = d.nnodes * N_FIELDS;
+        scalar_t        acc = 0;
+        for (size_t k = 0; k < live.size(); ++k) {
+            scalar_t *const SFEM_RESTRICT v = live[k].data();
+            const scalar_t *const SFEM_RESTRICT y = jac_out.data();
+            const scalar_t alpha = scalar_t(1e-8) * scalar_t(k + 1);
+            scalar_t       part  = 0;
+#pragma omp parallel for schedule(static) reduction(+ : part)
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                v[(size_t)i] += alpha * y[(size_t)i];
+                part += v[(size_t)i] * y[(size_t)i];
+            }
+            acc += part;
+        }
+        // Consumed so the loop above cannot be optimised away.
+        g_churn_sink += acc;
+    };
     // The Jacobian action's Rhie-Chow term differentiates through the nodal gradient
     // reconstruction, so it needs that reconstruction applied to the Krylov DIRECTION's
     // pressure as well as to the state's. The two have opposite lifetimes and that is the
@@ -872,23 +956,27 @@ int main(int argc, char **argv) {
     double qgrad_seconds = 0;
     const bool with_qgrad = rhie_chow && jac_action;
     auto jac_action_fn = [&]() {
+        // A Krylov iteration never sees the same direction twice, so neither does this when
+        // the live set exists: the rotation is what stops the direction being resident.
+        const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
+        last_dir                    = dir_v;
         if (with_qgrad) {
             const double t0 = wall_time();
-            cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, jac_dir.data() + 3, N_FIELDS,
+            cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, dir_v + 3, N_FIELDS,
                                            d.qgx, d.qgy, d.qgz);
             qgrad_seconds += wall_time() - t0;
         }
         if (layout == "colored")
-            apply_jacobian_action_colored(d, packed, colors, rho, mu, jac_dir.data(), jac_out.data(), geom_kind);
+            apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
         else if (layout == "packed" || layout == "store")
-            apply_jacobian_action_packed(d, packed, rho, mu, jac_dir.data(), jac_out.data(), geom_kind);
+            apply_jacobian_action_packed(d, packed, rho, mu, dir_v, jac_out.data(), geom_kind);
         else if (geom_kind == GeomKind::Isoparam)
-            apply_jacobian_action_atomic_isoparam(d, rho, mu, jac_dir.data(), jac_out.data());
+            apply_jacobian_action_atomic_isoparam(d, rho, mu, dir_v, jac_out.data());
         else
-            apply_jacobian_action_atomic(d, rho, mu, jac_dir.data(), jac_out.data());
+            apply_jacobian_action_atomic(d, rho, mu, dir_v, jac_out.data());
             if (boundary)
             apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0,
-                                                    jac_dir.data(), jac_out.data());
+                                                    dir_v, jac_out.data());
     };
 
     // Block diagonal, for the block-Jacobi preconditioner. Assembles only the 4x4
@@ -1013,20 +1101,45 @@ int main(int argc, char **argv) {
     }
 
     phase_reset();
-    const double t0 = wall_time();
-    for (int i = 0; i < repeat; ++i) {
-        if (assemble)
-            jac_fn();
-        else if (assemble_diag)
-            diag_fn();
-        else if (jac_action)
-            jac_action_fn();
-        else if (bsr_apply)
-            bsr_apply_fn();
-        else
-            apply_fn();
+    // With a live set the clock has to be stopped for the churn: what is being measured is
+    // still the apply, only now with the caches in the state a Krylov iteration leaves them
+    // in. Without one this is the same single interval it always was, so the default path's
+    // timing is unchanged rather than merely equivalent.
+    double       t0 = 0, t1 = 0;
+    if (live.empty()) {
+        t0 = wall_time();
+        for (int i = 0; i < repeat; ++i) {
+            if (assemble)
+                jac_fn();
+            else if (assemble_diag)
+                diag_fn();
+            else if (jac_action)
+                jac_action_fn();
+            else if (bsr_apply)
+                bsr_apply_fn();
+            else
+                apply_fn();
+        }
+        t1 = wall_time();
+    } else {
+        double acc = 0;
+        for (int i = 0; i < repeat; ++i) {
+            // Before the apply, not after: the churn writes into the live vectors, and one
+            // of them is the direction the apply is about to take. Running it afterwards
+            // would leave the last apply's input modified, and the cross-layout check below
+            // -- which re-applies the atomic kernel to that same vector -- would report a
+            // mismatch that is nothing but the churn.
+            churn_fn();
+            const double a = wall_time();
+            if (jac_action)
+                jac_action_fn();
+            else
+                bsr_apply_fn();
+            acc += wall_time() - a;
+        }
+        t0 = 0;
+        t1 = acc;
     }
-    const double t1 = wall_time();
 
     // The new staging checked against the reference layout, outside the timed region.
     // The `checksum` printed below cannot do this job here: the Jacobian action telescopes,
@@ -1035,7 +1148,10 @@ int main(int argc, char **argv) {
     // that sum. A max-abs difference does not cancel.
     if (with_qgrad && layout != "atomic") {
         std::vector<scalar_t> jv_ref((size_t)d.nnodes * N_FIELDS, 0.0);
-        apply_jacobian_action_atomic(d, rho, mu, jac_dir.data(), jv_ref.data());
+        // last_dir, not jac_dir: under --live-vectors the timed loop rotates the direction,
+        // and comparing the packed result against the atomic action on a different vector
+        // would fail for a reason that has nothing to do with the staging.
+        apply_jacobian_action_atomic(d, rho, mu, last_dir, jv_ref.data());
         scalar_t ref_max = 0;
         for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) ref_max = std::max(ref_max, std::fabs(jv_ref[(size_t)i]));
         const scalar_t err = max_abs_diff(jv_ref.data(), jac_out.data(), d.nnodes * N_FIELDS);
