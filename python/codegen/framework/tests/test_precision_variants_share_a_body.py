@@ -93,13 +93,18 @@ class PrecisionVariantsShareABodyTest(unittest.TestCase):
                     self.entry_points[symbol] = (path, body)
 
     def test_the_tree_publishes_runtime_typed_entry_points(self):
-        """A guard over an empty set passes for the wrong reason."""
+        """A guard over an empty set passes for the wrong reason.
+
+        The threshold tracks what the tree has rather than asserting a size:
+        it moved down when the forms that contract nothing stopped publishing
+        a kernel, which removed their entry points along with them.
+        """
         typed = [
             symbol
             for symbol, (_path, body) in self.entry_points.items()
             if "switch (scalar_bytes)" in body
         ]
-        self.assertGreater(len(typed), 400)
+        self.assertGreater(len(typed), 350)
 
     def test_no_kernel_publishes_a_precision_twin(self):
         offenders = [

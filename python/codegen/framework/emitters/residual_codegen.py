@@ -19,6 +19,7 @@ from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
     contracted_test_quantities,
+    publishes_kernel,
     assembled_matrix_dependencies,
     jacobian_action_dependencies,
     residual_codegen_dependencies,
@@ -2004,27 +2005,34 @@ def _local_header(
         "namespace codegen {",
         "",
     ]
-    lines.extend(
-        emit_local(
-            "%s_residual_block" % local_prefix,
-            specialization,
-            residual_coeffs,
-            dependencies=residual_dependencies,
-            specialized=False,
-        )
+    # A form that contracts nothing has no block: see
+    # `plans.dependencies.publishes_kernel`.  `_published_forms` is what the
+    # operator source walks, and the header agrees with it by construction.
+    published = _published_forms(
+        {"residual": residual_dependencies, "jacobian_action": action_dependencies}
     )
-    lines.append("")
-    lines.extend(
-        emit_local(
-            "%s_residual_block_contiguous" % local_prefix,
-            specialization,
-            residual_coeffs,
-            dependencies=residual_dependencies,
-            specialized=False,
-            stream_layout="contiguous",
+    for _residual in [form for form in published if form == "residual"]:
+        lines.extend(
+            emit_local(
+                "%s_residual_block" % local_prefix,
+                specialization,
+                residual_coeffs,
+                dependencies=residual_dependencies,
+                specialized=False,
+            )
         )
-    )
-    lines.append("")
+        lines.append("")
+        lines.extend(
+            emit_local(
+                "%s_residual_block_contiguous" % local_prefix,
+                specialization,
+                residual_coeffs,
+                dependencies=residual_dependencies,
+                specialized=False,
+                stream_layout="contiguous",
+            )
+        )
+        lines.append("")
     specialized = (
         None if mixed else _constant_p1_affine_specialized_local(
             local_prefix,
@@ -2033,7 +2041,10 @@ def _local_header(
     )
     specialized_prefix = specialized[0] if specialized is not None else None
     specialized_specialization = specialized[1] if specialized is not None else None
-    if specialized_prefix is not None:
+    for _specialized_residual in [
+        prefix_ for prefix_ in ([specialized_prefix] if specialized_prefix else [])
+        for form in published if form == "residual"
+    ]:
         lines.extend(
             emit_local(
                 "%s_residual_block" % specialized_prefix,
@@ -2055,27 +2066,31 @@ def _local_header(
             )
         )
         lines.append("")
-    lines.extend(
-        emit_local(
-            "%s_jacobian_action_block" % local_prefix,
-            specialization,
-            action_coeffs,
-            dependencies=action_dependencies,
-            specialized=False,
+    for _action in [form for form in published if form == "jacobian_action"]:
+        lines.extend(
+            emit_local(
+                "%s_jacobian_action_block" % local_prefix,
+                specialization,
+                action_coeffs,
+                dependencies=action_dependencies,
+                specialized=False,
+            )
         )
-    )
-    lines.append("")
-    lines.extend(
-        emit_local(
-            "%s_jacobian_action_block_contiguous" % local_prefix,
-            specialization,
-            action_coeffs,
-            dependencies=action_dependencies,
-            specialized=False,
-            stream_layout="contiguous",
+        lines.append("")
+        lines.extend(
+            emit_local(
+                "%s_jacobian_action_block_contiguous" % local_prefix,
+                specialization,
+                action_coeffs,
+                dependencies=action_dependencies,
+                specialized=False,
+                stream_layout="contiguous",
+            )
         )
-    )
-    if specialized_prefix is not None:
+    for _specialized_action in [
+        prefix_ for prefix_ in ([specialized_prefix] if specialized_prefix else [])
+        for form in published if form == "jacobian_action"
+    ]:
         lines.append("")
         lines.extend(
             emit_local(
@@ -3359,6 +3374,25 @@ def _test_value_nodes(dependencies):
     return nodes
 
 
+#: The forms a coupled residual unit emits, in the order it has always emitted
+#: them.
+RESIDUAL_FORMS = ("residual", "jacobian_action")
+
+
+def _published_forms(form_dependencies):
+    """Those of `RESIDUAL_FORMS` that contribute anything.
+
+    See `plans.dependencies.publishes_kernel`: a block whose coefficients are
+    all structurally zero has no kernel, so it is absent from this sequence and
+    nothing below emits, declares or dispatches to one.
+    """
+    return tuple(
+        form
+        for form in RESIDUAL_FORMS
+        if form in form_dependencies and publishes_kernel(form_dependencies[form])
+    )
+
+
 def _geometry_value_nodes(dependencies, dim):
     """The per-point geometry a body reads, from the plan that decides it.
 
@@ -4237,7 +4271,10 @@ def _operator_source(
             system.jacobian_action_dependencies(),
         ),
     }
-    for form in ("residual", "jacobian_action"):
+    # Which forms publish a kernel is the plan's answer, and the loop walks
+    # what it returns: a form that contracts nothing has no element entry
+    # point, rather than one wrapping an empty loop nest.
+    for form in _published_forms(form_dependencies):
         dependencies = form_dependencies[form]
         coefficients = residual_coeffs if form == "residual" else action_coeffs
         gradient_metric = None
@@ -4679,18 +4716,8 @@ def _mixed_affine_function(
             "  (void)nnodes;",
         ]
     )
-    if not dependencies.uses_test_coefficients:
-        lines.extend(
-            [
-                "  return SFEM_SUCCESS;",
-                "}",
-                "",
-                "} // namespace codegen",
-                "} // namespace sfem",
-                "",
-            ]
-        )
-        return lines
+    if not publishes_kernel(dependencies):
+        return []
     lines.extend(
         _mixed_reference_pointer_lines(
             system,
@@ -4877,18 +4904,8 @@ def _mixed_isoparametric_function(
             "  (void)nnodes;",
         ]
     )
-    if not dependencies.uses_test_coefficients:
-        lines.extend(
-            [
-                "  return SFEM_SUCCESS;",
-                "}",
-                "",
-                "} // namespace codegen",
-                "} // namespace sfem",
-                "",
-            ]
-        )
-        return lines
+    if not publishes_kernel(dependencies):
+        return []
     tensor_product = _is_tensor_product_family(cell_rule, basis_family)
     tensor_product_geometry = _is_tensor_product_family(cell_rule, geometry_family)
     if tensor_product:
