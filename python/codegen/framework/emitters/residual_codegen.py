@@ -25,6 +25,7 @@ from codegen.framework.emitters.runtime_typed_abi import (
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
+    contracted_gradient_components,
     contracted_test_quantities,
     publishes_kernel,
     assembled_matrix_dependencies,
@@ -2466,36 +2467,67 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 "    const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];",
             ]
         )
-    lines.extend(
-        [
-            *_work_item_loop_lines("    "),
-        ]
-    )
-    if uses_geometry_offset:
-        lines.append("      const ptrdiff_t goff = q * geometry_stride + lane;")
+    # Every buffer this loop touches is indexed by the quadrature point and the
+    # lane, and only the lane moves inside it, so the point's slice is named
+    # once out here and the loop reads and writes through it.
+    hoisted = []
+    body = []
     if uses_determinant:
-        lines.append("      const s_t det = determinant[goff];")
-    lines.extend(
-        "      const s_t adj%d = adjugate[%d][goff];" % (i, i)
+        hoisted.append(
+            "    const s_t *const RSTR det_q = determinant + q * geometry_stride;"
+        )
+    hoisted.extend(
+        "    const s_t *const RSTR adj_q%d = adjugate[%d] + q * geometry_stride;" % (i, i)
+        for i in _adjugate_components(dependencies, dim)
+    )
+    if uses_determinant:
+        body.append("      const s_t det = det_q[lane];")
+    body.extend(
+        "      const s_t adj%d = adj_q%d[lane];" % (i, i)
         for i in _adjugate_components(dependencies, dim)
     )
     for field_index, field in enumerate(system.fields):
         for group in groups:
             read = field_stream_usage(dependencies, field, group.name)
             if read.uses_value:
-                lines.append(
-                    "      const s_t %s%s = %s_%s_value[q * VS + lane];"
+                hoisted.append(
+                    "    const s_t *const RSTR %s_%s_value_q = &%s_%s_value[q * VS];"
+                    % (group.name, field.name, group.name, field.name)
+                )
+                body.append(
+                    "      const s_t %s%s = %s_%s_value_q[lane];"
                     % (field.name, group.symbol_suffix, group.name, field.name)
                 )
             if read.uses_gradient:
                 for k in range(dim):
-                    lines.append(
-                        "      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref[(q * ND + %d) * VS + lane];"
+                    hoisted.append(
+                        "    const s_t *const RSTR %s_%s_grad_ref_q%d = &%s_%s_grad_ref[(q * ND + %d) * VS];"
+                        % (group.name, field.name, k, group.name, field.name, k)
+                    )
+                    body.append(
+                        "      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref_q%d[lane];"
                         % (field.name, group.symbol_suffix, k, group.name, field.name, k)
                     )
-                lines.extend(
+                body.extend(
                     _physical_gradient_lines(field.name + group.symbol_suffix, dim, "      ")
                 )
+    for row, field in enumerate(system.fields):
+        hoisted.append(
+            "    s_t *const RSTR %s_value_coeff_q = &%s_value_coeff[q * VS];"
+            % (field.name, field.name)
+        )
+        hoisted.extend(
+            "    s_t *const RSTR %s_grad_coeff_ref_q%d = &%s_grad_coeff_ref[(q * ND + %d) * VS];"
+            % (field.name, k, field.name, k)
+            for k in contracted_gradient_components(dependencies, dim)
+        )
+    lines.extend(hoisted)
+    lines.extend(
+        [
+            *_work_item_loop_lines("    "),
+        ]
+    )
+    lines.extend(body)
     lines.extend(
         _coefficient_evaluation_lines(
             system,
@@ -2511,8 +2543,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         else:
             value = "s_t(0)"
         lines.append(
-            "      %s_value_coeff[q * VS + lane] = %s;"
-            % (field.name, value)
+            "      %s_value_coeff_q[lane] = %s;" % (field.name, value)
         )
         if dependencies.uses_test_gradients:
             for k in range(dim):
@@ -2523,8 +2554,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 ]
                 value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
                 lines.append(
-                    "      %s_grad_coeff_ref[(q * ND + %d) * VS + lane] = %s;"
-                    % (field.name, k, value)
+                    "      %s_grad_coeff_ref_q%d[lane] = %s;" % (field.name, k, value)
                 )
     lines.extend(["    }", "  }"])
     for row, field in enumerate(system.fields):
@@ -3791,27 +3821,31 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         )
 
     lane_body = []
-    if uses_geometry_offset:
-        lane_body.append(
-            BufferDeclNode(
-                "const ptrdiff_t", "goff", (),
-                expr_ref("q * geometry_stride + lane"),
-            )
-        )
     if uses_determinant:
-        lane_body.append(
+        quadrature_body.append(
             BufferDeclNode(
-                "const s_t", "det", (), expr_ref("determinant[goff]")
+                "const s_t *const RSTR", "det_q", (),
+                expr_ref("determinant + q * geometry_stride"),
             )
         )
-    lane_body.extend(
-        BufferDeclNode(
-            "const s_t", "adj%d" % i, (),
-            expr_ref("adjugate[%d][goff]" % i),
+        lane_body.append(
+            BufferDeclNode("const s_t", "det", (), expr_ref("det_q[lane]"))
         )
-        for i in _adjugate_components(dependencies, dim)
-    )
-    lane_body.extend(_tensor_field_alias_nodes(system, dependencies))
+    for i in _adjugate_components(dependencies, dim):
+        quadrature_body.append(
+            BufferDeclNode(
+                "const s_t *const RSTR", "adj_q%d" % i, (),
+                expr_ref("adjugate[%d] + q * geometry_stride" % i),
+            )
+        )
+        lane_body.append(
+            BufferDeclNode(
+                "const s_t", "adj%d" % i, (), expr_ref("adj_q%d[lane]" % i)
+            )
+        )
+    field_hoists, field_aliases = _tensor_field_alias_nodes(system, dependencies)
+    quadrature_body.extend(field_hoists)
+    lane_body.extend(field_aliases)
     lane_body.extend(
         _coefficient_evaluation_nodes(system, coefficients, dependencies)
     )
@@ -3821,13 +3855,18 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             if dependencies.value_coefficients[row]
             else "s_t(0)"
         )
-        lane_body.append(
-            AssignmentNode(
+        quadrature_body.append(
+            BufferDeclNode(
+                "s_t *const RSTR", "value_coeff_q%d" % row, (),
                 expr_ref(
-                    "value_coeff[%s * VS + lane]"
+                    "&value_coeff[%s * VS]"
                     % c_group(c_sum(c_product(row, "NQ"), "q"))
                 ),
-                expr_ref(value),
+            )
+        )
+        lane_body.append(
+            AssignmentNode(
+                expr_ref("value_coeff_q%d[lane]" % row), expr_ref(value)
             )
         )
         if not dependencies.uses_test_gradients:
@@ -3839,10 +3878,11 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
                 if dependencies.gradient_coefficients[row][d]
             ]
             value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
-            lane_body.append(
-                AssignmentNode(
+            quadrature_body.append(
+                BufferDeclNode(
+                    "s_t *const RSTR", "grad_coeff_ref_q%d_%d" % (row, k), (),
                     expr_ref(
-                        "grad_coeff_ref[%s * VS + lane]"
+                        "&grad_coeff_ref[%s * VS]"
                         % c_group(
                             c_sum(
                                 c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"),
@@ -3850,6 +3890,11 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
                             )
                         )
                     ),
+                )
+            )
+            lane_body.append(
+                AssignmentNode(
+                    expr_ref("grad_coeff_ref_q%d_%d[lane]" % (row, k)),
                     expr_ref(value),
                 )
             )
@@ -3992,6 +4037,7 @@ def _tensor_field_alias_nodes(system, dependencies):
     """
     dim = system.dim
     nodes = []
+    hoisted = []
     groups = _dependency_stream_groups(dependencies)
     for field_index, field in enumerate(system.fields):
         for group in groups:
@@ -4000,13 +4046,13 @@ def _tensor_field_alias_nodes(system, dependencies):
             if not read.is_read:
                 continue
             if read.uses_value:
-                nodes.append(
+                hoisted.append(
                     BufferDeclNode(
-                        "const s_t",
-                        stem,
+                        "const s_t *const RSTR",
+                        "%s_value_q%d" % (group.name, field_index),
                         (),
                         expr_ref(
-                            "%s_value[%s * VS + lane]"
+                            "&%s_value[%s * VS]"
                             % (
                                 group.name,
                                 c_group(c_sum(c_product(field_index, "NQ"), "q")),
@@ -4014,14 +4060,22 @@ def _tensor_field_alias_nodes(system, dependencies):
                         ),
                     )
                 )
-            if read.uses_gradient:
-                nodes.extend(
+                nodes.append(
                     BufferDeclNode(
                         "const s_t",
-                        "%s_grad_%d_ref" % (stem, k),
+                        stem,
+                        (),
+                        expr_ref("%s_value_q%d[lane]" % (group.name, field_index)),
+                    )
+                )
+            if read.uses_gradient:
+                hoisted.extend(
+                    BufferDeclNode(
+                        "const s_t *const RSTR",
+                        "%s_grad_ref_q%d_%d" % (group.name, field_index, k),
                         (),
                         expr_ref(
-                            "%s_grad_ref[%s * VS + lane]"
+                            "&%s_grad_ref[%s * VS]"
                             % (
                                 group.name,
                                 c_group(
@@ -4038,15 +4092,19 @@ def _tensor_field_alias_nodes(system, dependencies):
                     )
                     for k in range(dim)
                 )
+                nodes.extend(
+                    BufferDeclNode(
+                        "const s_t",
+                        "%s_grad_%d_ref" % (stem, k),
+                        (),
+                        expr_ref(
+                            "%s_grad_ref_q%d_%d[lane]" % (group.name, field_index, k)
+                        ),
+                    )
+                    for k in range(dim)
+                )
                 nodes.extend(_physical_gradient_nodes(stem, dim))
-    return nodes
-
-
-def _tensor_field_alias_lines(system, dependencies):
-    """The printed view of :func:`_tensor_field_alias_nodes`."""
-    return _print_statement_nodes(
-        _tensor_field_alias_nodes(system, dependencies), "      "
-    )
+    return tuple(hoisted), tuple(nodes)
 
 
 def _coefficient_evaluation_lines(system, coefficients, indent, weight, dependencies=None):

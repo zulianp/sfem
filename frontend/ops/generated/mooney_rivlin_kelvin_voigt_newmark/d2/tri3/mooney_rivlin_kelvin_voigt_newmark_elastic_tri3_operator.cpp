@@ -135,10 +135,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_objective
     s_t bvalue[VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
 
@@ -331,10 +332,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_gradient_
     s_t bout_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
     const s_t *const u_components[NC] = {ux, uy};
@@ -528,10 +530,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_apply_a_m
     s_t bout_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
     const s_t *const u_components[NC] = {ux, uy};

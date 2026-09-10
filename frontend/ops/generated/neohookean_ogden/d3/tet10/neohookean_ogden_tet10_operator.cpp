@@ -147,10 +147,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_a_msoa_impl(
     s_t bvalue[VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
 
@@ -543,10 +544,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_objective_steps_i_msoa_impl(
     s_t bdet0[NQ * VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
     const g_t *const coordinate_components[ND] = {x, y, z};
@@ -1057,10 +1059,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_a_msoa_impl(
     s_t bout_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
     const s_t *const u_components[NC] = {ux, uy, uz};
@@ -1691,10 +1694,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_i_msoa_impl(
     s_t bdet0[NQ * VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
     const g_t *const coordinate_components[ND] = {x, y, z};
@@ -2483,10 +2487,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_a_msoa_impl(
     s_t bout_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
     const s_t *const u_components[NC] = {ux, uy, uz};
@@ -3172,10 +3177,11 @@ static SFEM_INLINE int neohookean_ogden_tet10_apply_i_msoa_impl(
     s_t bdet0[NQ * VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node];
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        ev[element_node * VS + lane] = element_shape[evb + lane];
+        ev_node[lane] = element_shape[lane];
       }
     }
     const g_t *const coordinate_components[ND] = {x, y, z};

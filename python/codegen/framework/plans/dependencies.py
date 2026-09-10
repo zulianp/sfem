@@ -93,6 +93,16 @@ def publishes_kernel(dependencies):
     return dependencies.uses_test_coefficients
 
 
+def contracted_gradient_components(dependencies, dim):
+    """The reference-gradient components a form's test functions contract with.
+
+    Empty when the form contracts only values.  This is the same question
+    `uses_test_gradients` answers, phrased as a range so that emission can
+    iterate it instead of branching on it -- the decision is the plan's.
+    """
+    return tuple(range(dim)) if dependencies.uses_test_gradients else ()
+
+
 def contracted_test_quantities(dependencies):
     """Which of the test function's value and gradient the form contracts.
 

@@ -136,6 +136,9 @@ static SFEM_INLINE void laplace_d3_tensor_product_gradient_block(
     const s_t *const RSTR gu_ref0 = &gu_ref_q[(3 * q) * VS];
     const s_t *const RSTR gu_ref1 = &gu_ref_q[(3 * q + 1) * VS];
     const s_t *const RSTR gu_ref2 = &gu_ref_q[(3 * q + 2) * VS];
+    s_t *const RSTR loperand0 = &loperand_q[(3 * q) * VS];
+    s_t *const RSTR loperand1 = &loperand_q[(3 * q + 1) * VS];
+    s_t *const RSTR loperand2 = &loperand_q[(3 * q + 2) * VS];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -171,9 +174,9 @@ static SFEM_INLINE void laplace_d3_tensor_product_gradient_block(
     loperand[0] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1 + material[2] * adj_lane2);
     loperand[1] = qw * (material[0] * adj_lane3 + material[1] * adj_lane4 + material[2] * adj_lane5);
     loperand[2] = qw * (material[0] * adj_lane6 + material[1] * adj_lane7 + material[2] * adj_lane8);
-      loperand_q[(3 * q) * VS + lane] = loperand[0];
-      loperand_q[(3 * q + 1) * VS + lane] = loperand[1];
-      loperand_q[(3 * q + 2) * VS + lane] = loperand[2];
+      loperand0[lane] = loperand[0];
+      loperand1[lane] = loperand[1];
+      loperand2[lane] = loperand[2];
     }
   }
   tensor_test<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
@@ -217,6 +220,9 @@ static SFEM_INLINE void laplace_d3_tensor_product_apply_block(
     const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(3 * q) * VS];
     const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(3 * q + 1) * VS];
     const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(3 * q + 2) * VS];
+    s_t *const RSTR loperand0 = &loperand_q[(3 * q) * VS];
+    s_t *const RSTR loperand1 = &loperand_q[(3 * q + 1) * VS];
+    s_t *const RSTR loperand2 = &loperand_q[(3 * q + 2) * VS];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -252,9 +258,9 @@ static SFEM_INLINE void laplace_d3_tensor_product_apply_block(
     loperand[0] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1 + material[2] * adj_lane2);
     loperand[1] = qw * (material[0] * adj_lane3 + material[1] * adj_lane4 + material[2] * adj_lane5);
     loperand[2] = qw * (material[0] * adj_lane6 + material[1] * adj_lane7 + material[2] * adj_lane8);
-      loperand_q[(3 * q) * VS + lane] = loperand[0];
-      loperand_q[(3 * q + 1) * VS + lane] = loperand[1];
-      loperand_q[(3 * q + 2) * VS + lane] = loperand[2];
+      loperand0[lane] = loperand[0];
+      loperand1[lane] = loperand[1];
+      loperand2[lane] = loperand[2];
     }
   }
   tensor_test<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);

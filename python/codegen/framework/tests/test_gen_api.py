@@ -1433,7 +1433,10 @@ extern "C" int demo_tri3_apply_packed_a_msoa(ptrdiff_t n, idx_t **elements) { re
             self.assertIn("linear_elasticity_proteus_hex8_hessian_esoa", le_hex8_header)
             self.assertIn("SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6}", le_hex8_header)
             self.assertIn("neohookean_ogden_hex8_hessian_esoa", nh_hex8_header)
-            self.assertIn("q * nelements + evb + lane", le_header)
+            # The block's geometry slice is named once per quadrature point
+            # and read by lane, rather than each lane rebuilding the index.
+            self.assertIn("adj[0] + q * nelements + evb", le_header)
+            self.assertIn("badj0_q[lane] = adj0_q[lane];", le_header)
             self.assertIn("template <typename s_t, int VS, typename elem_type_t>", le_dispatch)
             self.assertNotIn("smesh_mesh.hpp", le_dispatch)
             self.assertNotIn("smesh_elem_type.hpp", le_dispatch)
@@ -1645,7 +1648,10 @@ int main() {
         self.assertIn("linear_elasticity_d3_simplex_tet4_gradient_block", local)
         self.assertIn("linear_elasticity_d3_simplex_apply_block", tet10_operator)
         self.assertNotIn("linear_elasticity_d3_simplex_tet4_apply_block", tet10_operator)
-        self.assertIn("ev[element_node * VS + lane]", tet10_operator)
+        # The connectivity slice for this node is named above the lane loop;
+        # `ev` is still laid out node-major, which the two checks below pin.
+        self.assertIn("idx_t *const RSTR ev_node = &ev[element_node * VS];", tet10_operator)
+        self.assertIn("ev_node[lane] = element_shape[lane];", tet10_operator)
         self.assertNotIn("ev[lane * NS", tet10_operator)
         self.assertNotIn("ev[scatter * NS", tet10_operator)
 

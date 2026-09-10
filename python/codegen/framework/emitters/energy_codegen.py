@@ -200,7 +200,9 @@ def _work_item_index(source_builder):
     return "lane"
 
 
-def _reference_gradient_offset_lines(name, n_field_components, dim, indent):
+def _reference_gradient_offset_lines(
+    name, n_field_components, dim, indent, pointer="const s_t *const RSTR"
+):
     """Name each quadrature point's slice of a reference gradient, above the loop.
 
     The slice belongs to the quadrature point, not to the lane, so computing
@@ -211,9 +213,10 @@ def _reference_gradient_offset_lines(name, n_field_components, dim, indent):
     out nine times.
     """
     return tuple(
-        "%sconst s_t *const RSTR %s%d = &%s_q[%s * VS];"
+        "%s%s %s%d = &%s_q[%s * VS];"
         % (
             indent,
+            pointer,
             name,
             row * dim + col,
             name,
@@ -1696,6 +1699,12 @@ def _append_sfem_soa_tensor_weak_form_lines(
                 "grad_h_ref", n_field_components, dim, "    "
             )
         )
+    for _written in [candidate for candidate in (form,) if writes_per_shape(candidate)]:
+        lines.extend(
+            _reference_gradient_offset_lines(
+                "loperand", n_field_components, dim, "    ", pointer="s_t *const RSTR"
+            )
+        )
     # The geometry stream is indexed by quadrature point and lane, and only the
     # lane part varies inside the loop, so the point's base is named once here.
     for component in range(dim * dim):
@@ -1801,17 +1810,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
     for row in range(n_field_components):
         for col in range(dim):
             lines.append(
-                "      loperand_q[%s * VS + %s] = loperand[%d];"
-                % (
-                    c_group(
-                        c_sum(
-                            c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
-                            col,
-                        )
-                    ),
-                    work_item,
-                    row * dim + col,
-                )
+                "      loperand%d[%s] = loperand[%d];"
+                % (row * dim + col, work_item, row * dim + col)
             )
     lines.extend(["    }", "  }"])
     for row in range(n_field_components):
@@ -4822,9 +4822,10 @@ def _sfem_soa_mesh_operator_function(
         [
             "",
             "    for (int element_node = 0; element_node < NS; ++element_node) {",
-            "      const idx_t *const RSTR element_shape = elements[element_node];",
+            "      const idx_t *const RSTR element_shape = elements[element_node] + evb;",
+            "      idx_t *const RSTR ev_node = &ev[element_node * VS];",
             *_work_item_loop_lines(source_builder, "      "),
-            "        ev[element_node * VS + %s] = element_shape[evb + %s];" % (work_item, work_item),
+            "        ev_node[%s] = element_shape[%s];" % (work_item, work_item),
             "      }",
             "    }",
         ]
@@ -6122,9 +6123,10 @@ def _sfem_soa_mesh_objective_steps_function(
         [
             "",
             "    for (int element_node = 0; element_node < NS; ++element_node) {",
-            "      const idx_t *const RSTR element_shape = elements[element_node];",
+            "      const idx_t *const RSTR element_shape = elements[element_node] + evb;",
+            "      idx_t *const RSTR ev_node = &ev[element_node * VS];",
             *_work_item_loop_lines(source_builder, "      "),
-            "        ev[element_node * VS + %s] = element_shape[evb + %s];"
+            "        ev_node[%s] = element_shape[%s];"
             % (work_item, work_item),
             "      }",
             "    }",
@@ -9611,14 +9613,25 @@ def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
     lines.extend(
         quadrature_scope_lines(quadrature_rule.element_type, "    ")
     )
+    # Both sides of this copy are indexed by the quadrature point and the lane,
+    # and the point is fixed for the whole loop, so name both slices out here.
+    for component in range(dim * dim):
+        lines.append(
+            "      s_t *const RSTR badj%d_q = &badj%d[q * VS];" % (component, component)
+        )
+        lines.append(
+            "      const s_t *const RSTR adj%d_q = adj[%d] + q * nelements + evb;"
+            % (component, component)
+        )
+    lines.append("      s_t *const RSTR bdet0_q = &bdet0[q * VS];")
+    lines.append("      const s_t *const RSTR det_q = det + q * nelements + evb;")
     lines.append("      #pragma omp simd")
     lines.append("      for (int lane = 0; lane < ne; ++lane) {")
     for component in range(dim * dim):
         lines.append(
-            "        badj%d[q * VS + lane] = adj[%d][q * nelements + evb + lane];"
-            % (component, component)
+            "        badj%d_q[lane] = adj%d_q[lane];" % (component, component)
         )
-    lines.append("        bdet0[q * VS + lane] = det[q * nelements + evb + lane];")
+    lines.append("        bdet0_q[lane] = det_q[lane];")
     lines.append("      }")
     lines.append("    }")
     return lines

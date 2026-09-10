@@ -121,6 +121,10 @@ static SFEM_INLINE void linear_elasticity_d2_tensor_product_gradient_block(
     const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1) * VS];
     const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q)) * VS];
     const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1) * VS];
+    s_t *const RSTR loperand0 = &loperand_q[(2 * q) * VS];
+    s_t *const RSTR loperand1 = &loperand_q[(2 * q + 1) * VS];
+    s_t *const RSTR loperand2 = &loperand_q[(2 * (NQ + q)) * VS];
+    s_t *const RSTR loperand3 = &loperand_q[(2 * (NQ + q) + 1) * VS];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -153,10 +157,10 @@ static SFEM_INLINE void linear_elasticity_d2_tensor_product_gradient_block(
     loperand[1] = qw * (material[0] * adj_lane2 + material[1] * adj_lane3);
     loperand[2] = qw * (material[2] * adj_lane0 + material[3] * adj_lane1);
     loperand[3] = qw * (material[2] * adj_lane2 + material[3] * adj_lane3);
-      loperand_q[(2 * q) * VS + lane] = loperand[0];
-      loperand_q[(2 * q + 1) * VS + lane] = loperand[1];
-      loperand_q[(2 * (NQ + q)) * VS + lane] = loperand[2];
-      loperand_q[(2 * (NQ + q) + 1) * VS + lane] = loperand[3];
+      loperand0[lane] = loperand[0];
+      loperand1[lane] = loperand[1];
+      loperand2[lane] = loperand[2];
+      loperand3[lane] = loperand[3];
     }
   }
   tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
@@ -198,6 +202,10 @@ static SFEM_INLINE void linear_elasticity_d2_tensor_product_apply_block(
     const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(2 * q + 1) * VS];
     const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(2 * (NQ + q)) * VS];
     const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(2 * (NQ + q) + 1) * VS];
+    s_t *const RSTR loperand0 = &loperand_q[(2 * q) * VS];
+    s_t *const RSTR loperand1 = &loperand_q[(2 * q + 1) * VS];
+    s_t *const RSTR loperand2 = &loperand_q[(2 * (NQ + q)) * VS];
+    s_t *const RSTR loperand3 = &loperand_q[(2 * (NQ + q) + 1) * VS];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -230,10 +238,10 @@ static SFEM_INLINE void linear_elasticity_d2_tensor_product_apply_block(
     loperand[1] = qw * (material[0] * adj_lane2 + material[1] * adj_lane3);
     loperand[2] = qw * (material[2] * adj_lane0 + material[3] * adj_lane1);
     loperand[3] = qw * (material[2] * adj_lane2 + material[3] * adj_lane3);
-      loperand_q[(2 * q) * VS + lane] = loperand[0];
-      loperand_q[(2 * q + 1) * VS + lane] = loperand[1];
-      loperand_q[(2 * (NQ + q)) * VS + lane] = loperand[2];
-      loperand_q[(2 * (NQ + q) + 1) * VS + lane] = loperand[3];
+      loperand0[lane] = loperand[0];
+      loperand1[lane] = loperand[1];
+      loperand2[lane] = loperand[2];
+      loperand3[lane] = loperand[3];
     }
   }
   tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);

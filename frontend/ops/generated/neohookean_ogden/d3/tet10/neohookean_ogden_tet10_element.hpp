@@ -48,18 +48,38 @@ static SFEM_INLINE int neohookean_ogden_tet10_energy_egeometry_soa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     for (int q = 0; q < NQ; ++q) {
+      s_t *const RSTR badj0_q = &badj0[q * VS];
+      const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
+      s_t *const RSTR badj1_q = &badj1[q * VS];
+      const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
+      s_t *const RSTR badj2_q = &badj2[q * VS];
+      const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
+      s_t *const RSTR badj3_q = &badj3[q * VS];
+      const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
+      s_t *const RSTR badj4_q = &badj4[q * VS];
+      const s_t *const RSTR adj4_q = adj[4] + q * nelements + evb;
+      s_t *const RSTR badj5_q = &badj5[q * VS];
+      const s_t *const RSTR adj5_q = adj[5] + q * nelements + evb;
+      s_t *const RSTR badj6_q = &badj6[q * VS];
+      const s_t *const RSTR adj6_q = adj[6] + q * nelements + evb;
+      s_t *const RSTR badj7_q = &badj7[q * VS];
+      const s_t *const RSTR adj7_q = adj[7] + q * nelements + evb;
+      s_t *const RSTR badj8_q = &badj8[q * VS];
+      const s_t *const RSTR adj8_q = adj[8] + q * nelements + evb;
+      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      const s_t *const RSTR det_q = det + q * nelements + evb;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
-        badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
-        badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
-        badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
-        badj4[q * VS + lane] = adj[4][q * nelements + evb + lane];
-        badj5[q * VS + lane] = adj[5][q * nelements + evb + lane];
-        badj6[q * VS + lane] = adj[6][q * nelements + evb + lane];
-        badj7[q * VS + lane] = adj[7][q * nelements + evb + lane];
-        badj8[q * VS + lane] = adj[8][q * nelements + evb + lane];
-        bdet0[q * VS + lane] = det[q * nelements + evb + lane];
+        badj0_q[lane] = adj0_q[lane];
+        badj1_q[lane] = adj1_q[lane];
+        badj2_q[lane] = adj2_q[lane];
+        badj3_q[lane] = adj3_q[lane];
+        badj4_q[lane] = adj4_q[lane];
+        badj5_q[lane] = adj5_q[lane];
+        badj6_q[lane] = adj6_q[lane];
+        badj7_q[lane] = adj7_q[lane];
+        badj8_q[lane] = adj8_q[lane];
+        bdet0_q[lane] = det_q[lane];
       }
     }
     neohookean_ogden_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
@@ -322,18 +342,38 @@ static SFEM_INLINE int neohookean_ogden_tet10_gradient_egeometry_soa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     for (int q = 0; q < NQ; ++q) {
+      s_t *const RSTR badj0_q = &badj0[q * VS];
+      const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
+      s_t *const RSTR badj1_q = &badj1[q * VS];
+      const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
+      s_t *const RSTR badj2_q = &badj2[q * VS];
+      const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
+      s_t *const RSTR badj3_q = &badj3[q * VS];
+      const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
+      s_t *const RSTR badj4_q = &badj4[q * VS];
+      const s_t *const RSTR adj4_q = adj[4] + q * nelements + evb;
+      s_t *const RSTR badj5_q = &badj5[q * VS];
+      const s_t *const RSTR adj5_q = adj[5] + q * nelements + evb;
+      s_t *const RSTR badj6_q = &badj6[q * VS];
+      const s_t *const RSTR adj6_q = adj[6] + q * nelements + evb;
+      s_t *const RSTR badj7_q = &badj7[q * VS];
+      const s_t *const RSTR adj7_q = adj[7] + q * nelements + evb;
+      s_t *const RSTR badj8_q = &badj8[q * VS];
+      const s_t *const RSTR adj8_q = adj[8] + q * nelements + evb;
+      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      const s_t *const RSTR det_q = det + q * nelements + evb;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
-        badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
-        badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
-        badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
-        badj4[q * VS + lane] = adj[4][q * nelements + evb + lane];
-        badj5[q * VS + lane] = adj[5][q * nelements + evb + lane];
-        badj6[q * VS + lane] = adj[6][q * nelements + evb + lane];
-        badj7[q * VS + lane] = adj[7][q * nelements + evb + lane];
-        badj8[q * VS + lane] = adj[8][q * nelements + evb + lane];
-        bdet0[q * VS + lane] = det[q * nelements + evb + lane];
+        badj0_q[lane] = adj0_q[lane];
+        badj1_q[lane] = adj1_q[lane];
+        badj2_q[lane] = adj2_q[lane];
+        badj3_q[lane] = adj3_q[lane];
+        badj4_q[lane] = adj4_q[lane];
+        badj5_q[lane] = adj5_q[lane];
+        badj6_q[lane] = adj6_q[lane];
+        badj7_q[lane] = adj7_q[lane];
+        badj8_q[lane] = adj8_q[lane];
+        bdet0_q[lane] = det_q[lane];
       }
     }
     neohookean_ogden_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
@@ -592,18 +632,38 @@ static SFEM_INLINE int neohookean_ogden_tet10_hessian_egeometry_soa(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     for (int q = 0; q < NQ; ++q) {
+      s_t *const RSTR badj0_q = &badj0[q * VS];
+      const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
+      s_t *const RSTR badj1_q = &badj1[q * VS];
+      const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
+      s_t *const RSTR badj2_q = &badj2[q * VS];
+      const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
+      s_t *const RSTR badj3_q = &badj3[q * VS];
+      const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
+      s_t *const RSTR badj4_q = &badj4[q * VS];
+      const s_t *const RSTR adj4_q = adj[4] + q * nelements + evb;
+      s_t *const RSTR badj5_q = &badj5[q * VS];
+      const s_t *const RSTR adj5_q = adj[5] + q * nelements + evb;
+      s_t *const RSTR badj6_q = &badj6[q * VS];
+      const s_t *const RSTR adj6_q = adj[6] + q * nelements + evb;
+      s_t *const RSTR badj7_q = &badj7[q * VS];
+      const s_t *const RSTR adj7_q = adj[7] + q * nelements + evb;
+      s_t *const RSTR badj8_q = &badj8[q * VS];
+      const s_t *const RSTR adj8_q = adj[8] + q * nelements + evb;
+      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      const s_t *const RSTR det_q = det + q * nelements + evb;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
-        badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
-        badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
-        badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
-        badj4[q * VS + lane] = adj[4][q * nelements + evb + lane];
-        badj5[q * VS + lane] = adj[5][q * nelements + evb + lane];
-        badj6[q * VS + lane] = adj[6][q * nelements + evb + lane];
-        badj7[q * VS + lane] = adj[7][q * nelements + evb + lane];
-        badj8[q * VS + lane] = adj[8][q * nelements + evb + lane];
-        bdet0[q * VS + lane] = det[q * nelements + evb + lane];
+        badj0_q[lane] = adj0_q[lane];
+        badj1_q[lane] = adj1_q[lane];
+        badj2_q[lane] = adj2_q[lane];
+        badj3_q[lane] = adj3_q[lane];
+        badj4_q[lane] = adj4_q[lane];
+        badj5_q[lane] = adj5_q[lane];
+        badj6_q[lane] = adj6_q[lane];
+        badj7_q[lane] = adj7_q[lane];
+        badj8_q[lane] = adj8_q[lane];
+        bdet0_q[lane] = det_q[lane];
       }
     }
     s_t bh_data[NDOFS][VS];

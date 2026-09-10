@@ -170,6 +170,15 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_pro
     const s_t *const RSTR gu_ref6 = &gu_ref_q[(3 * (2 * NQ + q)) * VS];
     const s_t *const RSTR gu_ref7 = &gu_ref_q[(3 * (2 * NQ + q) + 1) * VS];
     const s_t *const RSTR gu_ref8 = &gu_ref_q[(3 * (2 * NQ + q) + 2) * VS];
+    s_t *const RSTR loperand0 = &loperand_q[(3 * q) * VS];
+    s_t *const RSTR loperand1 = &loperand_q[(3 * q + 1) * VS];
+    s_t *const RSTR loperand2 = &loperand_q[(3 * q + 2) * VS];
+    s_t *const RSTR loperand3 = &loperand_q[(3 * (NQ + q)) * VS];
+    s_t *const RSTR loperand4 = &loperand_q[(3 * (NQ + q) + 1) * VS];
+    s_t *const RSTR loperand5 = &loperand_q[(3 * (NQ + q) + 2) * VS];
+    s_t *const RSTR loperand6 = &loperand_q[(3 * (2 * NQ + q)) * VS];
+    s_t *const RSTR loperand7 = &loperand_q[(3 * (2 * NQ + q) + 1) * VS];
+    s_t *const RSTR loperand8 = &loperand_q[(3 * (2 * NQ + q) + 2) * VS];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -246,15 +255,15 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_pro
     loperand[6] = qw * (material[6] * adj_lane0 + material[7] * adj_lane1 + material[8] * adj_lane2);
     loperand[7] = qw * (material[6] * adj_lane3 + material[7] * adj_lane4 + material[8] * adj_lane5);
     loperand[8] = qw * (material[6] * adj_lane6 + material[7] * adj_lane7 + material[8] * adj_lane8);
-      loperand_q[(3 * q) * VS + lane] = loperand[0];
-      loperand_q[(3 * q + 1) * VS + lane] = loperand[1];
-      loperand_q[(3 * q + 2) * VS + lane] = loperand[2];
-      loperand_q[(3 * (NQ + q)) * VS + lane] = loperand[3];
-      loperand_q[(3 * (NQ + q) + 1) * VS + lane] = loperand[4];
-      loperand_q[(3 * (NQ + q) + 2) * VS + lane] = loperand[5];
-      loperand_q[(3 * (2 * NQ + q)) * VS + lane] = loperand[6];
-      loperand_q[(3 * (2 * NQ + q) + 1) * VS + lane] = loperand[7];
-      loperand_q[(3 * (2 * NQ + q) + 2) * VS + lane] = loperand[8];
+      loperand0[lane] = loperand[0];
+      loperand1[lane] = loperand[1];
+      loperand2[lane] = loperand[2];
+      loperand3[lane] = loperand[3];
+      loperand4[lane] = loperand[4];
+      loperand5[lane] = loperand[5];
+      loperand6[lane] = loperand[6];
+      loperand7[lane] = loperand[7];
+      loperand8[lane] = loperand[8];
     }
   }
   tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
@@ -323,6 +332,15 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_pro
     const s_t *const RSTR grad_h_ref6 = &grad_h_ref_q[(3 * (2 * NQ + q)) * VS];
     const s_t *const RSTR grad_h_ref7 = &grad_h_ref_q[(3 * (2 * NQ + q) + 1) * VS];
     const s_t *const RSTR grad_h_ref8 = &grad_h_ref_q[(3 * (2 * NQ + q) + 2) * VS];
+    s_t *const RSTR loperand0 = &loperand_q[(3 * q) * VS];
+    s_t *const RSTR loperand1 = &loperand_q[(3 * q + 1) * VS];
+    s_t *const RSTR loperand2 = &loperand_q[(3 * q + 2) * VS];
+    s_t *const RSTR loperand3 = &loperand_q[(3 * (NQ + q)) * VS];
+    s_t *const RSTR loperand4 = &loperand_q[(3 * (NQ + q) + 1) * VS];
+    s_t *const RSTR loperand5 = &loperand_q[(3 * (NQ + q) + 2) * VS];
+    s_t *const RSTR loperand6 = &loperand_q[(3 * (2 * NQ + q)) * VS];
+    s_t *const RSTR loperand7 = &loperand_q[(3 * (2 * NQ + q) + 1) * VS];
+    s_t *const RSTR loperand8 = &loperand_q[(3 * (2 * NQ + q) + 2) * VS];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -536,15 +554,15 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_pro
     loperand[6] = qw * (material[6] * adj_lane0 + material[7] * adj_lane1 + material[8] * adj_lane2);
     loperand[7] = qw * (material[6] * adj_lane3 + material[7] * adj_lane4 + material[8] * adj_lane5);
     loperand[8] = qw * (material[6] * adj_lane6 + material[7] * adj_lane7 + material[8] * adj_lane8);
-      loperand_q[(3 * q) * VS + lane] = loperand[0];
-      loperand_q[(3 * q + 1) * VS + lane] = loperand[1];
-      loperand_q[(3 * q + 2) * VS + lane] = loperand[2];
-      loperand_q[(3 * (NQ + q)) * VS + lane] = loperand[3];
-      loperand_q[(3 * (NQ + q) + 1) * VS + lane] = loperand[4];
-      loperand_q[(3 * (NQ + q) + 2) * VS + lane] = loperand[5];
-      loperand_q[(3 * (2 * NQ + q)) * VS + lane] = loperand[6];
-      loperand_q[(3 * (2 * NQ + q) + 1) * VS + lane] = loperand[7];
-      loperand_q[(3 * (2 * NQ + q) + 2) * VS + lane] = loperand[8];
+      loperand0[lane] = loperand[0];
+      loperand1[lane] = loperand[1];
+      loperand2[lane] = loperand[2];
+      loperand3[lane] = loperand[3];
+      loperand4[lane] = loperand[4];
+      loperand5[lane] = loperand[5];
+      loperand6[lane] = loperand[6];
+      loperand7[lane] = loperand[7];
+      loperand8[lane] = loperand[8];
     }
   }
   tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
