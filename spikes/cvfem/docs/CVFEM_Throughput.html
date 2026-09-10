@@ -185,6 +185,10 @@ on the scope the Krylov iteration actually spends its time in.</p>
 </tr>
 </tbody>
 </table>
+<p><strong>The <code>boundary</code> column in the table above predates the fix below and is left as it
+was measured.</strong> On the flat rows it is now 2.7% at 14.5M dof rather than the 19-22%
+recorded here; the tables further down are likewise the original run. See "The
+boundary closure was bound by its own load imbalance".</p>
 <p>The boundary closure is a separate pass on the flat operator and is FUSED into
 the macro-element sweep on the semi-structured one, where it is inside the micro
 loop and cannot carry a scope of its own without paying for one per element. So
@@ -281,6 +285,65 @@ untouched by all of this, checked in the same runs: 1910 -&gt; 1912 MDOF/s for t
 Jacobian action and 2642 -&gt; 2640 for the residual, with bit-identical checksums.</p>
 <p>Reproduce with <code>jobs/fused_rc.sbatch</code> (the cascade) and <code>jobs/rc_hoist.sbatch</code> (the
 hoist, against the binary from the parent commit).</p>
+<h2>The boundary closure was bound by its own load imbalance</h2>
+<p>The flat operator closes its boundary control volumes in a second sweep after the
+element kernel, and that sweep walked the WHOLE mesh -- gathering coordinates, fields
+and, for the Jacobian, the direction, 88 doubles per element -- in order to do work on
+the shell alone. At N=96 the shell is about 9% of the elements, so 91% of the gathers
+bought nothing.</p>
+<p>The obvious fix is to test the face mask and skip. It bought nothing at all, and that
+is the interesting part:</p>
+<table>
+<thead>
+<tr>
+<th>packed Jacobian action, boundary scope</th>
+<th align="right">N=48, 1,853,572 dof</th>
+<th align="right">N=96, 14,489,860 dof</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>as it was</td>
+<td align="right">1059 us/call</td>
+<td align="right">7331 us/call</td>
+</tr>
+<tr>
+<td>skipping elements with no boundary face</td>
+<td align="right">1070 us/call</td>
+<td align="right">6212 us/call</td>
+</tr>
+<tr>
+<td>iterating a compacted list of them</td>
+<td align="right"><strong>180 us/call</strong></td>
+<td align="right"><strong>714 us/call</strong></td>
+</tr>
+<tr>
+<td></td>
+<td align="right"><strong>5.9x</strong></td>
+<td align="right"><strong>10.3x</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The skip removes ~91% of the work and leaves the wall time where it was, because the
+boundary elements are the shell of the mesh: under <code>schedule(static)</code> they fall into a
+few threads' chunks, and the pass is bound by whichever thread owns them, not by the
+total. Compacting the elements into a list first restores the balance -- every thread
+gets an equal share of the elements that do something -- and only then does the work
+reduction show up as time.</p>
+<p>The share of a matvec spent closing the boundary goes from 23.5% to 5.0% at N=48 and
+from 22.2% to 2.7% at N=96. The element sweep and the gradient reconstruction are
+unchanged in the same runs (13.13 -&gt; 13.26 s and 10.05 -&gt; 10.23 s at N=96), so nothing
+was moved around.</p>
+<p>The skip is exact rather than an approximation. <code>fmask</code> is read in exactly one place in
+each of the three boundary kernels, the per-face inclusion test, so an element with no
+boundary face contributes nothing -- which tests/cvfem_boundary_mask_test.cpp asserts
+directly ("fmask 0 contributes nothing"). Where no sideset mask exists, and that is the
+default since one is only compiled under SFEM_BOUNDARY_MASK=1, the list is built from
+the same bounding-box test the kernels would have run face by face.</p>
+<p>The benchmark could not have found this: its own <code>--boundary</code> pass already skipped
+zero-mask elements, so it had the work reduction and the imbalance together and showed
+neither. The measurement had to come from the solver's trace.</p>
+<p>Reproduce with <code>jobs/bnd_skip.sbatch</code>.</p>
 <h2>Per configuration</h2>
 <h3>flat_N16</h3>
 <p>75,140 dof, 72 threads, nid006544. 0.916 s in non-container scopes.</p>

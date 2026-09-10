@@ -475,6 +475,13 @@ namespace sfem {
         // with no pin -- a singular coarse operator, whose only visible symptom is that the
         // fine Krylov solve performs zero iterations.
         d.face_mask.clear();
+        // The compacted boundary-element list is derived from these, so it has to go with
+        // them. Its own key covers the mesh size and the domain extents but not a mask
+        // being recompiled underneath it, and a stale boundary list is silent -- it leaves
+        // a control volume open and the solve converges to the wrong answer.
+        d.face_mask_eff.clear();
+        d.bnd_elems.clear();
+        d.face_mask_eff_valid = false;
         d.natural_mask.clear();
         d.traction_mask.clear();
         d.pressure_mask.clear();
