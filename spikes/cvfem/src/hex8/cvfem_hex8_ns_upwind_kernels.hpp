@@ -104,6 +104,38 @@ struct Hex8RhieChowPack {
     alignas(ALIGN_BYTES) scalar_t coeff[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
 };
 
+// The partially assembled element tangent: the complete state dependence of one element's
+// Jacobian action, five scalars per sub-control surface.
+//
+// For a fixed Newton iterate the flux through a surface is BILINEAR -- state scalars times
+// direction vectors -- and reading cvfem_hex8_conv_face_jv_simd shows exactly which state
+// scalars survive. Its momentum flux is
+//
+//     fx = dpos*u_I + mpos*du_I + dneg*u_J + mneg*du_J + qmid*ax
+//
+// with dpos = d_pos*dmdot and dneg = d_neg*dmdot, and d_pos + d_neg = 1. The two state
+// terms collapse: dpos*u_I + dneg*u_J = dmdot * (d_pos*u_I + d_neg*u_J), and that bracket
+// is the upwinded velocity. So a surface's whole dependence on (u, p) is mpos, mneg and
+// three components of upwinded velocity -- 60 scalars per element, 116 bytes per degree of
+// freedom, against 847 for the assembled matrix.
+//
+// What the apply then stops doing is worth more than the arithmetic: it never stages the
+// state u,p at all, and never stages the nodal pressure gradient pgx/pgy/pgz, which is half
+// of the six-array Rhie-Chow staging and half of the 768 doubles gathered per SIMD group.
+// The coordinates stay, because the direction side still needs the edge vectors.
+//
+// Stored as SoA by (surface, component) for the same reason Hex8RhieChowPack::coeff is:
+// the gather is then a strided SoA read and not a stride-60 walk.
+struct Hex8TangentPack {
+    alignas(ALIGN_BYTES) scalar_t mpos[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t mneg[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t uupx[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t uupy[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t uupz[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+};
+static constexpr int CVFEM_HEX8_PA_PER_SCS = 5;
+static constexpr int CVFEM_HEX8_PA_PER_ELEM = CVFEM_HEX8_PA_PER_SCS * CVFEM_HEX8_N_SCS;
+
 /* Optional colocated Rhie–Chow: u_f = u_avg - D_f[(p_j-p_i)/h - 0.5(∇p_i+∇p_j)·e].
    scale=0 (default) keeps the original mdot = rho u_avg · A. Nodal ∇p is assembled
    outside the element kernel; globally linear p is unchanged. */
@@ -1673,6 +1705,92 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
                                     out);
 }
 
+// The same face flux with the state read out of the stored tangent instead of recomputed
+// from u and p. Compare cvfem_hex8_conv_face_jv_simd above: everything that touched `u` is
+// gone -- the advective mass flux, the Rhie-Chow correction to it, the upwind switch and
+// its derivative -- and what is left is the direction side, which was always there, times
+// three numbers that were computed once for this Newton step.
+//
+// Not bit-identical to the kernel it replaces, and it cannot be: dpos*u_I + dneg*u_J
+// reassociates into dmdot*uup. The difference is one rounding.
+template <int S, int I, int J, bool RC = false, bool QG = false>
+static SFEM_INLINE void cvfem_hex8_conv_face_jv_pa_simd(const scalar_t                      rho,
+                                                        const scalar_t                      half,
+                                                        const scalar_t *const SFEM_RESTRICT Ax,
+                                                        const scalar_t *const SFEM_RESTRICT Ay,
+                                                        const scalar_t *const SFEM_RESTRICT Az,
+                                                        const Hex8InputPack                &du,
+                                                        const Hex8RhieChowPack             *rc,
+                                                        const Hex8TangentPack              &t,
+                                                        Hex8ResidualPack                   &out) {
+    if constexpr (!RC) (void)rc;
+#pragma omp simd
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t ax    = Ax[lane];
+        const scalar_t ay    = Ay[lane];
+        const scalar_t az    = Az[lane];
+        scalar_t       dmdot = rho * half *
+                         ((du.ux[I][lane] + du.ux[J][lane]) * ax + (du.uy[I][lane] + du.uy[J][lane]) * ay +
+                          (du.uz[I][lane] + du.uz[J][lane]) * az);
+        if constexpr (RC) {
+            const scalar_t coeff = rc->coeff[S][lane];
+            dmdot += coeff * (du.p[I][lane] - du.p[J][lane]);
+            if constexpr (QG) {
+                const scalar_t dx = rc->x[J][lane] - rc->x[I][lane];
+                const scalar_t dy = rc->y[J][lane] - rc->y[I][lane];
+                const scalar_t dz = rc->z[J][lane] - rc->z[I][lane];
+                dmdot += coeff * (half * (rc->qgx[I][lane] + rc->qgx[J][lane]) * dx +
+                                  half * (rc->qgy[I][lane] + rc->qgy[J][lane]) * dy +
+                                  half * (rc->qgz[I][lane] + rc->qgz[J][lane]) * dz);
+            }
+        }
+        const scalar_t mpos = t.mpos[S][lane];
+        const scalar_t mneg = t.mneg[S][lane];
+        const scalar_t qmid = half * (du.p[I][lane] + du.p[J][lane]);
+        const scalar_t fx   = dmdot * t.uupx[S][lane] + mpos * du.ux[I][lane] + mneg * du.ux[J][lane] + qmid * ax;
+        const scalar_t fy   = dmdot * t.uupy[S][lane] + mpos * du.uy[I][lane] + mneg * du.uy[J][lane] + qmid * ay;
+        const scalar_t fz   = dmdot * t.uupz[S][lane] + mpos * du.uz[I][lane] + mneg * du.uz[J][lane] + qmid * az;
+        out.rx[I][lane] += fx;
+        out.ry[I][lane] += fy;
+        out.rz[I][lane] += fz;
+        out.rc[I][lane] += dmdot;
+        out.rx[J][lane] -= fx;
+        out.ry[J][lane] -= fy;
+        out.rz[J][lane] -= fz;
+        out.rc[J][lane] -= dmdot;
+    }
+}
+
+template <bool RC = false, bool QG = false>
+static SFEM_INLINE void cvfem_hex8_conv_all_jv_pa_simd(const scalar_t                      rho,
+                                                       const scalar_t                      half,
+                                                       const scalar_t *const SFEM_RESTRICT Ax0,
+                                                       const scalar_t *const SFEM_RESTRICT Ay0,
+                                                       const scalar_t *const SFEM_RESTRICT Az0,
+                                                       const scalar_t *const SFEM_RESTRICT Ax1,
+                                                       const scalar_t *const SFEM_RESTRICT Ay1,
+                                                       const scalar_t *const SFEM_RESTRICT Az1,
+                                                       const scalar_t *const SFEM_RESTRICT Ax2,
+                                                       const scalar_t *const SFEM_RESTRICT Ay2,
+                                                       const scalar_t *const SFEM_RESTRICT Az2,
+                                                       const Hex8InputPack                &du,
+                                                       const Hex8RhieChowPack             *rc,
+                                                       const Hex8TangentPack              &t,
+                                                       Hex8ResidualPack                   &out) {
+    cvfem_hex8_conv_face_jv_pa_simd<0, 0, 1, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<1, 3, 2, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<2, 4, 5, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<3, 7, 6, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<4, 0, 3, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<5, 1, 2, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<6, 4, 7, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<7, 5, 6, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<8, 0, 4, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<9, 1, 5, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<10, 2, 6, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, t, out);
+    cvfem_hex8_conv_face_jv_pa_simd<11, 3, 7, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, t, out);
+}
+
 template <bool RC = false, bool QG = false, bool EPS = false>
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
                                                     const scalar_t                      half,
@@ -1950,39 +2068,41 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
     }
 }
 
-static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
-        const scalar_t                        rho_s,
-        const scalar_t                        mu_s,
-        const scalar_t *const SFEM_RESTRICT   cof0,
-        const scalar_t *const SFEM_RESTRICT   cof1,
-        const scalar_t *const SFEM_RESTRICT   cof2,
-        const scalar_t *const SFEM_RESTRICT   cof3,
-        const scalar_t *const SFEM_RESTRICT   cof4,
-        const scalar_t *const SFEM_RESTRICT   cof5,
-        const scalar_t *const SFEM_RESTRICT   cof6,
-        const scalar_t *const SFEM_RESTRICT   cof7,
-        const scalar_t *const SFEM_RESTRICT   cof8,
-        const scalar_t *const SFEM_RESTRICT   det,
-        const Hex8InputPack                  &u,
-        const Hex8InputPack                  &du,
-        Hex8ResidualPack                     &out,
-        const Hex8RhieChowPack               *rc       = nullptr,
-        const scalar_t                        rc_scale = scalar_t(0),
-        const bool                            has_qg   = false,
-        const scalar_t                        ueps     = scalar_t(0)) {
-    const scalar_t rho  = rho_s;
-    const scalar_t mu   = mu_s;
-    const scalar_t half = scalar_t(0.5);
-    const scalar_t qtr  = scalar_t(0.25);
-    const scalar_t one  = scalar_t(1);
+#define CVFEM_HEX8_ACTION_GEOM_ARGS                                                                          \
+    scalar_t *const SFEM_RESTRICT Ax0, scalar_t *const SFEM_RESTRICT Ay0, scalar_t *const SFEM_RESTRICT Az0, \
+            scalar_t *const SFEM_RESTRICT Ax1, scalar_t *const SFEM_RESTRICT Ay1,                            \
+            scalar_t *const SFEM_RESTRICT Az1, scalar_t *const SFEM_RESTRICT Ax2,                            \
+            scalar_t *const SFEM_RESTRICT Ay2, scalar_t *const SFEM_RESTRICT Az2,                            \
+            scalar_t *const SFEM_RESTRICT g00v, scalar_t *const SFEM_RESTRICT g01v,                          \
+            scalar_t *const SFEM_RESTRICT g02v, scalar_t *const SFEM_RESTRICT g10v,                          \
+            scalar_t *const SFEM_RESTRICT g11v, scalar_t *const SFEM_RESTRICT g12v,                          \
+            scalar_t *const SFEM_RESTRICT g20v, scalar_t *const SFEM_RESTRICT g21v,                          \
+            scalar_t *const SFEM_RESTRICT g22v
 
-    alignas(ALIGN_BYTES) scalar_t g00v[CVFEM_HEX8_VEC_SIZE], g01v[CVFEM_HEX8_VEC_SIZE], g02v[CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t g10v[CVFEM_HEX8_VEC_SIZE], g11v[CVFEM_HEX8_VEC_SIZE], g12v[CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t g20v[CVFEM_HEX8_VEC_SIZE], g21v[CVFEM_HEX8_VEC_SIZE], g22v[CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t Ax0[CVFEM_HEX8_VEC_SIZE], Ay0[CVFEM_HEX8_VEC_SIZE], Az0[CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t Ax1[CVFEM_HEX8_VEC_SIZE], Ay1[CVFEM_HEX8_VEC_SIZE], Az1[CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t Ax2[CVFEM_HEX8_VEC_SIZE], Ay2[CVFEM_HEX8_VEC_SIZE], Az2[CVFEM_HEX8_VEC_SIZE];
+#define CVFEM_HEX8_ACTION_GEOM_PASS                                                                          \
+    Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v
 
+// The part of the Jacobian action that touches neither the state nor the stored tangent:
+// the three direction area vectors, and the gradient of the DIRECTION. Note it reads `du`
+// and never `u` -- the viscous block of this operator has no state dependence at all, which
+// is why it is not part of the partial assembly below.
+//
+// Shared by the two action kernels rather than written twice. It is SFEM_INLINE, so the
+// kernel that was here before gets the same instruction stream it always did; the
+// regression gate is what confirms that rather than the reasoning.
+static SFEM_INLINE void cvfem_hex8_action_geom_simd(const scalar_t                      qtr,
+                                                    const scalar_t *const SFEM_RESTRICT cof0,
+                                                    const scalar_t *const SFEM_RESTRICT cof1,
+                                                    const scalar_t *const SFEM_RESTRICT cof2,
+                                                    const scalar_t *const SFEM_RESTRICT cof3,
+                                                    const scalar_t *const SFEM_RESTRICT cof4,
+                                                    const scalar_t *const SFEM_RESTRICT cof5,
+                                                    const scalar_t *const SFEM_RESTRICT cof6,
+                                                    const scalar_t *const SFEM_RESTRICT cof7,
+                                                    const scalar_t *const SFEM_RESTRICT cof8,
+                                                    const scalar_t *const SFEM_RESTRICT det,
+                                                    const Hex8InputPack                &du,
+                                                    CVFEM_HEX8_ACTION_GEOM_ARGS) {
 #pragma omp simd aligned(cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det : 64)
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         const scalar_t inv = scalar_t(1) / det[lane];
@@ -2032,6 +2152,43 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
         g21v[lane] = (c1 * wr + c4 * ws + c7 * wt) * inv;
         g22v[lane] = (c2 * wr + c5 * ws + c8 * wt) * inv;
     }
+}
+
+static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
+        const scalar_t                        rho_s,
+        const scalar_t                        mu_s,
+        const scalar_t *const SFEM_RESTRICT   cof0,
+        const scalar_t *const SFEM_RESTRICT   cof1,
+        const scalar_t *const SFEM_RESTRICT   cof2,
+        const scalar_t *const SFEM_RESTRICT   cof3,
+        const scalar_t *const SFEM_RESTRICT   cof4,
+        const scalar_t *const SFEM_RESTRICT   cof5,
+        const scalar_t *const SFEM_RESTRICT   cof6,
+        const scalar_t *const SFEM_RESTRICT   cof7,
+        const scalar_t *const SFEM_RESTRICT   cof8,
+        const scalar_t *const SFEM_RESTRICT   det,
+        const Hex8InputPack                  &u,
+        const Hex8InputPack                  &du,
+        Hex8ResidualPack                     &out,
+        const Hex8RhieChowPack               *rc       = nullptr,
+        const scalar_t                        rc_scale = scalar_t(0),
+        const bool                            has_qg   = false,
+        const scalar_t                        ueps     = scalar_t(0)) {
+    const scalar_t rho  = rho_s;
+    const scalar_t mu   = mu_s;
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t qtr  = scalar_t(0.25);
+    const scalar_t one  = scalar_t(1);
+
+    alignas(ALIGN_BYTES) scalar_t g00v[CVFEM_HEX8_VEC_SIZE], g01v[CVFEM_HEX8_VEC_SIZE], g02v[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t g10v[CVFEM_HEX8_VEC_SIZE], g11v[CVFEM_HEX8_VEC_SIZE], g12v[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t g20v[CVFEM_HEX8_VEC_SIZE], g21v[CVFEM_HEX8_VEC_SIZE], g22v[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t Ax0[CVFEM_HEX8_VEC_SIZE], Ay0[CVFEM_HEX8_VEC_SIZE], Az0[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t Ax1[CVFEM_HEX8_VEC_SIZE], Ay1[CVFEM_HEX8_VEC_SIZE], Az1[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t Ax2[CVFEM_HEX8_VEC_SIZE], Ay2[CVFEM_HEX8_VEC_SIZE], Az2[CVFEM_HEX8_VEC_SIZE];
+
+    cvfem_hex8_action_geom_simd(qtr, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, du,
+                                CVFEM_HEX8_ACTION_GEOM_PASS);
 
     cvfem_hex8_zero_residual_pack(out);
     cvfem_hex8_visc_dir_simd<0, 1, 3, 2, 4, 5, 7, 6>(
@@ -2076,6 +2233,74 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
         else
             cvfem_hex8_conv_all_jv_simd<false, false, false>(
                     rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+    }
+}
+
+// The Jacobian action with the state read out of a partially assembled tangent.
+//
+// Same operator as cvfem_hex8_ns_upwind_jacobian_action_simd, and the same geometry and
+// viscous work -- it calls the same helpers for both. What differs is the convective half:
+// it takes no Hex8InputPack for the state, because the state reaches it only through the
+// sixty scalars per element that were computed once for this Newton step.
+//
+// The Rhie-Chow argument is still needed and is not a leftover: the coefficient and the
+// edge vectors multiply the DIRECTION's pressure and its reconstructed gradient, neither of
+// which can be folded into a per-element store.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_pa_simd(
+        const scalar_t                        rho_s,
+        const scalar_t                        mu_s,
+        const scalar_t *const SFEM_RESTRICT   cof0,
+        const scalar_t *const SFEM_RESTRICT   cof1,
+        const scalar_t *const SFEM_RESTRICT   cof2,
+        const scalar_t *const SFEM_RESTRICT   cof3,
+        const scalar_t *const SFEM_RESTRICT   cof4,
+        const scalar_t *const SFEM_RESTRICT   cof5,
+        const scalar_t *const SFEM_RESTRICT   cof6,
+        const scalar_t *const SFEM_RESTRICT   cof7,
+        const scalar_t *const SFEM_RESTRICT   cof8,
+        const scalar_t *const SFEM_RESTRICT   det,
+        const Hex8InputPack                  &du,
+        const Hex8TangentPack                &t,
+        Hex8ResidualPack                     &out,
+        const Hex8RhieChowPack               *rc       = nullptr,
+        const scalar_t                        rc_scale = scalar_t(0),
+        const bool                            has_qg   = false) {
+    const scalar_t rho  = rho_s;
+    const scalar_t mu   = mu_s;
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t qtr  = scalar_t(0.25);
+
+    alignas(ALIGN_BYTES) scalar_t g00v[CVFEM_HEX8_VEC_SIZE], g01v[CVFEM_HEX8_VEC_SIZE], g02v[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t g10v[CVFEM_HEX8_VEC_SIZE], g11v[CVFEM_HEX8_VEC_SIZE], g12v[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t g20v[CVFEM_HEX8_VEC_SIZE], g21v[CVFEM_HEX8_VEC_SIZE], g22v[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t Ax0[CVFEM_HEX8_VEC_SIZE], Ay0[CVFEM_HEX8_VEC_SIZE], Az0[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t Ax1[CVFEM_HEX8_VEC_SIZE], Ay1[CVFEM_HEX8_VEC_SIZE], Az1[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t Ax2[CVFEM_HEX8_VEC_SIZE], Ay2[CVFEM_HEX8_VEC_SIZE], Az2[CVFEM_HEX8_VEC_SIZE];
+
+    cvfem_hex8_action_geom_simd(qtr, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, du,
+                                CVFEM_HEX8_ACTION_GEOM_PASS);
+
+    cvfem_hex8_zero_residual_pack(out);
+    cvfem_hex8_visc_dir_simd<0, 1, 3, 2, 4, 5, 7, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax0, Ay0, Az0, out);
+    cvfem_hex8_visc_dir_simd<0, 3, 1, 2, 4, 7, 5, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax1, Ay1, Az1, out);
+    cvfem_hex8_visc_dir_simd<0, 4, 1, 5, 2, 6, 3, 7>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax2, Ay2, Az2, out);
+
+    // No upwind-band dispatch here: the band lives entirely in the switch, and the switch
+    // was evaluated when the tangent was built. That is one of the things the store buys --
+    // the smoothing costs the matvec nothing at all now, whatever eps is.
+    if (rc && rc_scale != scalar_t(0)) {
+        if (has_qg)
+            cvfem_hex8_conv_all_jv_pa_simd<true, true>(
+                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, t, out);
+        else
+            cvfem_hex8_conv_all_jv_pa_simd<true, false>(
+                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, t, out);
+    } else {
+        cvfem_hex8_conv_all_jv_pa_simd<false, false>(
+                rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, t, out);
     }
 }
 

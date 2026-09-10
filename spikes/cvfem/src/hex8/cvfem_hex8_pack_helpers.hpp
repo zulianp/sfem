@@ -142,6 +142,33 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_from_pack(pack_idx_t **const SFEM_R
     }
 }
 
+// Coordinates only, for the partially assembled apply. It needs the edge vectors -- the
+// direction's reconstructed gradient is contracted against them -- but not the state's
+// nodal pressure gradient, which is now inside the stored tangent. Three arrays staged
+// instead of six, and half of the 768 doubles the gather above moves per SIMD group.
+static SFEM_INLINE void cvfem_hex8_gather_rc_xyz_from_pack(pack_idx_t **const SFEM_RESTRICT    elems,
+                                                           const scalar_t *const SFEM_RESTRICT pack_x,
+                                                           const scalar_t *const SFEM_RESTRICT pack_y,
+                                                           const scalar_t *const SFEM_RESTRICT pack_z,
+                                                           const ptrdiff_t                     begin,
+                                                           const int                           nlanes,
+                                                           Hex8RhieChowPack                   &rc) {
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        if (lane < nlanes) {
+            const ptrdiff_t e = begin + lane;
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const pack_idx_t loc = elems[a][e];
+                rc.x[a][lane]        = pack_x[loc];
+                rc.y[a][lane]        = pack_y[loc];
+                rc.z[a][lane]        = pack_z[loc];
+            }
+        } else {
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+                rc.x[a][lane] = rc.y[a][lane] = rc.z[a][lane] = scalar_t(0);
+        }
+    }
+}
+
 // The direction's gradient into the same pack, called straight after the routine above
 // when the Jacobian action needs it. Padding lanes are zeroed here too: they multiply real
 // geometry and would otherwise contribute whatever the last sweep left behind.
@@ -229,6 +256,120 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
                     A[q][0], A[q][1], A[q][2]);
         }
     }
+}
+
+// ------------------------------------------------------- the partially assembled tangent
+//
+// Sixty scalars per element -- five per sub-control surface -- carrying the whole dependence
+// of the Jacobian action on the Newton iterate. Built once per Newton step, read by every
+// matvec of the Krylov solve that follows.
+//
+// This mirrors the state half of cvfem_hex8_conv_face_jv_simd exactly, and mirroring is the
+// risk: if that kernel's mass flux, Rhie-Chow correction or upwind switch changes and this
+// does not, the two disagree silently and the operator is wrong rather than slow. What
+// stops that is not discipline but a test -- cvfem_pa_tangent_test compares the partially
+// assembled apply against the direct one, so any divergence in these expressions shows up
+// as a failed agreement check rather than as a bad Newton rate months later.
+//
+// Layout matches d.rc_coeff's: SoA by (surface, component), so the gather is a strided read
+// and not a stride-60 walk.
+static SFEM_INLINE size_t cvfem_hex8_pa_offset(const ptrdiff_t nelements, const int s, const int c) {
+    return (size_t)(s * CVFEM_HEX8_PA_PER_SCS + c) * (size_t)nelements;
+}
+
+template <typename MeshT>
+static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scalar_t mu, const scalar_t ueps) {
+    if (d.pa_valid && d.pa_nelements == d.nelements && d.pa_rho == rho && d.pa_mu == mu &&
+        d.pa_scale == d.rhie_chow_scale && d.pa_ueps == ueps)
+        return;
+    d.pa_tangent.resize((size_t)CVFEM_HEX8_PA_PER_ELEM * (size_t)d.nelements);
+    d.pa_rho       = rho;
+    d.pa_mu        = mu;
+    d.pa_scale     = d.rhie_chow_scale;
+    d.pa_ueps      = ueps;
+    d.pa_nelements = d.nelements;
+    d.pa_valid     = true;
+
+    const int with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+    // The hoisted coefficient, not a fresh evaluation: the face loops read that table and
+    // the tangent has to be built from the same numbers they would have used.
+    if (with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+
+    const scalar_t                half = scalar_t(0.5);
+    const scalar_t                one  = scalar_t(1);
+    scalar_t *const SFEM_RESTRICT out  = d.pa_tangent.data();
+    const auto *const             px   = d.points[0];
+    const auto *const             py   = d.points[1];
+    const auto *const             pz   = d.points[2];
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t adj[9], det, A[3][3];
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_dir_areas(adj, A);
+
+        for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+            const int          i  = CVFEM_HEX8_SCS[s].i;
+            const int          j  = CVFEM_HEX8_SCS[s].j;
+            const int          q  = s >> 2;
+            const smesh::idx_t gi = d.elems[i][e];
+            const smesh::idx_t gj = d.elems[j][e];
+            const scalar_t     ax = A[q][0], ay = A[q][1], az = A[q][2];
+
+            const scalar_t uxi = d.ux[(size_t)gi], uxj = d.ux[(size_t)gj];
+            const scalar_t uyi = d.uy[(size_t)gi], uyj = d.uy[(size_t)gj];
+            const scalar_t uzi = d.uz[(size_t)gi], uzj = d.uz[(size_t)gj];
+
+            scalar_t mdot = rho * (half * (uxi + uxj) * ax + half * (uyi + uyj) * ay + half * (uzi + uzj) * az);
+            if (with_rc) {
+                const scalar_t dx    = scalar_t(px[gj]) - scalar_t(px[gi]);
+                const scalar_t dy    = scalar_t(py[gj]) - scalar_t(py[gi]);
+                const scalar_t dz    = scalar_t(pz[gj]) - scalar_t(pz[gi]);
+                const scalar_t coeff = d.rc_coeff[s][(size_t)e];
+                const scalar_t corr  = (d.p[(size_t)gj] - d.p[(size_t)gi]) -
+                                      (half * (d.pgx[(size_t)gi] + d.pgx[(size_t)gj]) * dx +
+                                       half * (d.pgy[(size_t)gi] + d.pgy[(size_t)gj]) * dy +
+                                       half * (d.pgz[(size_t)gi] + d.pgz[(size_t)gj]) * dz);
+                mdot -= coeff * corr;
+            }
+
+            scalar_t amdot, sgn;
+            cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+            const scalar_t d_pos = half * (one + sgn);
+            const scalar_t d_neg = half * (one - sgn);
+
+            out[cvfem_hex8_pa_offset(d.nelements, s, 0) + (size_t)e] = half * (mdot + amdot);
+            out[cvfem_hex8_pa_offset(d.nelements, s, 1) + (size_t)e] = half * (mdot - amdot);
+            out[cvfem_hex8_pa_offset(d.nelements, s, 2) + (size_t)e] = d_pos * uxi + d_neg * uxj;
+            out[cvfem_hex8_pa_offset(d.nelements, s, 3) + (size_t)e] = d_pos * uyi + d_neg * uyj;
+            out[cvfem_hex8_pa_offset(d.nelements, s, 4) + (size_t)e] = d_pos * uzi + d_neg * uzj;
+        }
+    }
+}
+
+template <typename MeshT>
+static SFEM_INLINE void cvfem_hex8_gather_pa_tangent(const MeshT      &d,
+                                                     const ptrdiff_t   begin,
+                                                     const int         nlanes,
+                                                     Hex8TangentPack  &t) {
+    const scalar_t *const SFEM_RESTRICT src = d.pa_tangent.data();
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        scalar_t *const SFEM_RESTRICT dst[CVFEM_HEX8_PA_PER_SCS] = {
+                t.mpos[s], t.mneg[s], t.uupx[s], t.uupy[s], t.uupz[s]};
+        for (int c = 0; c < CVFEM_HEX8_PA_PER_SCS; ++c) {
+            const scalar_t *const SFEM_RESTRICT from = src + cvfem_hex8_pa_offset(d.nelements, s, c);
+            for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane)
+                dst[c][lane] = lane < nlanes ? from[begin + lane] : scalar_t(0);
+        }
+    }
+}
+
+// Bytes the store costs, so a speedup can be reported next to its price rather than on its
+// own. The assembled matrix is about 847 bytes per degree of freedom for comparison.
+template <typename MeshT>
+static SFEM_INLINE double cvfem_hex8_pa_bytes_per_dof(const MeshT &d) {
+    const double ndof = double(d.nnodes) * double(N_FIELDS);
+    return ndof > 0 ? double(d.pa_tangent.size()) * double(sizeof(scalar_t)) / ndof : 0.0;
 }
 
 // The SoA gather for the above, straight into the pack the face loops read.

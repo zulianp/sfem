@@ -636,4 +636,134 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
     if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
 }
 
+
+// ------------------------------------------------- the partially assembled Jacobian action
+//
+// The same operator as apply_jacobian_action_packed, reading the state out of a store built
+// once per Newton step instead of gathering and re-deriving it on every matvec. What
+// disappears from the per-matvec work, in order of size:
+//
+//   * fill_pack_fields -- the state u,p is never staged at all;
+//   * the pgx/pgy/pgz half of cvfem_hex8_fill_pack_xyz_pgrad, and with it half of the 768
+//     doubles cvfem_hex8_gather_rc_from_pack moves per SIMD group. The coordinates stay,
+//     because the direction's reconstructed gradient is contracted against the edge vectors;
+//   * per element, twelve mass fluxes, twelve Rhie-Chow corrections and twelve upwind
+//     switches.
+//
+// and what appears is one contiguous SoA read of sixty scalars per element.
+//
+// Affine only. The store holds a per-element tangent built from one adjugate at the element
+// centre, which is not what the isoparametric kernels evaluate -- they build an area vector
+// per sub-control surface from a trilinear Jacobian. The driver refuses the combination
+// rather than measuring a store that describes a different operator.
+static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &d,
+                                                          PackedData           &p,
+                                                          const scalar_t        rho,
+                                                          const scalar_t        mu,
+                                                          const scalar_t *const dir,
+                                                          scalar_t *const       jv) {
+    const size_t scratch_n = packed_scratch_n(p);
+    const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+    const bool   with_qg   = with_rc && !d.qgx.empty();
+
+#pragma omp parallel
+    {
+        PhaseAcc                      acc;
+        scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
+        // Three arrays in slot 3, not six: the nodal pressure gradient is inside the store.
+        scalar_t *const SFEM_RESTRICT pack_xyz = with_qg ? thread_scratch<scalar_t>(3, packed_xyz_n(p)) : nullptr;
+        const ptrdiff_t               xyz_n    = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+        scalar_t *const SFEM_RESTRICT pack_x   = pack_xyz;
+        scalar_t *const SFEM_RESTRICT pack_y   = pack_xyz ? pack_xyz + xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_z   = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(p)) : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
+        scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+            const ptrdiff_t e_start      = pack * p.n_elements_per_pack;
+            const ptrdiff_t e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+            const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
+            const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const smesh::idx_t *const SFEM_RESTRICT ghosts    = &p.ghost_idx[p.ghost_ptr[pack]];
+            const ptrdiff_t                         ghost_off = p.ghost_ptr[pack];
+
+            double _t = phase_now();
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
+
+            fill_pack_interleaved(p, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
+            if (with_qg) {
+                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
+            }
+            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
+
+            Hex8InputPack    du_pack;
+            Hex8ResidualPack outp;
+            Hex8RhieChowPack rcp;
+            Hex8TangentPack  tan;
+            for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
+                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
+                alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
+                        cof2[CVFEM_HEX8_VEC_SIZE];
+                alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
+                        cof5[CVFEM_HEX8_VEC_SIZE];
+                alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE],
+                        cof8[CVFEM_HEX8_VEC_SIZE];
+                alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
+                gather_hex8_simd_from_pack(p.elems, pack_dir, d, begin, nlanes, du_pack, cof0, cof1, cof2, cof3,
+                                           cof4, cof5, cof6, cof7, cof8, det);
+                if (with_rc) cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
+                if (with_qg) {
+                    cvfem_hex8_gather_rc_xyz_from_pack(p.elems, pack_x, pack_y, pack_z, begin, nlanes, rcp);
+                    cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
+                }
+                cvfem_hex8_gather_pa_tangent(d, begin, nlanes, tan);
+                cvfem_hex8_ns_upwind_jacobian_action_pa_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6,
+                                                             cof7, cof8, det, du_pack, tan, outp,
+                                                             with_rc ? &rcp : nullptr, d.rhie_chow_scale, with_qg);
+                scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
+            }
+            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
+
+            std::memcpy(jv + owned * N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)N_FIELDS * sizeof(scalar_t));
+            scalar_t *const SFEM_RESTRICT gx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gy = p.ghost_buf.data() + 1 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gc = p.ghost_buf.data() + 3 * p.n_ghost_entries;
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * N_FIELDS;
+                gx[ghost_off + k]                       = out[0];
+                gy[ghost_off + k]                       = out[1];
+                gz[ghost_off + k]                       = out[2];
+                gc[ghost_off + k]                       = out[3];
+            }
+            if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
+        }
+        acc.flush();
+    }
+
+    const double _tg = phase_now();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        scalar_t *const    out   = jv + (ptrdiff_t)dest * N_FIELDS;
+        for (int f = 0; f < N_FIELDS; ++f) {
+            const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + f * p.n_ghost_entries;
+            scalar_t                            sum   = 0;
+            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
+            out[f] += sum;
+        }
+    }
+    if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
+}
+
 #endif  // CVFEM_HEX8_LAYOUT_PACKED_HPP

@@ -107,6 +107,15 @@ struct MeshData {
     // element, inside the pass that is 69% of that matvec. Keyed on the mesh and the
     // geometry rule, because the affine and isoparametric sweeps evaluate det differently.
     std::vector<scalar_t> grad_w_inv;
+    // The partially assembled element tangent: five scalars per sub-control surface, sixty
+    // per element, SoA by (surface, component). The complete dependence of the Jacobian
+    // action on the Newton iterate -- see Hex8TangentPack. Built once per Newton step and
+    // read on every matvec, so it is invalidated by the STATE changing, which no key made
+    // of rho, mu and the mesh can see: pa_valid is cleared by whoever moves the state.
+    std::vector<scalar_t> pa_tangent;
+    scalar_t              pa_rho{0}, pa_mu{0}, pa_scale{0}, pa_ueps{0};
+    ptrdiff_t             pa_nelements{0};
+    bool                  pa_valid{false};
     int                   grad_w_isoparam{-1};
     ptrdiff_t             grad_w_nelements{0};
     // Transient term. dt <= 0 means steady, in which case nothing below is touched and the
