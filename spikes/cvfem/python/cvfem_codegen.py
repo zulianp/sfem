@@ -104,7 +104,8 @@ def cse_emit(exprs: list[sp.Expr],
              *,
              mode: str = "assign",
              op: str = "=",
-             drop_zeros: bool = False) -> str:
+             drop_zeros: bool = False,
+             prefix: str = "x") -> str:
     """Common-subexpression-eliminate ``exprs`` and emit them into ``outputs``.
 
     ``drop_zeros`` is not cosmetic and is not a default: removing the zero expressions
@@ -124,8 +125,12 @@ def cse_emit(exprs: list[sp.Expr],
     else:
         pairs = list(zip(exprs, outputs))
 
+    # ``prefix`` exists so a kernel can run more than one CSE pass without the two sets of
+    # temporaries colliding -- the two-level geometry arrangement factors the
+    # geometry-only subexpressions in one pass and the field-dependent remainder in
+    # another, and both would otherwise be called x0, x1, ...
     replacements, reduced = sp.cse([e for e, _o in pairs],
-                                   symbols=sp.numbered_symbols("x"),
+                                   symbols=sp.numbered_symbols(prefix),
                                    optimizations="basic")
 
     temp_type = "auto" if mode == "vector_store" else "scalar_t"

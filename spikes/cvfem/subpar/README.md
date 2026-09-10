@@ -157,6 +157,40 @@ at 24.0 against 54.3 MDOF/s because it issued 2016 `CVFEM_ATOMIC_ADD`s against f
 768, and the action accumulates into a local `r[]` where those are register traffic. It
 is the best of the four here for the same reason it was the worst there.
 
+### The `sp.cse` options, and why only one of them matters
+
+Three settings were swept alongside the arrangements. Two close by counting, before
+anything is compiled:
+
+* **Dead-temporary pruning is unnecessary.** Zero dead temporaries out of 14,001 across
+  the whole generated header. `sp.cse` only emits a subexpression used twice or more, so
+  there is nothing for a liveness pass in `cvfem_codegen.py` to remove.
+* **`optimizations=None` is strictly worse**: 17,692 temporaries against 14,001 (+26%),
+  25,468 lines against 21,777 (+17%), and the blockwise assembly kernel +50%. `"basic"`
+  stays.
+
+The third could not be settled by counting. `order='none'` produces exactly the same
+14,001 temporaries -- the identical factorisation -- but emits 12,762 lines differently.
+Measured the same way as everything else:
+
+| run | canonical | `order='none'` | | output |
+|---|---:|---:|---:|---|
+| residual, sympy | 866.5 | 872.6 | 1.007x | bit-identical |
+| assemble, sympy | 56.1 | 56.2 | 1.001x | bit-identical |
+| assemble, sympy_block | 53.9 | 53.9 | 1.000x | bit-identical |
+| **action, flat** | 310.6 | **337.9** | **1.088x** | differ |
+| action, face-wise | 434.3 | 433.4 | 0.998x | differ |
+
+**It helps exactly one kernel, and that kernel is the one with the longest live ranges.**
+Flat CSE gains 8.8% from nothing but a reordering of its assignments; face-wise, whose
+scope is already cut, is unaffected. Residual and assembly do not move at all and their
+output stays bit-identical.
+
+So it is not adopted: it buys nothing where it counts, since face-wise is both faster
+(434 against 338) and indifferent to it. What it does is corroborate the mechanism --
+emission arrangement matters while live ranges are long and stops mattering once they are
+short, which is the same thing the scope sweep says from the other direction.
+
 Reproduce with `jobs/cse_action.sbatch`. Correctness is pinned by
 `tests/cvfem_sympy_action_test.cpp`, which holds all four against the hand-written action
 and against each other at 1e-16, so these remain measurable rather than merely present.
