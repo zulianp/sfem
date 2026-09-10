@@ -104,3 +104,44 @@ into a constant-coefficient stencil over the lattice and need fewer operations t
 gemm. And none of this was measured on a GPU, where the arithmetic-intensity argument is
 different enough that the ordering could invert -- as packing already does between Grace
 and Hopper.
+
+## `sympy_action*` — generated CSE for the HEX8 Jacobian action
+
+**Why they existed.** HEX8 had no generated Jacobian action at all: the four `sympy*`
+names covered the residual and the assembly, no `apply_jacobian_action_*` took a kernel
+selector, and the CSE arrangement question had therefore never been asked of the operation
+a Krylov solve spends its time in. The assembly evidence could not answer it — the
+residual is arrangement-independent by construction, and the action had been measured
+under exactly one kernel name.
+
+Three arrangements over one expression tree, differing only in the scope handed to one
+`sp.cse` call.
+
+**Why they lost.** On Grace, one socket, 72 cores, `--exclusive`, `OMP_PROC_BIND=true`,
+`--layout atomic --jac-action`, best of three:
+
+| kernel | 1,098,500 dof | 4,121,204 dof | temporaries |
+|---|---:|---:|---:|
+| `sumfact` — the hand-written scalar action | **796.9** | **860.0** | — |
+| `sympy_action` (flat, all 32 outputs in one scope) | 304.5 (0.38x) | 309.1 (0.36x) | 1295 |
+| `sympy_action_node` (4 dofs of a node, x8) | 329.5 (0.41x) | 337.4 (0.39x) | 1597 |
+| `sympy_action_comp` (one component across nodes, x4) | 325.2 (0.41x) | 328.4 (0.38x) | 1411 |
+
+All three lose to the hand-written kernel by about 2.5x, at both sizes, consistently.
+
+**This is the opposite of the assembly result, and the contrast is the finding.** On affine
+assembly the generated kernels beat the hand-written ones because all twelve
+sub-control surfaces share one adjugate and CSE has a great deal to factor out. The action
+has 32 outputs where the assembly has 1024, so there is far less shared work to recover —
+and the generated form pays the full price of that arrangement anyway: about 1300
+fully-unrolled temporaries against a compact twelve-face loop.
+
+**The ordering among the three is worth keeping.** Flat CSE is the *worst* of them at both
+sizes, despite having the most reuse and the fewest temporaries. Cutting the scope helps.
+That is evidence that live ranges cost more here than reuse buys, which is the hypothesis
+these three were built to test, and it is the reverse of what the assembly arrangements
+suggest. Anyone revisiting CSE scope on this operator should start from that.
+
+Reproduce with `jobs/cse_action.sbatch`. Correctness is pinned by
+`tests/cvfem_sympy_action_test.cpp`, which holds all three against the hand-written action
+and against each other at 1e-17, so these remain measurable rather than merely present.
