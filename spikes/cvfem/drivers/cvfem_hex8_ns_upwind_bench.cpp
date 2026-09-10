@@ -435,45 +435,19 @@ int main(int argc, char **argv) {
         }
     }
 
-    // --boundary is a separate element sweep and so is layout-independent, but it only
-    // reaches the residual and the Jacobian action that way. The assembled matrix needs the
-    // boundary blocks written through the element BSR slots, which so far only the atomic
-    // assembly does.
-    if (boundary && (assemble || assemble_diag || bsr_apply) && layout != "atomic") {
-        std::fprintf(stderr,
-                     "--boundary with --assemble/--assemble-diag/--bsr-apply is implemented "
-                     "for --layout atomic only (got '%s')\n",
-                     layout.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-    // Rhie-Chow lives inside the element kernel, so it has to be staged per layout. The
-    // packed, colored and store sweeps carry their element data through Hex8RhieChowPack
-    // and that staging is not wired up here yet; asking for it there has to fail rather
-    // than quietly return a number measured without it.
-    // The residual and the Jacobian action carry Rhie-Chow on atomic and on the
-    // packed/store SIMD sumfact path. The colored sweep and the assembled Jacobian on the
-    // packed layouts still need their staging extended, so those combinations are refused
-    // rather than measured without it.
-    // Assembly on the pack-based layouts is the one that is still missing: those sweeps
-    // build the matrix through per-element slot arrays and no Rhie-Chow staging exists for
-    // them. The residual and the Jacobian action carry it on all four layouts -- colored
-    // stages it exactly as packed does, which is checked by comparing the two.
-    const bool rc_layout_ok =
-            layout == "atomic" ||
-            ((layout == "packed" || layout == "store" || layout == "colored") && !assemble && !assemble_diag &&
-             !bsr_apply);
-    // (--assemble-diag is always the atomic diagonal, refused for any other --layout below,
-    // and it now carries both terms.)
-    if (rhie_chow && !rc_layout_ok) {
-        std::fprintf(stderr,
-                     "--rhie-chow is implemented for --layout atomic, and for the residual and "
-                     "the Jacobian action on --layout packed|store (got '%s'%s)\n",
-                     layout.c_str(),
-                     (assemble || assemble_diag || bsr_apply) ? " with an assembly operation" : "");
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
+    // --boundary used to be refused for an assembly on anything but --layout atomic,
+    // because the boundary blocks had to be written through the element BSR slots and only
+    // the atomic assembly did that. assemble_boundary_scs_jacobian_pass scatters through
+    // b.element_slots, the global map every layout shares, so the closure is now
+    // layout-independent for the assembly exactly as it already was for the residual and
+    // the Jacobian action. (--assemble-diag is atomic-only for a different reason and is
+    // refused for any other layout below.)
+    // The layout no longer decides. Every one of them carries Rhie-Chow for every operation
+    // it supports: the residual and the Jacobian action through the per-pack staging that
+    // only `packed` used to have, the assembly through the same Hex8RhieChow the atomic
+    // sweep builds -- those assembly sweeps are scalar per element, so the only difference
+    // is whether the coordinates and the nodal gradient are read from the pack or from the
+    // mesh. What decides is the KERNEL, and rc_kernel_ok below is where that is settled.
     if (pgrad_per_apply && !rhie_chow) {
         std::fprintf(stderr, "--pgrad-per-apply is meaningless without --rhie-chow\n");
         if (own_mpi) MPI_Finalize();
@@ -620,13 +594,18 @@ int main(int argc, char **argv) {
     // takes no pressure gradient; the hand-written affine `current` residual; and the
     // isoparametric SIMD kernels -- which is what confines the isoparametric case to
     // --layout atomic.
+    const bool iso_scalar_kernel = kernel_kind == KernelKind::Current || kernel_kind == KernelKind::Split;
     const bool rc_kernel_ok =
             // These two do not consult --kernel: they run the hand-written scalar kernels,
             // which take the term on both geometries.
             assemble_diag || (jac_action && (geom == "affine" || layout == "atomic")) ||
             (geom == "affine" && (kernel_kind == KernelKind::Sumfact || kernel_kind == KernelKind::Split)) ||
-            (geom == "isoparam" && layout == "atomic" &&
-             (kernel_kind == KernelKind::Current || kernel_kind == KernelKind::Split));
+            // Isoparametric geometry splits by OPERATION, not by layout. The residual and
+            // the action on a pack-based layout run the isoparametric SIMD kernels, which
+            // carry no term -- hence --layout atomic there. Assembly is scalar per element
+            // on every layout and runs the isoparametric kernel that does carry it.
+            (geom == "isoparam" && layout == "atomic" && iso_scalar_kernel) ||
+            (geom == "isoparam" && (assemble || bsr_apply) && iso_scalar_kernel);
     if (rhie_chow && !rc_kernel_ok) {
         std::fprintf(stderr,
                      "--rhie-chow is carried by: --kernel sumfact|split on --geom affine, "
@@ -1678,6 +1657,11 @@ int main(int argc, char **argv) {
                 // The isoparametric residual on a pack-based layout always runs the
                 // isoparametric SIMD kernel; the requested name is not consulted.
                 : (geom_kind == GeomKind::Isoparam && layout != "atomic" && !assemble) ? "isoparam_simd"
+                // Isoparametric assembly on a pack-based layout runs the hand-written
+                // scalar kernel for every name but `fd`: the branch there tests only for
+                // fd, so `sympy` reaches the same code `current` does.
+                : (geom_kind == GeomKind::Isoparam && layout != "atomic" && assemble &&
+                   kernel_kind != KernelKind::Fd)                  ? "current"
                 // There is no dedicated `current` assembly kernel, so it lands on fd.
                 : (assemble && kernel_kind == KernelKind::Current) ? "fd"
                                                                    : kernel.c_str();

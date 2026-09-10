@@ -557,7 +557,13 @@ static SFEM_NOINLINE void assemble_boundary_scs_jacobian_pass(MeshData      &d,
     if (d.face_mask.empty()) return;
     cvfem_hex8_build_face_mask_eff(d);
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    // The global element-to-slot map exists for the layouts that scatter through it. The
+    // pack-based ones do not build it -- they carry their own per-pack maps -- and it is
+    // 64 counts per element, a gigabyte at the sizes this driver runs, so building it just
+    // for this pass would be a poor trade. The slots for one element are found instead,
+    // and only for the boundary shell: a binary search per entry over 6/n of the mesh,
+    // once per assembly, against a term that is already the smaller part of the cost.
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.empty() ? nullptr : b.element_slots.data();
     const ptrdiff_t                           n_bnd  = (ptrdiff_t)d.bnd_elems.size();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < n_bnd; ++i) {
@@ -568,8 +574,14 @@ static SFEM_NOINLINE void assemble_boundary_scs_jacobian_pass(MeshData      &d,
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        smesh::count_t              found[64];
+        const smesh::count_t *const esl = slots ? slots + (size_t)e * 64 : found;
+        if (!slots)
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+                for (int bn = 0; bn < CVFEM_HEX8_N_NODES; ++bn)
+                    found[a * 8 + bn] = find_bsr_slot(b.rowptr, b.colidx, d.elems[a][e], d.elems[bn][e]);
         boundary_scs_add_jacobian<true>(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz,
-                                        x, y, z, ux, uy, uz, slots + (size_t)e * 64, values, fmask, 0);
+                                        x, y, z, ux, uy, uz, esl, values, fmask, 0);
         (void)p;
     }
 }

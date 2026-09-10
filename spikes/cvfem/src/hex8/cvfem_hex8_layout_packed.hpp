@@ -304,6 +304,12 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
+    // This sweep is scalar per element, not SIMD over a pack, so Rhie-Chow enters through
+    // the same Hex8RhieChow the atomic assembly builds -- the only difference is that the
+    // coordinates and the nodal gradient are read out of the pack rather than out of the
+    // mesh. Both hand-written kernels below take the term; the generated ones and the
+    // finite-difference reference do not, which the driver refuses rather than measures.
+    const int    with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
     {
@@ -313,11 +319,16 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
         scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                geom_kind == GeomKind::Isoparam ? thread_scratch<scalar_t>(3, packed_xyz_n(p)) : nullptr;
+                (geom_kind == GeomKind::Isoparam || with_rc)
+                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
+                        : nullptr;
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
@@ -336,6 +347,9 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
 
             fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
+                                               pack_pgx, pack_pgy, pack_pgz);
             if (geom_kind == GeomKind::Isoparam)
                 fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
@@ -355,6 +369,17 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                 scalar_t *const SFEM_RESTRICT local_vals = g_kernel_only ? dense_ke : local_vals_pack;
                 scalar_t adj[9], det;
                 if (geom_kind != GeomKind::Isoparam) load_hex8_adj(d, e, adj, &det);
+                // The coordinates and the nodal gradient come out of the pack; the
+                // Hex8RhieChow points at these locals, so they must outlive the call, which
+                // they do.
+                scalar_t     rc_x[8], rc_y[8], rc_z[8], rc_pgx[8], rc_pgy[8], rc_pgz[8];
+                Hex8RhieChow rc{};
+                if (with_rc) {
+                    gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, rc_x, rc_y, rc_z);
+                    gather_hex8_coords_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz, e, rc_pgx, rc_pgy, rc_pgz);
+                    rc = Hex8RhieChow{rc_x, rc_y, rc_z, rc_pgx, rc_pgy, rc_pgz, d.rhie_chow_scale};
+                }
+                const scalar_t *const rc_p = with_rc ? p_e : nullptr;
                 if (geom_kind == GeomKind::Isoparam) {
                     scalar_t x[8], y[8], z[8];
                     gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, x, y, z);
@@ -364,11 +389,11 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                         hex8_local_slots_to_bsr4(slots, ke, local_vals);
                     } else {
                         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
-                                rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, local_vals);
+                                rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
                     }
                 } else if (kernel_kind == KernelKind::Sumfact) {
                     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
+                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
                 } else if (kernel_kind == KernelKind::Sympy) {
                     cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
                 } else if (kernel_kind == KernelKind::SympyBlock) {

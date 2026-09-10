@@ -410,6 +410,10 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
 
     scalar_t *const SFEM_RESTRICT       values = b.values->data();
     const int *const SFEM_RESTRICT      gslots = reinterpret_cast<const int *>(b.element_slots.data());
+    // This assembly reads the mesh directly rather than a staged pack, so Rhie-Chow enters
+    // exactly as it does on the atomic layout -- through Hex8ExtraScratch. Only the two
+    // hand-written kernels take the term.
+    const Hex8Extras                    opt(d);
 
 #pragma omp parallel
     {
@@ -427,13 +431,16 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
                 for (ptrdiff_t e = e_start; e < e_end; ++e) {
                     scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
                     gather_element_fields(d, e, ux_e, uy_e, uz_e, p_e);
+                    Hex8ExtraScratch ex;
+                    ex.load(d, opt, e);
+                    const scalar_t *const          rc_p  = opt.with_rc ? p_e : nullptr;
                     const int *const SFEM_RESTRICT slots = gslots + (size_t)e * 64;
 
                     if (geom_kind == GeomKind::Isoparam) {
                         scalar_t x[8], y[8], z[8];
                         gather_element_coords(d, e, x, y, z);
                         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
-                                rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, values);
+                                rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, values, ex.rc, rc_p);
                     } else {
                         scalar_t adj[9], det;
                         load_hex8_adj(d, e, adj, &det);
@@ -458,11 +465,11 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
                                 if (g_dense_flush) {
                                     alignas(ALIGN_BYTES) scalar_t ke[64 * 16] = {};
                                     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                            rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke);
+                                            rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke, ex.rc, rc_p);
                                     hex8_blocks_to_slots(slots, ke, values);
                                 } else {
                                     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values);
+                                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values, ex.rc, rc_p);
                                 }
                                 break;
                             default: {
