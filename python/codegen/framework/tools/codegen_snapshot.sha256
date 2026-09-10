@@ -1,6 +1,6 @@
 # SHA-256 of every generated kernel source, one line per file.
 # Regenerate with: python -m codegen.framework.tools.codegen_snapshot capture <dir>
-74547f9587019daff574ffda4259d0a7391016d0ffab9ee65234bc3308571fa8  geometry_kernels.hpp
+3bfbb75dc7823a80f5cd477a8ce236c478cc5f6554c99ada055e22d3d9ab1392  geometry_kernels.hpp
 c7ad4e76534904359c30e4baf3cb7efee16a81e9d35cd98abaf285f37da6ad51  kernel_diagnostics.hpp
 945e256814fc1dc7e1ca133db59faba985ebbebd388b371d436ccac0c75bdc81  kernel_math.hpp
 f7179bfafaf539495a6695292e6bb9ac09dabb68f8e72c8ea2dd66ae5965417e  laplace/d2/laplace_d2_simplex_hessian.hpp
