@@ -96,6 +96,7 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
     // boundary_scs_add_jacobian over a whole mesh, which until now existed only as a
     // single-element unit test.
     apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
+    apply_transient_pass(d, rho);
     pack_residual(d, rm);
 
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -109,6 +110,7 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
     else
         apply_residual_atomic(d, rho, mu);
     apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
+    apply_transient_pass(d, rho);
     pack_residual(d, rp);
 
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -173,7 +175,7 @@ struct CsvRow {
     int         pgrad_per_apply;
     int         live_vectors;
     double      upwind_eps;    // always 0 in this driver; recorded so the column is not silently absent
-    int         transient;     // always 0; the benchmark family has no transient term
+    int         transient;     // 1 when --transient made the operator unsteady
     const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
 };
 
@@ -284,6 +286,10 @@ int main(int argc, char **argv) {
     // is the other half of the cascade: the gradient is a full element sweep.
     int         pgrad_per_apply = 0;
     int         live_vectors    = 0;
+    // Steady by default -- dt <= 0 means no transient term, which is what every recorded
+    // baseline was measured with.
+    scalar_t    dt         = 0;
+    int         bdf_order  = 1;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -337,6 +343,10 @@ int main(int argc, char **argv) {
             pgrad_per_apply = 1;
         else if (arg == "--live-vectors" && i + 1 < argc)
             live_vectors = std::atoi(argv[++i]);
+        else if (arg == "--transient" && i + 1 < argc)
+            dt = (scalar_t)std::atof(argv[++i]);
+        else if (arg == "--bdf" && i + 1 < argc)
+            bdf_order = std::atoi(argv[++i]);
         else if (arg == "--csv" && i + 1 < argc)
             csv_path = argv[++i];
         else if (arg == "--tag" && i + 1 < argc)
@@ -383,6 +393,15 @@ int main(int argc, char **argv) {
                     "                 no Rhie-Chow term. Off by default: without it there is no\n"
                     "                 pressure-pressure coupling at all, which is a smaller and\n"
                     "                 faster operator than the one the solver runs.\n"
+                    "  --transient DT   make the operator unsteady with timestep DT: the BDF mass\n"
+                    "                 term rho V a0 / dt on the velocity diagonal, applied as a\n"
+                    "                 per-node post-pass because in a control-volume scheme the mass\n"
+                    "                 matrix IS the control volume. Reaches the residual, the\n"
+                    "                 Jacobian action, the assembled matrix and the block diagonal,\n"
+                    "                 whatever the layout and kernel. Off by default.\n"
+                    "  --bdf ORDER    1 or 2 (default 1). Order 2 needs two history levels; the\n"
+                    "                 driver fills both, so it does not fall back the way a first\n"
+                    "                 timestep in the solver does.\n"
                     "  --live-vectors N   keep N extra vectors of the solution size resident and\n"
                     "                     churned between applies, and take the direction from them in\n"
                     "                     rotation. The default measures an apply replayed on a warm,\n"
@@ -726,6 +745,35 @@ int main(int argc, char **argv) {
     }
 
     fill_fields(d);
+
+    // The transient term. A history that is a small, node-varying displacement of the
+    // state: the term is linear in it, so its VALUE cannot change any cost, but a history
+    // equal to the state would make the BDF1 residual contribution identically zero and a
+    // run could then not tell a term that was applied from one that was not.
+    if (dt > scalar_t(0)) {
+        d.dt        = dt;
+        d.bdf_order = bdf_order;
+        d.u_prev.resize((size_t)d.nnodes * 3);
+        if (bdf_order >= 2) d.u_prev2.resize((size_t)d.nnodes * 3);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            const scalar_t s1 = scalar_t(0.97) + scalar_t(0.02) * (scalar_t)((i * 7) % 11) / scalar_t(11);
+            const scalar_t s2 = scalar_t(0.94) + scalar_t(0.03) * (scalar_t)((i * 5) % 13) / scalar_t(13);
+            d.u_prev[(size_t)i * 3 + 0] = s1 * d.ux[i];
+            d.u_prev[(size_t)i * 3 + 1] = s1 * d.uy[i];
+            d.u_prev[(size_t)i * 3 + 2] = s1 * d.uz[i];
+            if (!d.u_prev2.empty()) {
+                d.u_prev2[(size_t)i * 3 + 0] = s2 * d.ux[i];
+                d.u_prev2[(size_t)i * 3 + 1] = s2 * d.uy[i];
+                d.u_prev2[(size_t)i * 3 + 2] = s2 * d.uz[i];
+            }
+        }
+        build_node_volume(d, d.node_vol);
+        scalar_t vol = 0;
+        for (const scalar_t v : d.node_vol) vol += v;
+        std::printf("transient: dt %g, BDF%d, control volumes sum to %.12g\n", (double)dt,
+                    bdf_coeffs(d).order, (double)vol);
+    }
     precompute_affine_geometry(d);
 
     // --- optional terms -------------------------------------------------------------
@@ -983,6 +1031,7 @@ int main(int argc, char **argv) {
             apply_residual_atomic(d, rho, mu);
 
         if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
+        apply_transient_pass(d, rho);
     };
     auto jac_fn = [&]() {
         if (geom_kind == GeomKind::Isoparam) {
@@ -1034,6 +1083,7 @@ int main(int argc, char **argv) {
 
         if (boundary)
             assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
+        assemble_transient_diag_pass(d, rho, bsr);
     };
 
     std::vector<scalar_t> jac_dir, jac_out;
@@ -1132,6 +1182,7 @@ int main(int argc, char **argv) {
         if (boundary)
             apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0, dir_v,
                                                     jac_out.data());
+        apply_transient_action_pass(d, rho, dir_v, jac_out.data());
     };
 
     // Block diagonal, for the block-Jacobi preconditioner. Assembles only the 4x4
@@ -1142,6 +1193,7 @@ int main(int argc, char **argv) {
             assemble_diag_atomic_isoparam(d, rho, mu, diag_blocks);
         else
             assemble_diag_atomic(d, rho, mu, diag_blocks);
+        assemble_diag_transient_pass(d, rho, diag_blocks);
     };
 
     if (bsr_apply) jac_fn();
@@ -1189,6 +1241,10 @@ int main(int argc, char **argv) {
             if (colors.n_colors > 0)
                 apply_boundary_scs_jacobian_action_pass(d, rho, mu, iso, jac_dir.data(), jv_mf_colored.data());
         }
+        apply_transient_action_pass(d, rho, jac_dir.data(), jv_mf.data());
+        apply_transient_action_pass(d, rho, jac_dir.data(), jv_mf_atomic.data());
+        if (colors.n_colors > 0)
+            apply_transient_action_pass(d, rho, jac_dir.data(), jv_mf_colored.data());
         const scalar_t mf_err      = max_abs_diff(jv_spmv.data(), jv_mf.data(), d.nnodes * N_FIELDS);
         const scalar_t atomic_err  = max_abs_diff(jv_mf.data(), jv_mf_atomic.data(), d.nnodes * N_FIELDS);
         const scalar_t colored_err = colors.n_colors > 0
@@ -1223,9 +1279,11 @@ int main(int argc, char **argv) {
         else
             assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
         // The reference has to be closed the same way the thing under test is, or the
-        // comparison reports the boundary term as a mismatch.
+        // comparison reports the boundary term as a mismatch. Same for the transient
+        // diagonal.
         if (boundary)
             assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
+        assemble_transient_diag_pass(d, rho, bsr);
         const scalar_t *const ref = bsr.values->data();
 
         if (assemble_diag) {
@@ -1257,6 +1315,7 @@ int main(int argc, char **argv) {
             assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
             if (boundary)
                 assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, 1);
+            assemble_transient_diag_pass(d, rho, bsr);
             const scalar_t rel =
                     max_abs_diff(full.data(), bsr.values->data(), (ptrdiff_t)full.size()) /
                     (fmax > 0 ? fmax : scalar_t(1));
@@ -1583,7 +1642,7 @@ int main(int argc, char **argv) {
         // (SFEM_UPWIND_EPS, and BDF1/BDF2). A reader comparing a benchmark rate against a
         // solver scope needs to see that, and a zero that is present says it.
         row.upwind_eps      = 0.0;
-        row.transient       = 0;
+        row.transient       = dt > scalar_t(0) ? 1 : 0;
         row.phase                = g_breakdown ? g_phase : nullptr;
         csv_write(csv_path, row);
     }
