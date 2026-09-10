@@ -182,6 +182,38 @@ def void_discards(source):
     return [match.group(1) for match in _DISCARD.finditer(source)]
 
 
+_ELEMENT_ARRAY = re.compile(
+    r"(\w+)\[(\d+)\]\s*=\s*\{\s*(elements\[\d+\](?:\s*,\s*elements\[\d+\])*)\s*\}"
+)
+_ELEMENT_INDEX = re.compile(r"elements\[(\d+)\]")
+
+
+def kernel_permutations(source):
+    """Node-ordering permutations built inside a kernel rather than at the ABI.
+
+    A micro-kernel is written against the lexicographic basis, so an element
+    whose mesh numbers its nodes otherwise reconciles the two in a forwarding
+    wrapper and the kernel itself reorders nothing.
+
+    A selection is not a permutation and is not counted: a mixed element's
+    coarser field lives on some of the cell's nodes, and saying which -- 0, 2,
+    6, 8, 18, 20, 24, 26 for the pressure of a lexicographic HEX27_HEX8 pair --
+    is the element's shape rather than an order to be undone.  The two are told
+    apart by what the indices are: a permutation uses exactly 0..N-1 of its own
+    length, a selection draws N indices out of a wider range.
+    """
+    permutations = []
+    for match in _ELEMENT_ARRAY.finditer(source):
+        name, extent, body = match.group(1), int(match.group(2)), match.group(3)
+        indices = [int(value) for value in _ELEMENT_INDEX.findall(body)]
+        if len(indices) != extent or sorted(indices) != list(range(extent)):
+            continue
+        if name.startswith("proteus_"):
+            continue
+        permutations.append((name, extent))
+    return permutations
+
+
 def dead_assignments(body):
     """Assignments in this body whose result nothing reads, transitively.
 
@@ -275,6 +307,7 @@ def survey(generated):
     constants = []
     parameters = []
     discards = []
+    permutations = []
     for path in source_files(generated):
         with open(path, encoding="utf-8") as stream:
             source = stream.read()
@@ -287,6 +320,9 @@ def survey(generated):
         )
         parameters.extend((relative, name) for name in unused_parameters(source))
         discards.extend((relative, name) for name in void_discards(source))
+        permutations.extend(
+            (relative, name, extent) for name, extent in kernel_permutations(source)
+        )
         for length in lane_loop_runs(source):
             runs[length] += 1
         wrappers.extend((relative, name) for name in wrapped_helper_entry_points(source))
@@ -297,6 +333,7 @@ def survey(generated):
         "unused_constants": constants,
         "unused_parameters": parameters,
         "void_discards": discards,
+        "kernel_permutations": permutations,
     }
 
 
@@ -307,6 +344,9 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     result = survey(args.generated)
+    print("kernel permutations:         %d" % len(result["kernel_permutations"]))
+    for row in result["kernel_permutations"][: args.limit]:
+        print("    %s: %s[%d]" % row)
     print("(void) discards:              %d" % len(result["void_discards"]))
     for row in result["void_discards"][: args.limit]:
         print("    %s: %s" % row)

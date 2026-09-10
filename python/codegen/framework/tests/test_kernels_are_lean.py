@@ -86,6 +86,21 @@ UNUSED_CONSTANT_BUDGET = 0
 #: to drive down, not a target that has been met.
 UNUSED_PARAMETER_BUDGET = 179
 
+#: Node-ordering permutations built inside a kernel.
+#:
+#: A micro-kernel is written against the lexicographic basis, so an element
+#: whose mesh numbers its nodes otherwise reconciles the two in a forwarding
+#: wrapper -- `QUAD4` and `HEX8` always did, `HEX27` now does too -- and the
+#: kernel itself reorders nothing.  There were 81, all in `two_phase_flow`,
+#: `navier_stokes` and `stokes`.
+#:
+#: A selection is not a permutation and is not counted: the pressure of a
+#: lexicographic HEX27_HEX8 pair lives on cell nodes 0, 2, 6, 8, 18, 20, 24 and
+#: 26, which says which nodes carry the space rather than reordering it.  The
+#: same array was a permutation before this work and is a selection after, so
+#: the measure tells them apart by their indices rather than by their name.
+KERNEL_PERMUTATION_BUDGET = 0
+
 #: `extern "C"` wrappers around a `KernelDiagnostics` free function.  There
 #: were 1400 of them and nothing referenced any.
 WRAPPED_HELPER_BUDGET = 0
@@ -144,6 +159,16 @@ class KernelsAreLeanTest(unittest.TestCase):
             UNUSED_PARAMETER_BUDGET,
             "these parameters are named and never read:\n%s"
             % "\n".join("  %s: %s" % row for row in parameters[:20]),
+        )
+
+    def test_no_kernel_reorders_its_own_nodes(self):
+        permutations = self.survey["kernel_permutations"]
+        self.assertLessEqual(
+            len(permutations),
+            KERNEL_PERMUTATION_BUDGET,
+            "these kernels permute their own connectivity instead of being "
+            "handed it in the order they are written for:\n%s"
+            % "\n".join("  %s: %s[%d]" % row for row in permutations[:20]),
         )
 
     def test_no_kernel_wraps_a_shared_diagnostics_helper(self):
