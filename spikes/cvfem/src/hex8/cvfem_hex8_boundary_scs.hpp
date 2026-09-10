@@ -226,9 +226,14 @@ static SFEM_INLINE int cvfem_hex8_face_mask_of(const MeshT &d, const ptrdiff_t e
     return d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e];
 }
 
-template <bool Atomic, typename scalar_t>
+// Templated on the slot type rather than fixed to smesh::count_t, because the block
+// diagonal addresses its destination with ptrdiff_t node indices and relies on -1 meaning
+// "drop this write". Fixing the type here would force that array into count_t, whose
+// signedness is a build option (SMESH_COUNT_TYPE) -- and an unsigned -1 is an
+// out-of-bounds write rather than a dropped one.
+template <bool Atomic, typename Slot, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void hex8_visc_jac_row(const scalar_t mu, const scalar_t ax, const scalar_t ay, const scalar_t az,
-                                          const scalar_t w[][3], const int row, const smesh::count_t *const SFEM_RESTRICT slots,
+                                          const scalar_t w[][3], const int row, const Slot *const SFEM_RESTRICT slots,
                                           scalar_t *const SFEM_RESTRICT values) {
     for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
         const scalar_t wx  = w[k][0];
@@ -345,13 +350,13 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
     }
 }
 
-template <bool Atomic, typename scalar_t>
+template <bool Atomic, typename Slot, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_t rho, const scalar_t mu, const int isoparam, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                  const scalar_t Lx, const scalar_t Ly, const scalar_t Lz,
                                                  const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
                                                  const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
                                                  const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
-                                                 const smesh::count_t *const SFEM_RESTRICT slots, scalar_t *const SFEM_RESTRICT values,
+                                                 const Slot *const SFEM_RESTRICT slots, scalar_t *const SFEM_RESTRICT values,
                                                   const int fmask = -1,
                                                   const int nmask = 0,
                                                   const Hex8BoundaryDataT<scalar_t> &bd = {}) {
@@ -410,7 +415,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
 
             const scalar_t un   = ux[i] * ax + uy[i] * ay + uz[i] * az;
             const scalar_t mdot = rho * un;
-            const smesh::count_t sii = slots[i * 8 + i];
+            const Slot sii = slots[i * 8 + i];
 
             // The natural-outflow branch, matching boundary_scs_add_residual and
             // boundary_scs_add_jacobian_action. This function used to take nmask and

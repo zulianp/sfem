@@ -63,8 +63,21 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
         x0[(size_t)i * 4 + 2] = d.uz[i];
         x0[(size_t)i * 4 + 3] = d.p[i];
     }
+    // Pressure only, because with Rhie-Chow off the residual is linear in the pressure and
+    // the upwind switch cannot move -- so the central difference below is exact rather than
+    // second-order, and no sign flip can masquerade as an error.
+    //
+    // Not a UNIFORM pressure, which is what this used to be. A closed control volume has
+    // sum(A) = 0, so a constant pressure produces no net force and the difference collapses
+    // to round-off: with --boundary on, max_fd fell to 7e-12 and the relative measure --
+    // round-off over round-off -- read exactly 1.0 for every kernel. The check was not
+    // failing, it had stopped testing anything. A node-varying direction exercises the same
+    // columns and is annihilated by nothing.
     std::fill(dir.begin(), dir.end(), scalar_t(0));
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) dir[(size_t)i * 4 + 3] = scalar_t(1);
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const uint32_t h            = (uint32_t)i * 2654435761u;
+        dir[(size_t)i * 4 + 3]      = scalar_t(1) + scalar_t((h >> 8) & 0xffffu) / scalar_t(65535);
+    }
 
     const scalar_t eps = scalar_t(1.0e-6);
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -77,6 +90,12 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
         apply_residual_atomic_isoparam(d, rho, mu);
     else
         apply_residual_atomic(d, rho, mu);
+    // The assembled matrix carries the boundary closure whenever --boundary is on, so the
+    // residual differenced here has to as well -- otherwise the check reports the closure
+    // as the error. Adding it also makes this a finite-difference check of
+    // boundary_scs_add_jacobian over a whole mesh, which until now existed only as a
+    // single-element unit test.
+    apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
     pack_residual(d, rm);
 
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -89,6 +108,7 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
         apply_residual_atomic_isoparam(d, rho, mu);
     else
         apply_residual_atomic(d, rho, mu);
+    apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
     pack_residual(d, rp);
 
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -396,18 +416,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    // Rhie-Chow exists only in the sum-factorised kernels. cvfem_hex8_ns_upwind_residual
-    // (the hand-written `current` kernel) and every generated sympy kernel take no
-    // Hex8RhieChow argument at all, so asking for it there would silently measure a kernel
-    // without it -- exactly the confusion this option exists to remove.
-    if (rhie_chow && kernel != "sumfact") {
-        std::fprintf(stderr,
-                     "--rhie-chow requires --kernel sumfact (got '%s'): the hand-written and\n"
-                     "generated kernels carry no Rhie-Chow term.\n",
-                     kernel.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
     // --boundary is a separate element sweep and so is layout-independent, but it only
     // reaches the residual and the Jacobian action that way. The assembled matrix needs the
     // boundary blocks written through the element BSR slots, which so far only the atomic
@@ -431,20 +439,14 @@ int main(int argc, char **argv) {
     const bool rc_layout_ok =
             layout == "atomic" ||
             ((layout == "packed" || layout == "store") && !assemble && !assemble_diag && !bsr_apply);
+    // (--assemble-diag is always the atomic diagonal, refused for any other --layout below,
+    // and it now carries both terms.)
     if (rhie_chow && !rc_layout_ok) {
         std::fprintf(stderr,
                      "--rhie-chow is implemented for --layout atomic, and for the residual and "
                      "the Jacobian action on --layout packed|store (got '%s'%s)\n",
                      layout.c_str(),
                      (assemble || assemble_diag || bsr_apply) ? " with an assembly operation" : "");
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-    // The isoparametric Jacobian-action kernels take no Rhie-Chow argument at all
-    // (cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd), so this combination would
-    // report a throughput measured without the term. Refuse it rather than measure it.
-    if (rhie_chow && jac_action && geom == "isoparam") {
-        std::fprintf(stderr, "--rhie-chow with --jac-action is implemented for --geom affine only\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -530,11 +532,20 @@ int main(int argc, char **argv) {
     // The verification chains compare against `current` and against a finite difference of
     // it, and neither carries Rhie-Chow. With the term on they report a mismatch that is
     // the missing term in the reference, not a defect in what is being verified.
-    if (rhie_chow && (verify || verify_jac)) {
+    //
+    // With one exception, and it is the one that matters here. The block diagonal and the
+    // split both work by handing the FULL element kernel a modified slot array, so their
+    // check is against this driver's own assembly rather than against a Rhie-Chow-free
+    // reference -- both sides carry whatever the run asked for. That check is the only
+    // thing that can show the new staging is right, so it must be allowed to run with the
+    // term on. The chains that cannot are skipped rather than refused; see below.
+    const bool verify_jac_slot_only = verify_jac && (assemble_diag || kernel_kind == KernelKind::Split);
+    if (rhie_chow && (verify || (verify_jac && !verify_jac_slot_only))) {
         std::fprintf(stderr,
                      "--verify/--verify-jac cannot run with --rhie-chow: the reference "
                      "kernels carry no Rhie-Chow term, so the comparison fails by "
-                     "construction\n");
+                     "construction (--assemble-diag and --kernel split are the exception -- "
+                     "they check against this driver's own assembly)\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -560,24 +571,49 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
-    // The assembled boundary closure exists in exactly one function --
+    // The assembled boundary closure used to exist in exactly one function --
     // assemble_jacobian_atomic_sumfact -- so every other assembly kernel, and every
-    // isoparametric one, drops it while the row records boundary=1.
-    if (boundary && (assemble || bsr_apply) &&
-        (kernel_kind != KernelKind::Sumfact || geom == "isoparam")) {
+    // isoparametric one, dropped it while the row recorded boundary=1. It is now
+    // assemble_boundary_scs_jacobian_pass, one sweep over the compacted boundary shell
+    // that runs after whichever assembly the layout and kernel chose, so there is nothing
+    // left to refuse: the term is carried for every kernel, layout and geometry.
+    //
+    // ---- which configurations carry the Rhie-Chow term ------------------------------
+    //
+    // One gate, because the answer depends on the kernel, the geometry, the layout AND the
+    // operation together. The three scattered rules this replaces got it wrong in both
+    // directions: "--rhie-chow requires --kernel sumfact" refused the isoparametric
+    // hand-written kernels, which do take a Hex8RhieChow and are what --geom isoparam runs
+    // on the atomic layout; and nothing at all stopped `--rhie-chow --assemble --kernel
+    // sympy`, which ran a generated arrangement with no such term and wrote rhie_chow=1
+    // and ran_rc=frozen into the CSV.
+    //
+    // What carries it, read off the element kernels rather than off the flags:
+    //
+    //   affine    sumfact   residual / action / assembly    add_slots, *_sumfact_simd
+    //   affine    split     assembly, nonlinear half        add_slots_nonlinear
+    //   isoparam  current   residual / action / assembly    the SCALAR isoparam kernels
+    //   either    n/a       block diagonal                  add_slots{,_isoparam}
+    //
+    // What does not: every generated kernel, because the term was never put into the SymPy
+    // expressions; the finite-difference reference, because it differences a residual that
+    // takes no pressure gradient; the hand-written affine `current` residual; and the
+    // isoparametric SIMD kernels -- which is what confines the isoparametric case to
+    // --layout atomic.
+    const bool rc_kernel_ok =
+            // These two do not consult --kernel: they run the hand-written scalar kernels,
+            // which take the term on both geometries.
+            assemble_diag || (jac_action && (geom == "affine" || layout == "atomic")) ||
+            (geom == "affine" && (kernel_kind == KernelKind::Sumfact || kernel_kind == KernelKind::Split)) ||
+            (geom == "isoparam" && layout == "atomic" &&
+             (kernel_kind == KernelKind::Current || kernel_kind == KernelKind::Split));
+    if (rhie_chow && !rc_kernel_ok) {
         std::fprintf(stderr,
-                     "--boundary with --assemble/--bsr-apply is carried only by "
-                     "--kernel sumfact --geom affine; '%s'/%s would drop it silently\n",
-                     kernel.c_str(), geom.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-    // Until the diagonal carries them, asking for either would record a row claiming a term
-    // assemble_diag_atomic does not compute.
-    if (assemble_diag && (rhie_chow || boundary)) {
-        std::fprintf(stderr,
-                     "--assemble-diag carries neither --rhie-chow nor --boundary yet; the "
-                     "row would claim a term it did not compute\n");
+                     "--rhie-chow is carried by: --kernel sumfact|split on --geom affine, "
+                     "--kernel current|split on --geom isoparam --layout atomic, and by "
+                     "--jac-action and --assemble-diag, which run the hand-written kernels "
+                     "whatever --kernel says (got '%s'/%s/%s)\n",
+                     kernel.c_str(), geom.c_str(), layout.c_str());
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -945,8 +981,8 @@ int main(int argc, char **argv) {
             apply_residual_atomic_sumfact(d, rho, mu);
         else
             apply_residual_atomic(d, rho, mu);
-            if (boundary)
-            apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
+
+        if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
     };
     auto jac_fn = [&]() {
         if (geom_kind == GeomKind::Isoparam) {
@@ -995,6 +1031,9 @@ int main(int argc, char **argv) {
             // rejected, because fd is also the correctness reference, but the
             // two rows are the same kernel and should not be read as distinct.
             assemble_jacobian_atomic_fd(d, bsr, rho, mu);
+
+        if (boundary)
+            assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
     };
 
     std::vector<scalar_t> jac_dir, jac_out;
@@ -1089,9 +1128,10 @@ int main(int argc, char **argv) {
             apply_jacobian_action_atomic_isoparam(d, rho, mu, dir_v, jac_out.data());
         else
             apply_jacobian_action_atomic(d, rho, mu, dir_v, jac_out.data(), kernel_kind);
-            if (boundary)
-            apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0,
-                                                    dir_v, jac_out.data());
+
+        if (boundary)
+            apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0, dir_v,
+                                                    jac_out.data());
     };
 
     // Block diagonal, for the block-Jacobi preconditioner. Assembles only the 4x4
@@ -1113,7 +1153,12 @@ int main(int argc, char **argv) {
     }
     auto bsr_apply_fn = [&]() { bsr_apply_op->apply(jac_dir.data(), jac_out.data()); };
 
-    if (verify_jac) {
+    // Not with Rhie-Chow: the finite difference below differences the residual, which
+    // carries the term in its exact form, while the assembly carries the frozen one. The
+    // gap between them is the deliberate design decision recorded in ran_rc, not a defect,
+    // so measuring it here would fail every run. The slot-array check further down is the
+    // one that runs with the term on.
+    if (verify_jac && !rhie_chow) {
         jac_fn();
         const scalar_t rel = verify_jacobian_fd(d, bsr, rho, mu, geom_kind);
         std::printf("verify_jac_spmv_vs_fd_rel: %.6e\n", rel);
@@ -1134,6 +1179,16 @@ int main(int argc, char **argv) {
         if (colors.n_colors > 0)
             apply_jacobian_action_colored(
                     d, packed, colors, rho, mu, jac_dir.data(), jv_mf_colored.data(), geom_kind);
+        // The assembled matrix carries the boundary closure, so the three matrix-free
+        // actions compared against it have to be closed too -- this is the same pass
+        // jac_action_fn runs, applied to each of them.
+        if (boundary) {
+            const int iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+            apply_boundary_scs_jacobian_action_pass(d, rho, mu, iso, jac_dir.data(), jv_mf.data());
+            apply_boundary_scs_jacobian_action_pass(d, rho, mu, iso, jac_dir.data(), jv_mf_atomic.data());
+            if (colors.n_colors > 0)
+                apply_boundary_scs_jacobian_action_pass(d, rho, mu, iso, jac_dir.data(), jv_mf_colored.data());
+        }
         const scalar_t mf_err      = max_abs_diff(jv_spmv.data(), jv_mf.data(), d.nnodes * N_FIELDS);
         const scalar_t atomic_err  = max_abs_diff(jv_mf.data(), jv_mf_atomic.data(), d.nnodes * N_FIELDS);
         const scalar_t colored_err = colors.n_colors > 0
@@ -1147,7 +1202,13 @@ int main(int argc, char **argv) {
             if (own_mpi) MPI_Finalize();
             return 1;
         }
-        if (mf_err > 1.0e-8 || atomic_err > 1.0e-12) {
+        // `fd` assembles the matrix by central differences with eps=1e-6, so it agrees with
+        // the analytic action only to the truncation error of that -- about 5e-4 here, and
+        // the same figure with the boundary closure on or off. Comparing it at 1e-8 was
+        // measuring the reference against itself and failing every time; the looser bound
+        // is the right yardstick for a finite-difference matrix, not a concession.
+        const scalar_t mf_tol = kernel_kind == KernelKind::Fd ? scalar_t(1.0e-3) : scalar_t(1.0e-8);
+        if (mf_err > mf_tol || atomic_err > 1.0e-12) {
             std::fprintf(stderr, "HEX8 Jacobian-action mismatch\n");
             if (own_mpi) MPI_Finalize();
             return 1;
@@ -1161,6 +1222,10 @@ int main(int argc, char **argv) {
             assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
         else
             assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        // The reference has to be closed the same way the thing under test is, or the
+        // comparison reports the boundary term as a mismatch.
+        if (boundary)
+            assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
         const scalar_t *const ref = bsr.values->data();
 
         if (assemble_diag) {
@@ -1190,6 +1255,8 @@ int main(int argc, char **argv) {
             for (scalar_t v : full) fmax = std::max(fmax, std::fabs(v));
             assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear);
             assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
+            if (boundary)
+                assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, 1);
             const scalar_t rel =
                     max_abs_diff(full.data(), bsr.values->data(), (ptrdiff_t)full.size()) /
                     (fmax > 0 ? fmax : scalar_t(1));
@@ -1309,17 +1376,33 @@ int main(int argc, char **argv) {
     scalar_t checksum = 0;
     if (assemble) {
         for (ptrdiff_t i = 0; i < bsr.nnz * 16; ++i) checksum += bsr.values->data()[i];
+    } else if (assemble_diag) {
+        // The diagonal had no branch here, so it fell through to the residual arrays it
+        // never writes and every --assemble-diag row carried checksum 0 -- a number that
+        // cannot distinguish any two runs, which is the whole purpose of the column.
+        for (scalar_t v : diag_blocks) checksum += v;
     } else if (jac_action || bsr_apply) {
         for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) checksum += jac_out[(size_t)i];
     } else {
         for (ptrdiff_t i = 0; i < d.nnodes; ++i) checksum += d.rx[i] + d.ry[i] + d.rz[i] + d.rc[i];
     }
 
-    phase_report(assemble ? "assemble" : (jac_action ? "jac_action" : "residual"), repeat, threads_active());
+    // --assemble-diag was missing from both of these, so a diagonal run announced itself
+    // on stdout as a residual. The CSV column was fixed earlier; these were not, and a log
+    // is what a person reads.
+    phase_report(assemble ? "assemble"
+                          : assemble_diag ? "assemble_diag"
+                          : jac_action    ? "jac_action"
+                                          : "residual",
+                 repeat, threads_active());
     std::printf("cvfem_hex8_ns_upwind_smesh\n");
     std::printf("  mesh_manager: smesh::Mesh::create_hex8_cube\n");
     std::printf("  operation: %s\n",
-                bsr_apply ? "bsr_apply" : (jac_action ? "jacobian_action" : (assemble ? "jacobian_assemble" : "residual")));
+                bsr_apply      ? "bsr_apply"
+                : jac_action   ? "jacobian_action"
+                : assemble     ? "jacobian_assemble"
+                : assemble_diag ? "jacobian_block_diagonal"
+                               : "residual");
     std::printf("  layout: %s\n", layout.c_str());
     std::printf("  kernel: %s\n", kernel.c_str());
     std::printf("  geom: %s\n", geom.c_str());
@@ -1487,10 +1570,10 @@ int main(int argc, char **argv) {
         // form deliberately: the exact term couples pressures beyond nearest neighbours
         // and would widen the BSR pattern, and that operator exists only to build the
         // preconditioner.
-        row.ran_rc       = !rhie_chow                       ? "off"
-                           : jac_action                     ? "exact"
-                           : (assemble || bsr_apply)        ? "frozen"
-                                                            : "on";
+        row.ran_rc       = !rhie_chow                              ? "off"
+                           : jac_action                            ? "exact"
+                           : (assemble || bsr_apply || assemble_diag) ? "frozen"
+                                                                     : "on";
         row.ran_boundary = boundary ? "on" : "off";
         row.exact_rc     = (rhie_chow && jac_action) ? 1 : 0;
         row.pgrad_per_apply = pgrad_per_apply;
