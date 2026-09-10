@@ -1710,6 +1710,26 @@ def main(argv=None):
             baseline = json.load(handle)
     recorded = baseline.get(bucket, {})
 
+    # An entry that does not say which material owns it cannot be scoped to a
+    # run, so it is never compared and never dropped -- it just sits there
+    # looking like coverage.  Sixteen did, for kernels deleted when laplace was
+    # rewritten as an energy and when the precision suffixes were collapsed.
+    # The owner is recorded on every entry now, so an entry without one is a
+    # baseline that predates that and has to be re-recorded, not ignored.
+    unattributable = sorted(
+        name
+        for name, digest in recorded.items()
+        if not (isinstance(digest, dict) and digest.get("material"))
+    )
+    if unattributable:
+        sys.stderr.write(
+            "%d baseline entries at %s name no material, so nothing can compare "
+            "them:\n%s\nRe-record the bucket, or delete them if the kernels are "
+            "gone.\n"
+            % (len(unattributable), bucket, "\n".join("    " + n for n in unattributable[:20]))
+        )
+        return 1
+
     measured, measured_rates, skipped_all, failures = {}, {}, {}, []
     owner = {}
     keep = bool(os.environ.get("SFEM_REPRODUCIBILITY_KEEP"))
