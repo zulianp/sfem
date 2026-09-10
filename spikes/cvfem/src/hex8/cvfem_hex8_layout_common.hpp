@@ -529,6 +529,42 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
     }
 }
 
+// The assembled counterpart of the two passes above, and it exists for the same reason
+// they do: the closure touches no sub-control-surface flux, so one sweep over the boundary
+// shell covers every kernel and every layout at once. Threading it into each assembly
+// entry point instead would mean nine copies -- and would still be impossible for the
+// generated ones, whose element kernel is emitted text. That is why `--boundary` with
+// `--assemble` used to be refused for every kernel but `sumfact` on affine geometry.
+//
+// It scatters through b.element_slots, the global element-to-slot map, which is the same
+// whatever layout assembled the interior. `--kernel split` therefore gets the closure in
+// its nonlinear half by construction: the linear half is a memcpy restore that runs first,
+// and this pass runs after both.
+static SFEM_NOINLINE void assemble_boundary_scs_jacobian_pass(MeshData      &d,
+                                                              BSR4          &b,
+                                                              const scalar_t rho,
+                                                              const scalar_t mu,
+                                                              const int      isoparam) {
+    if (d.face_mask.empty()) return;
+    cvfem_hex8_build_face_mask_eff(d);
+    scalar_t *const SFEM_RESTRICT             values = b.values->data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    const ptrdiff_t                           n_bnd  = (ptrdiff_t)d.bnd_elems.size();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < n_bnd; ++i) {
+        const ptrdiff_t e     = d.bnd_elems[(size_t)i];
+        const int       fmask = (int)d.face_mask_eff[(size_t)e];
+        scalar_t        x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t adj[9], det = scalar_t(0);
+        if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        boundary_scs_add_jacobian<true>(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz,
+                                        x, y, z, ux, uy, uz, slots + (size_t)e * 64, values, fmask, 0);
+        (void)p;
+    }
+}
+
 // ---- optional terms: --rhie-chow and --boundary ------------------------------
 //
 // Both are off by default, and the default path must stay exactly as fast as it was --

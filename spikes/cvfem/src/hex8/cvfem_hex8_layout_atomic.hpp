@@ -77,11 +77,14 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
                                                                 const scalar_t *const dir,
                                                                 scalar_t *const       jv) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
+    const Hex8Extras opt(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
+        scalar_t         ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
         gather_element_fields(d, e, ux, uy, uz, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t                  g  = d.elems[a][e];
@@ -91,7 +94,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
             vz[a]                                  = dv[2];
             q[a]                                   = dv[3];
         }
-        cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, x, y, z, ux, uy, uz, vx, vy, vz, q, r);
+        cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, vx, vy, vz, q, r,
+                                                      ex.rc, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
@@ -154,13 +158,16 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
 
 static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu) {
     reset_residual(d);
+    const Hex8Extras opt(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
+        scalar_t         ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
         gather_element_fields(d, e, ux, uy, uz, p);
-        cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r);
+        cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, p, r, ex.rc);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -361,15 +368,21 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
     // accumulation it replaces.
     std::memcpy(values, linear.data(), linear.size() * sizeof(scalar_t));
 
+    // Rhie-Chow belongs entirely to this half: the linear half is the viscous block, which
+    // depends on the geometry and mu alone. So linear + nonlinear still reproduces the full
+    // assembly with the term on, and verify_split_isoparam_vs_full_rel still proves it.
+    const Hex8Extras opt(d);
+
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t ux[8], uy[8], uz[8], p[8];
+        scalar_t         ux[8], uy[8], uz[8], p[8];
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots_nonlinear<true>(
-                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
-        (void)p;
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
     }
 }
 
@@ -394,25 +407,30 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
         // assembly is a different operator from the solver's.
         cvfem_hex8_ns_upwind_jacobian_add_slots<true>(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
-        if (ex.fmask)
-            boundary_scs_add_jacobian<true>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, ex.x, ex.y, ex.z,
-                                            ux, uy, uz, slots + (size_t)e * 64, values, ex.fmask, 0);
     }
+    // The boundary closure used to be an `if (ex.fmask)` inside this loop, which is why it
+    // reached this kernel and no other. It is now assemble_boundary_scs_jacobian_pass, one
+    // sweep over the compacted boundary shell that every assembly entry point shares --
+    // the same arrangement the residual and the Jacobian action already used.
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    const Hex8Extras                          opt(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d, e, x, y, z);
+        scalar_t         ux[8], uy[8], uz[8], p[8];
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
+        // load() gathers the coordinates only when it has a reason to. This kernel always
+        // needs them, so gather into the same buffers when it did not.
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
         gather_element_fields(d, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
-                rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
-        (void)p;
+                rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
     }
 }
 
@@ -469,27 +487,78 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(MeshData      
 // duplicating it -- the same trick the CUDA path uses.
 //
 // The destination is indexed by node, 16 doubles per node, not by BSR block.
+
+// The masked slot array for one element: -1 everywhere but the diagonal, where it is the
+// global node index into the node-indexed destination.
+static SFEM_INLINE void diag_node_slots(const MeshData &d, const ptrdiff_t e, ptrdiff_t sl[64]) {
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        for (int b = 0; b < CVFEM_HEX8_N_NODES; ++b) sl[a * 8 + b] = -1;
+        sl[a * 8 + a] = (ptrdiff_t)d.elems[a][e];
+    }
+}
+
+// The boundary closure's contribution to the block diagonal, as a sweep over the compacted
+// boundary shell -- the same arrangement assemble_boundary_scs_jacobian_pass uses for the
+// full matrix, and for the same reason: the closure is a per-face term that neither
+// geometry nor kernel choice changes, so it does not belong inside the element loops.
+static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &d,
+                                                          const scalar_t        rho,
+                                                          const scalar_t        mu,
+                                                          const int             isoparam,
+                                                          std::vector<scalar_t> &diag) {
+    if (d.face_mask.empty()) return;
+    cvfem_hex8_build_face_mask_eff(d);
+    scalar_t *const SFEM_RESTRICT values = diag.data();
+    const ptrdiff_t               n_bnd  = (ptrdiff_t)d.bnd_elems.size();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < n_bnd; ++i) {
+        const ptrdiff_t e     = d.bnd_elems[(size_t)i];
+        const int       fmask = (int)d.face_mask_eff[(size_t)e];
+        ptrdiff_t       sl[64];
+        scalar_t        x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        diag_node_slots(d, e, sl);
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t adj[9], det = scalar_t(0);
+        if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        boundary_scs_add_jacobian<true>(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz,
+                                        x, y, z, ux, uy, uz, sl, values, fmask, 0);
+        (void)p;
+    }
+}
+// The -1 masking stays valid with Rhie-Chow and the boundary closure on, because both go
+// through the same guarded accessor the interior kernel uses. It is a `ptrdiff_t` array
+// deliberately: -1 has to be negative, and smesh::count_t's signedness is a build option
+// (SMESH_COUNT_TYPE), so an unsigned build would turn every dropped write into an
+// out-of-bounds one. boundary_scs_add_jacobian is templated on the slot type for exactly
+// this reason. The solver's assemble_block_diag cannot use the trick at all -- it runs the
+// generated kernel, which writes values[slot * 16 + f] without the guard.
+//
+// Rhie-Chow is not optional here in any meaningful sense: without it the pressure-pressure
+// entry of every block is structurally zero, which is the degenerate saddle point that
+// block-Jacobi cannot invert. A diagonal measured without it is a preconditioner that
+// could never be used.
 static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
                                                const scalar_t        rho,
                                                const scalar_t        mu,
                                                std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
     scalar_t *const SFEM_RESTRICT values = diag.data();
+    const Hex8Extras              opt(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        ptrdiff_t sl[64];
-        scalar_t  ux[8], uy[8], uz[8], p[8];
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            for (int b2 = 0; b2 < CVFEM_HEX8_N_NODES; ++b2) sl[a * 8 + b2] = -1;
-            sl[a * 8 + a] = (ptrdiff_t)d.elems[a][e];
-        }
+        ptrdiff_t        sl[64];
+        scalar_t         ux[8], uy[8], uz[8], p[8];
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
+        diag_node_slots(d, e, sl);
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d, e, adj, &det);
-        cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, values);
-        (void)p;
+        cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, values, ex.rc, p);
     }
+    assemble_diag_boundary_scs_pass(d, rho, mu, 0, diag);
 }
 
 static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
@@ -498,21 +567,21 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
                                                         std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
     scalar_t *const SFEM_RESTRICT values = diag.data();
+    const Hex8Extras              opt(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        ptrdiff_t sl[64];
-        scalar_t  x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            for (int b2 = 0; b2 < CVFEM_HEX8_N_NODES; ++b2) sl[a * 8 + b2] = -1;
-            sl[a * 8 + a] = (ptrdiff_t)d.elems[a][e];
-        }
-        gather_element_coords(d, e, x, y, z);
+        ptrdiff_t        sl[64];
+        scalar_t         ux[8], uy[8], uz[8], p[8];
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
+        diag_node_slots(d, e, sl);
         gather_element_fields(d, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
-                rho, mu, x, y, z, ux, uy, uz, sl, values);
-        (void)p;
+                rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, sl, values, ex.rc, p);
     }
+    assemble_diag_boundary_scs_pass(d, rho, mu, 1, diag);
 }
 
 // ---------------------------------------------------------------------------
@@ -550,14 +619,17 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
     // Restore the constant part, then add only what the velocity changes.
     std::memcpy(values, linear.data(), linear.size() * sizeof(scalar_t));
 
+    const Hex8Extras opt(d);
+
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d, e, x, y, z);
+        scalar_t         ux[8], uy[8], uz[8], p[8];
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
         gather_element_fields(d, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, CVFEM_HEX8_PART_NONLINEAR>(
-                rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
-        (void)p;
+                rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
     }
 }
 

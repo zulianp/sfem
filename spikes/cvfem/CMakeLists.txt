@@ -181,6 +181,14 @@ if(CVFEM_REPORT_PYTHON)
                      ${CMAKE_CURRENT_SOURCE_DIR}/python/cvfem_kernel_report.py --selftest)
 endif()
 
+# ------------------------------------------------------- what the benchmark stages, and what
+# it refuses. The staging work only means something if the combinations it opened are checked
+# and the ones it kept shut stay shut, and both halves live in the driver's own oracles rather
+# than in a reimplementation -- so this drives the driver. n=8, a couple of seconds.
+add_test(NAME cvfem_bench_staging
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_bench_staging.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+
 # ------------------------------------------------ generated headers match their generators
 #
 # The three headers under src/generated/ and src/cases/ are committed artifacts compiled as
