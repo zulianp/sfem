@@ -4,13 +4,13 @@ Against the atomic layout, on the residual at 4,121,204 dof:
 
 | operator | packed | atomic | packed / atomic |
 |---|---:|---:|---:|
-| element kernel only | 2916 | 881 | **3.31x** |
-| + Rhie–Chow, gradient hoisted | 1759 | 706 | 2.49x |
-| + Rhie–Chow + boundary | 1556 | 677 | 2.30x |
-| + Rhie–Chow, gradient per apply | 741 | 442 | 1.68x |
+| element kernel only | 2945 | 881 | **3.34x** |
+| + Rhie–Chow, gradient hoisted | 1759 | 703 | 2.50x |
+| + Rhie–Chow + boundary | 1559 | 675 | 2.31x |
+| + Rhie–Chow, gradient per apply | 729 | 439 | 1.66x |
 
-and on the Jacobian action, 2.42x on the bare kernel against 1.55x with Rhie–Chow and the
-boundary closure.
+and on the Jacobian action, 2.47x on the bare kernel (2066 against 835) against 1.54x with
+Rhie–Chow and the boundary closure (579 against 376).
 
 The packed layout is still the right choice — it wins in every row — but a layout
 comparison made on the bare kernel overstates the margin by about two. The reason is
@@ -22,4 +22,5 @@ coefficient). None of those is helped by the pack, so each one dilutes what the 
 for.
 
 The same caution applies to any two rows in the tables above: they are comparable only when
-the completeness column matches.
+the completeness column matches, and only when the gap between them exceeds the `spread`
+each was measured with.

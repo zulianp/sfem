@@ -90,6 +90,13 @@ def completeness(r):
     return "element kernel"
 
 
+def spread_cell(r):
+    s, n = r.get("_spread"), r.get("_n", 1)
+    if s is None:
+        return "1 run"
+    return "%.0f%% of %d" % (s, n)
+
+
 def table(headers, rows):
     out = ["| " + " | ".join(headers) + " |", "|" + "|".join("---" for _ in headers) + "|"]
     for r in rows:
@@ -105,7 +112,7 @@ def read_rows(paths):
     from a build that predates the ran_* columns are dropped rather than guessed at --
     that is exactly the misattribution this report exists to prevent.
     """
-    best, skipped = {}, 0
+    best, seen, skipped = {}, {}, 0
     for p in paths:
         with open(p) as fh:
             for raw in csv.DictReader(fh):
@@ -120,8 +127,17 @@ def read_rows(paths):
                     continue
                 key = (raw["operation"], variant(raw), condition(raw),
                        tuple(f(raw) for _, _, f in TERMS), raw["dofs"])
+                seen.setdefault(key, []).append(rate)
                 if key not in best or rate > float(best[key]["MDOF_s"]):
                     best[key] = raw
+    # How far apart the readings of one configuration were, as a percentage of the best.
+    # Reporting only the best hides whether a 3% difference between two rows means anything:
+    # the Rhie-Chow configurations here spread 20-32% across passes, which is more than the
+    # gaps a reader would otherwise take for results.
+    for key, row in best.items():
+        rates = seen[key]
+        row["_n"] = len(rates)
+        row["_spread"] = (max(rates) - min(rates)) / max(rates) * 100 if len(rates) > 1 else None
     return list(best.values()), skipped
 
 
@@ -193,10 +209,27 @@ def section_cascade(rows):
             terms = ", ".join("%s (%s)" % (h, f(r)) if f(r) not in ("carried",) else h
                               for _, h, f in TERMS if f(r) not in ("–", "?"))
             out.append([completeness(r), terms or "none", condition(r), "%.0f" % rate,
-                        "%.2fx" % (ref / rate) if rate > 0 else "–"])
+                        spread_cell(r), "%.2fx" % (ref / rate) if rate > 0 else "–"])
+        # The other way to apply the Jacobian belongs in this table, because the question
+        # the table answers -- what does a matvec cost -- has two answers and one of them
+        # is not matrix-free. One row per size and no more: the SpMV's cost is set by the
+        # sparsity pattern, which is the mesh's node-to-node graph whatever terms the
+        # values carry. The measurement below is the same reading for every set of terms,
+        # which is what says so.
+        spmv = [r for r in rows if r["operation"] == "bsr_apply" and r["layout"] == "packed"
+                and r["dofs"] == size]
+        if op == "jac_action" and spmv:
+            rate = max(float(r["MDOF_s"]) for r in spmv)
+            spread = ((max(float(r["MDOF_s"]) for r in spmv) -
+                       min(float(r["MDOF_s"]) for r in spmv)) / rate * 100) if len(spmv) > 1 else None
+            note = "SpMV of the assembled BSR"
+            if spread is not None:
+                note += " — %d term sets, %.1f%% apart" % (len(spmv), spread)
+            out.append(["assembled matrix", note, "warm", "%.0f" % rate,
+                        "n=%d" % len(spmv), "%.2fx" % (ref / rate) if rate > 0 else "–"])
         body.append("### %s, %s dof\n\n" % (op, "{:,}".format(size)) +
                     table(["operator", "terms carried", "working set", "MDOF/s",
-                           "cost vs bare kernel"], out))
+                           "spread", "cost vs bare kernel"], out))
     if not body:
         return ""
     return ("## What the physics costs\n\n"
@@ -204,6 +237,10 @@ def section_cascade(rows):
             "needs, one operation and one size at a time so that only the operator varies.\n"
             "The bare-kernel row is the number the regression gate tracks and the one every\n"
             "quoted figure has historically meant; the solver does not run it.\n\n"
+            "`spread` is how far apart that configuration's repeated measurements were, as a\n"
+            "percentage of the best. Two rows differ meaningfully only when the gap between\n"
+            "them is larger than that -- which is not true of every pair here, and saying so\n"
+            "is cheaper than inviting the reader to over-read a 3% difference.\n\n"
             + "\n".join(body))
 
 
