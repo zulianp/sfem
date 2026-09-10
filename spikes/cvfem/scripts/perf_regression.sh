@@ -153,22 +153,29 @@ if [ "$MODE" = against ]; then
 fi
 
 OUT="${OUT:-$(mktemp -d)}"; mkdir -p "$OUT"
-CSV="$OUT/perf_regression.csv"; rm -f "$CSV"
+# One CSV per binary, not one shared file. The driver refuses to append a row shape to a
+# header that does not match, which is the right behaviour for a sweep that accumulates over
+# time -- but in --against mode the two binaries are deliberately of different vintages, and
+# the moment one of them gains a column the shared file rejects whichever writes second and
+# every configuration comes out MISSING. That happened. Separate files also cost nothing:
+# the analysis reads by column name and merges on the tag.
+CSV_DIR="$OUT/main"; rm -rf "$CSV_DIR"; mkdir -p "$CSV_DIR"
 
 echo "### cvfem packed-throughput regression gate  (mode: $MODE)"
 echo "### binary   : $BIN"
 [ "$MODE" = against ] && echo "### reference: $REF_BIN"
 [ "$MODE" != against ] && echo "### baseline : $BASELINE"
-echo "### threads  : $THREADS   reps: $REPS   raw csv: $CSV"
+echo "### threads  : $THREADS   reps: $REPS   raw csv: $CSV_DIR/*.csv"
 echo "### host     : $(hostname)   $(date '+%Y-%m-%d %H:%M:%S')"
 
 measure() {  # binary tag_prefix key operation layout kernel n [extra options]
     local bin=$1 pfx=$2 key=$3 op=$4 layout=$5 kernel=$6 n=$7 extra=${8:-}
+    local side=${pfx:-solo_}
     # shellcheck disable=SC2046
     OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=true OMP_PLACES=cores \
         stdbuf -oL "$bin" --n "$n" --repeat 20 --warmup 3 \
             --layout "$layout" --kernel "$kernel" $(op_flag "$op") $extra \
-            --csv "$CSV" --tag "${pfx}${key}" >/dev/null 2>&1 \
+            --csv "$CSV_DIR/${side%_}.csv" --tag "${pfx}${key}" >/dev/null 2>&1 \
         || echo "### WARNING: ${pfx}${key} returned $? -- it will show as missing below"
 }
 
@@ -204,11 +211,11 @@ sweep() {
 
 sweep
 
-[ -s "$CSV" ] || { echo "error: no measurements were produced" >&2; exit 2; }
+ls "$CSV_DIR"/*.csv >/dev/null 2>&1 || { echo "error: no measurements were produced" >&2; exit 2; }
 
 CONFIG_SPEC=$(printf '%s\n' "${CONFIGS[@]}")
 FAILED="$OUT/failing_keys.txt"
-export CONFIG_SPEC CSV BASELINE MODE THREADS REPS BIN REF_BIN FAILED
+export CONFIG_SPEC CSV_DIR BASELINE MODE THREADS REPS BIN REF_BIN FAILED
 
 cat > "$OUT/analyse.py" <<'PY'
 import csv, os, statistics as st, sys, subprocess, datetime
@@ -216,14 +223,17 @@ from pathlib import Path
 
 configs = [l.split('|') for l in os.environ["CONFIG_SPEC"].splitlines()
            if l.strip() and not l.strip().startswith('#')]
-raw, baseline_path = Path(os.environ["CSV"]), Path(os.environ["BASELINE"])
+raw_dir, baseline_path = Path(os.environ["CSV_DIR"]), Path(os.environ["BASELINE"])
 mode = os.environ["MODE"]
 
+# One file per binary; they are merged on the tag, which already carries the side. Reading
+# by column name means the two files may have different columns, which is the point.
 runs, dofs = {}, {}
-with raw.open() as f:
-    for row in csv.DictReader(f):
-        runs.setdefault(row["tag"], []).append(float(row["MDOF_s"]))
-        dofs[row["tag"]] = int(row["dofs"])
+for raw in sorted(raw_dir.glob("*.csv")):
+    with raw.open() as f:
+        for row in csv.DictReader(f):
+            runs.setdefault(row["tag"], []).append(float(row["MDOF_s"]))
+            dofs[row["tag"]] = int(row["dofs"])
 
 def med(tag):
     v = runs.get(tag)
@@ -370,7 +380,7 @@ if [ "$rc" -ne 0 ] && [ "$MODE" = against ] && [ -s "$FAILED" ]; then
     echo
     echo "### $(wc -l < "$FAILED" | tr -d ' ') configuration(s) failed; re-measuring to confirm"
     keys=$(cat "$FAILED")
-    CSV="$OUT/perf_regression_confirm.csv"; rm -f "$CSV"; export CSV
+    CSV_DIR="$OUT/confirm"; rm -rf "$CSV_DIR"; mkdir -p "$CSV_DIR"; export CSV_DIR
     CONFIRM_ONLY="$(tr '\n' ' ' < "$FAILED")"; export CONFIRM_ONLY
     sweep "$keys"
     echo
