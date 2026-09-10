@@ -238,6 +238,62 @@ viscosity parameters.  However many state fields a material reads, they are all
 absorbed into `Sbar` at assembly time, so extra state costs one argument on the
 once-per-tangent kernel and nothing at all per Krylov iteration.
 
+## The two-unit material on a curved element
+
+TET4 was the only element this material had been measured on, and it is the one
+where the projection is provably exact -- so it established correctness and
+throughput and said nothing about accuracy.  `run_mixed.sh TET10` says the rest.
+Single-threaded, best of three.
+
+| elements | ndof | exact | st. f64 | st. f32 | st. f16 | assembly | rel diff |
+|---|---|---|---|---|---|---|---|
+|   3072 |   14739 | 5.66 | 24.03 | 24.09 | 24.37 | 1.33 | 3.9e-03 |
+|  24576 |  107811 | 5.11 | 19.63 | 20.53 | 21.35 | 1.18 | 1.8e-03 |
+|  82944 |  352947 | 4.88 | 17.30 | 19.21 | 19.96 | 1.15 | 1.2e-03 |
+| 196608 |  823875 | 4.72 | 15.78 | 16.84 | 17.81 | 1.12 | 8.7e-04 |
+| 384000 | 1594323 | 4.77 | 16.93 | 18.12 | 19.21 | 1.12 | 7.0e-04 |
+
+MDOF/s, white-noise increment (`MIXED_EXTRA_FLAGS=-DRANDOM_INCREMENT`).
+
+**The deviation is first order, at `O(h^1.07)`** across a fivefold refinement --
+pairwise rates 1.12, 1.00, 1.12, 0.97.  That is the same rate the single-unit
+TET10 measurement found, so carrying two units, one of them an unsymmetric
+Jacobian stored in 81 numbers, does not degrade the projection.
+
+With the smooth increment the same runs report a flat 2.9e-02 instead.  That is
+the metric artefact documented above, not a property of this material; it is
+recorded here only so that a reader who runs the default and sees 2.9e-02 knows
+which number to believe.
+
+**Storage precision is free on this element, which inverts the TET4 advice.**
+The f32 and f16 columns agree with f64 to two digits at every refinement -- 3.9e-03
+against 3.9e-03, 7.0e-04 against 7.2e-04.  On TET4 the same comparison gives
+6.4e-08 for f32 and 5.1e-04 for f16, because there the projection is exact and
+the store is the only error there is.  On TET10 the projection error is three to
+four orders larger than anything the store contributes, so f16 costs nothing
+measurable and saves three quarters of the memory.  The Grace conclusion that
+fp16 is not worth carrying was drawn on TET4 and does not transfer.
+
+HEX8 says the same thing on a different element:
+
+| elements | ndof | exact | st. f64 | st. f32 | st. f16 | assembly | rel diff |
+|---|---|---|---|---|---|---|---|
+|   512 |   2187 | 3.92 | 20.43 | 19.52 | 19.98 | 1.57 | 1.3e-03 |
+|  4096 |  14739 | 3.40 | 17.12 | 17.01 | 17.43 | 1.31 | 5.9e-04 |
+| 13824 |  46875 | 3.19 | 15.51 | 15.52 | 16.39 | 1.21 | 3.9e-04 |
+| 32768 | 107811 | 3.07 | 14.01 | 14.46 | 15.09 | 1.16 | 2.9e-04 |
+| 64000 | 206763 | 2.90 | 13.25 | 13.68 | 14.79 | 1.13 | 2.3e-04 |
+
+`O(h^1.08)`, pairwise 1.14, 1.02, 1.03, 1.04, and the same collapse of the
+precision columns onto one another.  Its deviation is about a third of TET10's
+at equal dof, and its break-even is 3.3 rather than 5.9.
+
+**Break-even**: 5.9 applies per tangent on TET10, 3.3 on HEX8, against 2.7 on
+TET4.  The exact TET10 apply is only 1.9x more expensive per dof than the
+exact TET4 one, while assembling the tangent costs about the same in all three,
+so the fixed cost is amortised over more applies.  The speed-up once past it is
+3.5x on TET10 and 4.6x on HEX8, against 2.8x on TET4.
+
 ## Threads
 
 206763 dof, on 8 performance plus 2 efficiency cores, twenty repetitions inside
@@ -349,7 +405,14 @@ single kernel with no harness at all and confirms the corrected figures.
 ## Reproducing
 
     spikes/inexact_apply_compare/run_split.sh <material> <element> [repeats]
+    spikes/inexact_apply_compare/run_mixed.sh <element> [repeats]
     spikes/inexact_apply_compare/run_warp.sh  <material> <element> [n]
+
+`run_mixed.sh` drives the two-unit material and takes no material argument: it
+generates one tree and links two sets of kernels out of it, because the energy
+unit's exact entry point is `apply_a_msoa` and the residual unit's is
+`jacobian_action_a_msoa`.  `MIXED_EXTRA_FLAGS=-DRANDOM_INCREMENT` selects the
+white-noise increment, which is the one to use for anything about accuracy.
 
 Elements are TET4, HEX8 and TET10.  `WARP_EXTRA_FLAGS=-DRANDOM_INCREMENT` selects
 the white-noise increment.  `SFEM_MAIN_CHECKOUT`, `SFEM_BUILD`, `SFEM_PYTHON` and
