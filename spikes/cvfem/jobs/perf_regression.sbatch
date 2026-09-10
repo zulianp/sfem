@@ -52,8 +52,13 @@ UENV_IMAGE="${UENV_IMAGE:-prgenv-gnu/24.11:v2}"
 UENV_VIEW="${UENV_VIEW:-default}"
 NCORES="${NCORES:-${SLURM_CPUS_PER_TASK:-72}}"
 
+# The tree on the compute side is usually an rsync copy with no .git, so `git rev-parse`
+# inside the run returns nothing and a --record baseline says "commit: unknown". A baseline
+# that cannot say what it measured gates nothing, so pass the commit in explicitly:
+#   sbatch --export=ALL,RECORD=1,CVFEM_COMMIT=$(git rev-parse --short HEAD) jobs/perf_regression.sbatch
 srun -u --ntasks=1 --cpus-per-task="${NCORES}" --uenv="${UENV_IMAGE}" --view="${UENV_VIEW}" \
     bash -lc "cd '${SPIKE_ROOT}' && THREADS=${NCORES} REPS=${REPS:-9} \
+              CVFEM_COMMIT='${CVFEM_COMMIT:-unknown}' \
               stdbuf -oL ./scripts/perf_regression.sh \
                   ${REF_BIN:+--against '${REF_BIN}'} ${RECORD:+--record}"
 rc=$?

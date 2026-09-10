@@ -76,8 +76,14 @@ CONFIGS=(
     "residual_packed_sympy|residual|packed|sympy|128|5|12|"
     "residual_packed_current|residual|packed|current|128|5|12|"
     "jac_action_packed_sumfact|jac_action|packed|sumfact|128|5|12|"
-    "jac_action_packed_sympy|jac_action|packed|sympy|128|5|12|"
-    "jac_action_packed_current|jac_action|packed|current|128|5|12|"
+    # `jac_action_packed_sympy` and `jac_action_packed_current` used to sit here and were
+    # not three checks but one: no apply_jacobian_action_* takes a KernelKind, so all three
+    # ran the same code. The gate said so every time and nobody read it that way -- the
+    # three medians agreed to 0.3%. Replaced by configurations that genuinely differ: the
+    # atomic sweep is a different scatter, and the isoparametric kernel is different
+    # arithmetic.
+    "jac_action_atomic_sumfact|jac_action|atomic|sumfact|128|5|12|"
+    "jac_action_packed_isoparam|jac_action|packed|sumfact|128|5|12|--geom isoparam"
     "residual_colored_sumfact|residual|colored|sumfact|128|5|12|"
     "bsr_apply_packed_sumfact|bsr_apply|packed|sumfact|128|8|-|"
     "assemble_store_sumfact|assemble|store|sumfact|128|10|-|"
@@ -90,6 +96,12 @@ CONFIGS=(
     "residual_packed_rc|residual|packed|sumfact|128|5|12|--rhie-chow"
     "residual_packed_rc_bnd|residual|packed|sumfact|128|5|12|--rhie-chow --boundary"
     "residual_packed_rc_perapply|residual|packed|sumfact|128|5|12|--rhie-chow --pgrad-per-apply"
+    # The Jacobian action carrying what the solver's Krylov loop evaluates. The gate had
+    # nothing like this: every jac_action row above is the bare element kernel, and the
+    # operator the solver runs is 3.5x slower than that (docs/CVFEM_Kernels.md), so a change
+    # that cost the exact Rhie-Chow term half its speed would not have shown up anywhere.
+    "jac_action_packed_rc|jac_action|packed|sumfact|128|5|12|--rhie-chow"
+    "jac_action_packed_rc_bnd|jac_action|packed|sumfact|128|5|12|--rhie-chow --boundary"
 )
 
 op_flag() {
@@ -111,7 +123,9 @@ REF_BIN=""
 case "${1:-}" in
     --record)  MODE=record ;;
     --against) MODE=against; REF_BIN="${2:?--against needs a path to the reference binary}" ;;
-    --list)    printf '%s\n' "${CONFIGS[@]}" | cut -d'|' -f1-5 | column -t -s'|'; exit 0 ;;
+    # Fields 1-5 and 8: the options are what distinguish four rows that are otherwise the
+    # same operation, layout, kernel and size, so a listing without them lists duplicates.
+    --list)    printf '%s\n' "${CONFIGS[@]}" | cut -d'|' -f1-5,8 | column -t -s'|'; exit 0 ;;
     --help|-h) sed -n '2,50p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     "") ;;
     *) echo "unknown argument: $1 (try --help)" >&2; exit 2 ;;
@@ -273,11 +287,18 @@ if mode == "record":
         f.write("# on what evidence -- a silently re-recorded baseline gates nothing.\n")
         for k, v in p.items():
             f.write(f"# {k}: {v}\n")
-        f.write("key,operation,layout,kernel,cube_n,ndof,mdof_s,band_pct,observed_spread_pct\n")
-        for key, op, layout, kernel, n, ab_band, bband, *_ in configs:
+        # `extra` is part of the row, not decoration. Without it residual_packed_sumfact,
+        # residual_packed_rc, residual_packed_rc_bnd and residual_packed_rc_perapply all
+        # wrote "residual,packed,sumfact,128" and differed only in a free-form key -- four
+        # rows describing themselves as the same measurement. It is quoted because it
+        # contains spaces.
+        f.write("key,operation,layout,kernel,cube_n,extra,ndof,mdof_s,band_pct,observed_spread_pct\n")
+        for key, op, layout, kernel, n, ab_band, bband, *rest in configs:
             if med(key) is None:
                 print(f"  {key}: MISSING, not recorded", file=sys.stderr); continue
-            f.write(f"{key},{op},{layout},{kernel},{n},{dofs[key]},{med(key):.1f},{bband},{spread(key):.1f}\n")
+            extra = (rest[0] if rest else "") or ""
+            f.write(f"{key},{op},{layout},{kernel},{n},\"{extra}\",{dofs[key]},"
+                    f"{med(key):.1f},{bband},{spread(key):.1f}\n")
     print(f"\nwrote {baseline_path}")
     print(f"{'config':<28}{'ndof':>10}{'MDOF/s':>10}{'spread':>9}  baseline band")
     for key, op, layout, kernel, n, ab_band, bband, *_ in configs:
