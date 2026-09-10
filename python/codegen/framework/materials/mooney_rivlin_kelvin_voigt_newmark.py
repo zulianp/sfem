@@ -82,6 +82,10 @@ material = gen.CodeGenerator(
         ("eta_b", 0.0),
         ("newmark_velocity_alpha", 1.0),
     ),
+    # Temporarily off: with it on, generating this material takes ~90 minutes
+    # against ~5, which makes every regeneration cycle impractical.  Nothing
+    # else depends on it being off -- re-enable by uncommenting.
+    # inexact_apply=True,
 )
 
 
