@@ -14,7 +14,7 @@
 
 # CVFEM HEX8 Navier-Stokes benchmark sweep on one CSCS ALPS Grace socket.
 #
-# Produces a single CSV that plot_cvfem_bench.py and report_cvfem_bench.py read.
+# Produces a single CSV that python/cvfem_kernel_report.py reads.
 # One Grace socket is 72 Neoverse V2 cores on ~500 GB/s of LPDDR5X, so the
 # assembly is expected to be even more bandwidth-bound here than on a laptop.
 #
@@ -290,5 +290,4 @@ echo "  csv:  ${CSV}   ($(( $(wc -l <"${CSV}") - 1 )) rows)"
 echo "  logs: ${OUT_DIR}"
 echo
 echo "Next:"
-echo "  python3 ${SCRIPT_DIR}/python/report_cvfem_bench.py ${CSV} -o ${OUT_DIR}/report.html"
-echo "  python3 ${SCRIPT_DIR}/python/plot_cvfem_bench.py   ${CSV} -o ${OUT_DIR}/plots"
+echo "  python3 ${SCRIPT_DIR}/python/cvfem_kernel_report.py ${CSV} -o ${OUT_DIR}/CVFEM_Kernels.md --html"

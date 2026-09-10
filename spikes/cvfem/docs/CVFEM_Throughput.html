@@ -197,7 +197,7 @@ above read 607-625 when this was first investigated, and reads 851-911 now that 
 Rhie-Chow coefficient is hoisted. These are the same kernel, and the trace figure
 already EXCLUDES the boundary pass and the nodal gradient -- they are sibling
 scopes, listed separately in the tables below -- so the cascade in
-docs/CVFEM_Operator_Cascade.md did not account for the difference.</p>
+docs/CVFEM_Kernels.md accounts for the difference.</p>
 <p>The bench could not measure the configuration the solver runs: it refused
 <code>--rhie-chow</code> with <code>--jac-action</code> on <code>--layout packed</code>, because the bench's packed
 staging never carried the term. That staging now exists (<code>--rhie-chow</code> with

@@ -60,7 +60,7 @@ requirement.** `numpy`, `matplotlib` and `markdown` are all absent from the Alps
 `python3` and from the default `python3` here, so the convergence fit is a hand-rolled
 log-log least squares -- the same estimator as
 `verification_and_validation/common/convergence.py`, which needs NumPy -- and the figures
-are hand-emitted inline SVG, following `report_cvfem_bench.py`. `--html` shells out to
+are hand-emitted inline SVG, which is this directory's convention for charts. `--html` shells out to
 `markdown_py`; a missing one is a skipped step and never a failure, because the Markdown is
 the artifact.
 
@@ -140,8 +140,7 @@ running it executes its self-tests, including a finite-difference check of the J
 | script | |
 |---|---|
 | `benchmark_jacobian_variants.py` | drives `build/cvfem_tet4_ns_upwind_bench` and tabulates the layouts |
-| `report_cvfem_bench.py` | the HTML + inline-SVG benchmark report |
-| `plot_cvfem_bench.py` | matplotlib figures from the same CSV; imports `report_cvfem_bench` |
+| `cvfem_kernel_report.py` | the kernel report: every rate beside the operator it was measured on |
 | `analyze_xctrace_export.py` | parses Instruments trace exports (macOS) |
 | `nullspace_eval.py` | reproduces the multigrid null-space behaviour on a model Stokes system |
 | `create_xdmf.py` | SFEM raw output to ParaView XDMF; driven by `scripts/create_xdmf.sh` |

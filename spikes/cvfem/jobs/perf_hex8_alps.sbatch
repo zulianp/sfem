@@ -288,4 +288,4 @@ echo "  counters: ${CSV}   ($(( $(wc -l <"${CSV}") - 1 )) rows)"
 echo "  events this machine exposes: ${EVENTS_TXT}"
 echo
 echo "Next:"
-echo "  python3 ${SCRIPT_DIR}/python/report_cvfem_bench.py <bench.csv> --perf ${CSV} -o report.html"
+echo "  python3 ${SCRIPT_DIR}/python/cvfem_kernel_report.py <bench.csv> -o CVFEM_Kernels.md --html"
