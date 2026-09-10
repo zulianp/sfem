@@ -398,7 +398,15 @@ inline void assemble_nodal_grad_strided(MeshData &d, const GeomKind geom_kind,
                                         std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
                                         std::vector<scalar_t> &ogz) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::nodal_grad_strided");
-    cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, src, stride, ogx, ogy, ogz);
+    const int iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+    // Over packs where there is a pack to sweep, which is the solver's normal case. Same
+    // operator, no atomics, and deterministic. SFEM_QGRAD_ATOMIC=1 forces the flat sweep,
+    // as a measurement escape hatch rather than a supported mode.
+    static const int force_atomic = smesh::Env::read<int>("SFEM_QGRAD_ATOMIC", 0);
+    if (d.packed && !force_atomic)
+        cvfem_hex8_assemble_nodal_grad_packed(d, *d.packed, iso, src, stride, ogx, ogy, ogz);
+    else
+        cvfem_hex8_assemble_nodal_grad(d, iso, src, stride, ogx, ogy, ogz);
 }
 
 inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {

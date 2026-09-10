@@ -90,7 +90,12 @@ int main(int argc, char **argv) {
     // would go unnoticed.
     const int N = 6;
     auto mesh = smesh::Mesh::create_hex8_cube(ctx.communicator(), N, N, N, 0, 0, 0, 2, 1.5, 1);
-    MeshData d;
+    // Packed first: creating a PackedMesh renumbers the mesh nodes in place, so everything
+    // derived from the node ordering has to come after it. A small pack deliberately: with
+    // one pack holding every element there are no ghost rows, and the ghost reduction --
+    // the part of the packed sweep that replaces the atomics -- would go unexercised.
+    PackedData packed = make_packed(mesh, 64);
+    MeshData   d;
     d.mesh      = mesh;
     d.nnodes    = mesh->n_nodes();
     d.nelements = mesh->n_elements(0);
@@ -188,6 +193,42 @@ int main(int argc, char **argv) {
         for (const scalar_t v : ogx) scale = std::max(scale, std::fabs(v));
         check(w <= scalar_t(1e-14) * scale, "stride 4 out of an interleaved vector matches stride 1", (double)w);
         std::printf("%-60s %-12.3e (informational)\n", "  the same input twice differs by", (double)self);
+    }
+
+    // ---- the packed sweep is the same operator, and is deterministic ---------------
+    //
+    // It replaces 24 atomics per element with a private per-pack accumulation and a ghost
+    // reduction over the shared rows only. That changes the summation order, so agreement
+    // is to round-off and not bitwise -- but it also FIXES the order, which the atomic
+    // sweep does not, so the packed one must reproduce itself exactly where the atomic one
+    // does not.
+    {
+        std::vector<scalar_t> px, py, pz, qx, qy, qz;
+        cvfem_hex8_assemble_nodal_grad_packed(d, packed, 0, f.data(), 1, px, py, pz);
+        cvfem_hex8_assemble_nodal_grad_packed(d, packed, 0, f.data(), 1, qx, qy, qz);
+
+        scalar_t scale = 0;
+        for (const scalar_t v : ogx) scale = std::max(scale, std::fabs(v));
+        const scalar_t w = std::max(worst_diff(px, ogx), std::max(worst_diff(py, ogy), worst_diff(pz, ogz)));
+        check(w <= scalar_t(1e-13) * scale, "the packed sweep agrees with the atomic one", (double)(w / scale));
+
+        const scalar_t self = std::max(worst_diff(px, qx), std::max(worst_diff(py, qy), worst_diff(pz, qz)));
+        check(self == scalar_t(0), "and reproduces itself exactly, which the atomic one does not",
+              (double)self);
+
+        // The linear-field property has to survive the change of sweep: it is the one the
+        // Rhie-Chow correction is defined against.
+        const scalar_t ax = scalar_t(0.37), ay = scalar_t(-0.21), az = scalar_t(0.58);
+        std::vector<scalar_t> lin((size_t)d.nnodes);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+            lin[(size_t)i] = scalar_t(1.7) + ax * d.points[0][i] + ay * d.points[1][i] + az * d.points[2][i];
+        cvfem_hex8_assemble_nodal_grad_packed(d, packed, 0, lin.data(), 1, px, py, pz);
+        scalar_t worst = 0;
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+            worst = std::max(worst,
+                             std::max(std::fabs(px[(size_t)i] - ax),
+                                      std::max(std::fabs(py[(size_t)i] - ay), std::fabs(pz[(size_t)i] - az))));
+        check(worst <= scalar_t(1e-12), "packed: a linear field still reconstructs exactly", (double)worst);
     }
 
     // ---- isoparametric agrees with affine on an affine mesh ------------------------
