@@ -4113,11 +4113,12 @@ def _append_mesh_operator_scalar_output(
                 [
                     "",
                     "    for (int shape = 0; shape < NS; ++shape) {",
+                    "      const idx_t *const RSTR ev_shape = &ev[shape * VS];",
                     "      for (int d = 0; d < NC; ++d) {",
                     *_scatter_add_lines(
                         source_builder,
                         "out_components[d]",
-                        "ev[shape * VS + %s] * out_stride",
+                        "ev_shape[%s] * out_stride",
                         "bout_data[shape * NC + d][%s]",
                         "        ",
                     ),
@@ -4338,9 +4339,10 @@ def _append_mesh_operator_stream_buffer_views(
         lines.extend(
             [
                 "    for (int shape = 0; shape < NS; ++shape) {",
+                "      const idx_t *const RSTR ev_shape = &ev[shape * VS];",
                 "      for (int d = 0; d < NC; ++d) {",
                 *_work_item_loop_lines(source_builder, "        "),
-                "          const idx_t node = ev[shape * VS + %s];" % work_item,
+                "          const idx_t node = ev_shape[%s];" % work_item,
             ]
         )
         if uses_current:
@@ -4423,13 +4425,13 @@ def _append_mesh_operator_isoparametric_jacobian(
                 [
                     "",
                     "    for (int shape = 0; shape < NS; ++shape) {",
-                    *([] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
+                    *(["      const idx_t *const RSTR ev_shape = &ev[shape * VS];"] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
                     "      for (int d = 0; d < ND; ++d) {",
                     *_work_item_loop_lines(source_builder, "        "),
                     "          bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
                     % (
                         work_item,
-                        "ev[shape * VS + %s]" % work_item
+                        "ev_shape[%s]" % work_item
                         if identity_stream_shape_order
                         else "coordinate_element_shape[evb + %s]" % work_item,
                     ),
@@ -6140,13 +6142,13 @@ def _sfem_soa_mesh_objective_steps_function(
                 [
                     "",
                     "    for (int shape = 0; shape < NS; ++shape) {",
-                    *([] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
+                    *(["      const idx_t *const RSTR ev_shape = &ev[shape * VS];"] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
                     "      for (int d = 0; d < ND; ++d) {",
                     *_work_item_loop_lines(source_builder, "        "),
                     "          bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
                     % (
                         work_item,
-                        "ev[shape * VS + %s]" % work_item
+                        "ev_shape[%s]" % work_item
                         if identity_stream_shape_order
                         else "coordinate_element_shape[evb + %s]" % work_item,
                     ),
@@ -6186,9 +6188,10 @@ def _sfem_soa_mesh_objective_steps_function(
             [
                 "",
                 "    for (int shape = 0; shape < NS; ++shape) {",
+                "      const idx_t *const RSTR ev_shape = &ev[shape * VS];",
                 "      for (int d = 0; d < NC; ++d) {",
                 *_work_item_loop_lines(source_builder, "        "),
-                "          const idx_t node = ev[shape * VS + %s];" % work_item,
+                "          const idx_t node = ev_shape[%s];" % work_item,
                 "          bu_base_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item,
                 "          bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item,
                 "        }",
