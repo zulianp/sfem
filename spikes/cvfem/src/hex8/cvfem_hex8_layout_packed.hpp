@@ -707,7 +707,6 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
             Hex8InputPack    du_pack;
             Hex8ResidualPack outp;
             Hex8RhieChowPack rcp;
-            Hex8TangentPack  tan;
             for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                 alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
@@ -724,9 +723,9 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
                     cvfem_hex8_gather_rc_xyz_from_pack(p.elems, pack_x, pack_y, pack_z, begin, nlanes, rcp);
                     cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
                 }
-                cvfem_hex8_gather_pa_tangent(d, begin, nlanes, tan);
                 cvfem_hex8_ns_upwind_jacobian_action_pa_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6,
-                                                             cof7, cof8, det, du_pack, tan, outp,
+                                                             cof7, cof8, det, du_pack,
+                                                             d.pa_tangent.data() + begin, d.nelements, outp,
                                                              with_rc ? &rcp : nullptr, d.rhie_chow_scale, with_qg);
                 scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
             }

@@ -158,6 +158,71 @@ generated action kernel existed. So none of the above was evidence about the ope
 Krylov solve spends its time in. That question was asked separately, and answered differently:
 see the `sympy_action*` section below, where the arrangement is worth 1.51x.
 
+## `--partial-assembly` — the Jacobian action's element tangent, stored
+
+**Why it existed.** For a fixed Newton iterate the flux through a sub-control surface is
+bilinear — state scalars times direction vectors — and the state enters through remarkably
+few numbers. The face kernel's momentum flux is
+
+```
+fx = dpos*u_I + mpos*du_I + dneg*u_J + mneg*du_J + qmid*ax
+```
+
+with `dpos = d_pos*dmdot`, `dneg = d_neg*dmdot` and `d_pos + d_neg = 1`, so the two state
+terms collapse to `dmdot` times the upwinded velocity. A surface's whole dependence on
+`(u, p)` is therefore `mpos`, `mneg` and three components of upwinded velocity — **60 scalars
+per element, 117 bytes per degree of freedom against 847 for the assembled matrix**. Built
+once per Newton step, read on every matvec, it removes from the matvec: the staging of the
+state `u,p` entirely, the staging of the nodal pressure gradient, and per element twelve
+mass fluxes, twelve Rhie–Chow corrections and twelve upwind switches.
+
+**Why it lost.** Grace, one socket, 72 cores, `--exclusive`, `OMP_PROC_BIND=true`, ten
+applies after five warmups, direct and stored interleaved in one allocation, three
+repetitions each. The full operator — exact Rhie–Chow, boundary closure, transient term:
+
+| dof | direct | stored | |
+|---:|---:|---:|---:|
+| 4,121,204 | 783–817 | 644–675 | **17% slower** |
+| 8,586,756 | 794–818 | 635–665 | **19% slower** |
+
+The per-phase breakdown says the design worked and the trade did not. Staging fell by
+exactly what it was meant to — `gather_u` 26.6 → 13.7 ms of thread time, halved, because the
+state and the nodal gradient are no longer staged at all. But the element kernel went
+212.4 → 278.5, up 31%, and that is five times the saving.
+
+**The mechanism, which is the part worth keeping.** The arithmetic the store replaces was
+close to free: twelve mass fluxes and twelve upwind switches per element, computed from
+velocities already in L1 — staged once per pack and reused across all twelve surfaces and
+all sixteen elements of a SIMD group. What replaces it is 480 bytes per element that are
+read from DRAM, used once, and never reused. That is why the deficit *grows* with problem
+size: 17% at 4.1M dof and 19% at 8.6M, as the store outgrows every level of cache.
+
+**Both obvious implementations were measured**, because the first result looked like it
+might be an artefact of how the store was read rather than of storing it. Staged into a
+per-SIMD-group struct, as `Hex8RhieChowPack::coeff` is: 10% and 21% slower. Read straight
+out of memory in the face loop, with the array padded so the final group can over-read: 17%
+and 19%. The two are within each other's spread, and the kernel penalty is 25–31% either
+way. Staging is not the problem; the store is.
+
+This is the same verdict as `cvfem_sshex8_em.hpp` above by a different route. There a dense
+gemm did 576 multiply-adds where evaluating the same terms cost 250–300 flops, and the
+arithmetic was the loss. Here the arithmetic saving is real and the *traffic* is the loss.
+The common cause is that these kernels are not bandwidth bound to begin with — the spike
+records compulsory traffic at 4% of Grace's peak — so trading arithmetic for memory
+traffic starts from the wrong side of the machine.
+
+**What this does not say.** It says nothing about a device, where the arithmetic-intensity
+argument is different enough that the ordering could invert, as packing already does between
+Grace and Hopper. It says nothing about single precision either: at `float` the store would
+be 58 bytes per degree of freedom and the traffic halves, which is the one variant that could
+plausibly close a 17% gap — but it perturbs the operator, and a Krylov method needs a
+consistent matvec, so it would need its own convergence evidence rather than a throughput.
+
+**Kept compiling.** `--partial-assembly` is rejected by name in the default build, the way
+`--kernel sympy_row` and `sympy_face` are, and runs under `-DCVFEM_ENABLE_SUBPAR=ON`.
+`tests/cvfem_pa_tangent_test` runs either way: it calls the kernels directly, so the
+quarantined path cannot rot, and it pins the algebraic identity the whole idea rests on.
+
 ## `sympy_action*` — generated CSE for the HEX8 Jacobian action
 
 **Why they existed.** HEX8 had no generated Jacobian action at all: the four `sympy*`
