@@ -21,7 +21,10 @@ from codegen.framework.fem.reference import (
     sfem_tensor_product_hex_uses_cartesian_ordering,
     sfem_tensor_product_quad_uses_cartesian_ordering,
 )
-from codegen.framework.fem.tensor_product import tensor_product_cartesian_shape_order
+from codegen.framework.fem.tensor_product import (
+    tensor_product_cartesian_shape_order,
+    tensor_product_subspace_shape_order,
+)
 
 
 def _identity_order(order):
@@ -118,6 +121,27 @@ def _residual_parent_field_name(field_or_name):
     return str(getattr(field_or_name, "field_name", field_or_name))
 
 
+def _cell_shape_order(element_type, cell_rule, n_shape):
+    """Which cell node each of a field's nodes is gathered from.
+
+    Two different questions meet here and both have to be asked.  A cell whose
+    mesh numbering is not lexicographic needs its nodes permuted into the order
+    the tensor-product basis is written in.  A field coarser than its cell needs
+    to know which of the cell's nodes carry it -- and that is only the identity
+    because SFEM numbers a cell's corners first.  A lexicographic cell spaces
+    them out instead, so the pressure of a `PROTEUS_HEX27_PROTEUS_HEX8` pair
+    lives on cell nodes 0, 2, 6, 8, 18, 20, 24 and 26, not on 0 through 7.
+    """
+    if not uses_cartesian_ordering(element_type):
+        return tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
+    field_n_shape_1d = round(n_shape ** (1.0 / cell_rule.dim))
+    return tensor_product_subspace_shape_order(
+        cell_rule.dim,
+        cell_rule.tensor_product_n_shape_1d,
+        field_n_shape_1d,
+    )
+
+
 def _mixed_field_shape_orders(
     layout,
     cell_rule,
@@ -136,11 +160,7 @@ def _mixed_field_shape_orders(
             cell_rule,
             field_element_types,
         )
-        orders.append(
-            tuple(range(n_shape))
-            if uses_cartesian_ordering(element_type)
-            else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
-        )
+        orders.append(_cell_shape_order(element_type, cell_rule, n_shape))
     return tuple(orders)
 
 
@@ -162,11 +182,7 @@ def _mixed_tensor_product_field_stream_order(
             cell_rule,
             field_element_types,
         )
-        shape_order = (
-            tuple(range(n_shape))
-            if uses_cartesian_ordering(element_type)
-            else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
-        )
+        shape_order = _cell_shape_order(element_type, cell_rule, n_shape)
         order.extend(layout.stream_index(field_index, shape) for shape in shape_order)
     return tuple(order)
 

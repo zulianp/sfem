@@ -1,5 +1,5 @@
 #include <type_traits>
-#include "../navier_stokes_form_2_p_u_d3_tensor_product_mixed_local.hpp"
+#include "../navier_stokes_form_2_u_p_d3_tensor_product_mixed_local.hpp"
 #include "../../../reference/line_p1_q4.hpp"
 #include "../../../reference/line_p2_q4.hpp"
 #include "../../../reference/quad_line_q4.hpp"
@@ -57,9 +57,9 @@ SFEM_INLINE const s_t *ageom_stream(
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics navier_stokes_form_2_p_u_hex27_hex8_residual_esoa_diagnostics_data = {
-  "navier_stokes_form_2_p_u_hex27_hex8_residual_esoa",
-  "HEX27",
+static const KernelDiagnostics navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_residual_esoa_diagnostics_data = {
+  "navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_residual_esoa",
+  "PROTEUS_HEX27",
   3,
   64,
   27,
@@ -104,16 +104,16 @@ static const KernelDiagnostics navier_stokes_form_2_p_u_hex27_hex8_residual_esoa
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_hex27_hex8_residual_esoa_diagnostics(void) {
-  return &sfem::codegen::navier_stokes_form_2_p_u_hex27_hex8_residual_esoa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_residual_esoa_diagnostics(void) {
+  return &sfem::codegen::navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_residual_esoa_diagnostics_data;
 }
 
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_esoa_diagnostics_data = {
-  "navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_esoa",
-  "HEX27",
+static const KernelDiagnostics navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_esoa_diagnostics_data = {
+  "navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_esoa",
+  "PROTEUS_HEX27",
   3,
   64,
   27,
@@ -158,15 +158,15 @@ static const KernelDiagnostics navier_stokes_form_2_p_u_hex27_hex8_jacobian_acti
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_esoa_diagnostics(void) {
-  return &sfem::codegen::navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_esoa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_esoa_diagnostics(void) {
+  return &sfem::codegen::navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_esoa_diagnostics_data;
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_mixed_impl(
+static SFEM_INLINE int navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_affine_mesh_mixed_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -195,10 +195,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
   static constexpr int VS = 16;
   const s_t *const field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()};
   const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
-  const idx_t *const RSTR field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
-  const idx_t *const RSTR field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
-  const idx_t *const RSTR field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
-  const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[1], elements[3], elements[2], elements[4], elements[5], elements[7], elements[6]};
+  const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[2], elements[6], elements[8], elements[18], elements[20], elements[24], elements[26]};
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -207,7 +204,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
     s_t boutput[N_FIELD_STREAMS][VS];
 
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
-      const idx_t *const RSTR element_shape = field_0_elements[local_shape];
+      const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 0 + local_shape;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
@@ -216,7 +213,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
       }
     }
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
-      const idx_t *const RSTR element_shape = field_1_elements[local_shape];
+      const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 27 + local_shape;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
@@ -225,7 +222,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
       }
     }
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
-      const idx_t *const RSTR element_shape = field_2_elements[local_shape];
+      const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 54 + local_shape;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
@@ -261,12 +258,12 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[9], badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bdirection, boutput);
+    navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[9], badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bdirection, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
-        const idx_t *const RSTR element_shape = field_0_elements[local_shape];
+        const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
         for (int scatter = 0; scatter < ne; ++scatter) {
           #pragma omp atomic update
@@ -277,7 +274,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
     {
       s_t *const RSTR out = u_out[1];
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
-        const idx_t *const RSTR element_shape = field_1_elements[local_shape];
+        const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 27 + local_shape;
         for (int scatter = 0; scatter < ne; ++scatter) {
           #pragma omp atomic update
@@ -288,7 +285,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
     {
       s_t *const RSTR out = u_out[2];
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
-        const idx_t *const RSTR element_shape = field_2_elements[local_shape];
+        const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 54 + local_shape;
         for (int scatter = 0; scatter < ne; ++scatter) {
           #pragma omp atomic update
@@ -314,7 +311,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affin
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa(
+extern "C" int navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -338,22 +335,22 @@ extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        return sfem::codegen::navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+        return sfem::codegen::navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_mixed_impl(
+static SFEM_INLINE int navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_isoparametric_mesh_mixed_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -374,11 +371,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
   static constexpr int VS = 16;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
-  const idx_t *const RSTR field_0_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
-  const idx_t *const RSTR field_1_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
-  const idx_t *const RSTR field_2_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
-  const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[1], elements[3], elements[2], elements[4], elements[5], elements[7], elements[6]};
-  const idx_t *const RSTR coordinate_elements[27] = {elements[0], elements[8], elements[1], elements[11], elements[24], elements[9], elements[3], elements[10], elements[2], elements[16], elements[20], elements[17], elements[23], elements[26], elements[21], elements[19], elements[22], elements[18], elements[4], elements[12], elements[5], elements[15], elements[25], elements[13], elements[7], elements[14], elements[6]};
+  const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[2], elements[6], elements[8], elements[18], elements[20], elements[24], elements[26]};
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
@@ -390,7 +383,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
 
     const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR element_shape = coordinate_elements[shape];
+      const idx_t *const RSTR element_shape = elements[shape];
       for (int d = 0; d < ND; ++d) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
@@ -401,7 +394,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
     }
 
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
-      const idx_t *const RSTR element_shape = field_0_elements[local_shape];
+      const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 0 + local_shape;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
@@ -410,7 +403,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
       }
     }
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
-      const idx_t *const RSTR element_shape = field_1_elements[local_shape];
+      const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 27 + local_shape;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
@@ -419,7 +412,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
       }
     }
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
-      const idx_t *const RSTR element_shape = field_2_elements[local_shape];
+      const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 54 + local_shape;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
@@ -463,12 +456,12 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
     const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bdirection, boutput);
+    navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bdirection, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
-        const idx_t *const RSTR element_shape = field_0_elements[local_shape];
+        const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
         for (int scatter = 0; scatter < ne; ++scatter) {
           #pragma omp atomic update
@@ -479,7 +472,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
     {
       s_t *const RSTR out = u_out[1];
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
-        const idx_t *const RSTR element_shape = field_1_elements[local_shape];
+        const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 27 + local_shape;
         for (int scatter = 0; scatter < ne; ++scatter) {
           #pragma omp atomic update
@@ -490,7 +483,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
     {
       s_t *const RSTR out = u_out[2];
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
-        const idx_t *const RSTR element_shape = field_2_elements[local_shape];
+        const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 54 + local_shape;
         for (int scatter = 0; scatter < ne; ++scatter) {
           #pragma omp atomic update
@@ -516,7 +509,7 @@ static SFEM_INLINE int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isopa
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_i_msoa(
+extern "C" int navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -531,13 +524,13 @@ extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+        return sfem::codegen::navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+        return sfem::codegen::navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_i_msoa", -1, (int)scalar_bytes);
 }

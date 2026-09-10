@@ -3829,11 +3829,14 @@ int main() {
                 out_dir,
                 elements=("HEX27_HEX8",),
             )
+            # The kernel lives with the Cartesian twin: `d3/hex27_hex8` is a
+            # forwarding source that permutes the connectivity and calls this,
+            # so it is here that the reference data has to be shared.
             operator = os.path.join(
                 out_dir,
                 "d3",
-                "hex27_hex8",
-                "stokes_hex27_hex8_operator.cpp",
+                "proteus_hex27_proteus_hex8",
+                "stokes_proteus_hex27_proteus_hex8_operator.cpp",
             )
             with open(operator) as input_file:
                 contents = input_file.read()
@@ -3855,9 +3858,18 @@ int main() {
                 "sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()}",
                 contents,
             )
+            # A Cartesian kernel reorders nothing: the velocity space is the
+            # cell, so it gathers straight through `elements[...]`. The one
+            # array left names which of the cell's 27 nodes carry the coarser
+            # pressure space, which is the element's shape and not an ordering.
+            self.assertNotIn("field_0_elements[27]", contents)
+            self.assertNotIn("field_1_elements[27]", contents)
+            self.assertNotIn("field_2_elements[27]", contents)
+            self.assertNotIn("coordinate_elements[27]", contents)
             self.assertIn(
-                "const idx_t *const RSTR field_0_elements[27] = {"
-                "elements[0], elements[8], elements[1]",
+                "const idx_t *const RSTR field_3_elements[8] = {"
+                "elements[0], elements[2], elements[6], elements[8], "
+                "elements[18], elements[20], elements[24], elements[26]}",
                 contents,
             )
             self.assertIn(

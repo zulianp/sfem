@@ -1398,6 +1398,15 @@ def _replace_legacy_tensor_product_sources_with_proteus_aliases(files):
             dim=3,
             n_shape=27,
         ),
+        # The mixed pair permutes the cell's connectivity, which is all its
+        # callee needs: which of those 27 nodes carry the coarser field is a
+        # property of the element and the Cartesian kernel derives it itself.
+        _tensor_product_proteus_alias(
+            element_name="hex27_hex8",
+            proteus_name="proteus_hex27_proteus_hex8",
+            dim=3,
+            n_shape=27,
+        ),
     )
     for c_abi_path, c_abi_source in c_abi_entries:
         declarations = _unique_extern_c_declarations(
@@ -2009,12 +2018,51 @@ def _default_elements_for_systems(systems):
     return sfem_supported_element_types()
 
 
+#: The lexicographically numbered twin of each mesh-order tensor-product family.
+_PROTEUS_TWIN_TYPES = {
+    "QUAD4": "PROTEUS_QUAD4",
+    "HEX8": "PROTEUS_HEX8",
+    "HEX27": "PROTEUS_HEX27",
+}
+
+
+def _proteus_twin(element):
+    """The same element with its nodes numbered lexicographically, or None.
+
+    A mixed element has to be answered field by field: `HEX27_HEX8` becomes
+    `PROTEUS_HEX27_PROTEUS_HEX8`, keeping the field names the material chose.
+    Matching on the selection name alone could not see this, so the HEX27 half
+    of the pairing never fired and `d3/hex27*` carried real kernels that
+    permuted their own connectivity instead of forwarding to a Cartesian twin.
+    """
+    if not isinstance(element, SfemCompatibleElement):
+        return _PROTEUS_TWIN_TYPES.get(_element_selection_name(element))
+    cell = _PROTEUS_TWIN_TYPES.get(element.cell_element_type)
+    fields = tuple(
+        (field, _PROTEUS_TWIN_TYPES.get(family))
+        for field, family in element.field_element_types
+    )
+    if cell is None or any(family is None for _, family in fields):
+        return None
+    return SfemCompatibleElement(
+        "_".join(dict.fromkeys(family for _, family in fields)),
+        cell,
+        fields,
+    )
+
+
 def _generation_available_elements(elements):
     available = tuple(elements or sfem_supported_element_types())
+    present = {_element_selection_name(element) for element in available}
     additions = []
-    for element, proteus in (("QUAD4", "PROTEUS_QUAD4"), ("HEX8", "PROTEUS_HEX8"), ("HEX27", "PROTEUS_HEX27")):
-        if element in available and proteus not in available:
-            additions.append(proteus)
+    for element in available:
+        twin = _proteus_twin(element)
+        if twin is None:
+            continue
+        name = _element_selection_name(twin)
+        if name not in present:
+            present.add(name)
+            additions.append(twin)
     return available + tuple(additions)
 
 
@@ -2026,9 +2074,14 @@ def _with_tensor_product_proteus_alias_dependencies(selected, available):
         _element_selection_name(element): element
         for element in available
     }
-    for element, proteus in (("QUAD4", "PROTEUS_QUAD4"), ("HEX8", "PROTEUS_HEX8"), ("HEX27", "PROTEUS_HEX27")):
-        if element in selected_names and proteus in available_by_name and proteus not in selected_names:
-            additions.append(available_by_name[proteus])
+    for element in selected:
+        twin = _proteus_twin(element)
+        if twin is None:
+            continue
+        name = _element_selection_name(twin)
+        if name in available_by_name and name not in selected_names:
+            selected_names.add(name)
+            additions.append(available_by_name[name])
     return selected + tuple(additions)
 
 

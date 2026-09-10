@@ -222,6 +222,8 @@
     "d3",
     "d3/hex27",
     "d3/hex27_hex8",
+    "d3/proteus_hex27",
+    "d3/proteus_hex27_proteus_hex8",
     "d3/tet10",
     "d3/tet10_tet4",
     "op",
