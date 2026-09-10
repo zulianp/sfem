@@ -159,4 +159,51 @@ Against the benchmark, the flat sweep at 4.3M dof now reads 1072 where the bench
 
 Reproduce with `jobs/sfc_driver.sbatch`.
 
+### perf: the remaining gap is not in the kernel
+
+Hardware counters separate the two possibilities cleanly. If the solver executed more
+instructions per element, the two would not be running the same code; if it executed the
+same instructions in more cycles, the kernel would be stalling. Exact totals from `perf
+stat` (counting mode) multiplied by per-symbol shares from `perf record`, at matched size
+-- the solver 1,048,576 elements x 903 applies, the benchmark 1,000,000 x 20:
+
+| element sweep | instructions / element | cycles / element | IPC |
+|---|---:|---:|---:|
+| benchmark | 1707 | 721 | 2.37 |
+| solver | 1716 | 693 | 2.48 |
+
+Neither. The instruction counts agree to 0.5%, so it is the same code doing the same
+work, and the solver's kernel runs it in slightly FEWER cycles at slightly HIGHER IPC.
+Per element of work the solver's sweep is not slower at all.
+
+So the 1.38x is wall-clock inside the traced scope during which threads are not executing
+kernel instructions. The OpenMP runtime's share is consistent with that and is the
+leading candidate: libgomp is 10.4% of the solver's cycles against 5.5% of the
+benchmark's, and 27% of its instructions against 18% -- barrier and spin-wait, which is
+what idle threads at an unbalanced `schedule(static)` loop look like.
+
+Two traps this went through, recorded because both produced confident wrong numbers:
+
+  * `perf record` wrapped around `uenv run` profiles the launcher and loses the process
+    at exec. The first attempt attributed 99.99% of its samples to
+    ld-linux-aarch64.so.1. perf has to go INSIDE the uenv.
+  * `cvfem_hex8_conv_all_jv_simd` is a separate symbol, not inlined into the sweep, and
+    the solver additionally keeps `cvfem_hex8_ns_upwind_jacobian_action_simd` separate
+    where the benchmark inlines it. Attributing only the enclosing function undercounts
+    the sweep by 40% in one binary and 47% in the other, in opposite proportion.
+
+The whole-run cache and stall counters are deliberately NOT quoted here. Both runs were
+measured, but the solver's instruction mix is dominated by the Krylov solve rather than
+the sweep, so per-instruction miss rates compare the composition of two different
+programs and say nothing about the kernel.
+
+What this does not yet establish is WHY the threads are idle -- imbalance across packs
+against barrier cost per call. 512 packs over 72 threads is 7.1 each, so static
+scheduling gives some threads 8 and others 7 before any variation in per-pack work is
+counted. Running at a thread count that divides the pack count exactly would separate
+the two.
+
+Reproduce with `jobs/perf_sweep.sbatch` (per-symbol) and `jobs/perf_stat.sbatch` (totals).
+
+
 
