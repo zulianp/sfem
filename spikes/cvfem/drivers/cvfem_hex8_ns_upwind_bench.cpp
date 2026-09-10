@@ -1429,6 +1429,14 @@ int main(int argc, char **argv) {
         // and comparing the packed result against the atomic action on a different vector
         // would fail for a reason that has nothing to do with the staging.
         apply_jacobian_action_atomic(d, rho, mu, last_dir, jv_ref.data());
+        // The reference has to carry everything the timed apply carried, or the check
+        // reports the boundary closure and the transient term as staging errors. It did:
+        // `--jac-action --rhie-chow --boundary --layout packed` failed here at 8.3e-1, and
+        // that combination has been accepted since the closure became a separate pass.
+        if (boundary)
+            apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0, last_dir,
+                                                    jv_ref.data());
+        apply_transient_action_pass(d, rho, last_dir, jv_ref.data());
         scalar_t ref_max = 0;
         for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) ref_max = std::max(ref_max, std::fabs(jv_ref[(size_t)i]));
         const scalar_t err = max_abs_diff(jv_ref.data(), jac_out.data(), d.nnodes * N_FIELDS);
