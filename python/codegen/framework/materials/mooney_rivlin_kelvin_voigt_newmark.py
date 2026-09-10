@@ -82,9 +82,23 @@ material = gen.CodeGenerator(
         ("eta_b", 0.0),
         ("newmark_velocity_alpha", 1.0),
     ),
-    # Temporarily off: with it on, generating this material takes ~90 minutes
-    # against ~5, which makes every regeneration cycle impractical.  Nothing
-    # else depends on it being off -- re-enable by uncommenting.
+    # Off because of what it costs to generate, now measured per element rather
+    # than as one number: TET4 74 s, HEX8 1380 s, TET10 1456 s.  The two curved
+    # elements are 47 of the roughly 50 minutes, and TET4 is a minute of it, so
+    # the spike generates the element it needs rather than the material paying
+    # for all of them on every regeneration.
+    #
+    # Where the time goes, from a profile of the TET4 run: `sympy.simplify` is
+    # 128.7 s of 261.6 s under cProfile -- half the run, in 295 calls from
+    # `symbolic/equations.py`, not from the inexact-apply plan at all.  The
+    # plan's own per-element work is small: the reference gradient product and
+    # its rank factorisation together are 10.5 s for TET10, and the `simplify`
+    # inside the factorisation check costs nothing measurable because the
+    # residual is structurally zero in exact rationals.  So this is the
+    # material's symbolic setup, amplified by the larger elements, and the
+    # standing rule about `simplify` is where an attack on it would start.
+    #
+    # Nothing else depends on it being off -- re-enable by uncommenting.
     # inexact_apply=True,
 )
 

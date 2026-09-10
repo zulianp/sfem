@@ -22,9 +22,11 @@
 #include <omp.h>
 #endif
 #include "kernel_math.hpp"
-#include "mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_inline.hpp"
-#include "mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_inline.hpp"
-#define ELEMENT_TET4
+// Element and unit names arrive as -D from `run_mixed.sh`, the way
+// `bench_split.cpp` already takes them.  The two units are separate materials
+// with separate generated headers, so there are two of everything.
+#include ELASTIC_INEXACT_HEADER
+#include VISCOUS_INEXACT_HEADER
 #include "element_mesh.inc"
 
 #define TC_ELASTIC 45
@@ -32,16 +34,10 @@
 // `half_t` comes from sfem_config.h: __fp16 on some targets, _Float16 on
 // others.  Declaring it here would conflict on whichever one it is not.
 
-#define ELASTIC_TANGENT  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_tangent_a_msoa_impl
-#define ELASTIC_STORED   sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_stored_a_msoa_impl
-#define ELASTIC_COMPRESS sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_compressed_a_msoa_impl
-#define VISCOUS_TANGENT  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_tangent_a_msoa_impl
-#define VISCOUS_STORED   sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_stored_a_msoa_impl
-#define VISCOUS_COMPRESS sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_inexact_apply_compressed_a_msoa_impl
 
 #include "generated_abi.inc"
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa(
+extern "C" int EXACT_ELASTIC_APPLY(
     const int,
     const ptrdiff_t, const ptrdiff_t, idx_t **const,
     const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
@@ -51,7 +47,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa(
     const ptrdiff_t, const double *const, const double *const, const double *const,
     const ptrdiff_t, double *const, double *const, double *const);
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa(
+extern "C" int EXACT_VISCOUS_ACTION(
     const int,
     const ptrdiff_t, const ptrdiff_t, idx_t **const,
     const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
@@ -98,7 +94,8 @@ int main(int argc, char **argv) {
     threads = omp_get_max_threads();
 #endif
     const double mu = 1.3, lmbda = 2.2, eta_s = 0.31, eta_b = 0.17, alpha = 0.9;
-    std::printf("mooney_rivlin_kelvin_voigt_newmark (elastic + viscous), TET4, threads %d, best of %d\n\n",
+    std::printf("mooney_rivlin_kelvin_voigt_newmark (elastic + viscous), %s, threads %d, best of %d\n\n",
+                ELEMENT_NAME,
                 threads, repeats);
     std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s\n",
                 "elements", "nodes", "ndof", "exact", "st.f64", "st.f32", "st.f16",
@@ -114,7 +111,26 @@ int main(int argc, char **argv) {
             const double x=m.px[v], y=m.py[v], z=m.pz[v];
             ux[v]=0.02*std::sin(3*x+y+0.5*z); uy[v]=0.02*std::sin(x+3*y+1.5*z); uz[v]=0.02*std::sin(0.5*x+1.5*y+3*z);
             zx[v]=0.013*std::sin(2*x+0.4*y+z); zy[v]=0.013*std::sin(0.4*x+2*y+z); zz[v]=0.013*std::sin(x+0.6*y+2*z);
+#ifdef RANDOM_INCREMENT
+            // A smooth increment makes the deviation ratio flat under
+            // refinement even where the projection converges perfectly well:
+            // the assembled action of a smooth field is a discrete second
+            // derivative, so neighbouring elements' contributions cancel in the
+            // denominator while the per-element projection errors carry
+            // independent signs and do not cancel at all.  White noise removes
+            // the cancellation and lets the rate be read.  See "The TET10
+            // non-convergence was the metric" in RESULTS.md, which established
+            // this for a single unit.
+            (void)x; (void)y; (void)z;
+            const unsigned seed = (unsigned)(v * 2654435761u);
+            auto noise = [](unsigned t) {
+                t ^= t >> 15; t *= 2246822519u; t ^= t >> 13;
+                return (double)(t & 0xffffff) / 16777216.0 - 0.5;
+            };
+            hx[v]=0.05*noise(seed+1); hy[v]=0.05*noise(seed+2); hz[v]=0.05*noise(seed+3);
+#else
             hx[v]=0.05*std::sin(2*x+0.7*y+1.1*z); hy[v]=0.05*std::sin(0.7*x+2*y+1.3*z); hz[v]=0.05*std::sin(1.1*x+1.3*y+2*z);
+#endif
         }
         std::vector<double> E64((size_t)CS*TC_ELASTIC), V64((size_t)CS*TC_VISCOUS);
         std::vector<float>  E32((size_t)CS*TC_ELASTIC), V32((size_t)CS*TC_VISCOUS);
@@ -153,11 +169,11 @@ int main(int argc, char **argv) {
 
         // The exact action is the sum of the two units' exact kernels.
         auto run_exact = [&] {
-            mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa(SFEM_CODEGEN_F64,
+            EXACT_ELASTIC_APPLY(SFEM_CODEGEN_F64,
                 EC, N, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
                 lmbda, mu, 1, ux.data(),uy.data(),uz.data(), 1, hx.data(),hy.data(),hz.data(),
                 1, ax.data(),ay.data(),az.data());
-            mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa(SFEM_CODEGEN_F64,
+            EXACT_VISCOUS_ACTION(SFEM_CODEGEN_F64,
                 EC, N, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
                 eta_b, eta_s, alpha, 1, ux.data(),uy.data(),uz.data(),
                 1, zx.data(),zy.data(),zz.data(), 1, hx.data(),hy.data(),hz.data(),
