@@ -123,7 +123,14 @@ enum class KernelKind {
     SympyFace,
     // Assembly only: rebuild just the velocity-dependent terms, reusing a viscous part
     // assembled once. See assemble_jacobian_atomic_{linear,nonlinear}.
-    Split
+    Split,
+    // Jacobian action only. Generated, and differing from each other solely in the scope
+    // one sp.cse call was given: all 32 outputs at once, the four dofs of a node, or one
+    // component across the eight nodes. The action had no generated form at all until
+    // these, so this axis has never been measured for it.
+    SympyAction,
+    SympyActionNode,
+    SympyActionComp
 };
 
 static KernelKind parse_kernel(const std::string &name) {
@@ -135,6 +142,13 @@ static KernelKind parse_kernel(const std::string &name) {
     if (name == "sympy_row") return KernelKind::SympyRow;
     if (name == "sympy_face") return KernelKind::SympyFace;
     if (name == "split") return KernelKind::Split;
+    // The generated Jacobian-action arrangements. These exist only for the action -- the
+    // residual and the assembly have their own arrangements under the names above -- so
+    // the driver refuses them for any other operation rather than mapping them onto
+    // something that did run.
+    if (name == "sympy_action") return KernelKind::SympyAction;
+    if (name == "sympy_action_node") return KernelKind::SympyActionNode;
+    if (name == "sympy_action_comp") return KernelKind::SympyActionComp;
     return KernelKind::Sumfact;
 }
 
@@ -144,7 +158,14 @@ static bool kernel_uses_sympy_residual(const KernelKind k) {
 
 static bool kernel_is_valid(const std::string &name) {
     return name == "current" || name == "fd" || name == "sumfact" || name == "sympy" || name == "sympy_block" ||
-           name == "sympy_row" || name == "sympy_face" || name == "split";
+           name == "sympy_row" || name == "sympy_face" || name == "split" || name == "sympy_action" ||
+           name == "sympy_action_node" || name == "sympy_action_comp";
+}
+
+// The three generated Jacobian-action CSE arrangements, which are the only kernels the
+// action dispatches on. Everything else ignores --kernel for that operation.
+static bool kernel_is_action_only(const KernelKind k) {
+    return k == KernelKind::SympyAction || k == KernelKind::SympyActionNode || k == KernelKind::SympyActionComp;
 }
 
 enum class GeomKind { Affine, Isoparam };
