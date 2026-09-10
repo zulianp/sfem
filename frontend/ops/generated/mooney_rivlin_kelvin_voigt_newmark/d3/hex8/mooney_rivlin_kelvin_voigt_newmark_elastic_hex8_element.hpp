@@ -19,14 +19,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_energy_eg
   static constexpr int NC = 3;
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
-  static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, values);
 }
 
@@ -42,21 +35,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_energy_ec
   static constexpr int NC = 3;
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
-  static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_coords[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_coords[shape * NC + component] = coords[source_shape * NC + component];
-    }
-  }
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_energy_ecoords_soa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, values);
 }
 
@@ -72,21 +52,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_energy_es
   static constexpr int NC = 3;
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
-  static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_coords[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_coords[shape * NC + component] = coords[source_shape * NC + component];
-    }
-  }
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_energy_esoa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, values);
 }
 
@@ -103,21 +70,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_
   static constexpr int NC = 3;
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
-  static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
-  s_t *ordered_out_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_out_streams[shape * NC + component] = out_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
+  s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[4], out_streams[5], out_streams[9], out_streams[10], out_streams[11], out_streams[6], out_streams[7], out_streams[8], out_streams[12], out_streams[13], out_streams[14], out_streams[15], out_streams[16], out_streams[17], out_streams[21], out_streams[22], out_streams[23], out_streams[18], out_streams[19], out_streams[20]};
   return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, ordered_out_streams);
 }
 
@@ -133,28 +87,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_
   static constexpr int NC = 3;
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
-  static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_coords[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_coords[shape * NC + component] = coords[source_shape * NC + component];
-    }
-  }
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
-  s_t *ordered_out_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_out_streams[shape * NC + component] = out_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
+  s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[4], out_streams[5], out_streams[9], out_streams[10], out_streams[11], out_streams[6], out_streams[7], out_streams[8], out_streams[12], out_streams[13], out_streams[14], out_streams[15], out_streams[16], out_streams[17], out_streams[21], out_streams[22], out_streams[23], out_streams[18], out_streams[19], out_streams[20]};
   return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_ecoords_soa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, ordered_out_streams);
 }
 
@@ -170,28 +105,9 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_
   static constexpr int NC = 3;
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
-  static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_coords[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_coords[shape * NC + component] = coords[source_shape * NC + component];
-    }
-  }
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
-  s_t *ordered_out_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_out_streams[shape * NC + component] = out_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
+  s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[4], out_streams[5], out_streams[9], out_streams[10], out_streams[11], out_streams[6], out_streams[7], out_streams[8], out_streams[12], out_streams[13], out_streams[14], out_streams[15], out_streams[16], out_streams[17], out_streams[21], out_streams[22], out_streams[23], out_streams[18], out_streams[19], out_streams[20]};
   return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_esoa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, ordered_out_streams);
 }
 
@@ -209,13 +125,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_hessian_e
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   s_t *ordered_matrix_streams[NDOFS * NDOFS];
   for (int row_shape = 0; row_shape < NS; ++row_shape) {
     const int source_row_shape = SHAPE_ORDER[row_shape];
@@ -248,20 +158,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_hessian_e
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_coords[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_coords[shape * NC + component] = coords[source_shape * NC + component];
-    }
-  }
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   s_t *ordered_matrix_streams[NDOFS * NDOFS];
   for (int row_shape = 0; row_shape < NS; ++row_shape) {
     const int source_row_shape = SHAPE_ORDER[row_shape];
@@ -294,20 +192,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_hessian_e
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
   static constexpr int SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const s_t *ordered_coords[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_coords[shape * NC + component] = coords[source_shape * NC + component];
-    }
-  }
-  const s_t *ordered_u_streams[NDOFS];
-  for (int shape = 0; shape < NS; ++shape) {
-    const int source_shape = SHAPE_ORDER[shape];
-    for (int component = 0; component < NC; ++component) {
-      ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
-    }
-  }
+  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
+  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   s_t *ordered_matrix_streams[NDOFS * NDOFS];
   for (int row_shape = 0; row_shape < NS; ++row_shape) {
     const int source_row_shape = SHAPE_ORDER[row_shape];
