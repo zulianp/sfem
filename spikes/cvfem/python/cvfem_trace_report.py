@@ -128,42 +128,6 @@ def section_summary(configs, traces):
              "loop and cannot carry a scope of its own without paying for one per element. So",
              "its column is blank for the semi-structured rows and its cost is inside theirs;",
              "the two boundary shares are not comparable and the sweep shares are not either.",
-             "",
-             "## Against the bench, and an unexplained factor",
-             "",
-             "perf/baseline_grace.csv records `jac_action_packed_sumfact` at 1933 MDOF/s, and",
-             "re-measured on one allocation with three repeats it is 1695 (spread 3%). The scope",
-             "above reads 607. These are the same kernel, and the trace figure already EXCLUDES",
-             "the boundary pass and the nodal gradient -- they are sibling scopes, listed",
-             "separately in the tables below -- so the cascade in docs/CVFEM_Operator_Cascade.md",
-             "does not account for the difference.",
-             "",
-             "What is established:",
-             "",
-             "  * The bench figure carries NO Rhie-Chow term. The solver carries two: the",
-             "    in-kernel correction, and the derivative of the nodal pressure-gradient",
-             "    reconstruction that the Jacobian differentiates through.",
-             "  * The bench CANNOT measure the configuration the solver runs. It refuses",
-             "    `--rhie-chow` with `--jac-action` on `--layout packed`, because the bench's own",
-             "    packed staging never carried the term -- a separate code family from the",
-             "    solver's, guarded by a mutual #error. So no bench number has ever described",
-             "    this kernel as the solver runs it.",
-             "  * Rhie-Chow costs the ATOMIC Jacobian action nothing at all, 817 -> 816 MDOF/s.",
-             "    That factor cannot be carried across: atomic runs at half the packed rate and",
-             "    is scatter bound, so arithmetic added to it is free in a way it need not be",
-             "    on packed.",
-             "  * The thread binding is not the explanation. OMP_PROC_BIND=true and close",
-             "    measure 1711 and 1718 MDOF/s, equal within a 3% run-to-run spread; spread is",
-             "    the slow one at 1490.",
-             "  * Problem size does not explain it in the helpful direction. The flat sweep here",
-             "    peaks at 687 MDOF/s near 560k dof and DECLINES to 607 by 4.3M, so measuring at",
-             "    the bench's 8.6M would read lower still, not higher.",
-             "",
-             "So roughly a factor of three is real and is not yet attributed. The way to settle",
-             "it is to extend the bench's packed staging to carry Rhie-Chow for the Jacobian",
-             "action, which would let one measurement bracket the other instead of leaving them",
-             "in different configurations. Until then, quoting ~2000 MDOF/s for this kernel means",
-             "the version without Rhie-Chow, and the solver does not run that version.",
              ""]
     return "\n".join(body) + "\n"
 
@@ -235,6 +199,13 @@ def main():
     ap.add_argument("-o", "--output", default="CVFEM_Throughput.md")
     ap.add_argument("--html", action="store_true")
     ap.add_argument("--top", type=int, default=16, help="rows per configuration (default 16)")
+    # Prose that outlives a rerun. The tables here are regenerated from scratch every time,
+    # so any analysis written into the output by hand is destroyed by the next run -- which
+    # is how the account of the Rhie-Chow and boundary findings would be lost the first time
+    # anyone re-measured. Keep it in a file and pass it here instead.
+    ap.add_argument("--prose", action="append", default=[], metavar="FILE",
+                    help="markdown file inserted after the summary, before the per-configuration "
+                         "tables; repeatable, inserted in the order given")
     args = ap.parse_args()
 
     configs = []
@@ -266,6 +237,10 @@ def main():
            "rate at all and is there only for scale.", "",
            ]
     doc.append(section_summary(configs, traces))
+    for path in args.prose:
+        with open(path) as fh:
+            doc.append(fh.read().rstrip("\n"))
+        doc.append("")
     doc += ["## Per configuration", ""]
     for c in configs:
         doc.append(section_config(c, traces[c["label"]], args.top))
