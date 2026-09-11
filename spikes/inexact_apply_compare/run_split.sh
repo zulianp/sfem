@@ -8,12 +8,11 @@
 # from a stuck one.
 set -euo pipefail
 
-# Mesh ordering: lex (as built), morton3, hilbert3 or random3.  How much of a
-# gather is compulsory rather than streamed is a property of the numbering, not
-# of the kernel, so a throughput here means nothing without it -- and SFEM's own
-# benchmark drivers reorder before they measure (`drivers/bench/*` call
-# `smesh::SFC::create_from_env()->reorder`, which defaults to morton3).
-MESH_ORDER="${MESH_ORDER:-lex}"
+# Mesh ordering.  morton3 by default because that is what SFEM runs:
+# `drivers/bench/*` call `smesh::SFC::create_from_env()->reorder`, which defaults
+# to it.  hilbert3 and lex are the other orderings worth comparing; random3 is a
+# sensitivity check and not a configuration anything produces.
+MESH_ORDER="${MESH_ORDER:-morton3}"
 
 MATERIAL="${1:-neohookean_ogden}"
 ELEMENT="${2:-TET4}"

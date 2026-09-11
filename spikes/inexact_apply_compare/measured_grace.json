@@ -4,16 +4,13 @@
     "What was actually run, so the roofline's dots are measurements rather than",
     "estimates. One point per kernel at the full socket -- the thread sweep is in",
     "RESULTS.md and would only crowd the plot.",
-    "",
     "The store's width is the kernel's template parameter, and these points are",
     "the instantiation the generated Op publishes: metric_tensor_t (f32) for the",
     "stored apply, compressed_t (f16) for the compressed one. The f64 store in",
     "RESULTS.md is a benchmark-only instantiation; model it with",
     "'--bind tangent_t=double', which is why that option exists.",
-    "",
     "Arithmetic is double throughout: s_t is double in every one of these.",
-    "",
-    "Mesh ordering: lex. Not incidental -- destroying the ordering costs the stored apply a factor of four (see the ordering sweep in RESULTS.md), so these points describe a well-ordered mesh and nothing else."
+    "Mesh ordering: morton3, the default, which is what SFEM's own benchmark drivers reorder with. See the ordering section of RESULTS.md for what the other orderings cost on these meshes."
   ],
   "points": [
     {
@@ -25,7 +22,7 @@
       "nelements": 64000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 564.2
+      "mdofs": 498.8
     },
     {
       "label": "HEX8 compressed f16",
@@ -36,7 +33,7 @@
       "nelements": 64000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 518.4
+      "mdofs": 484.7
     },
     {
       "label": "HEX8 tangent assembly",
@@ -47,7 +44,7 @@
       "nelements": 64000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 117.2
+      "mdofs": 117.6
     },
     {
       "label": "TET4 stored f32",
@@ -58,7 +55,7 @@
       "nelements": 384000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 344.6
+      "mdofs": 293.9
     },
     {
       "label": "TET4 compressed f16",
@@ -69,7 +66,7 @@
       "nelements": 384000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 411.0
+      "mdofs": 321.1
     },
     {
       "label": "TET4 tangent assembly",
@@ -80,8 +77,8 @@
       "nelements": 384000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 195.0
+      "mdofs": 194.7
     }
   ],
-  "ordering": "lex"
+  "ordering": "morton3"
 }

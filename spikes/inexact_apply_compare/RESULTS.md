@@ -740,23 +740,25 @@ is a property of the connectivity, not the kernel.  So two bounds are computed.
 rather than once per element, scaled by `nnodes / nelements`.  The truth is
 between them.
 
-Neohookean Ogden, 206763 dof, Grace at 72 threads.  Peak 3571 GFLOP/s, or 1786
+Neohookean Ogden, 206763 dof, Grace at 72 threads, morton3 ordering.  Peak 3571 GFLOP/s, or 1786
 without SIMD; 500 GB/s; ridge at 7.1 FLOP/byte.  (Quoted peaks -- the tool
 prints their provenance with every report.)
 
 | kernel | FLOP/el | B/el streamed | B/el compulsory | I streamed | I compulsory | measured | of no-SIMD |
 |---|---|---|---|---|---|---|---|
-| HEX8 tangent    | 11171 | 444 | 278 | 25.2 | 40.2 | 405 GFLOP/s | 23% |
-| HEX8 stored f32 |  1827 | 788 | 290 |  2.3 |  6.3 | 319 GFLOP/s | 18% |
-| HEX8 compressed f16 | 1851 | 702 | 204 | 2.6 | 9.1 | 297 GFLOP/s | 17% |
-| TET4 tangent    |  1314 | 332 | 240 |  4.0 |  5.5 | 476 GFLOP/s | 27% |
-| TET4 stored f32 |   243 | 484 | 209 |  0.5 |  1.2 | 156 GFLOP/s | 9% |
-| TET4 compressed f16 | 255 | 398 | 123 | 0.6 |  2.1 | 195 GFLOP/s | 11% |
+| HEX8 tangent    | 11171 | 444 | 278 | 25.2 | 40.2 | 407 GFLOP/s | 23% |
+| HEX8 stored f32 |  1827 | 788 | 290 |  2.3 |  6.3 | 282 GFLOP/s | 16% |
+| HEX8 compressed f16 | 1851 | 702 | 204 | 2.6 | 9.1 | 278 GFLOP/s | 16% |
+| TET4 tangent    |  1314 | 332 | 240 |  4.0 |  5.5 | 475 GFLOP/s | 27% |
+| TET4 stored f32 |   243 | 484 | 209 |  0.5 |  1.2 | 133 GFLOP/s | 7% |
+| TET4 compressed f16 | 255 | 398 | 123 | 0.6 |  2.1 | 152 GFLOP/s | 9% |
 
-Three things fall out of it that the throughput tables could only assert.
+Three things fall out of it that the throughput tables could only assert.  All
+of it is a *ceiling* argument: none of these kernels is on either line, so read
+the roofline as what they are under rather than what they are at.
 
 **The dashed ceiling is the one that matters.**  Every kernel here sits between
-17% and 27% of the *no-SIMD* ceiling -- the same issue rate with one lane per
+7% and 27% of the *no-SIMD* ceiling -- the same issue rate with one lane per
 operation -- and nowhere near the vector peak above it.  That is the same
 finding as the vectorisation reports, arrived at from measured throughput rather
 than from compiler diagnostics: on gcc these kernels are not vector code, so the
@@ -765,14 +767,17 @@ why lane-blocking the tangent bought nothing on Grace and +78% on clang.
 
 **The precision inversion is a roofline result, not a mystery.**  Narrowing the
 store raises a kernel's intensity, which only buys throughput if the kernel is
-near the bandwidth ceiling.  TET4's stored apply is: at I = 0.5 the ceiling is
-250 GFLOP/s and it achieves 156, or 62% of it.  Narrowing to f16 moves it to
-I = 0.64, a ceiling of 320, and it achieves 195 -- 61% of the new ceiling.  The
-model predicts a 1.28x gain; the measurement is 1.25x.  HEX8's stored apply is
-not near that ceiling at all: at I = 2.3 the ceiling is 1160 and it achieves 319,
-27% of it.  There is no bandwidth being waited on, so the wider intensity buys
-nothing and the conversion cost shows through instead -- f16 is *slower* there,
-297 against 319.  One number, `I`, orders both elements correctly.
+near the bandwidth ceiling.  TET4's stored apply is the nearest thing here to
+one: at I = 0.5 the streamed ceiling is 250 GFLOP/s and it achieves 133, 53% of
+it; narrowing to f16 moves it to I = 0.64, a ceiling of 320, and it achieves 152
+-- 48% of the new one.  The model predicts a 1.28x gain and the measurement is
+1.14x, so the direction is right and the size is not, which is about where a
+two-bound model of a gather deserves to be believed.  HEX8's stored apply is not
+near that ceiling at all: at I = 2.3 the ceiling is 1160 and it achieves 282,
+24% of it.  There is no bandwidth being waited on, so the wider intensity buys
+nothing and the conversion cost shows through instead -- f16 is level with f32
+there, 278 against 282, where on TET4 it is 14% ahead.  One number, `I`, orders
+the two elements correctly even though it does not predict either precisely.
 
 **The tangent is the intense kernel, and it is the one that is compute-bound.**
 HEX8's assembly does 11171 FLOPs against 444 bytes; it is three and a half times
@@ -796,78 +801,67 @@ draws are the table above.  `--bind
 tangent_t=double` models the f64 store, which is a benchmark-only instantiation:
 the Op publishes f32.
 
-## Mesh ordering, which was the free parameter all along
+## Mesh ordering
 
-These benchmarks build their mesh lexicographically -- nodes `(k*nn + j)*nn + i`,
-elements walked in the same order -- and until now nothing reordered it.  That is
-a gap against the rest of the repository: SFEM has space-filling-curve ordering
-in `external/smesh/src/mesh/ordering/`, `smesh::SFC::create_from_env()` defaults
-to `morton3`, and SFEM's own benchmark drivers reorder before they measure
-(`drivers/bench/bench_hyperelasticity.exe.cpp:240`).  These did not.
+These benchmarks built their mesh lexicographically and nothing reordered it,
+which is a gap against the rest of the repository: SFEM has space-filling-curve
+ordering in `external/smesh/src/mesh/ordering/`, `smesh::SFC::create_from_env()`
+defaults to `morton3`, and SFEM's own benchmark drivers reorder with it before
+they measure (`drivers/bench/bench_hyperelasticity.exe.cpp:240`).  These did not,
+so they were measuring a mesh the library does not run.
 
-It matters because the ordering, not the kernel, decides how much of a gather is
-compulsory rather than streamed -- which is exactly the width of the band in the
-roofline above.  `element_mesh.inc` now takes `-DMESH_ORDER`, reaching smesh's
-own encoders so this measures the library's ordering rather than a private
-reimplementation, and applying SFEM's own algorithm: sort the elements along the
-curve through their barycentres, then renumber the nodes in the order the
-reordered elements first touch them.
+`element_mesh.inc` now takes `-DMESH_ORDER` and **defaults to `morton3`**,
+reaching smesh's own encoders and applying SFEM's own algorithm: sort the
+elements along the curve through their barycentres, then renumber the nodes in
+the order the reordered elements first touch them.
 
-Grace, 206763 dof, 72 threads, MDOF/s.  `random3` is the control: an ordering
-with no locality at all.
+Grace, 206763 dof, 72 threads, MDOF/s:
 
 | element | ordering | exact | stored f64 | stored f32 | compressed f16 | assembly |
 |---|---|---|---|---|---|---|
-| TET4 | lex      | 205.6 | 337.6 | 342.2 | 407.6 | 195.2 |
 | TET4 | morton3  | 185.1 | 291.0 | 293.9 | 321.1 | 194.7 |
 | TET4 | hilbert3 | 188.6 | 293.0 | 293.8 | 330.8 | 194.3 |
-| TET4 | random3  |  96.7 |  78.8 |  61.9 |  61.5 | 152.7 |
-| HEX8 | lex      | 222.2 | 648.4 | 430.9 | 508.2 | 117.5 |
+| TET4 | lex      | 205.6 | 337.6 | 342.2 | 407.6 | 195.2 |
 | HEX8 | morton3  | 215.6 | 565.8 | 498.8 | 484.7 | 117.6 |
 | HEX8 | hilbert3 | 217.0 | 573.4 | 509.2 | 460.8 | 117.2 |
-| HEX8 | random3  | 182.5 | 158.7 | 144.8 | 227.2 | 116.2 |
+| HEX8 | lex      | 222.2 | 648.4 | 430.9 | 508.2 | 117.5 |
 
-**The ordering is worth more than everything else in this file put together.**
-Destroying it costs the stored apply a factor of four on both elements -- TET4
-f32 falls 342 to 62, HEX8 f64 falls 648 to 159 -- against the 13% the SoA store
-bought and the 3% the store's precision is worth.  Every throughput above is a
-statement about a well-ordered mesh and should be read as one.
+**The two curves are indistinguishable from each other, and lexicographic beats
+both on TET4.**  That is a statement about these meshes rather than about
+space-filling curves: they are a structured cube grid, and lexicographic
+numbering already *is* a good space-filling order for one.  On TET4 it is 16%
+ahead of Morton, which is the cost of reordering something that did not need
+reordering -- a curve through barycentres does not respect the six-tetrahedra
+decomposition of a cube, and lexicographic does.
 
-**An SFC buys nothing over lexicographic here, and that is not a result about
-SFCs.**  These meshes are a structured cube grid, for which the lexicographic
-numbering *is* a good space-filling order; morton3 and hilbert3 are within noise
-of it and sometimes behind.  What the comparison establishes is the sensitivity,
-not a recommendation: on an unstructured mesh in its natural file order the
-`random3` column is the relevant one, and that is the case SFC exists for.  This
-spike cannot say how close a real unstructured mesh comes to either end.
+So the ordering is not, on these meshes, a lever: switching to what the library
+runs moves the stored apply by at most 16% and the assembly not at all.  The
+figures elsewhere in this file were taken under `lex` and the table above is the
+correction to apply to them -- the f64 and f16 columns move down on TET4, the
+HEX8 f32 column moves up, everything about the tangent kernel is unchanged.
 
-**The assembly kernel barely notices** -- 117.5 to 116.2 on HEX8, 1% -- because
-it gathers 24 values and then does 11171 FLOPs with them.  TET4's assembly loses
-22%, which is the same statement at the other extreme of the FLOP-to-gather
-ratio.  Everything in this file about the tangent kernel is therefore independent
-of the ordering; everything about the applies is not.
+What this cannot say is what an *unstructured* mesh does, which is the case SFC
+ordering exists for and the one where these numbers might not transfer.  Every
+mesh this spike builds is a structured grid, so every one of them is
+well-ordered before anything reorders it.  Answering that needs a real
+unstructured mesh, not a synthetic one.
 
-**What it says about the roofline.**  Neither end of the band is where these
-kernels sit.  HEX8's stored apply at 431 MDOF/s is 244 GFLOP/s, under 8% of even
-the *streamed* bandwidth ceiling, and reordering moves it by a factor of three
-without moving a single byte of its compulsory traffic -- so what the ordering
-costs is latency, TLB and cache misses on the gather, which a roofline does not
-model.  TET4's stored apply is the one case that does behave like a
-bandwidth-bound kernel: 154 GFLOP/s against a streamed ceiling of 250, 62% of
-it, falling to 11% under `random3`.  Read the roofline as the ceiling these
-kernels are under, not as the line they are on.
-
-**A caveat on the f32 column.**  HEX8 stored f32 at 72 threads has come back
-between 431 and 567 across runs on different nodes, while f64 on the same runs
-stayed within 648-653.  The ordering comparison above is within one job and one
-node, so it is internally consistent, but no single f32 figure at 72 threads in
-this file should be trusted to better than 25% without repeats.
+`random3` is also accepted, and is `rand()` as the sort key.  It exists to
+confirm that these measurements are sensitive to the ordering at all -- they are,
+by about a factor of four -- and for nothing else: no tool produces such a mesh,
+so no speed-up should be quoted against it.
 
 Sweep it with:
 
-    for o in lex morton3 hilbert3 random3; do
+    for o in morton3 hilbert3 lex; do
       MESH_ORDER=$o spikes/inexact_apply_compare/run_split.sh neohookean_ogden HEX8
     done
+
+**A caveat on the f32 column.**  HEX8 stored f32 at 72 threads has come back
+between 431 and 567 across runs on different nodes, while f64 on the same runs
+stayed within 648-653.  The ordering comparison above is within one job on one
+node, so it is internally consistent, but no single f32 figure at 72 threads in
+this file should be trusted to better than 25% without repeats.
 
 ## What the first version of these measurements got wrong
 

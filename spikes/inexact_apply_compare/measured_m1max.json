@@ -7,12 +7,10 @@
     "rooflines differ in kind and not only in scale: the M1's ridge is at 1.0",
     "FLOP/byte against Grace's 7.1, so a kernel that is bandwidth-bound on one",
     "is compute-bound on the other.",
-    "",
     "Eight threads, not ten: the two efficiency cores are not interchangeable",
     "with the performance ones and a rate that mixes them is not comparable",
     "with anything.",
-    "",
-    "Mesh ordering: lex. Not incidental -- destroying the ordering costs the stored apply a factor of four (see the ordering sweep in RESULTS.md), so these points describe a well-ordered mesh and nothing else."
+    "Mesh ordering: morton3, the default, which is what SFEM's own benchmark drivers reorder with. See the ordering section of RESULTS.md for what the other orderings cost on these meshes."
   ],
   "points": [
     {
@@ -24,7 +22,7 @@
       "nelements": 64000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 151.06
+      "mdofs": 171.75
     },
     {
       "label": "HEX8 compressed f16",
@@ -35,7 +33,7 @@
       "nelements": 64000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 111.48
+      "mdofs": 120.33
     },
     {
       "label": "HEX8 tangent assembly",
@@ -46,7 +44,7 @@
       "nelements": 64000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 32.5
+      "mdofs": 35.28
     },
     {
       "label": "TET4 stored f32",
@@ -57,7 +55,7 @@
       "nelements": 384000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 53.34
+      "mdofs": 66.67
     },
     {
       "label": "TET4 compressed f16",
@@ -68,7 +66,7 @@
       "nelements": 384000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 71.94
+      "mdofs": 83.85
     },
     {
       "label": "TET4 tangent assembly",
@@ -79,8 +77,8 @@
       "nelements": 384000,
       "nnodes": 68921,
       "ndof": 206763,
-      "mdofs": 32.44
+      "mdofs": 35.24
     }
   ],
-  "ordering": "lex"
+  "ordering": "morton3"
 }
