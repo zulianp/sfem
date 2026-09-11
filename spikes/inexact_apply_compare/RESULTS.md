@@ -553,6 +553,74 @@ TET4, which is the gate, and the projection error is 3.6e-05 on HEX8.  The 2.7e-
 on TET10 is the smooth-increment metric artefact documented above, not the
 approximation.
 
+## What perf says is left, and it is not the store
+
+`perf` on one Grace core, neohookean HEX8, and the answer is not where the store
+precision work was looking.
+
+    IPC                          3.76  (1 thread)   3.82  (72 threads)
+    stalled cycles per insn      0.08
+    cache-misses                 0.48% of references
+    branch-misses                0.16% of branches
+
+Nothing is stalling.  At 3.8 instructions per cycle on a machine about six wide,
+with half a per cent of references missing cache, these kernels are compute-bound
+and already issuing near the width of the core.  **There is no headroom in moving
+data better; the only way to go faster is to execute fewer instructions.**
+
+That also settles why narrowing the store bought so little.  It was never the
+bottleneck.
+
+### The inexact-apply kernels are the only ones in the generator that are not vectorised
+
+Counting the instructions `perf annotate` attributes to each symbol:
+
+| symbol | instructions | ldr | str | FP arith | `fmla` | `ld1`/`st1` |
+|---|---|---|---|---|---|---|
+| `inexact_apply_stored<double, float>`  |  3182 |   989 |  694 |  967 | 0 | 0 |
+| `inexact_apply_tangent<double, float, double>` | 25078 | 12219 | 5542 | 6659 | 0 | 0 |
+
+Scalar loads and stores are **53%** of the stored apply and **71%** of the
+tangent assembly, and neither contains a single vector FMA or vector
+load/store.  The same binary holds 2967 `fmla` and 157 `ld1` -- all of them in
+the *exact* apply, which is lane-blocked and vectorised like every other kernel
+this generator emits.
+
+The reason is in the emitted source.  The inexact-apply kernels loop
+
+    for (ptrdiff_t element = 0; element < nelements; ++element)
+
+with no `VS` template parameter and no `#pragma omp simd` anywhere in the file,
+against three simd pragmas in the tensor-product local header next to it.  This
+kernel family was written one element at a time and never picked up the lane
+blocking the rest of the framework uses.
+
+### What that is worth, and what it changes about the store
+
+Two things follow, and the second is why this matters more than it looks.
+
+Half the stored apply's instructions are scalar memory operations that a lane
+loop turns into one vector operation per two lanes at f64 and four at f32.  With
+IPC already at the machine's limit and no stalls to recover, instruction count
+is throughput, so the headroom is close to the reduction factor.
+
+And **the store-precision question cannot be answered properly until this is
+done.**  Scalar code loads one number per `ldr` whatever its width, so narrowing
+f64 to f32 changes bytes moved and not instructions issued -- which is exactly
+what the six measured rows show, a couple of per cent either way.  Vectorised, an
+f32 vector load carries four lanes where f64 carries two, so the width goes
+straight into the instruction count.  The conclusion "f32 by default, f16 only
+where measured" is correct for the kernels as they exist, and should be
+re-measured once they are lane-blocked, because the mechanism that would make
+narrow stores pay is currently absent.
+
+### Default
+
+`metric_tensor_t` is `float`, and the generated Op has always stored the tangent
+in it -- `SharedBuffer<metric_tensor_t> inexact_tangent` -- and called
+`inexact_apply_stored_*`.  f32 is the default and nothing needed changing; the
+compressed f16 entry points are generated and no Op calls them.
+
 ## What the first version of these measurements got wrong
 
 The throughput figures above replace an earlier set that was wrong, and the way it
