@@ -723,6 +723,79 @@ in it -- `SharedBuffer<metric_tensor_t> inexact_tangent` -- and called
 `inexact_apply_stored_*`.  f32 is the default and nothing needed changing; the
 compressed f16 entry points are generated and no Op calls them.
 
+## Roofline
+
+The throughput tables above say how fast these kernels ran.  The roofline says
+whether that was fast, by placing each against the two ceilings the machine
+imposes at the kernel's own arithmetic intensity.  Both coordinates are read out
+of the generated source by `codegen.framework.tools.roofline` -- the FLOPs from
+the printed arithmetic, the bytes from the memory references and the widths the
+`extern "C"` wrapper instantiates them with -- so the model follows the
+generator rather than a table someone has to remember to update.
+
+A mesh kernel does not have *one* intensity: how much of a gather is compulsory
+is a property of the connectivity, not the kernel.  So two bounds are computed.
+**Streamed** charges every reference its own bytes: no reuse at all.
+**Compulsory** charges a value reached through the connectivity once per *node*
+rather than once per element, scaled by `nnodes / nelements`.  The truth is
+between them.
+
+Neohookean Ogden, 206763 dof, Grace at 72 threads.  Peak 3571 GFLOP/s, or 1786
+without SIMD; 500 GB/s; ridge at 7.1 FLOP/byte.  (Quoted peaks -- the tool
+prints their provenance with every report.)
+
+| kernel | FLOP/el | B/el streamed | B/el compulsory | I streamed | I compulsory | measured | of no-SIMD |
+|---|---|---|---|---|---|---|---|
+| HEX8 tangent    | 11171 | 444 | 278 | 25.2 | 40.2 | 405 GFLOP/s | 23% |
+| HEX8 stored f32 |  1827 | 788 | 290 |  2.3 |  6.3 | 319 GFLOP/s | 18% |
+| HEX8 compressed f16 | 1851 | 702 | 204 | 2.6 | 9.1 | 297 GFLOP/s | 17% |
+| TET4 tangent    |  1314 | 332 | 240 |  4.0 |  5.5 | 476 GFLOP/s | 27% |
+| TET4 stored f32 |   243 | 484 | 209 |  0.5 |  1.2 | 156 GFLOP/s | 9% |
+| TET4 compressed f16 | 255 | 398 | 123 | 0.6 |  2.1 | 195 GFLOP/s | 11% |
+
+Three things fall out of it that the throughput tables could only assert.
+
+**The dashed ceiling is the one that matters.**  Every kernel here sits between
+17% and 27% of the *no-SIMD* ceiling -- the same issue rate with one lane per
+operation -- and nowhere near the vector peak above it.  That is the same
+finding as the vectorisation reports, arrived at from measured throughput rather
+than from compiler diagnostics: on gcc these kernels are not vector code, so the
+ceiling they are actually working against is half the headline one.  It is also
+why lane-blocking the tangent bought nothing on Grace and +78% on clang.
+
+**The precision inversion is a roofline result, not a mystery.**  Narrowing the
+store raises a kernel's intensity, which only buys throughput if the kernel is
+near the bandwidth ceiling.  TET4's stored apply is: at I = 0.5 the ceiling is
+250 GFLOP/s and it achieves 156, or 62% of it.  Narrowing to f16 moves it to
+I = 0.64, a ceiling of 320, and it achieves 195 -- 61% of the new ceiling.  The
+model predicts a 1.28x gain; the measurement is 1.25x.  HEX8's stored apply is
+not near that ceiling at all: at I = 2.3 the ceiling is 1160 and it achieves 319,
+27% of it.  There is no bandwidth being waited on, so the wider intensity buys
+nothing and the conversion cost shows through instead -- f16 is *slower* there,
+297 against 319.  One number, `I`, orders both elements correctly.
+
+**The tangent is the intense kernel, and it is the one that is compute-bound.**
+HEX8's assembly does 11171 FLOPs against 444 bytes; it is three and a half times
+past the ridge and the only kernel in the set for which the memory ceiling is
+irrelevant.  That agrees with the `perf` reading above -- 3.8 IPC, half a per
+cent of references missing cache -- and it is why the store's precision was
+never going to move the assembly.
+
+Regenerate, with the plot:
+
+    spikes/inexact_apply_compare/run_roofline.sh neohookean_ogden HEX8 grace
+    spikes/inexact_apply_compare/run_roofline.sh neohookean_ogden TET4 m1max
+
+It reuses the tree `run_split.sh` generates, so whichever is run first pays for
+the generation.  The measured dots come from `measured_<machine>.json` -- one
+file per machine, because a dof rate from a laptop and one from a Grace socket
+are not comparable and a single file would invite mixing them.  A kernel with no
+measurement is still modelled, it just has no dot.  The plot is written beside
+the log rather than committed -- it is a generated artifact, and the numbers it
+draws are the table above.  `--bind
+tangent_t=double` models the f64 store, which is a benchmark-only instantiation:
+the Op publishes f32.
+
 ## What the first version of these measurements got wrong
 
 The throughput figures above replace an earlier set that was wrong, and the way it
@@ -760,6 +833,7 @@ single kernel with no harness at all and confirms the corrected figures.
     spikes/inexact_apply_compare/run_mixed.sh <element> [repeats]
     spikes/inexact_apply_compare/run_store_precision.sh <element> [amplitudes...]
     spikes/inexact_apply_compare/run_warp.sh  <material> <element> [n]
+    spikes/inexact_apply_compare/run_roofline.sh <material> <element> [machine]
 
 `run_mixed.sh` drives the two-unit material and takes no material argument: it
 generates one tree and links two sets of kernels out of it, because the energy
