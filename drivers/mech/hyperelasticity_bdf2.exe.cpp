@@ -408,6 +408,14 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     if (elastic_op->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
+    // An element whose Jacobian is constant publishes only the affine kernels --
+    // TET4 and TRI3 are constant-P1 -- so without this the operator has nothing
+    // to dispatch to and every call fails.  Default off, because for HEX8 and
+    // TET10 it is an assumption about the mesh rather than a fact about the
+    // element.
+    if (smesh::Env::read("SFEM_ASSUME_AFFINE", false)) {
+        elastic_op->set_option("ASSUME_AFFINE", true);
+    }
     set_material_parameters(env, elastic_op, mesh);
     f->add_operator(elastic_op);
 
@@ -557,7 +565,14 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             }
 
             blas->zeros(ndofs, rhs->data());
-            f->gradient(u->data(), rhs->data());
+            // Checked.  An operator with no kernel for this element leaves `rhs`
+            // zeroed, and an unchecked call then reads as a converged Newton
+            // step: gnorm 0, zero iterations, a printed solution that was never
+            // solved for.
+            if (f->gradient(u->data(), rhs->data()) != SFEM_SUCCESS) {
+                SFEM_ERROR("gradient failed at step %d, Newton iteration %d\n", step, it);
+                return SFEM_FAILURE;
+            }
             f->set_value_to_constrained_dofs(0, rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());

@@ -1009,6 +1009,55 @@ that: its BDF2 inertia term has no stored tangent and is applied exactly, at the
 its own `update` last saw -- which is the state the tangent was assembled at, because
 a Newton step drives both from the same iterate.
 
+### It stops working on HEX8 under refinement, and TET4 says why
+
+The 32-cube above is not a mesh sweep, and one refinement step later the technique
+does not merely slow down -- it stops working. Same problem, same settings, 352947
+dof:
+
+| | Newton its | CG its | wall |
+|---|---|---|---|
+| matrix-free | 6 | 160 | 2.79 s |
+| inexact | 20 (the cap) | 380065 | 1410 s |
+
+That is about 19000 CG iterations per Newton step: CG hits its own iteration cap every
+time and never converges. Not slower, broken, and a qualitative break rather than a
+gradual one -- at 107811 dof the same configuration does 19 CG iterations per Newton
+step and converges.
+
+**TET4 identifies the cause.** The projection is *exact* on TET4 and TRI3
+(`EXACT_ON_ELEMENTS`), so there the stored tangent is the Hessian and the only
+remaining approximation is the `float` store. If the failure were the store's
+precision, or a defect in the path, TET4 would show it too. It does not:
+
+| mesh | | Newton | CG | ms/apply | final gnorm |
+|---|---|---|---|---|---|
+| TET4 206115 dof | matrix-free | 4 | 171 | 6.52 | 5.5796e-10 |
+| TET4 206115 dof | inexact | 4 | 171 | 6.13 | 5.5796e-10 |
+| TET4 684723 dof | matrix-free | 4 | 261 | 21.27 | 2.6477e-09 |
+| TET4 684723 dof | inexact | 4 | 261 | **16.71** | 2.6477e-09 |
+
+Identical iteration counts and identical residuals to every digit, at both sizes. So
+the HEX8 failure is **the projection error**, not the storage precision and not the
+implementation: it is the part of the tangent that varies within an element, thrown
+away. The Hessian's condition number grows like `h^-2` under refinement while that
+error does not shrink with it, and past some resolution CG can no longer work against
+the difference.
+
+**What that means for the technique.** On an element where the projection is exact it
+is a drop-in with no convergence cost at all -- and there the whole kernel speed-up is
+kept. Where the projection is inexact it buys a cheaper apply, pays for it in Newton
+iterations, and has a mesh resolution beyond which it stops converging. That
+resolution has to be established per element and per problem before this is used as a
+solver's linear operator; nothing above establishes it, and 32-cubed happens to be
+inside it.
+
+The per-apply gain on TET4 is also much smaller here than in the kernel benchmark --
+1.06x at 206115 dof and 1.27x at 684723, against the 1.8x the spike measures at eight
+threads. The exact TET4 apply in this driver runs the cached-metric specialised affine
+kernel, which is a far cheaper baseline than the spike's; that is a plausible
+explanation and not a measured one.
+
 **What this run does not include.** It is on the standard mesh layout. The packed
 layout, worth 70 to 150% on the apply above, needs a `FunctionSpace` built on a packed
 mesh, which this driver does not create.
