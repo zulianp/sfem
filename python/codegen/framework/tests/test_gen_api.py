@@ -229,6 +229,34 @@ def _assert_lane_loops_request_simd(test_case, path):
         while previous >= 0 and lines[previous].strip() == "":
             previous -= 1
         test_case.assertGreaterEqual(previous, 0)
+
+        # Two kinds of loop wear this head, and they want opposite things.  A
+        # lane loop is normally vector work and must be guarded.  A *scatter*
+        # walks the lanes to accumulate into nodes, and two lanes of one block
+        # can land on the same node -- so it must NOT be guarded, and its
+        # atomic, where it has one, is what makes it correct.  Which it is, is
+        # read off the body: a write through `bev<n>[lane]` is indirect, and
+        # that is precisely what cannot be vectorised.
+        depth = line.count("{") - line.count("}")
+        body, extent = index + 1, []
+        while body < len(lines) and depth > 0:
+            extent.append(lines[body])
+            depth += lines[body].count("{") - lines[body].count("}")
+            body += 1
+        is_scatter = any(
+            re.search(r"\bbev\d+\[lane\]\s*\]?[^;]*\+=", text)
+            or re.search(r"\[[^\]]*bev\d+\[lane\][^\]]*\]\s*\+=", text)
+            for text in extent
+        )
+        if is_scatter:
+            test_case.assertNotEqual(
+                lines[previous].strip(),
+                "#pragma omp simd",
+                "%s:%d scatter over lanes is guarded by a SIMD pragma; two lanes "
+                "can share a node" % (path, index + 1),
+            )
+            continue
+
         test_case.assertEqual(
             lines[previous].strip(),
             "#pragma omp simd",

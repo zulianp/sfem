@@ -192,6 +192,7 @@ namespace sfem {
     struct AffineGeometryCache {
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
+            SharedBuffer<metric_tensor_t> inexact_tangent;
         };
 
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
@@ -513,7 +514,8 @@ namespace sfem {
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
-        impl_->apply_uses_affine;
+        impl_->apply_uses_affine ||
+                (impl_->space->mesh_ptr()->spatial_dimension() == 3 /* the inexact path assembles from the affine geometry, which smesh fills for 3D elements only */);
     for (auto &entry : impl_->domains->domains()) {
       seed_parameters(*entry.second.parameters);
       impl_->element_capacity =
@@ -1013,4 +1015,153 @@ namespace sfem {
     return ret;
   }
 #endif  // SFEM_ENABLE_RYAML
+
+  bool GeneratedNeoHookeanOgden::inexact_supported() const {
+    // The split assembles its tangent from the cached affine geometry, and
+    // that cache does not exist for every element: smesh's adjugate fill
+    // refuses TRI3 and QUAD4, so a 2D mesh reaches `inexact_update` with
+    // nothing to read.  Reporting support the operator cannot deliver is
+    // worse than reporting none, so this asks the cache rather than
+    // answering from what was generated.
+    for (const auto &entry : impl_->domains->domains()) {
+      auto cache = std::static_pointer_cast<AffineGeometryCache>(
+          entry.second.user_data);
+      if (!cache || !cache->jacobian_soa) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  int GeneratedNeoHookeanOgden::inexact_update(const real_t *const x) {
+    SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::inexact_update");
+    auto mesh = impl_->space->mesh_ptr();
+    const int dim = mesh->spatial_dimension();
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+      if (!cache || !cache->jacobian_soa) {
+        SFEM_ERROR("GeneratedNeoHookeanOgden::inexact_update requires cached affine geometry\n");
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nelements = domain.block->n_elements();
+      if (!cache->inexact_tangent) {
+        // Sized by the mesh's dimension: the tangent is 10 numbers per
+        // element in two dimensions and 45 in three, and a material that
+        // generates both would overflow one store if sized from the other.
+        const ptrdiff_t components = (dim == 2) ? 10 : (dim == 3) ? 45 : 0;
+        if (components == 0) {
+          SFEM_ERROR("GeneratedNeoHookeanOgden::inexact_update has no tangent size for dimension %d\n", dim);
+          return SFEM_FAILURE;
+        }
+        cache->inexact_tangent =
+            sfem::create_host_buffer<metric_tensor_t>(nelements * components);
+      }
+      auto adjugate = reinterpret_cast<const geom_t *const *>(
+          cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+      auto determinant = reinterpret_cast<const geom_t *>(
+          cache->jacobian_soa->jacobian_determinant()->data());
+      if (dim == 2) {
+        return neohookean_ogden_inexact_apply_tangent_2d_a_msoa(
+            domain.element_type,
+                        real_type,
+                        nelements,
+                        domain.block->elements()->data(),
+                        adjugate[0], adjugate[1], adjugate[2], adjugate[3],
+                        determinant,
+                        domain.parameters->require_real_value("lmbda"),
+                        domain.parameters->require_real_value("mu"),
+                        2, x + 0, x + 1,
+                        nelements,
+                        cache->inexact_tangent->data());
+      }
+      else if (dim == 3) {
+        return neohookean_ogden_inexact_apply_tangent_3d_a_msoa(
+            domain.element_type,
+                        real_type,
+                        nelements,
+                        domain.block->elements()->data(),
+                        adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8],
+                        determinant,
+                        domain.parameters->require_real_value("lmbda"),
+                        domain.parameters->require_real_value("mu"),
+                        3, x + 0, x + 1, x + 2,
+                        nelements,
+                        cache->inexact_tangent->data());
+      }
+      SFEM_ERROR("GeneratedNeoHookeanOgden::inexact_update has no kernel for dimension %d\n", dim);
+      return SFEM_FAILURE;
+    });
+  }
+
+  int GeneratedNeoHookeanOgden::inexact_apply(const real_t *const h, real_t *const out) {
+    SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::inexact_apply");
+    auto mesh = impl_->space->mesh_ptr();
+    const int dim = mesh->spatial_dimension();
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+      if (!cache || !cache->inexact_tangent) {
+        SFEM_ERROR("GeneratedNeoHookeanOgden::inexact_apply requires inexact_update first\n");
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nelements = domain.block->n_elements();
+      if (dim == 2) {
+        return neohookean_ogden_inexact_apply_stored_2d_a_msoa(
+            domain.element_type,
+                        real_type,
+                        nelements,
+                        domain.block->elements()->data(),
+                        nelements,
+                        cache->inexact_tangent->data(),
+                        2, h + 0, h + 1,
+                        2, out + 0, out + 1);
+      }
+      else if (dim == 3) {
+        if (impl_->space->has_packed_mesh()) {
+          auto packed = impl_->space->packed_mesh();
+          const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+          if (packed_block >= 0) {
+            auto packed_elements = packed->elements(packed_block);
+            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+            auto ghost_ptr = packed->ghost_ptr(packed_block);
+            auto ghost_idx = packed->ghost_idx(packed_block);
+            auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+            auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+            auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+            return neohookean_ogden_inexact_apply_stored_packed_two_pass_3d_a_msoa(
+                domain.element_type,
+                            real_type,
+                            packed->n_packs(packed_block),
+                            packed->n_elements_per_pack(packed_block),
+                            nelements,
+                            packed->max_nodes_per_pack(),
+                            packed_elements->data(),
+                            owned_nodes_ptr->data(),
+                            packed->n_ghost_entries(packed_block),
+                            packed->n_ghost_reduce_rows(packed_block),
+                            ghost_ptr->data(),
+                            ghost_idx->data(),
+                            ghost_reduce_ptr->data(),
+                            ghost_reduce_idx->data(),
+                            ghost_reduce_dest->data(),
+                            impl_->packed_ghost_buf[packed_block]->data(),
+                            nelements,
+                            cache->inexact_tangent->data(),
+                            3, h + 0, h + 1, h + 2,
+                            3, out + 0, out + 1, out + 2);
+          }
+        }
+        return neohookean_ogden_inexact_apply_stored_3d_a_msoa(
+            domain.element_type,
+                        real_type,
+                        nelements,
+                        domain.block->elements()->data(),
+                        nelements,
+                        cache->inexact_tangent->data(),
+                        3, h + 0, h + 1, h + 2,
+                        3, out + 0, out + 1, out + 2);
+      }
+      SFEM_ERROR("GeneratedNeoHookeanOgden::inexact_apply has no kernel for dimension %d\n", dim);
+      return SFEM_FAILURE;
+    });
+  }
 }  // namespace sfem

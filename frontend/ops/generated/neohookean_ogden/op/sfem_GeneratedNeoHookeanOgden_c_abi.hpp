@@ -555,6 +555,145 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_hex8_matrix_as
 
 extern "C" int neohookean_ogden_hex8_matrix_assembly_variant_count();
 
+extern "C" int neohookean_ogden_inexact_apply_compressed_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const RSTR elements,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const RSTR tangent,
+        const scaling_t *const RSTR scaling,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+);
+
+extern "C" int neohookean_ogden_inexact_apply_compressed_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const RSTR elements,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const RSTR tangent,
+        const scaling_t *const RSTR scaling,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+
+extern "C" int neohookean_ogden_inexact_apply_stored_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const RSTR elements,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const RSTR tangent,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+);
+
+extern "C" int neohookean_ogden_inexact_apply_stored_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const RSTR elements,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const RSTR tangent,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+
+extern "C" int neohookean_ogden_inexact_apply_stored_packed_two_pass_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const RSTR tangent,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+
+extern "C" int neohookean_ogden_inexact_apply_tangent_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const RSTR tangent
+);
+
+extern "C" int neohookean_ogden_inexact_apply_tangent_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const RSTR tangent
+);
+
 extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_2d_soa_diagnostics(
     const smesh::ElemType element_type);
 
