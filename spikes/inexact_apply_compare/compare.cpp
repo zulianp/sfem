@@ -76,7 +76,7 @@ int main() {
     // `Sbar` is 45 numbers per element in three dimensions, stored one
     // component-plane at a time.  The padding keeps each plane's start clear of
     // the previous plane's tail for the vector loads.
-    const ptrdiff_t tangent_element_stride = nelements + 64;
+    const ptrdiff_t tangent_component_stride = nelements + 64;
 
     linear_elasticity_tet4_apply_a_msoa(SFEM_CODEGEN_F64, nelements, nnodes, evp.data(),
         adj[0].data(),adj[1].data(),adj[2].data(),adj[3].data(),adj[4].data(),
@@ -91,18 +91,17 @@ int main() {
     //
     // `linear_elasticity`'s tangent does not depend on the state, so the
     // assembly is handed a zero state and still produces the same `Sbar`.
-    std::vector<double> tangent((size_t)tangent_element_stride * TANGENT_COMPONENTS);
-    sfem::codegen::linear_elasticity_tet4_inexact_apply_tangent_a_msoa_impl<double, geom_t, double>(
-        nelements, evp.data(),
+    std::vector<double> tangent((size_t)tangent_component_stride * TANGENT_COMPONENTS);
+    sfem::codegen::linear_elasticity_tet4_inexact_apply_tangent_a_msoa_impl<double, geom_t, double, 16>(
+        nelements,
         adj[0].data(),adj[1].data(),adj[2].data(),adj[3].data(),adj[4].data(),
         adj[5].data(),adj[6].data(),adj[7].data(),adj[8].data(), det.data(),
         lmbda, mu,
-        1, zero.data(), zero.data(), zero.data(),
-        1, tangent_element_stride, tangent.data());
+        tangent_component_stride, tangent.data());
 
-    sfem::codegen::linear_elasticity_tet4_inexact_apply_stored_a_msoa_impl<double, double>(
+    sfem::codegen::linear_elasticity_tet4_inexact_apply_stored_a_msoa_impl<double, double, 16>(
         nelements, evp.data(),
-        1, tangent_element_stride, tangent.data(),
+        tangent_component_stride, tangent.data(),
         1, hx.data(), hy.data(), hz.data(),
         1, bx.data(), by.data(), bz.data());
 

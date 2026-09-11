@@ -174,10 +174,10 @@ int main(int argc, char *argv[]) {
 
         const double mu = 1.0, lmbda = 1.0;
         auto assemble = [&] {
-            TANGENT_KERNEL<double, geom_t, double>(
+            TANGENT_KERNEL<double, geom_t, double, 16>(
                 nelements, elements, A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8],
                 determinant, lmbda, mu, 1, ux.data(), uy.data(), uz.data(),
-                1, cstride, S64.data());
+                cstride, S64.data());
         };
 
         Row setup_row;
@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
             row.apply = time_best(repeats, [&] {
                 STORED_APPLY<double, typename std::remove_const<
                         typename std::remove_pointer<decltype(store)>::type>::type>(
-                    nelements, elements, 1, cstride, store,
+                    nelements, elements, cstride, store,
                     1, hx.data(), hy.data(), hz.data(),
                     1, ox.data(), oy.data(), oz.data());
             });
@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
             row.setup = setup_row.apply;
             row.apply = time_best(repeats, [&] {
                 COMPRESSED_APPLY<double, half_t, float>(
-                    nelements, elements, 1, cstride, S16.data(), scale.data(),
+                    nelements, elements, cstride, S16.data(), scale.data(),
                     1, hx.data(), hy.data(), hz.data(),
                     1, ox.data(), oy.data(), oz.data());
             });

@@ -796,6 +796,79 @@ draws are the table above.  `--bind
 tangent_t=double` models the f64 store, which is a benchmark-only instantiation:
 the Op publishes f32.
 
+## Mesh ordering, which was the free parameter all along
+
+These benchmarks build their mesh lexicographically -- nodes `(k*nn + j)*nn + i`,
+elements walked in the same order -- and until now nothing reordered it.  That is
+a gap against the rest of the repository: SFEM has space-filling-curve ordering
+in `external/smesh/src/mesh/ordering/`, `smesh::SFC::create_from_env()` defaults
+to `morton3`, and SFEM's own benchmark drivers reorder before they measure
+(`drivers/bench/bench_hyperelasticity.exe.cpp:240`).  These did not.
+
+It matters because the ordering, not the kernel, decides how much of a gather is
+compulsory rather than streamed -- which is exactly the width of the band in the
+roofline above.  `element_mesh.inc` now takes `-DMESH_ORDER`, reaching smesh's
+own encoders so this measures the library's ordering rather than a private
+reimplementation, and applying SFEM's own algorithm: sort the elements along the
+curve through their barycentres, then renumber the nodes in the order the
+reordered elements first touch them.
+
+Grace, 206763 dof, 72 threads, MDOF/s.  `random3` is the control: an ordering
+with no locality at all.
+
+| element | ordering | exact | stored f64 | stored f32 | compressed f16 | assembly |
+|---|---|---|---|---|---|---|
+| TET4 | lex      | 205.6 | 337.6 | 342.2 | 407.6 | 195.2 |
+| TET4 | morton3  | 185.1 | 291.0 | 293.9 | 321.1 | 194.7 |
+| TET4 | hilbert3 | 188.6 | 293.0 | 293.8 | 330.8 | 194.3 |
+| TET4 | random3  |  96.7 |  78.8 |  61.9 |  61.5 | 152.7 |
+| HEX8 | lex      | 222.2 | 648.4 | 430.9 | 508.2 | 117.5 |
+| HEX8 | morton3  | 215.6 | 565.8 | 498.8 | 484.7 | 117.6 |
+| HEX8 | hilbert3 | 217.0 | 573.4 | 509.2 | 460.8 | 117.2 |
+| HEX8 | random3  | 182.5 | 158.7 | 144.8 | 227.2 | 116.2 |
+
+**The ordering is worth more than everything else in this file put together.**
+Destroying it costs the stored apply a factor of four on both elements -- TET4
+f32 falls 342 to 62, HEX8 f64 falls 648 to 159 -- against the 13% the SoA store
+bought and the 3% the store's precision is worth.  Every throughput above is a
+statement about a well-ordered mesh and should be read as one.
+
+**An SFC buys nothing over lexicographic here, and that is not a result about
+SFCs.**  These meshes are a structured cube grid, for which the lexicographic
+numbering *is* a good space-filling order; morton3 and hilbert3 are within noise
+of it and sometimes behind.  What the comparison establishes is the sensitivity,
+not a recommendation: on an unstructured mesh in its natural file order the
+`random3` column is the relevant one, and that is the case SFC exists for.  This
+spike cannot say how close a real unstructured mesh comes to either end.
+
+**The assembly kernel barely notices** -- 117.5 to 116.2 on HEX8, 1% -- because
+it gathers 24 values and then does 11171 FLOPs with them.  TET4's assembly loses
+22%, which is the same statement at the other extreme of the FLOP-to-gather
+ratio.  Everything in this file about the tangent kernel is therefore independent
+of the ordering; everything about the applies is not.
+
+**What it says about the roofline.**  Neither end of the band is where these
+kernels sit.  HEX8's stored apply at 431 MDOF/s is 244 GFLOP/s, under 8% of even
+the *streamed* bandwidth ceiling, and reordering moves it by a factor of three
+without moving a single byte of its compulsory traffic -- so what the ordering
+costs is latency, TLB and cache misses on the gather, which a roofline does not
+model.  TET4's stored apply is the one case that does behave like a
+bandwidth-bound kernel: 154 GFLOP/s against a streamed ceiling of 250, 62% of
+it, falling to 11% under `random3`.  Read the roofline as the ceiling these
+kernels are under, not as the line they are on.
+
+**A caveat on the f32 column.**  HEX8 stored f32 at 72 threads has come back
+between 431 and 567 across runs on different nodes, while f64 on the same runs
+stayed within 648-653.  The ordering comparison above is within one job and one
+node, so it is internally consistent, but no single f32 figure at 72 threads in
+this file should be trusted to better than 25% without repeats.
+
+Sweep it with:
+
+    for o in lex morton3 hilbert3 random3; do
+      MESH_ORDER=$o spikes/inexact_apply_compare/run_split.sh neohookean_ogden HEX8
+    done
+
 ## What the first version of these measurements got wrong
 
 The throughput figures above replace an earlier set that was wrong, and the way it

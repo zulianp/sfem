@@ -10,7 +10,9 @@
     "",
     "Eight threads, not ten: the two efficiency cores are not interchangeable",
     "with the performance ones and a rate that mixes them is not comparable",
-    "with anything."
+    "with anything.",
+    "",
+    "Mesh ordering: lex. Not incidental -- destroying the ordering costs the stored apply a factor of four (see the ordering sweep in RESULTS.md), so these points describe a well-ordered mesh and nothing else."
   ],
   "points": [
     {
@@ -79,5 +81,6 @@
       "ndof": 206763,
       "mdofs": 32.44
     }
-  ]
+  ],
+  "ordering": "lex"
 }

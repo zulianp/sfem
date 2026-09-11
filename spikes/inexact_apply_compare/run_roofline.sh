@@ -87,7 +87,7 @@ PYTHONPATH=. "$PYTHON" -m codegen.framework.tools.roofline "$WORK/gen" \
     ${THREADS:+--threads "$THREADS"} \
     --nodes-per-element "$NPE" \
     --measured "$MEASURED" \
-    --plot "$OUT/roofline_${MATERIAL}_${LOWER}_${MACHINE}.svg" \
+    --plot "$OUT/roofline_${MATERIAL}_${LOWER}_${MACHINE}.pdf" \
     "${CONFIGS[@]}" 2>&1 | stdbuf -oL tee -a "$LOG"
 
 echo "END $(date +%T)  report $LOG" | tee -a "$LOG"
