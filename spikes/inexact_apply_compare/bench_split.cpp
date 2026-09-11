@@ -66,6 +66,36 @@ extern "C" int EXACT_APPLY(
         const ptrdiff_t, double *const, double *const, double *const);
 
 #include "element_mesh.inc"
+#include "packed_mesh.inc"
+#ifdef MATERIAL_PACKED_REFERENCE
+#include MATERIAL_PACKED_REFERENCE
+#endif
+
+#ifdef PACKED_EXACT_APPLY
+// The packed two-pass exact apply, which the generator already publishes.  It is
+// here before any packed *inexact* kernel exists, because it is the cheapest way
+// to find out whether the layout built in `packed_mesh.inc` is the layout the
+// generated kernels actually expect: this one's answer is known.
+extern "C" int PACKED_EXACT_APPLY(
+        const int,
+        const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t,
+        uint16_t **const,
+        const ptrdiff_t *const, const ptrdiff_t *const,
+        const ptrdiff_t *const, const idx_t *const,
+        const ptrdiff_t, const ptrdiff_t,
+        const ptrdiff_t *const, const ptrdiff_t *const, const idx_t *const,
+        void *const,
+        const geom_t *const, const geom_t *const, const geom_t *const,
+        const geom_t *const, const geom_t *const, const geom_t *const,
+        const geom_t *const, const geom_t *const, const geom_t *const,
+        const geom_t *const,
+        const double, const double,
+#ifdef EXACT_TAKES_STATE
+        const ptrdiff_t, const double *const, const double *const, const double *const,
+#endif
+        const ptrdiff_t, const double *const, const double *const, const double *const,
+        const ptrdiff_t, double *const, double *const, double *const);
+#endif
 
 template <typename F> static double best_mdof(int repeats, ptrdiff_t ndof, F &&fn) {
     // The timed region is the kernel and nothing else.
@@ -103,12 +133,26 @@ int main(int argc, char **argv) {
 #endif
     const double mu = 2.3333333333333335, lmbda = 2.2;
     std::printf("%s, %s, threads %d, best of %d\n\n", MATERIAL_LABEL, ELEMENT_NAME, threads, repeats);
-    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s %9s\n",
+    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s %9s",
                 "elements", "nodes", "ndof",
                 "exact", "st.f64", "st.f32", "st.f16", "assembly",
                 "f64 diff", "f32 diff", "f16 diff");
-    std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s\n", "", "", "",
+#ifdef PACKED_EXACT_APPLY
+    std::printf(" | %8s %9s", "pk.exact", "pk diff");
+#endif
+#ifdef PACKED_STORED_APPLY
+    std::printf(" | %8s %9s", "pk.st32", "pk diff");
+#endif
+    std::printf("\n");
+    std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s", "", "", "",
                 "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
+#ifdef PACKED_EXACT_APPLY
+    std::printf(" | %8s %9s", "MDOF/s", "rel");
+#endif
+#ifdef PACKED_STORED_APPLY
+    std::printf(" | %8s %9s", "MDOF/s", "rel");
+#endif
+    std::printf("\n");
 
     static const int sizes_probe[] = SIZES;
     for (int n : sizes_probe) {
@@ -166,6 +210,18 @@ int main(int argc, char **argv) {
 
         std::vector<double> ax(m.nnodes,0), ay(m.nnodes,0), az(m.nnodes,0);
         std::vector<double> cx(m.nnodes,0), cy(m.nnodes,0), cz(m.nnodes,0);
+#ifdef PACKED_EXACT_APPLY
+        // The same mesh, partitioned into packs, with the fields placed through
+        // its permutation so this is the same problem relabelled.
+        PackedMeshView pk = build_packed_mesh(m, PACK_SIZE);
+        std::vector<double> pux, puy, puz, phx, phy, phz;
+        place_packed(ux, pk.layout, pux); place_packed(uy, pk.layout, puy);
+        place_packed(uz, pk.layout, puz);
+        place_packed(hx, pk.layout, phx); place_packed(hy, pk.layout, phy);
+        place_packed(hz, pk.layout, phz);
+        std::vector<double> pkx(m.nnodes), pky(m.nnodes), pkz(m.nnodes);
+        std::vector<double> ghost_buf((size_t)pk.layout.n_ghost_entries * 3, 0.0);
+#endif
         auto zero = [&](std::vector<double> &p, std::vector<double> &q, std::vector<double> &r) {
             std::fill(p.begin(),p.end(),0.0); std::fill(q.begin(),q.end(),0.0); std::fill(r.begin(),r.end(),0.0);
         };
@@ -193,6 +249,60 @@ int main(int argc, char **argv) {
                 m.nelements, m.evp.data(), cstride, S16.data(), scale.data(),
                 1, hx.data(), hy.data(), hz.data(), 1, cx.data(), cy.data(), cz.data());
         };
+#ifdef PACKED_STORED_APPLY
+        // The store is assembled on the standard mesh and read here unchanged:
+        // packing renumbers nodes, never elements, so element e is element e in
+        // both and its 45 tangent components are the same numbers.
+        auto run_packed_stored = [&](auto *store) {
+            zero(pkx,pky,pkz);
+            sfem::codegen::PACKED_STORED_APPLY<double, typename std::remove_const<
+                typename std::remove_pointer<decltype(store)>::type>::type, LANE_VS>(
+                pk.layout.n_packs, pk.layout.n_elements_per_pack, m.nelements, m.nnodes,
+                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.owned_nodes_ptr.data(),
+                pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
+                pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
+                pk.layout.ghost_reduce_ptr.data(), pk.layout.ghost_reduce_idx.data(),
+                pk.layout.ghost_reduce_dest.data(), ghost_buf.data(),
+                cstride, store,
+                1, phx.data(), phy.data(), phz.data(),
+                1, pkx.data(), pky.data(), pkz.data());
+        };
+#endif
+#ifdef PACKED_EXACT_APPLY
+        auto run_packed_exact = [&] {
+            zero(pkx,pky,pkz);
+            PACKED_EXACT_APPLY(SFEM_CODEGEN_F64,
+                pk.layout.n_packs, pk.layout.n_elements_per_pack, m.nelements, m.nnodes,
+                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.owned_nodes_ptr.data(), pk.layout.n_shared_nodes.data(),
+                pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
+                pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
+                pk.layout.ghost_reduce_ptr.data(), pk.layout.ghost_reduce_idx.data(),
+                pk.layout.ghost_reduce_dest.data(), ghost_buf.data(),
+                pk.mesh.adj[0].data(),pk.mesh.adj[1].data(),pk.mesh.adj[2].data(),
+                pk.mesh.adj[3].data(),pk.mesh.adj[4].data(),pk.mesh.adj[5].data(),
+                pk.mesh.adj[6].data(),pk.mesh.adj[7].data(),pk.mesh.adj[8].data(),
+                pk.mesh.det.data(), lmbda, mu,
+#ifdef EXACT_TAKES_STATE
+                1, pux.data(), puy.data(), puz.data(),
+#endif
+                1, phx.data(), phy.data(), phz.data(),
+                1, pkx.data(), pky.data(), pkz.data());
+        };
+        // Against the standard apply, read back through the permutation.  The two
+        // are the same operator on the same problem, so this is round-off or it is
+        // a layout that does not match what the kernel expects.
+        auto rel_packed = [&] {
+            double num = 0, den = 0;
+            for (ptrdiff_t i = 0; i < m.nnodes; ++i) {
+                const idx_t j = pk.layout.to_new[i];
+                num += std::fabs(ax[i]-pkx[j])+std::fabs(ay[i]-pky[j])+std::fabs(az[i]-pkz[j]);
+                den += std::fabs(ax[i])+std::fabs(ay[i])+std::fabs(az[i]);
+            }
+            return num / den;
+        };
+#endif
         auto rel = [&](const std::vector<double> &px, const std::vector<double> &py,
                        const std::vector<double> &pz) {
             double num = 0, den = 0;
@@ -211,15 +321,37 @@ int main(int argc, char **argv) {
         run_compressed();
         const double d_16 = rel(cx,cy,cz);
 
+#ifdef PACKED_EXACT_APPLY
+        run_packed_exact();
+        const double d_pk = rel_packed();
+#endif
+#ifdef PACKED_STORED_APPLY
+        run_packed_stored(S32.data());
+        const double d_pks = rel_packed();
+#endif
+
         const double e  = best_mdof(repeats, ndof, run_exact);
         const double s64 = best_mdof(repeats, ndof, [&]{ run_stored(S64.data()); });
         const double s32 = best_mdof(repeats, ndof, [&]{ run_stored(S32.data()); });
         const double s16 = best_mdof(repeats, ndof, run_compressed);
         const double a  = best_mdof(repeats, ndof, assemble);
+#ifdef PACKED_EXACT_APPLY
+        const double epk = best_mdof(repeats, ndof, run_packed_exact);
+#endif
+#ifdef PACKED_STORED_APPLY
+        const double spk = best_mdof(repeats, ndof, [&]{ run_packed_stored(S32.data()); });
+#endif
 
-        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e\n",
+        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e",
                     (long)m.nelements, (long)m.nnodes, (long)ndof,
                     e, s64, s32, s16, a, d_64, d_32, d_16);
+#ifdef PACKED_EXACT_APPLY
+        std::printf(" | %8.2f %9.1e", epk, d_pk);
+#endif
+#ifdef PACKED_STORED_APPLY
+        std::printf(" | %8.2f %9.1e", spk, d_pks);
+#endif
+        std::printf("\n");
         if (n == sizes_probe[sizeof(sizes_probe)/sizeof(int) - 1]) {
             // The gate: on an affine simplex the projection loses nothing, so
             // the f64 store must reproduce the exact apply to round-off.
