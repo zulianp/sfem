@@ -100,12 +100,12 @@ int main(int argc, char **argv) {
 #endif
     const double mu = 2.3333333333333335, lmbda = 2.2;
     std::printf("%s, %s, threads %d, best of %d\n\n", MATERIAL_LABEL, ELEMENT_NAME, threads, repeats);
-    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s\n",
+    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s %9s\n",
                 "elements", "nodes", "ndof",
                 "exact", "st.f64", "st.f32", "st.f16", "assembly",
-                "f32 diff", "f16 diff");
-    std::printf("%10s %10s %12s | %s | %8s | %9s %9s\n", "", "", "",
-                "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel");
+                "f64 diff", "f32 diff", "f16 diff");
+    std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s\n", "", "", "",
+                "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
 
     static const int sizes_probe[] = SIZES;
     for (int n : sizes_probe) {
@@ -214,9 +214,9 @@ int main(int argc, char **argv) {
         const double s16 = best_mdof(repeats, ndof, run_compressed);
         const double a  = best_mdof(repeats, ndof, assemble);
 
-        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e\n",
+        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e\n",
                     (long)m.nelements, (long)m.nnodes, (long)ndof,
-                    e, s64, s32, s16, a, d_32, d_16);
+                    e, s64, s32, s16, a, d_64, d_32, d_16);
         if (n == sizes_probe[sizeof(sizes_probe)/sizeof(int) - 1]) {
             // The gate: on an affine simplex the projection loses nothing, so
             // the f64 store must reproduce the exact apply to round-off.

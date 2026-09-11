@@ -55,10 +55,15 @@ if [ "$MATERIAL" = "linear_elasticity" ]; then TAKES_STATE=""; fi
 
 # HEX8's operator aliases into the PROTEUS_HEX8 translation unit, which pulls
 # in mpi.h, so it needs the MPI compiler wrapper and the extra source.
+# Every operator includes the mesh types when they are on the path, and those
+# reach mpi.h, so the MPI wrapper is needed for all elements -- not only for
+# HEX8, which additionally aliases into the PROTEUS_HEX8 translation unit.
 EXTRA_TU=""
-CXX="${CXX:-c++}"
+CXX="${CXX:-}"
+if [ -z "$CXX" ]; then
+    if command -v "${MPICXX:-mpic++}" >/dev/null 2>&1; then CXX="${MPICXX:-mpic++}"; else CXX="c++"; fi
+fi
 if [ "$ELEMENT" = "HEX8" ]; then
-    CXX="${MPICXX:-mpic++}"
     for candidate in "$WORK/gen/$MATERIAL/d3/proteus_hex8/${MATERIAL}_proteus_hex8_operator.cpp"; do
         [ -f "$candidate" ] && EXTRA_TU="$candidate"
     done
