@@ -127,6 +127,15 @@ namespace sfem {
         // against something known -- the volume a prescribed normal velocity sweeps.
         int sideset_mass_flux(const real_t *const x, const std::string &sideset, real_t &out);
 
+        // The same integral carrying a nodal weight: sum of w_i * (rho u.n)_i over the
+        // sideset's sub-control surfaces. With w = 1/2 |u|^2 + p/rho this is the rate at
+        // which the surface does work on the fluid, which is the term an energy budget needs
+        // on an open boundary and which no independent quadrature could be trusted to match.
+        // Flat HEX8 only -- a weighted call on a semi-structured mesh fails rather than
+        // quietly dropping the weight.
+        int sideset_flux_weighted(const real_t *const x, const std::string &sideset,
+                                  const real_t *const w, real_t &out);
+
         // The timestep this operator was given, so clone_onto can hand it to a coarse level.
         real_t dt_for_clone() const;
         int    bdf_order_for_clone() const;
@@ -154,6 +163,20 @@ namespace sfem {
         // Control volume per node -- the CVFEM lumped mass. Exposed because the driver
         // cannot include the kernel headers, and the MMS error norms are volume-weighted.
         int node_volume(real_t *const out) const;
+
+        // The nodal velocity gradient, row-major per node: out[i*9 + r*3 + c] = d u_r / d x_c.
+        //
+        // Every flow diagnostic worth having is a contraction of this one array -- the strain
+        // rate and so the viscous dissipation, the vorticity and so the enstrophy, the
+        // divergence -- and none of them existed because the quantity was not reachable from
+        // a driver. The reconstruction itself is not new: it is the same least-distance nodal
+        // gradient the Rhie-Chow term already builds for pressure, run once per velocity
+        // component, and it is exact for a globally linear field (tests/cvfem_nodal_grad_test).
+        //
+        // `x` is the interleaved state the solver carries, so the components are read with a
+        // stride rather than compacted first. Flat HEX8 only for now; the semi-structured twin
+        // is sscvfem_nodal_grad_strided and would slot in the same way node_volume does.
+        int nodal_velocity_gradient(const real_t *const x, real_t *const out) const;
 
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;

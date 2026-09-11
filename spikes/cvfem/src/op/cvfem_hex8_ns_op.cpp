@@ -703,23 +703,28 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int CVFEMNavierStokes::sideset_mass_flux(const real_t *const x, const std::string &sideset,
-                                             real_t &out) {
-        SFEM_TRACE_SCOPE("CVFEMNavierStokes::sideset_mass_flux");
+    int CVFEMNavierStokes::sideset_flux_weighted(const real_t *const x, const std::string &sideset,
+                                                 const real_t *const w, real_t &out) {
+        SFEM_TRACE_SCOPE("CVFEMNavierStokes::sideset_flux_weighted");
         out = 0;
         if (!impl_->initialized) return SFEM_FAILURE;
         auto mesh  = impl_->space->mesh_ptr();
         auto named = mesh->sidesets(sideset);
         if (named.empty() || !named.front()) {
-            SFEM_ERROR("CVFEMNavierStokes::sideset_mass_flux: sideset '%s' not found\n", sideset.c_str());
+            SFEM_ERROR("CVFEMNavierStokes::sideset_flux_weighted: sideset '%s' not found\n", sideset.c_str());
             return SFEM_FAILURE;
         }
-        if (impl_->semi_structured) return sideset_mass_flux_ss(x, named.front(), out);
+        // The semi-structured integrator carries no weight; an unweighted call still routes
+        // to it, a weighted one is refused rather than silently dropping the weight.
+        if (impl_->semi_structured) {
+            if (w) return SFEM_FAILURE;
+            return sideset_mass_flux_ss(x, named.front(), out);
+        }
 
         auto &d = impl_->d;
         std::vector<uint8_t> mask;
         if (compile_sideset_mask(named.front(), d.nelements, mask) < 0) {
-            SFEM_ERROR("CVFEMNavierStokes::sideset_mass_flux: malformed sideset '%s'\n", sideset.c_str());
+            SFEM_ERROR("CVFEMNavierStokes::sideset_flux_weighted: malformed sideset '%s'\n", sideset.c_str());
             return SFEM_FAILURE;
         }
 
@@ -760,10 +765,23 @@ namespace sfem {
             for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) re[k] = 0;
             boundary_scs_add_residual((scalar_t)rho, (scalar_t)mu, 0, adj, det, d.Lx, d.Ly, d.Lz,
                                       xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) q += (long double)re[a * N_FIELDS + 3];
+            // The continuity row a boundary node receives IS its mass flux through this
+            // surface, so a nodal weight applied here integrates w * (rho u.n) over exactly
+            // the sub-control surfaces the residual used -- which is what makes an energy
+            // flux comparable with the dissipation computed on the same control volumes.
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const smesh::idx_t g  = d.elems[a][e];
+                const long double  wf = w ? (long double)w[(size_t)g] : (long double)1;
+                q += wf * (long double)re[a * N_FIELDS + 3];
+            }
         }
         out = (real_t)q;
         return SFEM_SUCCESS;
+    }
+
+    int CVFEMNavierStokes::sideset_mass_flux(const real_t *const x, const std::string &sideset,
+                                             real_t &out) {
+        return sideset_flux_weighted(x, sideset, nullptr, out);
     }
 
     bool CVFEMNavierStokes::fixes_pressure_level() const {
@@ -1037,6 +1055,28 @@ namespace sfem {
             build_node_volume(impl_->d, v);
         }
         for (size_t i = 0; i < v.size(); ++i) out[i] = (real_t)v[i];
+        return SFEM_SUCCESS;
+    }
+
+    int CVFEMNavierStokes::nodal_velocity_gradient(const real_t *const x, real_t *const out) const {
+        if (!impl_->initialized) return SFEM_FAILURE;
+        // Flat HEX8 only. Returning failure rather than silently reconstructing on the macro
+        // mesh: a caller that got the coarse gradient back and averaged it would see a
+        // dissipation far too small and have no way to tell.
+        if (impl_->semi_structured) return SFEM_FAILURE;
+
+        MeshData &d = const_cast<MeshData &>(impl_->d);
+        // Not the member vectors the Rhie-Chow path uses (d.pgx/pgy/pgz): this must not
+        // disturb a cached pressure gradient that a subsequent apply would read.
+        std::vector<scalar_t> gx, gy, gz;
+        for (int r = 0; r < 3; ++r) {
+            assemble_nodal_grad_strided(d, to_geom_kind(geom), (const scalar_t *)x + r, N_FIELDS, gx, gy, gz);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                out[i * 9 + r * 3 + 0] = (real_t)gx[(size_t)i];
+                out[i * 9 + r * 3 + 1] = (real_t)gy[(size_t)i];
+                out[i * 9 + r * 3 + 2] = (real_t)gz[(size_t)i];
+            }
+        }
         return SFEM_SUCCESS;
     }
 
