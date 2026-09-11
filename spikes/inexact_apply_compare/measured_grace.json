@@ -1,0 +1,54 @@
+{
+  "machine": "grace",
+  "note": [
+    "What was actually run, so the roofline's dots are measurements rather than",
+    "estimates. One point per kernel at the full socket -- the thread sweep is in",
+    "RESULTS.md and would only crowd the plot.",
+    "",
+    "The store's width is the kernel's template parameter, and these points are",
+    "the instantiation the generated Op publishes: metric_tensor_t (f32) for the",
+    "stored apply, compressed_t (f16) for the compressed one. The f64 store in",
+    "RESULTS.md is a benchmark-only instantiation; model it with",
+    "'--bind tangent_t=double', which is why that option exists.",
+    "",
+    "Arithmetic is double throughout: s_t is double in every one of these."
+  ],
+  "points": [
+    {
+      "label": "HEX8 stored f32",
+      "kernel": "neohookean_ogden_hex8_inexact_apply_stored_a_msoa",
+      "element": "HEX8", "threads": 72, "scalar_bytes": 8,
+      "nelements": 64000, "nnodes": 68921, "ndof": 206763, "mdofs": 564.2
+    },
+    {
+      "label": "HEX8 compressed f16",
+      "kernel": "neohookean_ogden_hex8_inexact_apply_compressed_a_msoa",
+      "element": "HEX8", "threads": 72, "scalar_bytes": 8,
+      "nelements": 64000, "nnodes": 68921, "ndof": 206763, "mdofs": 518.4
+    },
+    {
+      "label": "HEX8 tangent assembly",
+      "kernel": "neohookean_ogden_hex8_inexact_apply_tangent_a_msoa",
+      "element": "HEX8", "threads": 72, "scalar_bytes": 8,
+      "nelements": 64000, "nnodes": 68921, "ndof": 206763, "mdofs": 117.2
+    },
+    {
+      "label": "TET4 stored f32",
+      "kernel": "neohookean_ogden_tet4_inexact_apply_stored_a_msoa",
+      "element": "TET4", "threads": 72, "scalar_bytes": 8,
+      "nelements": 384000, "nnodes": 68921, "ndof": 206763, "mdofs": 344.6
+    },
+    {
+      "label": "TET4 compressed f16",
+      "kernel": "neohookean_ogden_tet4_inexact_apply_compressed_a_msoa",
+      "element": "TET4", "threads": 72, "scalar_bytes": 8,
+      "nelements": 384000, "nnodes": 68921, "ndof": 206763, "mdofs": 411.0
+    },
+    {
+      "label": "TET4 tangent assembly",
+      "kernel": "neohookean_ogden_tet4_inexact_apply_tangent_a_msoa",
+      "element": "TET4", "threads": 72, "scalar_bytes": 8,
+      "nelements": 384000, "nnodes": 68921, "ndof": 206763, "mdofs": 195.0
+    }
+  ]
+}
