@@ -26,3 +26,4 @@ viz/
 # Raw trace CSVs behind docs/CVFEM_Throughput.md, regenerable from a job id.
 perf/trace-*/
 throughput_runs/
+kernel_runs/
