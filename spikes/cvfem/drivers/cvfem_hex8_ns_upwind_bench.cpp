@@ -3,6 +3,9 @@
 // The operator implementations live in the per-layout headers below; this file
 // holds the mesh/option setup, the verification harness and the timing loop.
 
+#include <cstdint>
+#include <cstring>
+
 #include "cvfem_hex8_layout_common.hpp"
 #include "cvfem_hex8_layout_atomic.hpp"
 #include "cvfem_hex8_layout_colored.hpp"
@@ -1573,18 +1576,54 @@ int main(int argc, char **argv) {
                                             : CVFEM_HEX8_ASSEMBLE_FLOPS_PER_ELEMENT;
     const double elem_apps = double(repeat) * double(d.nelements);
 
+    // A bitwise fingerprint of the result, beside the checksum.
+    //
+    // The checksum cannot answer whether a run is reproducible, and that is not a matter of
+    // degree: it is a running sum of millions of values, so a last-bit difference on a
+    // handful of nodes is far below the ULP of the total and rounds away completely. Five
+    // repeats of the boundary closure scattered atomically and gathered per node produced
+    // byte-identical checksums for both, while a per-node comparison of the same operator
+    // showed hundreds of doubles differing.
+    //
+    // This folds every value's bit pattern in, so any single bit that changes anywhere
+    // changes it. The multiply-and-rotate is there because a plain XOR would cancel a value
+    // that appears twice, which node arrays are full of.
+    uint64_t fingerprint = 0xcbf29ce484222325ull;
+    const auto fold = [&fingerprint](const scalar_t v) {
+        uint64_t bits;
+        std::memcpy(&bits, &v, sizeof(bits));
+        fingerprint ^= bits;
+        fingerprint *= 0x100000001b3ull;
+        fingerprint = (fingerprint << 7) | (fingerprint >> 57);
+    };
+
     scalar_t checksum = 0;
     if (assemble) {
-        for (ptrdiff_t i = 0; i < bsr.nnz * 16; ++i) checksum += bsr.values->data()[i];
+        for (ptrdiff_t i = 0; i < bsr.nnz * 16; ++i) {
+            checksum += bsr.values->data()[i];
+            fold(bsr.values->data()[i]);
+        }
     } else if (assemble_diag) {
         // The diagonal had no branch here, so it fell through to the residual arrays it
         // never writes and every --assemble-diag row carried checksum 0 -- a number that
         // cannot distinguish any two runs, which is the whole purpose of the column.
-        for (scalar_t v : diag_blocks) checksum += v;
+        for (scalar_t v : diag_blocks) {
+            checksum += v;
+            fold(v);
+        }
     } else if (jac_action || bsr_apply) {
-        for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) checksum += jac_out[(size_t)i];
+        for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) {
+            checksum += jac_out[(size_t)i];
+            fold(jac_out[(size_t)i]);
+        }
     } else {
-        for (ptrdiff_t i = 0; i < d.nnodes; ++i) checksum += d.rx[i] + d.ry[i] + d.rz[i] + d.rc[i];
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            checksum += d.rx[i] + d.ry[i] + d.rz[i] + d.rc[i];
+            fold(d.rx[i]);
+            fold(d.ry[i]);
+            fold(d.rz[i]);
+            fold(d.rc[i]);
+        }
     }
 
     // --assemble-diag was missing from both of these, so a diagonal run announced itself
@@ -1645,6 +1684,7 @@ int main(int argc, char **argv) {
         std::printf("  MELEM/s: %.3f\n", melems);
     }
     std::printf("  checksum: %.16e\n", checksum);
+    std::printf("  fingerprint: %016llx\n", (unsigned long long)fingerprint);
     if (!assemble && !jac_action && !bsr_apply) {
         std::printf("  seconds_per_apply: %.6e\n", seconds_per_call);
         std::printf("  MDOF/s_residual: %.3f\n", mdofs);
