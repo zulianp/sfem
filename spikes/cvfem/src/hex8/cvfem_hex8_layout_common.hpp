@@ -258,6 +258,15 @@ struct MeshData {
     // The subset of elements face_mask_eff marks, compacted so the boundary sweeps are
     // load balanced rather than merely short.
     std::vector<ptrdiff_t> bnd_elems;
+    // The boundary shell's node gather map -- see cvfem_hex8_build_bnd_gather. It lets the
+    // closure be summed per node in a fixed order instead of scattered atomically, which
+    // is what makes the operator bit-reproducible across thread counts.
+    std::vector<ptrdiff_t>   bnd_gather_ptr;
+    std::vector<int32_t>     bnd_gather_slot;
+    std::vector<smesh::idx_t> bnd_gather_dest;
+    std::vector<scalar_t>    bnd_r;
+    ptrdiff_t                bnd_gather_n_bnd{-1};
+    bool                     bnd_gather_valid{false};
     scalar_t              Lx{0}, Ly{0}, Lz{0};
 
     // --transient dt makes the operator unsteady. In a control-volume scheme the mass
@@ -428,6 +437,13 @@ static SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f, const smesh:
     CVFEM_ATOMIC_ADD(f[id], value);
 }
 
+// The bench is driven by flags rather than by the environment, so it has no smesh::Env to
+// read through; this is for the one escape hatch that has to match the solver's spelling.
+static int cvfem_env_flag(const char *const name) {
+    const char *const v = std::getenv(name);
+    return v && *v && *v != '0' ? 1 : 0;
+}
+
 static SFEM_INLINE smesh::count_t find_bsr_slot(const smesh::count_t *const SFEM_RESTRICT rowptr,
                                                 const smesh::idx_t *const SFEM_RESTRICT   colidx,
                                                 const smesh::idx_t                        row,
@@ -520,6 +536,11 @@ static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const sc
     // clusters into a few static chunks, so filtering cuts the work without cutting the
     // wall time. See cvfem_hex8_compact_boundary_elems.
     cvfem_hex8_build_face_mask_eff(d);
+    // The gather is the default: scattering the closure atomically made the operator's
+    // result depend on thread timing. SFEM_BND_ATOMIC=1 restores the old scatter, as a
+    // measurement escape hatch rather than a supported mode.
+    static const int bnd_atomic = cvfem_env_flag("SFEM_BND_ATOMIC");
+    if (!bnd_atomic) cvfem_hex8_build_bnd_gather(d);
     const ptrdiff_t n_bnd = (ptrdiff_t)d.bnd_elems.size();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < n_bnd; ++i) {
@@ -533,14 +554,9 @@ static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const sc
         if (!isoparam) load_hex8_adj(d, e, adj, &det);
         boundary_scs_add_residual(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
                                   ux, uy, uz, p, r, fmask, 0);
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
-            atomic_add(d.rx.data(), g, r[a * 4 + 0]);
-            atomic_add(d.ry.data(), g, r[a * 4 + 1]);
-            atomic_add(d.rz.data(), g, r[a * 4 + 2]);
-            atomic_add(d.rc.data(), g, r[a * 4 + 3]);
-        }
+        cvfem_hex8_bnd_commit(d, i, e, r, bnd_atomic, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     }
+    if (!bnd_atomic) cvfem_hex8_bnd_gather_soa(d, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 }
 
 static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, const scalar_t rho, const scalar_t mu,
@@ -552,6 +568,11 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
     // clusters into a few static chunks, so filtering cuts the work without cutting the
     // wall time. See cvfem_hex8_compact_boundary_elems.
     cvfem_hex8_build_face_mask_eff(d);
+    // The gather is the default: scattering the closure atomically made the operator's
+    // result depend on thread timing. SFEM_BND_ATOMIC=1 restores the old scatter, as a
+    // measurement escape hatch rather than a supported mode.
+    static const int bnd_atomic = cvfem_env_flag("SFEM_BND_ATOMIC");
+    if (!bnd_atomic) cvfem_hex8_build_bnd_gather(d);
     const ptrdiff_t n_bnd = (ptrdiff_t)d.bnd_elems.size();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < n_bnd; ++i) {
@@ -572,14 +593,9 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
         if (!isoparam) load_hex8_adj(d, e, adj, &det);
         boundary_scs_add_jacobian_action(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
                                          ux, uy, uz, vx, vy, vz, q, r, fmask, 0);
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const ptrdiff_t g = (ptrdiff_t)d.elems[a][e] * N_FIELDS;
-            atomic_add(jv + g + 0, 0, r[a * 4 + 0]);
-            atomic_add(jv + g + 1, 0, r[a * 4 + 1]);
-            atomic_add(jv + g + 2, 0, r[a * 4 + 2]);
-            atomic_add(jv + g + 3, 0, r[a * 4 + 3]);
-        }
+        cvfem_hex8_bnd_commit_interleaved(d, i, e, r, bnd_atomic, jv);
     }
+    if (!bnd_atomic) cvfem_hex8_bnd_gather_interleaved(d, jv);
 }
 
 // The assembled counterpart of the two passes above, and it exists for the same reason
