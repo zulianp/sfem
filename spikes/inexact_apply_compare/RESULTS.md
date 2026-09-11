@@ -614,56 +614,51 @@ where measured" is correct for the kernels as they exist, and should be
 re-measured once they are lane-blocked, because the mechanism that would make
 narrow stores pay is currently absent.
 
-### Lane-blocking them was tried and does not pay
+### Lane-blocking them: two failed attempts, then a win
 
-The obvious inference from the instruction mix -- these kernels are scalar, so
-block them over lanes like the rest of the framework and take the vector
-instructions -- was implemented and measured, and it is wrong.  On one Grace
-socket at 206763 dof, stored apply, MDOF/s:
+Blocking these kernels over lanes like the rest of the framework does pay, but
+the first two attempts said it did not, and both were measurement faults rather
+than results.
 
-| | threads | scalar | blocked |
-|---|---|---|---|
-| TET4 f64  |  1 |   7.25 |   5.05 |
-| TET4 f64  | 72 | 437.44 | 321.68 |
-| TET4 f32  | 72 | 415.46 | 330.41 |
-| HEX8 f64  |  1 |  10.88 |   6.85 |
-| HEX8 f64  | 72 | 550.32 | 395.70 |
-| HEX8 f32  | 72 | 534.55 | 531.48 |
+**`run_split.sh` was not passing `-fopenmp`.** Every `#pragma omp simd` in the
+generated kernels was therefore inert, and every comparison this file made of a
+blocked kernel against a scalar one measured the blocking's overhead against
+none of its benefit. Fixed; without it these benchmarks measure unvectorised
+code whatever the kernels say.
 
-26 to 28 per cent slower at 72 threads, and 30 to 37 per cent at one.  Answers
-were identical throughout -- the f64 store still reproduces the exact apply to
-3.8e-15 -- so the whole of it is cost.  The f16 column moves hardly at all,
-which is the control: the compressed kernel was not blocked, and it did not
-change.
+**The one configuration that reached Grace read the increment inside the
+arithmetic loop.** Those loads go through the mesh connectivity, there is no
+gather instruction to put them in, and the compiler abandons the loop. That
+shape was already diagnosed as unvectorisable here -- and then benchmarked
+anyway, while the staged variant was only ever run on the laptop, where the
+missing `-fopenmp` made it look worse too.
 
-Four formulations were tried and all lose: staging every gathered value into
-lane-major scratch, staging none of them and reading where they are used,
-staging only the values reached through the connectivity, and block widths of
-4, 8, 16 and 32.  `objdump` on the blocked kernel finds no vector instruction in
-it at all.
+Staged and with OpenMP on, it wins.  The values reached through the connectivity
+are gathered into lane-major scratch in one pass, so by the time the arithmetic
+loop runs everything it touches is contiguous in the lane.  That is how the
+exact apply has always got its vector code.  HEX8 at 206763 dof, stored apply,
+one Grace socket:
 
-The reason is that the apply's inputs are reached *through the mesh
-connectivity* -- `hx[ev * h_stride]` -- so the arithmetic loop contains gathers,
-and there is no gather instruction to vectorise them into on this target.  The
-compiler serialises the lane loop and the blocking is left as pure overhead.
-Staging the gathers into scratch first, which is how the exact apply gets its
-vector code, replaces that overhead with a different one: a store and a reload
-per value, and this kernel has too little arithmetic per element to amortise it.
-The exact apply can because sum factorisation gives it far more work per gather.
+| threads | scalar f64 | blocked f64 | | scalar f32 | blocked f32 |
+|---|---|---|---|---|---|
+|  1 |  10.86 |  12.59 | +16% |  10.69 |  10.79 | +1% |
+|  8 |  82.30 |  94.34 | +15% |  80.20 |  81.43 | +2% |
+| 32 | 277.97 | 312.69 | +13% | 273.16 | 278.12 | +2% |
+| 72 | 548.29 | 617.29 | +13% | 529.77 | 553.77 | +5% |
 
-Two things this corrects about the reading above.  **53% scalar `ldr`/`str` is
-not by itself evidence of waste** when the loads are indirect and the core is
-already issuing 3.8 instructions per cycle: there was less headroom than the
-instruction mix suggested, because most of those loads are irreducible.  And the
-store-precision conclusion stands as measured rather than being provisional --
-the mechanism that would have made a narrow store pay, vector loads carrying
-more lanes, is not reachable for this kernel shape, so f32-by-default is the
-answer and not a placeholder.
+The compressed kernel is not blocked and does not move at any thread count,
+which is the control.  Answers are identical at 3.63e-05 and the binary gains
+1193 vector instructions.  On the laptop, where clang vectorises this more
+aggressively, both widths gain 34% to 42%.
 
-What would actually reduce the instruction count is a different change: a
-layout in which the increment is already element-major, so the apply reads
-contiguously and has no gather to defeat it.  That is a change to what the
-caller hands the kernel, not to the kernel, and it is not attempted here.
+Three things worth keeping.  The tangent is not staged: a component-major store,
+which the ABI has always allowed, makes it contiguous across the lanes already,
+and staging it costs a store and a reload per value for nothing -- an early
+version did that and lost a third of the throughput.  The gathers go in **one**
+loop with many statements, not one loop each; `tests/test_kernels_are_lean.py`
+caught thirty-two of the latter.  And the f32 path, which is what the Op
+actually uses, gains least on Grace -- 1 to 5% against f64's 13 to 16% -- so the
+headline number is not the one that ships.
 
 ### Default
 
