@@ -69,6 +69,7 @@ import itertools
 
 import sympy as sp
 
+from codegen.framework.plans.geometry_variants import packed_is_worth_emitting
 from codegen.framework.fem.reference_basis import reference_basis
 
 
@@ -222,6 +223,25 @@ class InexactApplyPlan:
         if row > column:
             row, column = column, row
         return row * order - row * (row - 1) // 2 + (column - row)
+
+    @property
+    def apply_layouts(self):
+        """The mesh layouts the applies are emitted for, in emission order.
+
+        A sequence, not a flag, for the reason `geometry_variants` gives: emission
+        iterates it and never tests it, so a layout the plan does not name simply
+        does not appear and nothing at the point of emission decided anything.
+
+        The standard layout is always there.  The packed one is worth about 70%
+        on HEX8 and 150% on TET4 at full socket -- it gathers each node once per
+        pack into thread-private scratch and scatters into it without an atomic,
+        where the standard kernel does `dim * n_nodes` global atomic updates per
+        element.  Whether it is worth emitting at all is the same question the
+        geometry variants answer, so it is asked in the same place.
+        """
+        if packed_is_worth_emitting(self.dim):
+            return ("standard", "packed_two_pass")
+        return ("standard",)
 
     def state_dependence(self, packed, state):
         """Which state values the projected tangent actually reads.

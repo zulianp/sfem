@@ -127,6 +127,18 @@ class GeometryVariantPlan:
         }
 
 
+def packed_is_worth_emitting(dim):
+    """Whether a packed-mesh variant is worth emitting at this dimension.
+
+    Named rather than written twice: the inexact apply grew a packed variant of
+    its own and needs the same answer, and two copies of a scope decision are two
+    things to remember to change together.  Two dimensions is not where the
+    performance is -- see this module's docstring; it is the part of the policy to
+    revisit first when 2D matters again.
+    """
+    return int(dim) == 3
+
+
 def geometry_variant_plan(weak_form, rule, *, specialized=True, assembles_matrix=False):
     """The variants this form publishes on the element `rule` describes.
 
@@ -150,7 +162,7 @@ def geometry_variant_plan(weak_form, rule, *, specialized=True, assembles_matrix
     return GeometryVariantPlan(
         emits_affine=constant_p1 or dim == 3,
         emits_isoparametric=not constant_p1,
-        emits_packed=dim == 3,
+        emits_packed=packed_is_worth_emitting(dim),
         cached_metric=metric,
         assembles_matrix=assembles_matrix,
     )

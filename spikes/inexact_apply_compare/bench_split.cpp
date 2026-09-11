@@ -143,6 +143,9 @@ int main(int argc, char **argv) {
 #ifdef PACKED_STORED_APPLY
     std::printf(" | %8s %9s", "pk.st32", "pk diff");
 #endif
+#ifdef PACKED_REFERENCE_APPLY
+    std::printf(" | %8s", "pk.ref");
+#endif
     std::printf("\n");
     std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s", "", "", "",
                 "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
@@ -151,6 +154,9 @@ int main(int argc, char **argv) {
 #endif
 #ifdef PACKED_STORED_APPLY
     std::printf(" | %8s %9s", "MDOF/s", "rel");
+#endif
+#ifdef PACKED_REFERENCE_APPLY
+    std::printf(" | %8s", "MDOF/s");
 #endif
     std::printf("\n");
 
@@ -249,6 +255,23 @@ int main(int argc, char **argv) {
                 m.nelements, m.evp.data(), cstride, S16.data(), scale.data(),
                 1, hx.data(), hy.data(), hz.data(), 1, cx.data(), cy.data(), cz.data());
         };
+#ifdef PACKED_REFERENCE_APPLY
+        auto run_packed_reference = [&](auto *store) {
+            zero(pkx,pky,pkz);
+            sfem::codegen::PACKED_REFERENCE_APPLY<double, typename std::remove_const<
+                typename std::remove_pointer<decltype(store)>::type>::type, LANE_VS>(
+                pk.layout.n_packs, pk.layout.n_elements_per_pack, m.nelements,
+                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.owned_nodes_ptr.data(),
+                pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
+                pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
+                pk.layout.ghost_reduce_ptr.data(), pk.layout.ghost_reduce_idx.data(),
+                pk.layout.ghost_reduce_dest.data(), ghost_buf.data(),
+                cstride, store,
+                1, phx.data(), phy.data(), phz.data(),
+                1, pkx.data(), pky.data(), pkz.data());
+        };
+#endif
 #ifdef PACKED_STORED_APPLY
         // The store is assembled on the standard mesh and read here unchanged:
         // packing renumbers nodes, never elements, so element e is element e in
@@ -257,7 +280,7 @@ int main(int argc, char **argv) {
             zero(pkx,pky,pkz);
             sfem::codegen::PACKED_STORED_APPLY<double, typename std::remove_const<
                 typename std::remove_pointer<decltype(store)>::type>::type, LANE_VS>(
-                pk.layout.n_packs, pk.layout.n_elements_per_pack, m.nelements, m.nnodes,
+                pk.layout.n_packs, pk.layout.n_elements_per_pack, m.nelements,
                 pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
                 pk.layout.owned_nodes_ptr.data(),
                 pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
@@ -341,6 +364,9 @@ int main(int argc, char **argv) {
 #ifdef PACKED_STORED_APPLY
         const double spk = best_mdof(repeats, ndof, [&]{ run_packed_stored(S32.data()); });
 #endif
+#ifdef PACKED_REFERENCE_APPLY
+        const double sref = best_mdof(repeats, ndof, [&]{ run_packed_reference(S32.data()); });
+#endif
 
         std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e",
                     (long)m.nelements, (long)m.nnodes, (long)ndof,
@@ -350,6 +376,9 @@ int main(int argc, char **argv) {
 #endif
 #ifdef PACKED_STORED_APPLY
         std::printf(" | %8.2f %9.1e", spk, d_pks);
+#endif
+#ifdef PACKED_REFERENCE_APPLY
+        std::printf(" | %8.2f", sref);
 #endif
         std::printf("\n");
         if (n == sizes_probe[sizeof(sizes_probe)/sizeof(int) - 1]) {

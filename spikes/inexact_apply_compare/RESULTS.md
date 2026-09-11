@@ -779,6 +779,17 @@ nothing and the conversion cost shows through instead -- f16 is level with f32
 there, 278 against 282, where on TET4 it is 14% ahead.  One number, `I`, orders
 the two elements correctly even though it does not predict either precisely.
 
+**The packed layout crosses the streamed bound, which is the check.**  A kernel cannot
+beat its own streamed ceiling -- that bound assumes every reference pays -- unless it
+is getting reuse.  TET4's stored apply sits at 53% of its streamed ceiling on the
+standard layout and at **134%** of it on the packed one, moving from 23% to 58% of
+the compulsory ceiling.  That is the packed gather doing exactly what it claims:
+fetching each node once per pack instead of once per element that reaches it.  HEX8,
+which was never near the bandwidth ceiling, moves 24% to 41% of streamed and 16% to
+27% of the no-SIMD ceiling -- a real gain, but there it comes from deleting the
+atomics rather than from bandwidth.  The two elements improve for different reasons
+and the model says which is which.
+
 **The tangent is the intense kernel, and it is the one that is compute-bound.**
 HEX8's assembly does 11171 FLOPs against 444 bytes; it is three and a half times
 past the ridge and the only kernel in the set for which the memory ceiling is

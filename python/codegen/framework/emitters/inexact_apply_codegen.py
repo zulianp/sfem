@@ -86,6 +86,17 @@ def inexact_apply_kernel_source(
     )
 
 
+#: The staging header, named only where a packed kernel stages through it.
+_PACK_SCRATCH_INCLUDE = {
+    True: ['#include "packed_thread_scratch.hpp"'],
+    False: [],
+}
+
+
+def _emits_packed(plan):
+    return any(layout != "standard" for layout in plan.apply_layouts)
+
+
 def _inexact_apply_kernel_source(
     plan,
     material_name,
@@ -149,20 +160,27 @@ def _inexact_apply_kernel_source(
 
     parameters = tuple(str(name) for name in parameter_names)
     prefix = "%s_%s" % (material_name, str(element_type).lower())
-    lines = [
-        '#include "kernel_math.hpp"',
-        "",
-        "namespace sfem {",
-        "namespace codegen {",
-        "",
-    ]
+    # The guard is not decoration: this header is included once today, but the
+    # packed variant gave a second consumer a reason to include it and a second
+    # inclusion redefines every kernel in it.
+    lines = ["#pragma once", '#include "kernel_math.hpp"']
+    # A packed kernel stages through thread-private scratch, which the framework
+    # already publishes.  Named only when a packed layout is emitted, so a 2D
+    # header does not include something it never calls.
+    lines.extend(_PACK_SCRATCH_INCLUDE[_emits_packed(plan)])
+    lines.extend(["", "namespace sfem {", "namespace codegen {", ""])
     lines.extend(
         _tangent_lines(
             prefix, dim, n_nodes, component, parameters, used_state,
             used_previous, packed, plan,
         )
     )
-    lines.extend(_stored_lines(prefix, n_nodes, component, plan, action_body))
+    # One per layout the plan names, in the order it names them.  Iterated, not
+    # tested: `test_emission_is_a_printer` is the reason.
+    for layout in plan.apply_layouts:
+        lines.extend(
+            _stored_lines(prefix, n_nodes, component, plan, action_body, layout)
+        )
     lines.extend(_compressed_lines(prefix, n_nodes, component, plan, action_body))
     lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
 
@@ -184,6 +202,7 @@ def _inexact_apply_kernel_source(
         _c_abi_lines(
             prefix, dim, n_nodes, component, parameters, used_previous,
             bool(used_state),
+            tuple(l for l in plan.apply_layouts if l != "standard"),
         )
     )
     return (
@@ -200,6 +219,20 @@ _KERNEL_BY_APPLICABILITY = {
     True: lambda plan, *arguments: _inexact_apply_kernel_source(plan, *arguments),
     False: lambda plan, *arguments: None,
 }
+
+
+def _target_pragma(method, *arguments):
+    """One pragma from the bound target, or nothing if it has none.
+
+    Every pragma this emitter prints goes through here; `test_target_binding`
+    gates that, and the reason is that a hardcoded `#pragma omp` is a kernel that
+    silently means something else on a target that is not OpenMP.
+    """
+    target = current_target()
+    if target is None or not hasattr(target, method):
+        return []
+    pragma = getattr(target, method)(*arguments)
+    return [pragma] if pragma else []
 
 
 def _parallel_loop_lines():
@@ -383,12 +416,19 @@ def _tangent_lines(
     )
 
 
-def _stored_lines(prefix, n_nodes, component, plan, action_body):
-    """The apply: stored tangent and the vector, and nothing else."""
+def _stored_lines(prefix, n_nodes, component, plan, action_body, layout="standard"):
+    """The apply: stored tangent and the vector, and nothing else.
+
+    Two layouts, one arithmetic.  Everything between the gather and the scatter is
+    built once and handed to both, because it *is* the same computation -- what a
+    packed mesh changes is where the increment is read from and where the output
+    is accumulated, and nothing else.  The layout is chosen by the caller from the
+    plan and looked up here; emission does not decide it.
+    """
     gathered = _gathered_names(
         "h", component, n_nodes, _all_names("h", component, n_nodes)
     )
-    scratch = _connectivity_scratch(n_nodes)
+    scratch = _connectivity_scratch(n_nodes, _CONNECTIVITY_INDEX_TYPE[layout])
     scratch.extend("    s_t b%s[VS];" % value for value, _s, _n, _r in gathered)
     scratch.extend(
         "    s_t bout%d_%d[VS];" % (index, node)
@@ -398,8 +438,9 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     # Staged outside the arithmetic loop, one pass each: these are indirect and
     # will not vectorise, and leaving them inside stops the arithmetic
     # vectorising with them.  The tangent is not staged -- component-major makes
-    # it contiguous across the lanes already.
-    gathers = _staged_gathers(gathered)
+    # it contiguous across the lanes already, and it stays so under packing
+    # because packs are contiguous ranges of elements.
+    gathers = _STORED_GATHERS_BY_LAYOUT[layout](gathered, component)
     gathers.extend(_blocked_tangent_bases(plan.tangent_components, "const "))
     compute = [
         "      const s_t %s = b%s[lane];" % (value, value)
@@ -415,22 +456,25 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
         for index in range(len(component))
         for node in range(n_nodes)
     )
-    store = _blocked_scatter(component, n_nodes)
+    store = _STORED_SCATTER_BY_LAYOUT[layout](component, n_nodes)
 
-    signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]
-    signature.extend(
-        [
-            "    const ptrdiff_t tangent_component_stride,",
-            "    const tangent_t *const RSTR tangent,",
-        ]
-    )
+    signature = _STORED_PROLOGUE_BY_LAYOUT[layout](component, plan.tangent_components)
     signature.extend(_stream_arguments("h", component))
     signature.extend(_output_arguments(component))
-    return _blocked_function_lines(
-        "%s_inexact_apply_stored_a_msoa" % prefix,
+    return _STORED_SKELETON_BY_LAYOUT[layout](
+        "%s_inexact_apply_stored%s_a_msoa" % (prefix, _LAYOUT_SUFFIX[layout]),
         "template <typename s_t, typename tangent_t, int VS>",
-        signature, scratch, gathers, compute, store,
+        signature, scratch, gathers, compute, store, component,
     )
+
+
+def _standard_stored_prologue(_component, _n_components):
+    return [
+        "    const ptrdiff_t nelements,",
+        "    idx_t **const RSTR elements,",
+        "    const ptrdiff_t tangent_component_stride,",
+        "    const tangent_t *const RSTR tangent,",
+    ]
 
 
 def _compressed_lines(prefix, n_nodes, component, plan, action_body):
@@ -540,14 +584,18 @@ def _lane_loop(body, indent="    "):
     ]
 
 
-def _connectivity_scratch(n_nodes):
+def _connectivity_scratch(n_nodes, index_type="idx_t"):
     """The block's connectivity, gathered in one pass.
 
     One loop with `n_nodes` statements rather than `n_nodes` loops with one
     each: the stores belong in a single SIMD region, and opening one per node
     is the pattern `tests/test_kernels_are_lean.py` gates against.
+
+    A packed mesh numbers its nodes within the pack, so its connectivity is
+    `uint16_t` rather than `idx_t` -- the index type is the layout's, not this
+    function's.
     """
-    scratch = ["    idx_t bev%d[VS];" % node for node in range(n_nodes)]
+    scratch = ["    %s bev%d[VS];" % (index_type, node) for node in range(n_nodes)]
     scratch.extend(
         _lane_loop(
             [
@@ -617,6 +665,196 @@ _CONNECTIVITY_BY_USE = {
 }
 
 
+#: How a packed kernel names its thread-private staging.  `conventions.py` already
+#: reserves the `pk_` prefix for it.
+_PACK_SCRATCH = "pk_%s"
+
+
+def _packed_staged_gathers(gathered, component):
+    """The block's reads, from pack-local scratch instead of global memory.
+
+    The index is the same `bev` the standard kernel gathers, except that it is a
+    pack-local slot rather than a global node, so this is a read from an array a
+    few tens of kilobytes wide that this thread alone owns.  That is the whole of
+    what packing buys on the gather side.
+    """
+    return _lane_loop(
+        [
+            "      b%s[lane] = pk_h[%d * max_nodes_per_pack + bev%d[lane]];"
+            % (value, component.index(source[-1]), node)
+            for value, source, node, _role in gathered
+        ]
+    )
+
+
+def _packed_scatter(component, n_nodes):
+    """Scatter into the pack's own scratch -- no atomic, because nothing shares it.
+
+    Still serial over the lanes, for the reason the standard scatter is: two
+    lanes of one block can land on the same node.  What is gone is the
+    `#pragma omp atomic update`, and with it the contended global read-modify-write
+    that this kernel spent most of its time on.
+    """
+    lines = []
+    for index, _name in enumerate(component):
+        for node in range(n_nodes):
+            lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+            lines.append(
+                "      pk_out[%d * max_nodes_per_pack + bev%d[lane]] += bout%d_%d[lane];"
+                % (index, node, index, node)
+            )
+            lines.append("    }")
+    return lines
+
+
+def _packed_signature(component, n_components):
+    """The packed ABI's prologue, in the order every packed kernel takes it.
+
+    `n_shared_nodes` is absent: it exists so a one-pass kernel can tell which
+    owned nodes need an atomic, and a two-pass kernel never scatters atomically
+    at all.
+    """
+    return [
+        "    const ptrdiff_t n_packs,",
+        "    const ptrdiff_t n_elements_per_pack,",
+        "    const ptrdiff_t nelements,",
+        "    const ptrdiff_t max_nodes_per_pack,",
+        "    uint16_t **const RSTR elements,",
+        "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
+        "    const ptrdiff_t n_ghost_entries,",
+        "    const ptrdiff_t n_ghost_reduce_rows,",
+        "    const ptrdiff_t *const RSTR ghost_ptr,",
+        "    const idx_t *const RSTR ghost_idx,",
+        "    const ptrdiff_t *const RSTR ghost_reduce_ptr,",
+        "    const ptrdiff_t *const RSTR ghost_reduce_idx,",
+        "    const idx_t *const RSTR ghost_reduce_dest,",
+        "    s_t *const RSTR ghost_buf,",
+        "    const ptrdiff_t tangent_component_stride,",
+        "    const tangent_t *const RSTR tangent,",
+    ]
+
+
+def _packed_function_lines(name, template, signature, scratch, gathers, compute,
+                           store, component):
+    """One kernel over a packed mesh, two-pass.
+
+    The element's arithmetic is the standard kernel's, unchanged and in the same
+    place; what differs is on either side of it.  The gather runs once per *pack*
+    into thread-private scratch instead of once per element through the mesh
+    connectivity, the scatter accumulates into that scratch without an atomic,
+    and only the pack boundary reaches global memory -- the ghosts through a
+    buffer that the disjoint second pass below reduces.
+    """
+    n_components = len(component)
+    lines = [template, "static SFEM_INLINE int %s_impl(" % name]
+    lines.extend(signature)
+    lines.append(") {")
+    lines.append("  static constexpr int NC = %d;" % n_components)
+    lines.append(
+        "  const s_t *const h_components[NC] = {%s};"
+        % ", ".join("h%s" % name for name in component)
+    )
+    lines.append(
+        "  s_t *const out_components[NC] = {%s};"
+        % ", ".join("out%s" % name for name in component)
+    )
+    lines.extend([""])
+    lines.extend("  %s" % line for line in _target_pragma("parallel_region_pragma"))
+    lines.extend(
+        [
+            "  {",
+            "    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>("
+            "2, (size_t)NC * (size_t)max_nodes_per_pack);",
+            "    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>("
+            "3, (size_t)NC * (size_t)max_nodes_per_pack);",
+        ]
+    )
+    lines.extend("    %s" % line
+                 for line in _target_pragma("worksharing_for_pragma", "static"))
+    lines.extend(
+        [
+            "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "      const ptrdiff_t e_end = (nelements < (pack + 1) * n_elements_per_pack)",
+            "                                  ? nelements",
+            "                                  : (pack + 1) * n_elements_per_pack;",
+            "      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "      const ptrdiff_t ghost_off = ghost_ptr[pack];",
+            "      const idx_t *const RSTR ghosts = &ghost_idx[ghost_off];",
+            "",
+            "      for (int d = 0; d < NC; ++d) {",
+            "        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;",
+            "        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+            "        const s_t *const RSTR h_component = h_components[d];",
+            "        for (ptrdiff_t k = 0; k < n_contiguous + n_ghost; ++k) {",
+            "          pk_component_out[k] = s_t(0);",
+            "        }",
+            "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "          pk_h_component[k] = h_component[(owned_nodes_ptr[pack] + k) * h_stride];",
+            "        }",
+            "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "          pk_h_component[n_contiguous + k] = h_component[ghosts[k] * h_stride];",
+            "        }",
+            "      }",
+            "",
+            "      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
+            "        const int ne = (int)((e_end - evb) < (ptrdiff_t)VS "
+            "? (e_end - evb) : (ptrdiff_t)VS);",
+        ]
+    )
+    for block in (scratch, gathers):
+        lines.extend("    %s" % line for line in block)
+    lines.extend(_simd_pragma("        "))
+    lines.append("        for (int lane = 0; lane < ne; ++lane) {")
+    lines.extend("    %s" % line for line in compute)
+    lines.append("        }")
+    lines.extend("    %s" % line for line in store)
+    lines.append("      }")
+    lines.extend(
+        [
+            "",
+            "      for (int d = 0; d < NC; ++d) {",
+            "        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+            "        s_t *const RSTR global_out = out_components[d];",
+            "        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;",
+            "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
+            "        }",
+            "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];",
+            "        }",
+            "      }",
+            "    }",
+            "  }",
+            "",
+        ]
+    )
+    lines.extend("  %s" % line
+                 for line in _target_pragma("parallel_for_pragma", "static"))
+    lines.extend(
+        [
+            "  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
+            "    const idx_t dest = ghost_reduce_dest[row];",
+            "    const ptrdiff_t begin = ghost_reduce_ptr[row];",
+            "    const ptrdiff_t end = ghost_reduce_ptr[row + 1];",
+            "    for (int d = 0; d < NC; ++d) {",
+            "      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;",
+            "      s_t sum = s_t(0);",
+            "      for (ptrdiff_t j = begin; j < end; ++j) {",
+            "        sum += ghost_component[ghost_reduce_idx[j]];",
+            "      }",
+            "      out_components[d][dest * out_stride] += sum;",
+            "    }",
+            "  }",
+            "  return SFEM_SUCCESS;",
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
 def _blocked_function_lines(name, template, signature, scratch, gathers, compute, store):
     """One kernel, blocked over `VS` elements, with the gathers staged.
 
@@ -680,6 +918,30 @@ def _function_lines(name, template, signature, body):
 
 
 
+#: The layout axis, as tables rather than branches.  A layout the plan does not
+#: name is never looked up, which is what keeps emission a printer.
+_LAYOUT_SUFFIX = {"standard": "", "packed_two_pass": "_packed_two_pass"}
+_CONNECTIVITY_INDEX_TYPE = {"standard": "idx_t", "packed_two_pass": "uint16_t"}
+_STORED_GATHERS_BY_LAYOUT = {
+    "standard": lambda gathered, _component: _staged_gathers(gathered),
+    "packed_two_pass": _packed_staged_gathers,
+}
+_STORED_SCATTER_BY_LAYOUT = {
+    "standard": _blocked_scatter,
+    "packed_two_pass": _packed_scatter,
+}
+_STORED_PROLOGUE_BY_LAYOUT = {
+    "standard": _standard_stored_prologue,
+    "packed_two_pass": _packed_signature,
+}
+_STORED_SKELETON_BY_LAYOUT = {
+    "standard": lambda name, template, signature, scratch, gathers, compute, store, _c: (
+        _blocked_function_lines(name, template, signature, scratch, gathers, compute, store)
+    ),
+    "packed_two_pass": _packed_function_lines,
+}
+
+
 #: The block width the published C entry points instantiate with.
 _ABI_VECTOR_SIZE = 16
 
@@ -713,8 +975,35 @@ def _abi_tangent_arguments(dim, n_nodes, component):
     return ["adjugate%d" % i for i in range(dim * dim)]
 
 
+def _packed_abi_prologue(scalar):
+    """The packed ABI's leading parameters, in the order every packed kernel takes.
+
+    Spelled here as well as in the templated kernel because the ABI is a C
+    boundary: the dispatch layer builds its calls out of these names.
+    """
+    return [
+        "    const ptrdiff_t n_packs,",
+        "    const ptrdiff_t n_elements_per_pack,",
+        "    const ptrdiff_t nelements,",
+        "    const ptrdiff_t max_nodes_per_pack,",
+        "    uint16_t **const RSTR elements,",
+        "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
+        "    const ptrdiff_t n_ghost_entries,",
+        "    const ptrdiff_t n_ghost_reduce_rows,",
+        "    const ptrdiff_t *const RSTR ghost_ptr,",
+        "    const idx_t *const RSTR ghost_idx,",
+        "    const ptrdiff_t *const RSTR ghost_reduce_ptr,",
+        "    const ptrdiff_t *const RSTR ghost_reduce_idx,",
+        "    const idx_t *const RSTR ghost_reduce_dest,",
+        "    %s *const RSTR ghost_buf," % scalar,
+        "    const ptrdiff_t tangent_component_stride,",
+        "    const metric_tensor_t *const RSTR tangent,",
+    ]
+
+
 def _c_abi_lines(
-    prefix, dim, n_nodes, component, parameters, used_previous, reads_state
+    prefix, dim, n_nodes, component, parameters, used_previous, reads_state,
+    packed_layouts=(),
 ):
     """`extern "C"` wrappers, so the split is reachable from SFEM.
 
@@ -791,6 +1080,34 @@ def _c_abi_lines(
                 "",
             ]
         )
+
+        # --- the apply, over a packed mesh --------------------------------
+        for layout in packed_layouts:
+            name = "%s_inexact_apply_stored%s_a_msoa%s" % (
+                prefix, _LAYOUT_SUFFIX[layout], suffix
+            )
+            lines.append('extern "C" int %s(' % name)
+            lines.extend(_packed_abi_prologue(scalar))
+            lines.extend(_abi_stream(scalar, "h", component))
+            lines.extend(_abi_stream(scalar, "out", component, const=""))
+            lines[-1] = lines[-1].rstrip(",")
+            lines.extend(
+                [
+                    ") {",
+                    "  return sfem::codegen::%s_inexact_apply_stored%s_a_msoa_impl<"
+                    "%s, metric_tensor_t, %d>("
+                    % (prefix, _LAYOUT_SUFFIX[layout], scalar, _ABI_VECTOR_SIZE),
+                    "      n_packs, n_elements_per_pack, nelements, max_nodes_per_pack,",
+                    "      elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows,",
+                    "      ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx,",
+                    "      ghost_reduce_dest, ghost_buf,",
+                    "      tangent_component_stride, tangent,",
+                    "      h_stride, %s," % ", ".join("h%s" % n for n in component),
+                    "      out_stride, %s);" % ", ".join("out%s" % n for n in component),
+                    "}",
+                    "",
+                ]
+            )
 
         # --- the apply, from a compressed store ---------------------------
         name = "%s_inexact_apply_compressed_a_msoa%s" % (prefix, suffix)
