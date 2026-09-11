@@ -93,9 +93,15 @@ which thread owns which face, but not the order in which two threads holding fac
 at a node commit their updates, and floating-point addition is not associative. That pass
 runs on every matvec on every layout -- it is deliberately one shared sweep rather than nine
 copies, for the reason its own comment gives -- so it is common to both binaries here and is
-unaffected by anything Stage 1 changed. The Vanka smoother and the semi-structured operator
-(`src/ss/cvfem_ss_vanka.hpp`, `src/ss/cvfem_sshex8_ns.hpp`) carry atomics of their own, so
-the preconditioner is a second source and this measurement does not separate them.
+unaffected by anything Stage 1 changed.
+
+Both have since been fixed, and the solve is reproducible as a result. The closure is now
+gathered per node, and `assemble_block_diag` -- the preconditioner's data, which was the
+second source -- runs the two-pass packed algorithm. Five repeats of the same case at 72
+threads now give an identical residual at a fixed iteration under block Jacobi, an identical
+1358 linear iterations under multigrid, and an identical 5680 on the semi-structured level-2
+hierarchy. The dot products were never the problem: SFEM's deterministic BLAS is in the
+installed library and on by default.
 
 At one thread every one of those reductions has a single fixed order, which is why the serial
 repeats agree bit for bit. The port at p_bar = 3.0 is simply the case where the perturbation

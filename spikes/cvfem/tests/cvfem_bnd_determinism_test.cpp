@@ -227,6 +227,37 @@ int main(int argc, char **argv) {
         check(differing(mref, matvec_at(8)) == 0, msg);
     }
 
+    // ---- the preconditioner's block diagonal ----
+    //
+    // Not part of the operator, but it is what block Jacobi inverts and what the multigrid
+    // smoother is built from, so a solve is no more reproducible than this is. It used to
+    // be accumulated with CVFEM_ATOMIC_ADD, and a solve with no multigrid at all still
+    // varied run to run because of it.
+    auto diag_at = [&pk](const int threads) {
+#ifdef _OPENMP
+        omp_set_num_threads(threads);
+#else
+        (void)threads;
+#endif
+        std::vector<scalar_t> diag;
+        assemble_block_diag(pk.d, RHO, MU, GeomKind::Affine, diag);
+        return diag;
+    };
+    const std::vector<scalar_t> dref = diag_at(1);
+    ptrdiff_t                   dnz  = 0;
+    for (const scalar_t v : dref)
+        if (v != scalar_t(0)) ++dnz;
+    check(dnz > 0, "block diagonal: contributes something at all");
+    for (const int t : {2, 4, 8}) {
+        const ptrdiff_t n = differing(dref, diag_at(t));
+        std::snprintf(msg, sizeof(msg), "block diagonal, %d threads: bit identical (%td differ)", t, n);
+        check(n == 0, msg);
+    }
+    for (int rep = 0; rep < 3; ++rep) {
+        std::snprintf(msg, sizeof(msg), "block diagonal, 8 threads, repeat %d: bit identical", rep + 1);
+        check(differing(dref, diag_at(8)) == 0, msg);
+    }
+
     std::printf("\n%s\n", g_failures ? "FAILED" : "PASSED");
     return g_failures ? 1 : 0;
 }
