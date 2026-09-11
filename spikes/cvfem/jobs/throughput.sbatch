@@ -16,7 +16,10 @@
 # Each run gets its own directory: the tracer writes smesh.trace.csv into the working
 # directory, so runs in a shared one would overwrite each other's evidence.
 set -u
-BLK=$SCRATCH/cvfem_blk; B=$BLK/after/build_blk
+# The binary is taken from the environment so the same sweep can be run against a
+# different build without editing the job; the default is the one it was written for.
+DRIVER=${DRIVER:-$SCRATCH/cvfem_blk/after/build_blk/cvfem_hex8_ns_ssgmg}
+[ -x "$DRIVER" ] || { echo "throughput: no driver at $DRIVER" >&2; exit 1; }
 OUT=${OUT:-$SCRATCH/cvfem_tp/$SLURM_JOB_ID}
 mkdir -p "$OUT"
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores
@@ -32,7 +35,7 @@ one() {
     export SFEM_CASE=poiseuille SFEM_N=$n SFEM_ELEMENT_REFINE_LEVEL=$lvl
     export SFEM_GMG=0 SFEM_PRECOND=bjacobi SFEM_NL_MAX_IT=3 SFEM_LSOLVE_MAX_IT=150
     export SFEM_MU=0.01 SFEM_ENABLE_OUTPUT=0
-    uenv run $U -- $B/cvfem_hex8_ns_ssgmg "$d/out" > "$d/run.log" 2>&1 )
+    uenv run $U -- "$DRIVER" "$d/out" > "$d/run.log" 2>&1 )
   local ndof=$(grep -m1 -o 'ndof: [0-9]*' "$d/run.log" | awk '{print $2}')
   if [ -n "$ndof" ] && [ -f "$d/smesh.trace.csv" ]; then
     printf "%s\t%s\t%s\t%s\t%s\n" "$label" "$d/smesh.trace.csv" "$ndof" "$OMP_NUM_THREADS" "$(hostname)" >> "$OUT/runs.tsv"

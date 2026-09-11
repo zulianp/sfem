@@ -72,8 +72,33 @@ and its linear solve is fragile in both binaries:
 | after | 922 it | 789 it | diverged | 2225 it | 822 it |
 | before | 779 it | 868 it | diverged | 816 it | 1066 it |
 
-Both fail at 18 threads and both converge at 72. The same binary at 72 threads diverged in
-one run of this case and converged in another, so the outcome is not reproducible run to
-run: neither reduction order is bit-reproducible with itself, and this case sits on the
-edge. Iteration counts on a case that does converge swing by a factor of three for the same
-reason.
+Both fail at 18 threads and both converge at 72. The outcome is not a property of the
+binary at all: the same binary run five times at 72 threads on the same case takes 900, 839,
+1595, 943 and 742 linear iterations, and its residual at linear iteration 100 is 5.98, 0.318,
+73.1, 2.52 and 17.8. Run five times at one thread it takes 922 iterations every time and
+prints 20.2637 at iteration 100 in all five.
+
+## Why the operator is not deterministic across threads
+
+The obvious suspect is wrong. The packed interior sweep contains no atomics, and after Stage
+1 neither does the reconstruction -- it stages into per-pack buffers, writes owned rows, and
+closes the ghosts with a CSR gather whose summation order is fixed by the index array rather
+than by thread timing. Both are bit-reproducible.
+
+What is not is the **boundary closure**. `apply_boundary_scs_jacobian_action_pass` and its
+residual twin (`src/hex8/cvfem_hex8_layout_common.hpp:538,577`) scatter the element
+contribution into the shared node arrays with `atomic_add`, under
+`#pragma omp parallel for schedule(static)` over the boundary shell. `schedule(static)` fixes
+which thread owns which face, but not the order in which two threads holding faces that meet
+at a node commit their updates, and floating-point addition is not associative. That pass
+runs on every matvec on every layout -- it is deliberately one shared sweep rather than nine
+copies, for the reason its own comment gives -- so it is common to both binaries here and is
+unaffected by anything Stage 1 changed. The Vanka smoother and the semi-structured operator
+(`src/ss/cvfem_ss_vanka.hpp`, `src/ss/cvfem_sshex8_ns.hpp`) carry atomics of their own, so
+the preconditioner is a second source and this measurement does not separate them.
+
+At one thread every one of those reductions has a single fixed order, which is why the serial
+repeats agree bit for bit. The port at p_bar = 3.0 is simply the case where the perturbation
+matters: it is the far end of a sweep whose other seven values lie between -0.16 and 1.5, and
+its Krylov iteration amplifies a last-bit difference into a factor of two in iteration count
+and, sometimes, into divergence.
