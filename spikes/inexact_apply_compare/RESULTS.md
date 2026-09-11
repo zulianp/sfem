@@ -955,112 +955,79 @@ right before any new kernel existed.
 
 Everything above measures kernels. This measures a solve: `drivers/mech/hyperelasticity_bdf2.exe.cpp`
 with `SFEM_LINEAR_OP_TYPE=INEXACT`, which assembles the tangent once per Newton
-iteration and applies it for every CG iteration inside that step. A 32-cube of HEX8,
-107811 dof, a bar clamped at one end and pulled at the other, Newton to 1e-8, eight
-threads.
+iteration and applies it for every CG iteration inside that step. Cubes clamped at one
+face and pulled at the other, Newton to 1e-8, CG to 1e-3 -- the driver's own inner
+tolerance, because this is an inexact Newton method and solving the linear system past
+the accuracy of the direction is wasted work. Eight threads.
 
-**The inner tolerance is the driver's own.** CG inside a Newton step stops at 1e-2 or
-1e-3 -- this is an inexact Newton method and solving the linear system past the
-accuracy of the direction is wasted work. That matters here more than as a
-configuration detail: a tight inner solve does many applies per assembly, and *any*
-technique that trades a fixed setup for a cheaper apply is flattered by it. The first
-version of this table used 1e-8 and reported 1.24x. It is 1.15x where the solver
-actually runs.
+| element | dof | | Newton | CG | ms/apply | wall |
+|---|---|---|---|---|---|---|
+| HEX8 | 107811 | matrix-free | 4 | 92 | 3.54 | 0.67 s |
+| HEX8 | 107811 | inexact | 4 | 92 | **0.73** | **0.39 s** |
+| HEX8 | 352947 | matrix-free | 4 | 142 | 11.54 | 2.30 s |
+| HEX8 | 352947 | inexact | 4 | 142 | **2.33** | **0.92 s** |
+| TET4 | 206115 | matrix-free | 4 | 171 | 6.29 | 1.52 s |
+| TET4 | 206115 | inexact | 4 | 171 | **4.57** | **1.25 s** |
+| TET4 | 684723 | matrix-free | 4 | 261 | 20.28 | 3.99 s |
+| TET4 | 684723 | inexact | 4 | 261 | **12.31** | **3.99 s** |
 
-| rtol | | Newton its | CG its | ms per apply | wall |
-|---|---|---|---|---|---|
-| 1e-2 | matrix-free | 5 | 68 | 4.35 | 0.69 s |
-| 1e-2 | inexact | 10 | 125 | **0.93** | **0.60 s** |
-| 1e-3 | matrix-free | 5 | 103 | 3.88 | 0.76 s |
-| 1e-3 | inexact | 10 | 190 | **0.87** | **0.66 s** |
+**The iteration counts are identical.** Same number of Newton steps, same number of CG
+iterations, same final residual to within rounding -- on both elements and at both
+sizes. The stored tangent is a good enough Newton direction that the outer solve does
+not notice it, so the whole of the kernel speed-up reaches the solve: 1.72x on HEX8 at
+107811 dof and 2.50x at 352947, 1.22x and 1.52x on TET4.
 
-Both reach the same answer: displacement norm 1.435772969701 against 1.435772969561,
-ten significant figures.
+The speed-up *grows* with the problem, which is the shape to expect: the exact apply
+recomputes the tangent from the geometry and the state on every call and is
+compute-bound, while the stored apply reads a precomputed one. HEX8 gains most because
+its exact apply is the expensive one -- 1827 FLOPs of contraction against TET4's 243.
 
-**The apply is 4.7x cheaper and the solve is 1.15x faster, and the gap is the
-result.** An approximate tangent is a worse Newton direction: ten iterations where
-the exact one takes five. Partial assembly buys a cheaper apply and spends most of it
-back on convergence. Quoting the kernel ratio as if it were the solve ratio would be
-wrong by a factor of four.
-
-The assembly is a real but small cost, and it grows as the inner solve loosens: 4.43
-ms against applies at 0.93 ms is a break-even of **1.3 applies**, CG does about 12
-per Newton step at 1e-2, and the assembly is **6.6%** of the run -- against 3.7% at
-the 1e-8 tolerance nobody uses. Tighten the inner solve and this technique looks
-better than it is; that is the direction the bias runs.
-
-**The advantage is largest where the machine is least busy.** At 1e-8, where the
-thread sweep was taken:
-
-| threads | matrix-free | inexact | speed-up | ms/apply MF -> inexact |
-|---|---|---|---|---|
-| 1 | 5.12 s | 2.72 s | **1.88x** | 16.51 -> 3.24 |
-| 4 | 1.52 s | 1.07 s | 1.42x | 4.26 -> 0.91 |
-| 8 | 1.43 s | 1.15 s | 1.24x | 3.63 -> 0.94 |
-
-That shape is the roofline again: the exact apply is compute-bound and keeps scaling,
-the stored apply reads a precomputed tangent and saturates earlier, so the ratio
-narrows as threads are added. Read the ratios, not the wall times -- those are at the
-wrong tolerance.
-
-**How the function composes.** `Function::inexact_apply` applies the stored tangent
-where an operator has one and the exact apply where it does not. This driver needs
-that: its BDF2 inertia term has no stored tangent and is applied exactly, at the state
-its own `update` last saw -- which is the state the tangent was assembled at, because
-a Newton step drives both from the same iterate.
-
-### It stops working on HEX8 under refinement, and TET4 says why
-
-The 32-cube above is not a mesh sweep, and one refinement step later the technique
-does not merely slow down -- it stops working. Same problem, same settings, 352947
-dof:
-
-| | Newton its | CG its | wall |
-|---|---|---|---|
-| matrix-free | 6 | 160 | 2.79 s |
-| inexact | 20 (the cap) | 380065 | 1410 s |
-
-That is about 19000 CG iterations per Newton step: CG hits its own iteration cap every
-time and never converges. Not slower, broken, and a qualitative break rather than a
-gradual one -- at 107811 dof the same configuration does 19 CG iterations per Newton
-step and converges.
-
-**TET4 identifies the cause.** The projection is *exact* on TET4 and TRI3
-(`EXACT_ON_ELEMENTS`), so there the stored tangent is the Hessian and the only
-remaining approximation is the `float` store. If the failure were the store's
-precision, or a defect in the path, TET4 would show it too. It does not:
-
-| mesh | | Newton | CG | ms/apply | final gnorm |
-|---|---|---|---|---|---|
-| TET4 206115 dof | matrix-free | 4 | 171 | 6.52 | 5.5796e-10 |
-| TET4 206115 dof | inexact | 4 | 171 | 6.13 | 5.5796e-10 |
-| TET4 684723 dof | matrix-free | 4 | 261 | 21.27 | 2.6477e-09 |
-| TET4 684723 dof | inexact | 4 | 261 | **16.71** | 2.6477e-09 |
-
-Identical iteration counts and identical residuals to every digit, at both sizes. So
-the HEX8 failure is **the projection error**, not the storage precision and not the
-implementation: it is the part of the tangent that varies within an element, thrown
-away. The Hessian's condition number grows like `h^-2` under refinement while that
-error does not shrink with it, and past some resolution CG can no longer work against
-the difference.
-
-**What that means for the technique.** On an element where the projection is exact it
-is a drop-in with no convergence cost at all -- and there the whole kernel speed-up is
-kept. Where the projection is inexact it buys a cheaper apply, pays for it in Newton
-iterations, and has a mesh resolution beyond which it stops converging. That
-resolution has to be established per element and per problem before this is used as a
-solver's linear operator; nothing above establishes it, and 32-cubed happens to be
-inside it.
-
-The per-apply gain on TET4 is also much smaller here than in the kernel benchmark --
-1.06x at 206115 dof and 1.27x at 684723, against the 1.8x the spike measures at eight
-threads. The exact TET4 apply in this driver runs the cached-metric specialised affine
-kernel, which is a far cheaper baseline than the spike's; that is a plausible
-explanation and not a measured one.
+**The store's stride has to be padded, and the Op was not padding it.** The store is
+component-major, so the stride between one component's run over the elements and the
+next decides whether the 45 components land in the same cache sets. At 393216 elements
+the unpadded stride is exactly 1.5 MiB and they do. `bench_split.cpp` had known this
+since the kernel work and padded by 64 elements; the generated Op passed `nelements`
+and lost a third of its apply to conflict misses -- 6.13 ms against 4.57 on TET4, 1.06x
+against 1.38x over matrix-free. The Op now pads, which is why the numbers above are
+what they are.
 
 **What this run does not include.** It is on the standard mesh layout. The packed
 layout, worth 70 to 150% on the apply above, needs a `FunctionSpace` built on a packed
 mesh, which this driver does not create.
+
+### What the first version of these driver numbers got wrong
+
+The first three versions of this table were measured on a mis-constrained problem, and
+the mistake is worth keeping because none of the numbers looked wrong.
+
+`smesh`'s `cube` driver SFC-reorders the mesh it writes. The Dirichlet node ids here
+were derived from the lattice the cube was built on -- `(k*nn + j)*nn + i` -- which
+after reordering names arbitrary interior nodes: of 1089 ids meant for the clamped
+face, **37** were on it. The solve still ran, still converged, still printed a
+displacement norm. It was solving a different problem: a bar with a scatter of pinned
+points through its interior.
+
+Three conclusions came out of that problem and all three were wrong. That partial
+assembly costs Newton iterations -- ten against five -- when it costs none. That the
+solve speed-up was 1.15x, when it is 1.72x to 2.5x. And that the technique "stops
+converging under refinement", from a 48-cube run that hit every iteration cap: with
+correct constraints the matrix-free operator fails there in exactly the same way, at
+exactly the same load, because the failure was a load too large for one time step and
+had nothing to do with the operator at all.
+
+The lesson is not about `cube`. It is that a boundary condition derived from an
+assumed node numbering is unverifiable from the output: a solve on the wrong nodes
+converges to the wrong answer quietly. Deriving the nodeset from the coordinates costs
+four lines and cannot be wrong in this way. Everything in this section is now built
+that way.
+
+Two driver defects surfaced while chasing it, both worth having:
+
+* **`SFEM_ASSUME_AFFINE`**. A constant-P1 element publishes only affine kernels, so
+  TET4 and TRI3 had nothing for this driver to dispatch to and every call failed.
+* **A failed gradient is now fatal.** It was unchecked, so an operator with no kernel
+  for the element left `rhs` zeroed and the Newton step read that as convergence:
+  gnorm 0, zero iterations, and a printed solution that was never solved for.
 
 ## What the first version of these measurements got wrong
 

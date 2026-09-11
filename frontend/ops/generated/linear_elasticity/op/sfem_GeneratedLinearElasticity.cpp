@@ -1033,6 +1033,13 @@ namespace sfem {
         return SFEM_FAILURE;
       }
       const ptrdiff_t nelements = domain.block->n_elements();
+      // The store is component-major, so this stride is the distance between one
+      // component's run over the elements and the next.  Padded off a power of
+      // two on purpose: at 393216 elements the unpadded stride is exactly 1.5
+      // MiB, all 45 components land in the same cache sets, and the apply loses
+      // half its throughput to conflict misses.  The kernel takes the stride as
+      // a parameter precisely so the caller can do this.
+      const ptrdiff_t tangent_stride = nelements + 64;
       if (!cache->inexact_tangent) {
         // Sized by the mesh's dimension: the tangent is 10 numbers per
         // element in two dimensions and 45 in three, and a material that
@@ -1043,7 +1050,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         cache->inexact_tangent =
-            sfem::create_host_buffer<metric_tensor_t>(nelements * components);
+            sfem::create_host_buffer<metric_tensor_t>(tangent_stride * components);
       }
       auto adjugate = reinterpret_cast<const geom_t *const *>(
           cache->jacobian_soa->jacobian_adjugate_SoA()->data());
@@ -1058,7 +1065,7 @@ namespace sfem {
                         determinant,
                         domain.parameters->require_real_value("lmbda"),
                         domain.parameters->require_real_value("mu"),
-                        nelements,
+                        tangent_stride,
                         cache->inexact_tangent->data());
       }
       else if (dim == 3) {
@@ -1070,7 +1077,7 @@ namespace sfem {
                         determinant,
                         domain.parameters->require_real_value("lmbda"),
                         domain.parameters->require_real_value("mu"),
-                        nelements,
+                        tangent_stride,
                         cache->inexact_tangent->data());
       }
       SFEM_ERROR("GeneratedLinearElasticity::inexact_update has no kernel for dimension %d\n", dim);
@@ -1089,13 +1096,20 @@ namespace sfem {
         return SFEM_FAILURE;
       }
       const ptrdiff_t nelements = domain.block->n_elements();
+      // The store is component-major, so this stride is the distance between one
+      // component's run over the elements and the next.  Padded off a power of
+      // two on purpose: at 393216 elements the unpadded stride is exactly 1.5
+      // MiB, all 45 components land in the same cache sets, and the apply loses
+      // half its throughput to conflict misses.  The kernel takes the stride as
+      // a parameter precisely so the caller can do this.
+      const ptrdiff_t tangent_stride = nelements + 64;
       if (dim == 2) {
         return linear_elasticity_inexact_apply_stored_2d_a_msoa(
             domain.element_type,
                         real_type,
                         nelements,
                         domain.block->elements()->data(),
-                        nelements,
+                        tangent_stride,
                         cache->inexact_tangent->data(),
                         2, h + 0, h + 1,
                         2, out + 0, out + 1);
@@ -1129,7 +1143,7 @@ namespace sfem {
                             ghost_reduce_idx->data(),
                             ghost_reduce_dest->data(),
                             impl_->packed_ghost_buf[packed_block]->data(),
-                            nelements,
+                            tangent_stride,
                             cache->inexact_tangent->data(),
                             3, h + 0, h + 1, h + 2,
                             3, out + 0, out + 1, out + 2);
@@ -1140,7 +1154,7 @@ namespace sfem {
                         real_type,
                         nelements,
                         domain.block->elements()->data(),
-                        nelements,
+                        tangent_stride,
                         cache->inexact_tangent->data(),
                         3, h + 0, h + 1, h + 2,
                         3, out + 0, out + 1, out + 2);

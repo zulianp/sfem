@@ -703,7 +703,7 @@ def _inexact_definitions(
         arguments.extend(parameter_args)
         if "ux" in tangent_parameters:
             arguments.append(state)
-        arguments.append("nelements")
+        arguments.append("tangent_stride")
         arguments.append("cache->inexact_tangent->data()")
         update_lines.extend([
             "      %s (dim == %d) {" % (prefix, dim),
@@ -713,7 +713,7 @@ def _inexact_definitions(
         ])
         apply_arguments = ["domain.element_type", "real_type", "nelements",
                            "domain.block->elements()->data()",
-                           "nelements",
+                           "tangent_stride",
                            "cache->inexact_tangent->data()",
                            increment, output]
         apply_lines.append("      %s (dim == %d) {" % (prefix, dim))
@@ -741,7 +741,7 @@ def _inexact_definitions(
                 "ghost_reduce_idx->data()",
                 "ghost_reduce_dest->data()",
                 "impl_->packed_ghost_buf[packed_block]->data()",
-                "nelements",
+                "tangent_stride",
                 "cache->inexact_tangent->data()",
                 increment, output,
             ]
@@ -804,6 +804,13 @@ def _inexact_definitions(
         return SFEM_FAILURE;
       }
       const ptrdiff_t nelements = domain.block->n_elements();
+      // The store is component-major, so this stride is the distance between one
+      // component's run over the elements and the next.  Padded off a power of
+      // two on purpose: at 393216 elements the unpadded stride is exactly 1.5
+      // MiB, all 45 components land in the same cache sets, and the apply loses
+      // half its throughput to conflict misses.  The kernel takes the stride as
+      // a parameter precisely so the caller can do this.
+      const ptrdiff_t tangent_stride = nelements + 64;
       if (!cache->inexact_tangent) {
         // Sized by the mesh's dimension: the tangent is 10 numbers per
         // element in two dimensions and 45 in three, and a material that
@@ -814,7 +821,7 @@ def _inexact_definitions(
           return SFEM_FAILURE;
         }
         cache->inexact_tangent =
-            sfem::create_host_buffer<metric_tensor_t>(nelements * components);
+            sfem::create_host_buffer<metric_tensor_t>(tangent_stride * components);
       }
       auto adjugate = reinterpret_cast<const geom_t *const *>(
           cache->jacobian_soa->jacobian_adjugate_SoA()->data());
@@ -837,6 +844,13 @@ def _inexact_definitions(
         return SFEM_FAILURE;
       }
       const ptrdiff_t nelements = domain.block->n_elements();
+      // The store is component-major, so this stride is the distance between one
+      // component's run over the elements and the next.  Padded off a power of
+      // two on purpose: at 393216 elements the unpadded stride is exactly 1.5
+      // MiB, all 45 components land in the same cache sets, and the apply loses
+      // half its throughput to conflict misses.  The kernel takes the stride as
+      // a parameter precisely so the caller can do this.
+      const ptrdiff_t tangent_stride = nelements + 64;
 %(apply_body)s
       SFEM_ERROR("%%(op)s::inexact_apply has no kernel for dimension %%%%d\\n", dim);
       return SFEM_FAILURE;
