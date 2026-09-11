@@ -41,16 +41,16 @@ from codegen.framework.plans.inexact_apply import (
 )
 from codegen.framework.targets import current_target
 
-#: How the stored tangent is addressed.  Two strides rather than one so that
-#: both layouts are expressible by the caller without a second kernel: element
-#: major is `(components, 1)`, component major is `(1, nelements)`.
-_TANGENT_ADDRESS = "element * tangent_element_stride + %d * tangent_component_stride"
-#: The same address with the block's lane as the element.  Component-major --
-#: element stride 1, component stride the element count, which the ABI has
-#: always allowed -- makes this contiguous across lanes, so it needs no staging.
-_BLOCKED_TANGENT_ADDRESS = (
-    "(evb + lane) * tangent_element_stride + %d * tangent_component_stride"
-)
+#: How the stored tangent is addressed.  The store is SoA: each component is its
+#: own contiguous run over the elements, so the element index needs no stride at
+#: all and one stride places the components.
+_TANGENT_ADDRESS = "element + %d * tangent_component_stride"
+#: The block's slice of the store, hoisted above the lane loop.  Being SoA is
+#: what makes this a base pointer and nothing more: the component is contiguous
+#: across the lanes, so it needs no staging and the lane indexes it directly.
+_BLOCKED_TANGENT_BASE = "evb + %d * tangent_component_stride"
+#: How the lane addresses it once the base pointer is in hand.
+_BLOCKED_TANGENT_LANE = "btangent%d[lane]"
 
 
 def inexact_apply_kernel_source(
@@ -181,7 +181,10 @@ def _inexact_apply_kernel_source(
         "",
     ]
     operator_lines.extend(
-        _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous)
+        _c_abi_lines(
+            prefix, dim, n_nodes, component, parameters, used_previous,
+            bool(used_state),
+        )
     )
     return (
         "%s_inexact_apply_tangent_a_msoa" % prefix,
@@ -308,11 +311,25 @@ def _scatter_body(component, n_nodes, scale=""):
     return lines
 
 
+def _gathered_names(role, component, n_nodes, wanted):
+    """The values one role contributes, as (name, source, node, role) tuples."""
+    return [
+        ("%s%s_%d" % (role, name, node), "%s%s" % (role, name), node, role)
+        for name in component
+        for node in range(n_nodes)
+        if sp.Symbol("%s%s_%d" % (role, name, node)) in wanted
+    ]
+
+
 def _tangent_lines(
     prefix, dim, n_nodes, component, parameters, used_state, used_previous,
     packed, plan,
 ):
     """The partial assembly: `Sbar` computed once and stored.
+
+    Blocked over `VS` elements like the applies: the state reaches this kernel
+    through the connectivity and so arrives indirect, and staging it lane-major
+    first is what lets the arithmetic that follows vectorise.
 
     Takes the previous state only when the material reads one, so a
     rate-independent material keeps the shorter signature.
@@ -320,47 +337,59 @@ def _tangent_lines(
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
     ]
-    body = _element_lines(n_nodes)
-    body.extend(_gather_lines("u", component, n_nodes, used_state))
-    body.extend(_gather_lines("z", component, n_nodes, used_previous))
-    body.extend(_geometry_lines(dim))
-    body.extend(_assignment_lines(list(zip(tangent_symbols, packed)), "tangent"))
-    body.extend(
-        "    tangent[%s] = tangent_t(tangent%d);" % (_TANGENT_ADDRESS % slot, slot)
+    gathered = _gathered_names("u", component, n_nodes, used_state)
+    gathered.extend(_gathered_names("z", component, n_nodes, used_previous))
+
+    # Only a material whose tangent reads the state needs the connectivity: a
+    # linear one is a function of the geometry alone, and gathering nodes it
+    # never looks at would leave an empty lane loop behind.
+    scratch = _CONNECTIVITY_BY_USE[bool(gathered)](n_nodes)
+    scratch.extend("    s_t b%s[VS];" % value for value, _s, _n, _r in gathered)
+
+    gathers = _STAGED_GATHERS_BY_USE[bool(gathered)](gathered)
+    gathers.extend(_blocked_geometry_bases(dim))
+    gathers.extend(_blocked_tangent_bases(plan.tangent_components))
+
+    compute = [
+        "      const s_t %s = b%s[lane];" % (value, value)
+        for value, _s, _n, _r in gathered
+    ]
+    compute.extend(_blocked_geometry_lines(dim))
+    compute.extend(
+        "  %s" % line
+        for line in _assignment_lines(list(zip(tangent_symbols, packed)), "tangent")
+    )
+    compute.extend(
+        "      %s = tangent_t(tangent%d);" % (_BLOCKED_TANGENT_LANE % slot, slot)
         for slot in range(plan.tangent_components)
     )
 
-    signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]
+    signature = ["    const ptrdiff_t nelements,"]
+    signature.extend(_CONNECTIVITY_ARGUMENT_BY_USE[bool(gathered)])
     signature.extend(_geometry_arguments(dim))
     signature.extend("    const s_t %s," % name for name in parameters)
-    signature.extend(_stream_arguments("u", component))
+    signature.extend(_STATE_STREAMS_BY_USE[bool(used_state)](component))
     signature.extend(_PREVIOUS_STREAMS_BY_USE[bool(used_previous)](component))
     signature.extend(
         [
-            "    const ptrdiff_t tangent_element_stride,",
             "    const ptrdiff_t tangent_component_stride,",
             "    tangent_t *const RSTR tangent",
         ]
     )
-    return _function_lines(
+    return _blocked_function_lines(
         "%s_inexact_apply_tangent_a_msoa" % prefix,
-        "template <typename s_t, typename g_t, typename tangent_t>",
-        signature,
-        body,
+        "template <typename s_t, typename g_t, typename tangent_t, int VS>",
+        signature, scratch, gathers, compute, [],
     )
 
 
 def _stored_lines(prefix, n_nodes, component, plan, action_body):
     """The apply: stored tangent and the vector, and nothing else."""
-    wanted = _all_names("h", component, n_nodes)
-    gathered = [
-        ("h%s_%d" % (name, node), "h%s" % name, node)
-        for name in component
-        for node in range(n_nodes)
-        if sp.Symbol("h%s_%d" % (name, node)) in wanted
-    ]
+    gathered = _gathered_names(
+        "h", component, n_nodes, _all_names("h", component, n_nodes)
+    )
     scratch = _connectivity_scratch(n_nodes)
-    scratch.extend("    s_t b%s[VS];" % value for value, _s, _n in gathered)
+    scratch.extend("    s_t b%s[VS];" % value for value, _s, _n, _r in gathered)
     scratch.extend(
         "    s_t bout%d_%d[VS];" % (index, node)
         for index in range(len(component))
@@ -370,18 +399,14 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     # will not vectorise, and leaving them inside stops the arithmetic
     # vectorising with them.  The tangent is not staged -- component-major makes
     # it contiguous across the lanes already.
-    gathers = _lane_loop(
-        [
-            "      b%s[lane] = %s[bev%d[lane] * h_stride];" % (value, source, node)
-            for value, source, node in gathered
-        ]
-    )
+    gathers = _staged_gathers(gathered)
+    gathers.extend(_blocked_tangent_bases(plan.tangent_components, "const "))
     compute = [
-        "      const s_t %s = b%s[lane];" % (value, value) for value, _s, _n in gathered
+        "      const s_t %s = b%s[lane];" % (value, value)
+        for value, _s, _n, _r in gathered
     ]
     compute.extend(
-        "      const s_t tangent%d = s_t(tangent[%s]);"
-        % (slot, _BLOCKED_TANGENT_ADDRESS % slot)
+        "      const s_t tangent%d = s_t(%s);" % (slot, _BLOCKED_TANGENT_LANE % slot)
         for slot in range(plan.tangent_components)
     )
     compute.extend("  %s" % line for line in action_body)
@@ -395,7 +420,6 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]
     signature.extend(
         [
-            "    const ptrdiff_t tangent_element_stride,",
             "    const ptrdiff_t tangent_component_stride,",
             "    const tangent_t *const RSTR tangent,",
         ]
@@ -430,7 +454,6 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]
     signature.extend(
         [
-            "    const ptrdiff_t tangent_element_stride,",
             "    const ptrdiff_t tangent_component_stride,",
             "    const tangent_t *const RSTR tangent,",
             "    const scale_t *const RSTR scaling,",
@@ -452,6 +475,39 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
 #: `state_dependence`, and emission spells the answer.
 _PREVIOUS_STREAMS_BY_USE = {
     True: lambda component: _stream_arguments("z", component),
+    False: lambda component: [],
+}
+#: And whether it reads the current one decides the same for that, for the same
+#: reason: linear elasticity's tangent is a function of the geometry alone.
+_STATE_STREAMS_BY_USE = {
+    True: lambda component: _stream_arguments("u", component),
+    False: lambda component: [],
+}
+#: The connectivity is there to be gathered through.  A kernel that gathers
+#: nothing does not take it.
+_CONNECTIVITY_ARGUMENT_BY_USE = {
+    True: ["    idx_t **const RSTR elements,"],
+    False: [],
+}
+#: The `extern "C"` wrapper takes what it forwards, and no more.  Leaving the
+#: parameter in place unnamed was the other option and is not available: the
+#: dispatch layer builds its call out of the published signature's parameter
+#: *names*, so a nameless parameter there produces a call with no argument for
+#: it.  The published signature varies with what the material reads, exactly as
+#: it already does for a previous state.
+_CONNECTIVITY_CALL_BY_USE = {True: ["elements"], False: []}
+_CONNECTIVITY_ABI_BY_USE = {
+    True: ["    idx_t **const RSTR elements,"],
+    False: [],
+}
+_ABI_STATE_BY_USE = {
+    True: lambda scalar, component: _abi_stream(scalar, "u", component),
+    False: lambda scalar, component: [],
+}
+_STATE_CALL_BY_USE = {
+    True: lambda component: ["      u_stride, %s," % ", ".join(
+        "u%s" % name for name in component
+    )],
     False: lambda component: [],
 }
 
@@ -501,6 +557,64 @@ def _connectivity_scratch(n_nodes):
         )
     )
     return scratch
+
+
+def _blocked_geometry_bases(dim):
+    """The block's geometry as base pointers, one per component.
+
+    The geometry is element-indexed and therefore already contiguous across the
+    block, so it needs no staging -- only a pointer to the block's first
+    element, so the lane loop reads `bg_adj0[lane]` rather than rebuilding the
+    address per lane.
+    """
+    lines = [
+        "    const g_t *const RSTR bg_adj%d = g_adj%d + evb;" % (index, index)
+        for index in range(dim * dim)
+    ]
+    lines.append("    const g_t *const RSTR bg_det0 = g_det0 + evb;")
+    return lines
+
+
+def _blocked_geometry_lines(dim, indent="      "):
+    lines = [
+        "%sconst s_t adjugate%d = s_t(bg_adj%d[lane]);" % (indent, index, index)
+        for index in range(dim * dim)
+    ]
+    lines.append("%sconst s_t determinant = s_t(bg_det0[lane]);" % indent)
+    return lines
+
+
+def _blocked_tangent_bases(n_components, qualifier=""):
+    """The block's slice of the store, one base pointer per component.
+
+    The two strides stay in the address because the ABI carries both layouts;
+    what leaves the loop is everything that does not depend on the lane.
+    """
+    return [
+        "    %stangent_t *const RSTR btangent%d = tangent + %s;"
+        % (qualifier, slot, _BLOCKED_TANGENT_BASE % slot)
+        for slot in range(n_components)
+    ]
+
+
+def _staged_gathers(gathered):
+    """The block's indirect reads, staged lane-major in one pass."""
+    return _lane_loop(
+        [
+            "      b%s[lane] = %s[bev%d[lane] * %s_stride];"
+            % (value, source, node, role)
+            for value, source, node, role in gathered
+        ]
+    )
+
+
+#: A kernel that gathers nothing needs neither the pass nor the connectivity it
+#: would read through.  Tables rather than branches, as elsewhere here.
+_STAGED_GATHERS_BY_USE = {True: _staged_gathers, False: lambda gathered: []}
+_CONNECTIVITY_BY_USE = {
+    True: lambda n_nodes: _connectivity_scratch(n_nodes),
+    False: lambda n_nodes: [],
+}
 
 
 def _blocked_function_lines(name, template, signature, scratch, gathers, compute, store):
@@ -599,7 +713,9 @@ def _abi_tangent_arguments(dim, n_nodes, component):
     return ["adjugate%d" % i for i in range(dim * dim)]
 
 
-def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
+def _c_abi_lines(
+    prefix, dim, n_nodes, component, parameters, used_previous, reads_state
+):
     """`extern "C"` wrappers, so the split is reachable from SFEM.
 
     The templated kernels above are what the generator produces; these are what
@@ -610,7 +726,8 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
     SFEM's C ABI already has.
     """
     geometry_call = ", ".join(
-        ["nelements", "elements"]
+        ["nelements"]
+        + _CONNECTIVITY_CALL_BY_USE[bool(reads_state or used_previous)]
         + ["g_adj%d" % index for index in range(dim * dim)]
         + ["g_det0"]
     )
@@ -621,25 +738,26 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
     for suffix, scalar in _ABI_SCALARS:
         # --- the partial assembly ---------------------------------------
         name = "%s_inexact_apply_tangent_a_msoa%s" % (prefix, suffix)
+        gathers = bool(reads_state or used_previous)
         lines.append('extern "C" int %s(' % name)
         lines.append("    const ptrdiff_t nelements,")
-        lines.append("    idx_t **const RSTR elements,")
+        lines.extend(_CONNECTIVITY_ABI_BY_USE[gathers])
         lines.extend(_abi_geometry(dim))
         lines.extend("    const %s %s," % (scalar, p) for p in parameters)
-        lines.extend(_abi_stream(scalar, "u", component))
+        lines.extend(_ABI_STATE_BY_USE[bool(reads_state)](scalar, component))
         lines.extend(previous_signature(scalar, component))
         lines.extend(
             [
-                "    const ptrdiff_t tangent_element_stride,",
                 "    const ptrdiff_t tangent_component_stride,",
                 "    metric_tensor_t *const RSTR tangent",
                 ") {",
                 "  return sfem::codegen::%s_inexact_apply_tangent_a_msoa_impl<"
-                "%s, geom_t, metric_tensor_t>(" % (prefix, scalar),
+                "%s, geom_t, metric_tensor_t, %d>("
+                % (prefix, scalar, _ABI_VECTOR_SIZE),
                 "      %s," % geometry_call,
                 "      %s," % ", ".join(parameters),
-                "      u_stride, %s," % ", ".join("u%s" % n for n in component),
-                "      %stangent_element_stride, tangent_component_stride, tangent);"
+                *_STATE_CALL_BY_USE[bool(reads_state)](component),
+                "      %stangent_component_stride, tangent);"
                 % previous_call(component),
                 "}",
                 "",
@@ -653,7 +771,6 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
             [
                 "    const ptrdiff_t nelements,",
                 "    idx_t **const RSTR elements,",
-                "    const ptrdiff_t tangent_element_stride,",
                 "    const ptrdiff_t tangent_component_stride,",
                 "    const metric_tensor_t *const RSTR tangent,",
             ]
@@ -667,7 +784,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
                 "  return sfem::codegen::%s_inexact_apply_stored_a_msoa_impl<"
                 "%s, metric_tensor_t, %d>(" % (prefix, scalar, _ABI_VECTOR_SIZE),
                 "      nelements, elements,",
-                "      tangent_element_stride, tangent_component_stride, tangent,",
+                "      tangent_component_stride, tangent,",
                 "      h_stride, %s," % ", ".join("h%s" % n for n in component),
                 "      out_stride, %s);" % ", ".join("out%s" % n for n in component),
                 "}",
@@ -682,7 +799,6 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
             [
                 "    const ptrdiff_t nelements,",
                 "    idx_t **const RSTR elements,",
-                "    const ptrdiff_t tangent_element_stride,",
                 "    const ptrdiff_t tangent_component_stride,",
                 "    const compressed_t *const RSTR tangent,",
                 "    const scaling_t *const RSTR scaling,",
@@ -697,7 +813,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
                 "  return sfem::codegen::%s_inexact_apply_compressed_a_msoa_impl<"
                 "%s, compressed_t, scaling_t>(" % (prefix, scalar),
                 "      nelements, elements,",
-                "      tangent_element_stride, tangent_component_stride, tangent, scaling,",
+                "      tangent_component_stride, tangent, scaling,",
                 "      h_stride, %s," % ", ".join("h%s" % n for n in component),
                 "      out_stride, %s);" % ", ".join("out%s" % n for n in component),
                 "}",

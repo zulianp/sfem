@@ -81,9 +81,11 @@ Size per element is `d²` squared, halved when the tangent carries the major sym
 45 numbers per element in three dimensions **whatever the element**, so the store is small and its
 precision is a free parameter — hence the templated `tangent_t`.
 
-Addressed as `element * tangent_element_stride + slot * tangent_component_stride`. Two strides, so
-both layouts are reachable without a second kernel: element-major is `(components, 1)`,
-component-major is `(1, nelements)`. The generated Op passes component-major.
+The store is SoA: addressed as `element + slot * tangent_component_stride`, so each of the 45
+components is its own contiguous run over the elements. That is what lets the applies read and
+write it as `btangent<k>[lane]` with the base pointer hoisted above the lane loop and no index
+arithmetic inside it — a general element stride would make every one of those 45 accesses an
+unknown-stride scatter. The generated Op passes `nelements` as the component stride.
 
 **The compressed apply scales the outputs, not the tangent.** The action is linear in `Sbar`, so it
 is the same number either way, and there are `dim * n_nodes` outputs against the tangent's 45

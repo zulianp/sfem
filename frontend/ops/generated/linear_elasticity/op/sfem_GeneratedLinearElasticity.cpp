@@ -1054,13 +1054,11 @@ namespace sfem {
             domain.element_type,
                         real_type,
                         nelements,
-                        domain.block->elements()->data(),
                         adjugate[0], adjugate[1], adjugate[2], adjugate[3],
                         determinant,
                         domain.parameters->require_real_value("lmbda"),
                         domain.parameters->require_real_value("mu"),
-                        2, x + 0, x + 1,
-                        1, nelements,
+                        nelements,
                         cache->inexact_tangent->data());
       }
       else if (dim == 3) {
@@ -1068,13 +1066,11 @@ namespace sfem {
             domain.element_type,
                         real_type,
                         nelements,
-                        domain.block->elements()->data(),
                         adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8],
                         determinant,
                         domain.parameters->require_real_value("lmbda"),
                         domain.parameters->require_real_value("mu"),
-                        3, x + 0, x + 1, x + 2,
-                        1, nelements,
+                        nelements,
                         cache->inexact_tangent->data());
       }
       SFEM_ERROR("GeneratedLinearElasticity::inexact_update has no kernel for dimension %d\n", dim);
@@ -1099,7 +1095,7 @@ namespace sfem {
                         real_type,
                         nelements,
                         domain.block->elements()->data(),
-                        1, nelements,
+                        nelements,
                         cache->inexact_tangent->data(),
                         2, h + 0, h + 1,
                         2, out + 0, out + 1);
@@ -1110,7 +1106,7 @@ namespace sfem {
                         real_type,
                         nelements,
                         domain.block->elements()->data(),
-                        1, nelements,
+                        nelements,
                         cache->inexact_tangent->data(),
                         3, h + 0, h + 1, h + 2,
                         3, out + 0, out + 1, out + 2);

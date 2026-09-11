@@ -3,10 +3,9 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, typename tangent_t>
+template <typename s_t, typename g_t, typename tangent_t, int VS>
 static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl(
     const ptrdiff_t nelements,
-    idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
     const g_t *const RSTR g_adj1,
     const g_t *const RSTR g_adj2,
@@ -14,55 +13,66 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl
     const g_t *const RSTR g_det0,
     const s_t lmbda,
     const s_t mu,
-    const ptrdiff_t u_stride,
-    const s_t *const RSTR ux,
-    const s_t *const RSTR uy,
-    const ptrdiff_t tangent_element_stride,
     const ptrdiff_t tangent_component_stride,
     tangent_t *const RSTR tangent
 ) {
   #pragma omp parallel for schedule(static)
-  for (ptrdiff_t element = 0; element < nelements; ++element) {
-    const idx_t ev0 = elements[0][element];
-    const idx_t ev1 = elements[1][element];
-    const idx_t ev2 = elements[2][element];
-    const idx_t ev3 = elements[3][element];
-    const s_t adjugate0 = s_t(g_adj0[element]);
-    const s_t adjugate1 = s_t(g_adj1[element]);
-    const s_t adjugate2 = s_t(g_adj2[element]);
-    const s_t adjugate3 = s_t(g_adj3[element]);
-    const s_t determinant = s_t(g_det0[element]);
-    const s_t tangent_t0 = pow_m1(determinant);
-    const s_t tangent_t1 = pow_2(adjugate1);
-    const s_t tangent_t2 = pow_2(adjugate0);
-    const s_t tangent_t3 = lmbda + s_t(2)*mu;
-    const s_t tangent_t4 = adjugate1*mu;
-    const s_t tangent_t5 = adjugate0*adjugate2;
-    const s_t tangent_t6 = adjugate0*lmbda;
-    const s_t tangent_t7 = pow_2(adjugate3);
-    const s_t tangent_t8 = pow_2(adjugate2);
-    const s_t tangent_t9 = adjugate3*mu;
-    const s_t tangent_t10 = adjugate2*lmbda;
-    const s_t tangent0 = tangent_t0*(mu*tangent_t1 + tangent_t2*tangent_t3);
-    const s_t tangent1 = tangent_t0*(adjugate3*tangent_t4 + tangent_t3*tangent_t5);
-    const s_t tangent2 = tangent_t0*(adjugate0*tangent_t4 + adjugate1*tangent_t6);
-    const s_t tangent3 = tangent_t0*(adjugate2*tangent_t4 + adjugate3*tangent_t6);
-    const s_t tangent4 = tangent_t0*(mu*tangent_t7 + tangent_t3*tangent_t8);
-    const s_t tangent5 = tangent_t0*(adjugate0*tangent_t9 + adjugate1*tangent_t10);
-    const s_t tangent6 = tangent_t0*(adjugate2*tangent_t9 + adjugate3*tangent_t10);
-    const s_t tangent7 = tangent_t0*(mu*tangent_t2 + tangent_t1*tangent_t3);
-    const s_t tangent8 = tangent_t0*(adjugate1*adjugate3*tangent_t3 + mu*tangent_t5);
-    const s_t tangent9 = tangent_t0*(mu*tangent_t8 + tangent_t3*tangent_t7);
-    tangent[element * tangent_element_stride + 0 * tangent_component_stride] = tangent_t(tangent0);
-    tangent[element * tangent_element_stride + 1 * tangent_component_stride] = tangent_t(tangent1);
-    tangent[element * tangent_element_stride + 2 * tangent_component_stride] = tangent_t(tangent2);
-    tangent[element * tangent_element_stride + 3 * tangent_component_stride] = tangent_t(tangent3);
-    tangent[element * tangent_element_stride + 4 * tangent_component_stride] = tangent_t(tangent4);
-    tangent[element * tangent_element_stride + 5 * tangent_component_stride] = tangent_t(tangent5);
-    tangent[element * tangent_element_stride + 6 * tangent_component_stride] = tangent_t(tangent6);
-    tangent[element * tangent_element_stride + 7 * tangent_component_stride] = tangent_t(tangent7);
-    tangent[element * tangent_element_stride + 8 * tangent_component_stride] = tangent_t(tangent8);
-    tangent[element * tangent_element_stride + 9 * tangent_component_stride] = tangent_t(tangent9);
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)((nelements - evb) < (ptrdiff_t)VS ? (nelements - evb) : (ptrdiff_t)VS);
+    const g_t *const RSTR bg_adj0 = g_adj0 + evb;
+    const g_t *const RSTR bg_adj1 = g_adj1 + evb;
+    const g_t *const RSTR bg_adj2 = g_adj2 + evb;
+    const g_t *const RSTR bg_adj3 = g_adj3 + evb;
+    const g_t *const RSTR bg_det0 = g_det0 + evb;
+    tangent_t *const RSTR btangent0 = tangent + evb + 0 * tangent_component_stride;
+    tangent_t *const RSTR btangent1 = tangent + evb + 1 * tangent_component_stride;
+    tangent_t *const RSTR btangent2 = tangent + evb + 2 * tangent_component_stride;
+    tangent_t *const RSTR btangent3 = tangent + evb + 3 * tangent_component_stride;
+    tangent_t *const RSTR btangent4 = tangent + evb + 4 * tangent_component_stride;
+    tangent_t *const RSTR btangent5 = tangent + evb + 5 * tangent_component_stride;
+    tangent_t *const RSTR btangent6 = tangent + evb + 6 * tangent_component_stride;
+    tangent_t *const RSTR btangent7 = tangent + evb + 7 * tangent_component_stride;
+    tangent_t *const RSTR btangent8 = tangent + evb + 8 * tangent_component_stride;
+    tangent_t *const RSTR btangent9 = tangent + evb + 9 * tangent_component_stride;
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      const s_t adjugate0 = s_t(bg_adj0[lane]);
+      const s_t adjugate1 = s_t(bg_adj1[lane]);
+      const s_t adjugate2 = s_t(bg_adj2[lane]);
+      const s_t adjugate3 = s_t(bg_adj3[lane]);
+      const s_t determinant = s_t(bg_det0[lane]);
+      const s_t tangent_t0 = pow_m1(determinant);
+      const s_t tangent_t1 = pow_2(adjugate1);
+      const s_t tangent_t2 = pow_2(adjugate0);
+      const s_t tangent_t3 = lmbda + s_t(2)*mu;
+      const s_t tangent_t4 = adjugate1*mu;
+      const s_t tangent_t5 = adjugate0*adjugate2;
+      const s_t tangent_t6 = adjugate0*lmbda;
+      const s_t tangent_t7 = pow_2(adjugate3);
+      const s_t tangent_t8 = pow_2(adjugate2);
+      const s_t tangent_t9 = adjugate3*mu;
+      const s_t tangent_t10 = adjugate2*lmbda;
+      const s_t tangent0 = tangent_t0*(mu*tangent_t1 + tangent_t2*tangent_t3);
+      const s_t tangent1 = tangent_t0*(adjugate3*tangent_t4 + tangent_t3*tangent_t5);
+      const s_t tangent2 = tangent_t0*(adjugate0*tangent_t4 + adjugate1*tangent_t6);
+      const s_t tangent3 = tangent_t0*(adjugate2*tangent_t4 + adjugate3*tangent_t6);
+      const s_t tangent4 = tangent_t0*(mu*tangent_t7 + tangent_t3*tangent_t8);
+      const s_t tangent5 = tangent_t0*(adjugate0*tangent_t9 + adjugate1*tangent_t10);
+      const s_t tangent6 = tangent_t0*(adjugate2*tangent_t9 + adjugate3*tangent_t10);
+      const s_t tangent7 = tangent_t0*(mu*tangent_t2 + tangent_t1*tangent_t3);
+      const s_t tangent8 = tangent_t0*(adjugate1*adjugate3*tangent_t3 + mu*tangent_t5);
+      const s_t tangent9 = tangent_t0*(mu*tangent_t8 + tangent_t3*tangent_t7);
+      btangent0[lane] = tangent_t(tangent0);
+      btangent1[lane] = tangent_t(tangent1);
+      btangent2[lane] = tangent_t(tangent2);
+      btangent3[lane] = tangent_t(tangent3);
+      btangent4[lane] = tangent_t(tangent4);
+      btangent5[lane] = tangent_t(tangent5);
+      btangent6[lane] = tangent_t(tangent6);
+      btangent7[lane] = tangent_t(tangent7);
+      btangent8[lane] = tangent_t(tangent8);
+      btangent9[lane] = tangent_t(tangent9);
+    }
   }
 
   return SFEM_SUCCESS;
@@ -72,7 +82,6 @@ template <typename s_t, typename tangent_t, int VS>
 static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_stored_a_msoa_impl(
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
-    const ptrdiff_t tangent_element_stride,
     const ptrdiff_t tangent_component_stride,
     const tangent_t *const RSTR tangent,
     const ptrdiff_t h_stride,
@@ -123,6 +132,16 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_stored_a_msoa_impl(
       bhy_2[lane] = hy[bev2[lane] * h_stride];
       bhy_3[lane] = hy[bev3[lane] * h_stride];
     }
+    const tangent_t *const RSTR btangent0 = tangent + evb + 0 * tangent_component_stride;
+    const tangent_t *const RSTR btangent1 = tangent + evb + 1 * tangent_component_stride;
+    const tangent_t *const RSTR btangent2 = tangent + evb + 2 * tangent_component_stride;
+    const tangent_t *const RSTR btangent3 = tangent + evb + 3 * tangent_component_stride;
+    const tangent_t *const RSTR btangent4 = tangent + evb + 4 * tangent_component_stride;
+    const tangent_t *const RSTR btangent5 = tangent + evb + 5 * tangent_component_stride;
+    const tangent_t *const RSTR btangent6 = tangent + evb + 6 * tangent_component_stride;
+    const tangent_t *const RSTR btangent7 = tangent + evb + 7 * tangent_component_stride;
+    const tangent_t *const RSTR btangent8 = tangent + evb + 8 * tangent_component_stride;
+    const tangent_t *const RSTR btangent9 = tangent + evb + 9 * tangent_component_stride;
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       const s_t hx_0 = bhx_0[lane];
@@ -133,16 +152,16 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_stored_a_msoa_impl(
       const s_t hy_1 = bhy_1[lane];
       const s_t hy_2 = bhy_2[lane];
       const s_t hy_3 = bhy_3[lane];
-      const s_t tangent0 = s_t(tangent[(evb + lane) * tangent_element_stride + 0 * tangent_component_stride]);
-      const s_t tangent1 = s_t(tangent[(evb + lane) * tangent_element_stride + 1 * tangent_component_stride]);
-      const s_t tangent2 = s_t(tangent[(evb + lane) * tangent_element_stride + 2 * tangent_component_stride]);
-      const s_t tangent3 = s_t(tangent[(evb + lane) * tangent_element_stride + 3 * tangent_component_stride]);
-      const s_t tangent4 = s_t(tangent[(evb + lane) * tangent_element_stride + 4 * tangent_component_stride]);
-      const s_t tangent5 = s_t(tangent[(evb + lane) * tangent_element_stride + 5 * tangent_component_stride]);
-      const s_t tangent6 = s_t(tangent[(evb + lane) * tangent_element_stride + 6 * tangent_component_stride]);
-      const s_t tangent7 = s_t(tangent[(evb + lane) * tangent_element_stride + 7 * tangent_component_stride]);
-      const s_t tangent8 = s_t(tangent[(evb + lane) * tangent_element_stride + 8 * tangent_component_stride]);
-      const s_t tangent9 = s_t(tangent[(evb + lane) * tangent_element_stride + 9 * tangent_component_stride]);
+      const s_t tangent0 = s_t(btangent0[lane]);
+      const s_t tangent1 = s_t(btangent1[lane]);
+      const s_t tangent2 = s_t(btangent2[lane]);
+      const s_t tangent3 = s_t(btangent3[lane]);
+      const s_t tangent4 = s_t(btangent4[lane]);
+      const s_t tangent5 = s_t(btangent5[lane]);
+      const s_t tangent6 = s_t(btangent6[lane]);
+      const s_t tangent7 = s_t(btangent7[lane]);
+      const s_t tangent8 = s_t(btangent8[lane]);
+      const s_t tangent9 = s_t(btangent9[lane]);
       const s_t reference_product_t0 = ((s_t(1) / s_t(3)))*hx_1;
       const s_t reference_product_t1 = ((s_t(1) / s_t(6)))*hx_3;
       const s_t reference_product_t2 = ((s_t(1) / s_t(3)))*hx_0 - (s_t(1) / s_t(6))*hx_2;
@@ -267,7 +286,6 @@ template <typename s_t, typename tangent_t, typename scale_t>
 static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_compressed_a_msoa_impl(
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
-    const ptrdiff_t tangent_element_stride,
     const ptrdiff_t tangent_component_stride,
     const tangent_t *const RSTR tangent,
     const scale_t *const RSTR scaling,
@@ -293,16 +311,16 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_compressed_a_msoa_i
     const s_t hy_2 = hy[ev2 * h_stride];
     const s_t hy_3 = hy[ev3 * h_stride];
     const s_t scale = s_t(scaling[element]);
-    const s_t tangent0 = s_t(tangent[element * tangent_element_stride + 0 * tangent_component_stride]);
-    const s_t tangent1 = s_t(tangent[element * tangent_element_stride + 1 * tangent_component_stride]);
-    const s_t tangent2 = s_t(tangent[element * tangent_element_stride + 2 * tangent_component_stride]);
-    const s_t tangent3 = s_t(tangent[element * tangent_element_stride + 3 * tangent_component_stride]);
-    const s_t tangent4 = s_t(tangent[element * tangent_element_stride + 4 * tangent_component_stride]);
-    const s_t tangent5 = s_t(tangent[element * tangent_element_stride + 5 * tangent_component_stride]);
-    const s_t tangent6 = s_t(tangent[element * tangent_element_stride + 6 * tangent_component_stride]);
-    const s_t tangent7 = s_t(tangent[element * tangent_element_stride + 7 * tangent_component_stride]);
-    const s_t tangent8 = s_t(tangent[element * tangent_element_stride + 8 * tangent_component_stride]);
-    const s_t tangent9 = s_t(tangent[element * tangent_element_stride + 9 * tangent_component_stride]);
+    const s_t tangent0 = s_t(tangent[element + 0 * tangent_component_stride]);
+    const s_t tangent1 = s_t(tangent[element + 1 * tangent_component_stride]);
+    const s_t tangent2 = s_t(tangent[element + 2 * tangent_component_stride]);
+    const s_t tangent3 = s_t(tangent[element + 3 * tangent_component_stride]);
+    const s_t tangent4 = s_t(tangent[element + 4 * tangent_component_stride]);
+    const s_t tangent5 = s_t(tangent[element + 5 * tangent_component_stride]);
+    const s_t tangent6 = s_t(tangent[element + 6 * tangent_component_stride]);
+    const s_t tangent7 = s_t(tangent[element + 7 * tangent_component_stride]);
+    const s_t tangent8 = s_t(tangent[element + 8 * tangent_component_stride]);
+    const s_t tangent9 = s_t(tangent[element + 9 * tangent_component_stride]);
     const s_t reference_product_t0 = ((s_t(1) / s_t(3)))*hx_1;
     const s_t reference_product_t1 = ((s_t(1) / s_t(6)))*hx_3;
     const s_t reference_product_t2 = ((s_t(1) / s_t(3)))*hx_0 - (s_t(1) / s_t(6))*hx_2;

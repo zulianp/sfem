@@ -660,6 +660,62 @@ caught thirty-two of the latter.  And the f32 path, which is what the Op
 actually uses, gains least on Grace -- 1 to 5% against f64's 13 to 16% -- so the
 headline number is not the one that ships.
 
+### The store's layout, and what it was costing
+
+The blocked kernels addressed the store through two runtime strides, so that
+"both layouts are expressible by the caller without a second kernel".  Nothing
+ever used that: the only caller, the generated Op, passes `1, nelements` -- which
+is the SoA layout -- and it is not free.  With a runtime element stride, the
+address inside the lane loop is `btangent<k>[lane * tangent_element_stride]`, so
+every one of the 45 accesses is an unknown-stride scatter as far as the
+vectoriser is concerned.  One stride, and the lane indexes the component
+directly.
+
+The comparison below is between two trees whose *only* difference is that: both
+have the blocked tangent, both have the staged gathers.  Grace, 206763 dof,
+stored apply, MDOF/s.
+
+| | | two strides | SoA | |
+|---|---|---|---|---|
+| HEX8 | f64, 72 threads | 625 | 652 | +4% |
+| HEX8 | f32, 72 threads | 545 | 564 | +3% |
+| TET4 | f64, 72 threads | 310 | 341 | +10% |
+| TET4 | f32, 72 threads | 306 | 345 | **+13%** |
+| TET4 | f32, 8 threads   | 39.1 | 43.7 | +12% |
+
+f32 is what ships, TET4 gains most, and this is the kernel that runs every
+iteration rather than once per Newton step.  Answers are unchanged to the digit
+-- 3.6e-05 on HEX8, 1.7e-07 on TET4 -- because it is the same arithmetic reading
+the same numbers from a different address.
+
+### The tangent blocking is a clang result, not a Grace result
+
+Blocking the assembly kernel the same way is worth +78% with clang and nothing
+with gcc, and the vectorisation reports say why.  Clang vectorises the tangent's
+1676-line CSE body; gcc vectorises only the gather loop above it and leaves the
+body scalar, in every variant tried -- two strides, SoA, and SoA with an explicit
+`simdlen(VS)` to rule out its cost model declining a loop it could have taken.
+
+Assembly throughput, 206763 dof, MDOF/s:
+
+| | scalar tangent | blocked tangent |
+|---|---|---|
+| HEX8, laptop, 1 thread | 3.88 | **6.93** |
+| TET4, laptop, 1 thread | 4.18 | **7.32** |
+| HEX8, Grace, 72 threads | 118.2 | 117.2 |
+| TET4, Grace, 72 threads | 194.2 | 195.0 |
+
+Repeatable to better than a per cent in both directions, so the Grace figures are
+a wash rather than noise hiding a win: about -1% on HEX8 and +0.5% on TET4.  The
+kernel ships blocked anyway -- the three kernels then have one shape, the clang
+gain is large, and the assembly runs once against many applies -- but the
+headline that belongs to this change is the store layout above it, not this.
+
+`simdlen(VS)` is worth a further 2 to 3% on the HEX8 f32 apply and about -1.5% on
+the assembly.  It is a property of the target's `vectorize_pragma`, so it would
+change every generated kernel in the framework, and nothing here has measured
+that; it stays an open question rather than a change.
+
 ### Default
 
 `metric_tensor_t` is `float`, and the generated Op has always stored the tangent
