@@ -1101,6 +1101,40 @@ namespace sfem {
                         2, out + 0, out + 1);
       }
       else if (dim == 3) {
+        if (impl_->space->has_packed_mesh()) {
+          auto packed = impl_->space->packed_mesh();
+          const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+          if (packed_block >= 0) {
+            auto packed_elements = packed->elements(packed_block);
+            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+            auto ghost_ptr = packed->ghost_ptr(packed_block);
+            auto ghost_idx = packed->ghost_idx(packed_block);
+            auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+            auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+            auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+            return linear_elasticity_inexact_apply_stored_packed_two_pass_3d_a_msoa(
+                domain.element_type,
+                            real_type,
+                            packed->n_packs(packed_block),
+                            packed->n_elements_per_pack(packed_block),
+                            nelements,
+                            packed->max_nodes_per_pack(),
+                            packed_elements->data(),
+                            owned_nodes_ptr->data(),
+                            packed->n_ghost_entries(packed_block),
+                            packed->n_ghost_reduce_rows(packed_block),
+                            ghost_ptr->data(),
+                            ghost_idx->data(),
+                            ghost_reduce_ptr->data(),
+                            ghost_reduce_idx->data(),
+                            ghost_reduce_dest->data(),
+                            impl_->packed_ghost_buf[packed_block]->data(),
+                            nelements,
+                            cache->inexact_tangent->data(),
+                            3, h + 0, h + 1, h + 2,
+                            3, out + 0, out + 1, out + 2);
+          }
+        }
         return linear_elasticity_inexact_apply_stored_3d_a_msoa(
             domain.element_type,
                         real_type,

@@ -199,12 +199,38 @@ class InexactApplyOpWrapperTest(InexactApplyGenerationTest):
         return header, source
 
     def test_the_op_declares_the_inexact_methods(self):
-        header, _source = self._op_files(opt_in=True)
-        self.assertIn("bool inexact_supported() const override { return true; }", header)
+        """Declared, not defined inline.
+
+        This asserted `inexact_supported() const override { return true; }` for a
+        while after the definition moved out of line, and was one of the suite's
+        standing failures.  It is out of line deliberately: the answer is not "the
+        generator emitted these kernels" but "every domain has the affine geometry
+        cache they read", which only the definition in the `.cpp` can ask.
+        """
+        header, source = self._op_files(opt_in=True)
+        self.assertIn("bool inexact_supported() const override;", header)
+        self.assertIn("::inexact_supported() const", source)
         self.assertIn("int inexact_update(const real_t *const x) override;", header)
         self.assertIn(
             "int inexact_apply(const real_t *const h, real_t *const out) override;", header
         )
+
+    def test_the_apply_prefers_the_packed_mesh_when_there_is_one(self):
+        """The packed kernel is reached, and falling through to the standard one
+        is not an error.
+
+        A packed mesh whose blocks do not match this domain is a domain the
+        standard kernel handles; the branch has to fall through rather than fail,
+        which is the shape `apply` already uses.
+        """
+        _header, source = self._op_files(opt_in=True)
+        apply_body = source[source.index("::inexact_apply("):]
+        apply_body = apply_body[: apply_body.index("::inexact_update(")] \
+            if "::inexact_update(" in apply_body[10:] else apply_body
+        self.assertIn("has_packed_mesh()", apply_body)
+        self.assertIn("inexact_apply_stored_packed_two_pass_3d_a_msoa", apply_body)
+        # and the standard call still follows it, unguarded
+        self.assertIn("inexact_apply_stored_3d_a_msoa", apply_body)
 
     def test_an_op_without_the_split_declares_nothing(self):
         """The default `inexact_supported() == false` has to survive."""
