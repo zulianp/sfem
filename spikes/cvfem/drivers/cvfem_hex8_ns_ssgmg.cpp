@@ -3693,6 +3693,27 @@ int main(int argc, char **argv) {
         std::printf("pump: t = %g  v_diaphragm = %g\n", (double)t_now, (double)(U * pump_scale));
     }
 
+    // The Reynolds ramp is for a state that has no good initial guess. From the second time
+    // step on there is one -- the previous step's converged solution -- and walking the ramp
+    // again does not merely repeat work, it destroys that guess: the first stage takes a
+    // solution at the physical Reynolds number and converges it to the solution of a much
+    // more viscous problem before climbing back. Measured on the pump at N=32 and Re=200,
+    // 17 time steps produced 84 stage executions, about 4.94 per step, of which only the
+    // last solved the problem asked for.
+    //
+    // So a step that has a guess solves the physical problem directly, and the ramp stays as
+    // the fallback: if that single stage fails, the retry below inserts an intermediate
+    // Reynolds number and the walk reappears for exactly the step that needed it. Each step
+    // gets its own retry budget and step factor, because a step is where the difficulty is
+    // -- one hard instant in a cycle should not spend the budget of the ones after it.
+    const bool have_guess = dt_step > real_t(0) && tstep > 0;
+    if (have_guess) {
+        rho_schedule.assign(1, rho);
+        rho_solved = 0;  // no stage of THIS step has converged yet
+        re_retries = 0;
+        step_f     = re_step;
+    }
+
     for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
     const real_t rho_use = rho_schedule[stage];
     // The manufactured forcing is a function of rho, so it must track the continuation. The
@@ -4445,7 +4466,7 @@ int main(int argc, char **argv) {
     if (!converged) {
         // Roll back and halve the step in log space rather than giving up. The stage that
         // failed is retried from the last state known to be good, via an intermediate Re.
-        if ((stage > 0 || rho_solved > real_t(0)) && re_retries < re_retry) {
+        if ((stage > 0 || rho_solved > real_t(0) || have_guess) && re_retries < re_retry) {
             std::copy(x_stage_start.begin(), x_stage_start.end(), x);
             real_t next;
             if (re_adapt) {
