@@ -114,15 +114,15 @@ int main(int argc, char **argv) {
 #endif
             1, hx.data(), hy.data(), hz.data(), 1, ax.data(), ay.data(), az.data());
 
-        sfem::codegen::TANGENT_KERNEL<double, geom_t, double>(
+        sfem::codegen::TANGENT_KERNEL<double, geom_t, double, 16>(
             m.nelements, m.evp.data(),
             m.adj[0].data(),m.adj[1].data(),m.adj[2].data(),m.adj[3].data(),m.adj[4].data(),
             m.adj[5].data(),m.adj[6].data(),m.adj[7].data(),m.adj[8].data(), m.det.data(),
-            lmbda, mu, 1, ux.data(), uy.data(), uz.data(), 1, cstride, S64.data());
+            lmbda, mu, 1, ux.data(), uy.data(), uz.data(), cstride, S64.data());
         std::fill(bx.begin(), bx.end(), 0.0); std::fill(by.begin(), by.end(), 0.0);
         std::fill(bz.begin(), bz.end(), 0.0);
-        sfem::codegen::STORED_APPLY<double, double>(
-            m.nelements, m.evp.data(), 1, cstride, S64.data(),
+        sfem::codegen::STORED_APPLY<double, double, 16>(
+            m.nelements, m.evp.data(), cstride, S64.data(),
             1, hx.data(), hy.data(), hz.data(), 1, bx.data(), by.data(), bz.data());
 
         double num = 0, den = 0;

@@ -8,8 +8,31 @@
 #pragma once
 #include <vector>
 #include <algorithm>
+#include <numeric>
+#include <cstring>
 #include <unordered_map>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+
+// Mesh ordering.  `lex` is the lexicographic numbering these meshes are built
+// in; the rest are SFEM's own space-filling curves, reached through smesh's
+// encoders so that this measures the ordering the library ships rather than a
+// private reimplementation of one.
+//
+//   -DMESH_ORDER="lex"        as built: nodes (k*nn+j)*nn+i, elements likewise
+//   -DMESH_ORDER="morton3"    what `smesh::SFC::create_from_env()` defaults to
+//   -DMESH_ORDER="hilbert3"
+//   -DMESH_ORDER="random3"    the pessimistic control: no locality at all
+//
+// This matters more than a mesh-generation detail.  How much of a gather is
+// compulsory rather than streamed is a property of the numbering, not of the
+// kernel, so it is the free parameter in the roofline of `RESULTS.md` -- on
+// HEX8 the band it spans is a factor of three in the bandwidth ceiling.
+#ifndef MESH_ORDER
+#define MESH_ORDER "lex"
+#endif
+#include "smesh_sfc.impl.hpp"
 
 #if defined(ELEMENT_HEX8)
 #define NXE 8
@@ -40,8 +63,81 @@ struct Mesh {
     std::vector<double> px, py, pz;  // node positions, for seeding the fields
 };
 
+// SFEM's algorithm, from `smesh::SFC::reorder`: sort the elements by the curve
+// through their barycentres, then renumber the nodes in the order the reordered
+// elements first touch them.  Numbering the nodes by their own curve would be
+// the obvious alternative and is not what the library does -- first-touch order
+// is what makes the gather walk forwards.
+static void reorder_mesh(Mesh &m, const char *ordering) {
+    if (!ordering || !std::strcmp(ordering, "lex")) return;
+
+    std::vector<geom_t> bx(m.nelements), by(m.nelements), bz(m.nelements);
+    for (ptrdiff_t e = 0; e < m.nelements; ++e) {
+        double sx = 0, sy = 0, sz = 0;
+        for (int c = 0; c < NXE; ++c) {
+            const idx_t v = m.ev[c][e];
+            sx += m.px[v]; sy += m.py[v]; sz += m.pz[v];
+        }
+        bx[e] = (geom_t)(sx / NXE); by[e] = (geom_t)(sy / NXE); bz[e] = (geom_t)(sz / NXE);
+    }
+
+    std::vector<smesh::u32> code(m.nelements);
+    int status = -1;
+    if (!std::strcmp(ordering, "morton3"))
+        status = smesh::encode_morton3<geom_t>(m.nelements, bx.data(), by.data(), bz.data(), code.data());
+    else if (!std::strcmp(ordering, "hilbert3"))
+        status = smesh::encode_hilbert3<geom_t>(m.nelements, bx.data(), by.data(), bz.data(), code.data());
+    else if (!std::strcmp(ordering, "random3"))
+        status = smesh::encode_random3<geom_t>(m.nelements, bx.data(), by.data(), bz.data(), code.data());
+    if (status != 0) {
+        std::fprintf(stderr, "unknown or failed MESH_ORDER '%s'\n", ordering);
+        std::abort();
+    }
+
+    std::vector<ptrdiff_t> order(m.nelements);
+    std::iota(order.begin(), order.end(), (ptrdiff_t)0);
+    // Stable, so two elements sharing a code keep the order they were built in
+    // and the mesh is a function of the ordering name alone.
+    std::stable_sort(order.begin(), order.end(),
+                     [&](ptrdiff_t l, ptrdiff_t r) { return code[l] < code[r]; });
+
+    std::vector<std::vector<idx_t>> ev(NXE, std::vector<idx_t>(m.nelements));
+    std::vector<std::vector<geom_t>> adj(9, std::vector<geom_t>(m.nelements));
+    std::vector<geom_t> det(m.nelements);
+    for (ptrdiff_t e = 0; e < m.nelements; ++e) {
+        const ptrdiff_t from = order[e];
+        for (int c = 0; c < NXE; ++c) ev[c][e] = m.ev[c][from];
+        for (int c = 0; c < 9; ++c) adj[c][e] = m.adj[c][from];
+        det[e] = m.det[from];
+    }
+    m.ev.swap(ev); m.adj.swap(adj); m.det.swap(det);
+
+    std::vector<idx_t> renumber((size_t)m.nnodes, (idx_t)-1);
+    idx_t next = 0;
+    for (ptrdiff_t e = 0; e < m.nelements; ++e)
+        for (int c = 0; c < NXE; ++c) {
+            const idx_t v = m.ev[c][e];
+            if (renumber[v] < 0) renumber[v] = next++;
+        }
+    // A node no element reaches keeps a number, so the coordinate arrays stay
+    // the length the rest of the harness expects.
+    for (ptrdiff_t v = 0; v < m.nnodes; ++v) if (renumber[v] < 0) renumber[v] = next++;
+
+    for (auto &row : m.ev)
+        for (ptrdiff_t e = 0; e < m.nelements; ++e) row[e] = renumber[row[e]];
+
+    std::vector<double> px((size_t)m.nnodes), py((size_t)m.nnodes), pz((size_t)m.nnodes);
+    for (ptrdiff_t v = 0; v < m.nnodes; ++v) {
+        px[renumber[v]] = m.px[v]; py[renumber[v]] = m.py[v]; pz[renumber[v]] = m.pz[v];
+    }
+    m.px.swap(px); m.py.swap(py); m.pz.swap(pz);
+
+    m.evp.clear();
+    for (auto &row : m.ev) m.evp.push_back(row.data());
+}
+
 #if defined(ELEMENT_HEX8)
-static Mesh build(int n) {
+static Mesh build_unordered(int n) {
     Mesh m;
     const int nn = n + 1;
     const double h = 1.0 / n;
@@ -73,7 +169,7 @@ static Mesh build(int n) {
 // is still affine and the adjugate is still the tetrahedron's -- what makes
 // TET10 a genuine test of the projection is that its reference gradients vary
 // over the element, not that its geometry is curved.
-static Mesh build(int n) {
+static Mesh build_unordered(int n) {
     Mesh m;
     const int nn = n + 1;
     const double h = 1.0 / n;
@@ -142,3 +238,8 @@ static Mesh build(int n) {
 }
 #endif
 
+static Mesh build(int n) {
+    Mesh m = build_unordered(n);
+    reorder_mesh(m, MESH_ORDER);
+    return m;
+}

@@ -141,12 +141,12 @@ int main(int argc, char **argv) {
         std::vector<float>  scale(ecount, 1.0f);
 
         auto assemble = [&] {
-            sfem::codegen::TANGENT_KERNEL<double, geom_t, double>(
+            sfem::codegen::TANGENT_KERNEL<double, geom_t, double, LANE_VS>(
                 m.nelements, m.evp.data(),
                 m.adj[0].data(),m.adj[1].data(),m.adj[2].data(),m.adj[3].data(),m.adj[4].data(),
                 m.adj[5].data(),m.adj[6].data(),m.adj[7].data(),m.adj[8].data(), m.det.data(),
                 lmbda, mu, 1, ux.data(), uy.data(), uz.data(),
-                1, cstride, S64.data());
+                cstride, S64.data());
         };
         assemble();
         // fp32 store, and the fp16 store with one max-abs scale per element so
@@ -184,13 +184,13 @@ int main(int argc, char **argv) {
             zero(cx,cy,cz);
             sfem::codegen::STORED_APPLY<double, typename std::remove_const<
                 typename std::remove_pointer<decltype(store)>::type>::type, LANE_VS>(
-                m.nelements, m.evp.data(), 1, cstride, store,
+                m.nelements, m.evp.data(), cstride, store,
                 1, hx.data(), hy.data(), hz.data(), 1, cx.data(), cy.data(), cz.data());
         };
         auto run_compressed = [&] {
             zero(cx,cy,cz);
             sfem::codegen::COMPRESSED_APPLY<double, half_t, float>(
-                m.nelements, m.evp.data(), 1, cstride, S16.data(), scale.data(),
+                m.nelements, m.evp.data(), cstride, S16.data(), scale.data(),
                 1, hx.data(), hy.data(), hz.data(), 1, cx.data(), cy.data(), cz.data());
         };
         auto rel = [&](const std::vector<double> &px, const std::vector<double> &py,

@@ -11,44 +11,77 @@
     "RESULTS.md is a benchmark-only instantiation; model it with",
     "'--bind tangent_t=double', which is why that option exists.",
     "",
-    "Arithmetic is double throughout: s_t is double in every one of these."
+    "Arithmetic is double throughout: s_t is double in every one of these.",
+    "",
+    "Mesh ordering: lex. Not incidental -- destroying the ordering costs the stored apply a factor of four (see the ordering sweep in RESULTS.md), so these points describe a well-ordered mesh and nothing else."
   ],
   "points": [
     {
       "label": "HEX8 stored f32",
       "kernel": "neohookean_ogden_hex8_inexact_apply_stored_a_msoa",
-      "element": "HEX8", "threads": 72, "scalar_bytes": 8,
-      "nelements": 64000, "nnodes": 68921, "ndof": 206763, "mdofs": 564.2
+      "element": "HEX8",
+      "threads": 72,
+      "scalar_bytes": 8,
+      "nelements": 64000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 564.2
     },
     {
       "label": "HEX8 compressed f16",
       "kernel": "neohookean_ogden_hex8_inexact_apply_compressed_a_msoa",
-      "element": "HEX8", "threads": 72, "scalar_bytes": 8,
-      "nelements": 64000, "nnodes": 68921, "ndof": 206763, "mdofs": 518.4
+      "element": "HEX8",
+      "threads": 72,
+      "scalar_bytes": 8,
+      "nelements": 64000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 518.4
     },
     {
       "label": "HEX8 tangent assembly",
       "kernel": "neohookean_ogden_hex8_inexact_apply_tangent_a_msoa",
-      "element": "HEX8", "threads": 72, "scalar_bytes": 8,
-      "nelements": 64000, "nnodes": 68921, "ndof": 206763, "mdofs": 117.2
+      "element": "HEX8",
+      "threads": 72,
+      "scalar_bytes": 8,
+      "nelements": 64000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 117.2
     },
     {
       "label": "TET4 stored f32",
       "kernel": "neohookean_ogden_tet4_inexact_apply_stored_a_msoa",
-      "element": "TET4", "threads": 72, "scalar_bytes": 8,
-      "nelements": 384000, "nnodes": 68921, "ndof": 206763, "mdofs": 344.6
+      "element": "TET4",
+      "threads": 72,
+      "scalar_bytes": 8,
+      "nelements": 384000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 344.6
     },
     {
       "label": "TET4 compressed f16",
       "kernel": "neohookean_ogden_tet4_inexact_apply_compressed_a_msoa",
-      "element": "TET4", "threads": 72, "scalar_bytes": 8,
-      "nelements": 384000, "nnodes": 68921, "ndof": 206763, "mdofs": 411.0
+      "element": "TET4",
+      "threads": 72,
+      "scalar_bytes": 8,
+      "nelements": 384000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 411.0
     },
     {
       "label": "TET4 tangent assembly",
       "kernel": "neohookean_ogden_tet4_inexact_apply_tangent_a_msoa",
-      "element": "TET4", "threads": 72, "scalar_bytes": 8,
-      "nelements": 384000, "nnodes": 68921, "ndof": 206763, "mdofs": 195.0
+      "element": "TET4",
+      "threads": 72,
+      "scalar_bytes": 8,
+      "nelements": 384000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 195.0
     }
-  ]
+  ],
+  "ordering": "lex"
 }
