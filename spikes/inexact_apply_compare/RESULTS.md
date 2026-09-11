@@ -614,6 +614,57 @@ where measured" is correct for the kernels as they exist, and should be
 re-measured once they are lane-blocked, because the mechanism that would make
 narrow stores pay is currently absent.
 
+### Lane-blocking them was tried and does not pay
+
+The obvious inference from the instruction mix -- these kernels are scalar, so
+block them over lanes like the rest of the framework and take the vector
+instructions -- was implemented and measured, and it is wrong.  On one Grace
+socket at 206763 dof, stored apply, MDOF/s:
+
+| | threads | scalar | blocked |
+|---|---|---|---|
+| TET4 f64  |  1 |   7.25 |   5.05 |
+| TET4 f64  | 72 | 437.44 | 321.68 |
+| TET4 f32  | 72 | 415.46 | 330.41 |
+| HEX8 f64  |  1 |  10.88 |   6.85 |
+| HEX8 f64  | 72 | 550.32 | 395.70 |
+| HEX8 f32  | 72 | 534.55 | 531.48 |
+
+26 to 28 per cent slower at 72 threads, and 30 to 37 per cent at one.  Answers
+were identical throughout -- the f64 store still reproduces the exact apply to
+3.8e-15 -- so the whole of it is cost.  The f16 column moves hardly at all,
+which is the control: the compressed kernel was not blocked, and it did not
+change.
+
+Four formulations were tried and all lose: staging every gathered value into
+lane-major scratch, staging none of them and reading where they are used,
+staging only the values reached through the connectivity, and block widths of
+4, 8, 16 and 32.  `objdump` on the blocked kernel finds no vector instruction in
+it at all.
+
+The reason is that the apply's inputs are reached *through the mesh
+connectivity* -- `hx[ev * h_stride]` -- so the arithmetic loop contains gathers,
+and there is no gather instruction to vectorise them into on this target.  The
+compiler serialises the lane loop and the blocking is left as pure overhead.
+Staging the gathers into scratch first, which is how the exact apply gets its
+vector code, replaces that overhead with a different one: a store and a reload
+per value, and this kernel has too little arithmetic per element to amortise it.
+The exact apply can because sum factorisation gives it far more work per gather.
+
+Two things this corrects about the reading above.  **53% scalar `ldr`/`str` is
+not by itself evidence of waste** when the loads are indirect and the core is
+already issuing 3.8 instructions per cycle: there was less headroom than the
+instruction mix suggested, because most of those loads are irreducible.  And the
+store-precision conclusion stands as measured rather than being provisional --
+the mechanism that would have made a narrow store pay, vector loads carrying
+more lanes, is not reachable for this kernel shape, so f32-by-default is the
+answer and not a placeholder.
+
+What would actually reduce the instruction count is a different change: a
+layout in which the increment is already element-major, so the apply reads
+contiguously and has no gather to defeat it.  That is a change to what the
+caller hands the kernel, not to the kernel, and it is not attempted here.
+
 ### Default
 
 `metric_tensor_t` is `float`, and the generated Op has always stored the tangent
