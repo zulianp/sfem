@@ -282,6 +282,21 @@ _MET_PATTERN = r"%s(\d+)" % re.escape(conventions.abi_geometry_name("geom_metric
 _MET_AOS = conventions.abi_geometry_name("geom_metric")
 
 #: Pointer element types that name a field the kernel reads or writes.
+#: The most components an element tangent can have: 3x3x3x3 with no symmetry.
+#: The store is over-allocated to this rather than sized from the plan, because
+#: the plan's answer depends on the material's flux form and this harness reads
+#: only emitted text.  Over-allocating is safe -- the kernel touches the slots it
+#: was generated for -- and the untouched tail is deterministic zeros, so the
+#: digest stays stable and still moves when the kernel does.
+TANGENT_SLOTS = 81
+
+#: The stored element tangent, which is element-indexed rather than node-indexed
+#: and therefore sized and seeded differently from every other buffer here.  The
+#: compressed store is deliberately absent: it is `half_t`, which this driver has
+#: no arithmetic for, and no Op calls that entry point.
+STORE_IN_FIELDS = ("const metric_tensor_t *const %s" % _RSTR,)
+STORE_OUT_FIELDS = ("metric_tensor_t *const %s" % _RSTR,)
+
 IN_FIELDS = (
     "const double *const %s" % _RSTR,
     "const float *const %s" % _RSTR,
@@ -325,6 +340,12 @@ def _scalar_type(ctype):
     if "void" in ctype:
         # Driven at SMESH_FLOAT64, so the buffer behind the void is a double.
         return "double"
+    # The store's own type, before the generic scalars: `metric_tensor_t` is a
+    # `float` typedef and matching on the word would size the buffer right and
+    # name the type wrong.
+    for name in ("metric_tensor_t",):
+        if name in ctype:
+            return name
     for name in ("double", "float", "real_t"):
         if name in ctype:
             return name
@@ -422,6 +443,12 @@ def _bind(params, element, components, block_values=None):
             args.append("%s.metric_aos.data()" % mesh)
         elif "PrimitiveType" in ctype:
             args.append(RUNTIME_TYPE_VALUE)
+        elif name == "tangent_component_stride" and ctype == "const ptrdiff_t":
+            # Not 1.  The store is component-major over the elements, so this is
+            # the distance between one component's run and the next; binding it
+            # like every other stride would land all 81 components on top of each
+            # other and the kernel would still run.
+            args.append("%s.nelements" % mesh)
         elif name.endswith("_stride") and ctype == "const ptrdiff_t":
             args.append("1")
         elif name == "nsteps" and ctype == "const int":
@@ -452,6 +479,22 @@ def _bind(params, element, components, block_values=None):
             args.append("graph.rowptr.data()")
         elif name == "colidx" and "idx_t" in ctype:
             args.append("graph.colidx.data()")
+        elif ctype in STORE_OUT_FIELDS:
+            # Element-indexed, so its length is the element count and not the
+            # node count, and it is seeded by index rather than through the
+            # packed permutation -- packing renumbers nodes and never elements,
+            # so element e is element e in both layouts.
+            scalar = _scalar_type(ctype)
+            buffer = "out_%s_%s" % (scalar, name)
+            length = "(size_t)%s.nelements * %d" % (mesh, TANGENT_SLOTS)
+            outputs.append((buffer, scalar, name, components, extent, length))
+            args.append("%s.data()" % buffer)
+        elif ctype in STORE_IN_FIELDS:
+            scalar = _scalar_type(ctype)
+            buffer = "in_%s_%s" % (scalar, name)
+            length = "(size_t)%s.nelements * %d" % (mesh, TANGENT_SLOTS)
+            inputs.append((buffer, scalar, name, components, extent, length))
+            args.append("%s.data()" % buffer)
         elif ctype in OUT_FIELDS:
             scalar = _scalar_type(ctype)
             buffer = "out_%s_%s" % (scalar, name)
@@ -1031,8 +1074,13 @@ def _call_block(name, args, inputs, outputs, repeats=0, packed=False, scratch=()
         "    {",
         '        std::fprintf(stderr, "running %s\\n");' % name,
     ]
-    for buffer, scalar, param, components, extent, _length in inputs:
-        if extent:
+    for buffer, scalar, param, components, extent, length in inputs:
+        if length is not None:
+            lines.append(
+                "        std::vector<%s> %s(%s); fill_field(%s, \"%s\");"
+                % (scalar, buffer, length, buffer, param)
+            )
+        elif extent:
             for slot in range(extent):
                 lines.append(
                     "        std::vector<%s> %s_%d(nodes * %d); %s;"
@@ -1441,6 +1489,26 @@ def _geometry_parity(measured):
     return disagreements
 
 
+def _unpacked_twin(name):
+    """The standard-layout kernel a packed one mirrors, or `None`.
+
+    Built from the naming table rather than by deleting the text `_packed_`.
+    That spelling only ever matched the one-pass kernels: a two-pass name
+    carries `_packed_two_pass_`, and removing `_packed_` from it leaves
+    `_two_pass_`, which names nothing -- so every two-pass kernel in the tree
+    silently paired with nothing and went unchecked. The qualifier slot can also
+    hold a store *and* a traversal, as a packed inexact apply does, and only the
+    traversal is what the twin lacks.
+    """
+    try:
+        traversal = conventions.abi_traversal(conventions.abi_qualifier(name))
+    except ValueError:
+        return None
+    if not traversal:
+        return None
+    return name.replace("_%s_" % traversal, "_", 1)
+
+
 def _packed_parity(measured):
     """Packed kernels that disagree with the unpacked kernel they mirror.
 
@@ -1456,10 +1524,8 @@ def _packed_parity(measured):
     """
     disagreements = []
     for name in sorted(measured):
-        if "_packed_" not in name:
-            continue
-        twin = name.replace("_packed_", "_")
-        if twin not in measured:
+        twin = _unpacked_twin(name)
+        if twin is None or twin not in measured:
             continue
         tolerance = _parity_tolerance(name)
         worst = 0.0
@@ -1727,10 +1793,13 @@ def main(argv=None):
                 % (name, twin, worst, tolerance)
             )
         return 1
+    # Counted the same way the check pairs them.  These were two different
+    # expressions, so the number reported was not the number checked -- it
+    # undercounted by every two-pass kernel in the tree.
     packed_pairs = sum(
         1
         for name in measured
-        if "_packed_" in name and name.replace("_packed_", "_") in measured
+        if (_unpacked_twin(name) or "") in measured
     )
     if packed_pairs:
         print("packed/unpacked parity holds for %d pairs" % packed_pairs)

@@ -59,7 +59,26 @@ evaluated away into `Sbar`, and what remains is a contraction identical for ever
 the property the split exists for; a change that reintroduces any of the three has undone it, and
 `test_the_apply_still_takes_no_geometry_or_state` fails.
 
-Only the affine SoA variant exists. There is no packed, isoparametric or AoS case to choose between.
+The geometry is affine and the layout SoA; there is no isoparametric or AoS case to choose between.
+There *is* a mesh-layout choice. The applies are emitted for the standard layout and, in three
+dimensions, for the packed mesh as well — `InexactApplyPlan.apply_layouts` names them and emission
+iterates that sequence. Whether packing is worth emitting at a dimension is the same question the
+geometry variants answer, so it is asked in the same place: `plans/geometry_variants.py`
+`packed_is_worth_emitting`.
+
+**The packed apply is where the performance is.** The standard apply's scatter is `dim * n_nodes`
+global atomic updates per element, which is more than half its memory traffic and most of its time.
+The packed one gathers each node once per *pack* into thread-private scratch, accumulates into that
+scratch with no atomic at all, and reaches global memory only at the pack boundary — two-pass, so
+even the ghosts go through a buffer that a disjoint second pass reduces. Measured on Grace at
+206763 dof and 72 threads: TET4 295 to 744 MDOF/s, HEX8 498 to 848. See
+`spikes/inexact_apply_compare/RESULTS.md`.
+
+Two facts make it cheaper than it looks. Packs are contiguous *element* ranges, so the store is
+addressed exactly as before and a store assembled on the standard mesh is valid for the packed one
+element for element — the assembly kernel needs no packed variant. And the compressed apply has
+none either: no Op calls it, and it stays on the standard layout as the unblocked control the
+throughput tables compare against.
 
 **The fused variant is not emitted.** It rebuilt `Sbar` on every apply, which is strictly more work
 than the exact apply it was compared against. It was scaffolding; the stored apply gates correctness now.
@@ -218,5 +237,12 @@ generates nothing and overrides nothing, so `Op`'s refusing defaults stand.
 | the apply has not regained what it exists to shed | no geometry, no state, no material parameters in the ABI body |
 
 Correctness of the emitted kernels is carried by `tools/reproducibility.py`, not by byte-identity:
-this path changes generated output by construction. Report throughput with the dof count, the thread
+this path changes generated output by construction. That claim was false when it was first written
+— the harness drove no inexact kernel at all, because the apply needs a store and the binder had no
+value for that parameter. It does now: the store is bound as an element-indexed buffer, seeded by
+index rather than through the packed permutation because packing renumbers nodes and never
+elements. The packed apply and the standard one therefore reproduce each other's digest exactly,
+which is what `_packed_parity` asserts and what makes the packed layout checkable at all — nothing
+else validates the partition, the ghost lists or the pack-local indices, and a wrong ghost list
+still runs and still returns a number. Report throughput with the dof count, the thread
 count and the machine, and quote break-even in applies per assembly.
