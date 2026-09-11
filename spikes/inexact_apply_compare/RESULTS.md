@@ -918,6 +918,26 @@ second-order effect on top of a kernel that was scattering through atomics.
 and HEX8 128 -- which is worth knowing mostly because it means the knob does not have
 to be tuned per machine.
 
+**The generated kernel holds the reference's number.**  The emitter emits this shape
+now, and on Grace at 72 threads it comes within 1% of the hand-written original:
+
+| element | standard f32 | packed, generated | packed, reference | pack |
+|---|---|---|---|---|
+| TET4 | 295 | **739** | 744 | 256 |
+| HEX8 | 499 | **845** | 848 | 128 |
+
+Errors unchanged at 1.7e-07 and 3.6e-05, and the reproducibility harness now drives
+both and finds their digests *identical* -- 0.310504988649, the same number, not a
+tolerance.
+
+One thing about how that was measured, because it nearly went wrong.  An earlier job
+reported these figures from binaries a previous job had left in the same directory
+under the same names; the build had in fact failed, and the numbers were the
+reference's.  Every benchmark job here now deletes its binaries first and reports the
+compiler's exit status, and the header line prints whether the kernel under test is
+even present in the tree it compiled.  A benchmark that cannot fail loudly will
+eventually report someone else's number.
+
 This is the reference, not the deliverable: it is measured so that the emitter port
 has a number to be held to.  `spikes/inexact_apply_compare/packed_mesh.inc` builds the
 layout from `python/codegen/framework/tools/packed_layout.inc`, shared with
