@@ -686,11 +686,23 @@ def _inexact_definitions(
         state = ", ".join(["%d" % n_components] + ["x + %d" % d for d in range(n_components)])
         increment = ", ".join(["%d" % n_components] + ["h + %d" % d for d in range(n_components)])
         output = ", ".join(["%d" % n_components] + ["out + %d" % d for d in range(n_components)])
-        arguments = ["domain.element_type", "real_type", "nelements",
-                     "domain.block->elements()->data()", adjugate, "determinant"]
+        # A material whose tangent is a function of the geometry alone -- linear
+        # elasticity -- publishes an assembly entry point that takes neither the
+        # connectivity nor the state.  Which it is, the emitted signature says.
+        tangent_parameters = frozenset(
+            parameter.name
+            for parameter in _c_abi_signatures(
+                kernel_sources, public_only=True
+            )[tangent_abi].parameters
+        )
+        arguments = ["domain.element_type", "real_type", "nelements"]
+        if "elements" in tangent_parameters:
+            arguments.append("domain.block->elements()->data()")
+        arguments.extend([adjugate, "determinant"])
         arguments.extend(parameter_args)
-        arguments.append(state)
-        arguments.append("1, nelements")
+        if "ux" in tangent_parameters:
+            arguments.append(state)
+        arguments.append("nelements")
         arguments.append("cache->inexact_tangent->data()")
         update_lines.extend([
             "      %s (dim == %d) {" % (prefix, dim),
@@ -700,7 +712,7 @@ def _inexact_definitions(
         ])
         apply_arguments = ["domain.element_type", "real_type", "nelements",
                            "domain.block->elements()->data()",
-                           "1, nelements",
+                           "nelements",
                            "cache->inexact_tangent->data()",
                            increment, output]
         apply_lines.extend([
@@ -5671,15 +5683,19 @@ def _merge_precision_pair(base, twin):
 
     ``real_type`` is inserted immediately before the first pointer it governs,
     the position ``cu_laplacian_apply`` puts ``real_type_xy`` in.
+
+    What the pair differs in may be scalars alone.  The inexact tangent of a
+    linear material takes no state -- it is a function of the geometry -- so the
+    only parameters that carry the dispatched scalar are the material constants.
+    That is still the scalar axis, and requiring a differing *pointer* here left
+    such a pair unmerged and its entry point without a ``real_type``, which took
+    the choice of arithmetic precision away from the caller.
     """
     base_params, twin_params = list(base["params"]), list(twin["params"])
     if len(base_params) != len(twin_params):
         return None
     typed = [i for i, (a, b) in enumerate(zip(base_params, twin_params)) if a != b]
     if not typed:
-        return None
-    pointers = [i for i in typed if "*" in base_params[i]]
-    if not pointers:
         return None
     params = [_runtime_typed_parameter(p) if i in set(typed) else p
               for i, p in enumerate(base_params)]
@@ -5720,10 +5736,13 @@ def _merge_precision_pair(base, twin):
         # By name.  The emitter sees the transformed parameters -- `void *`
         # where these were `double *` -- so matching on the original text
         # would never fire, which is exactly the bug the compile gate caught.
+        #
+        # Every parameter on the scalar axis, pointer or not: this flag is what
+        # routes the group to the merged emitter at all, so a pair that differs
+        # only in its material constants must set it too or the merge produces a
+        # group the plain emitter cannot print.
         "runtime_typed": tuple(
-            _c_parameter_name(base_params[i])
-            for i in typed
-            if "*" in base_params[i]
+            _c_parameter_name(base_params[i]) for i in typed
         ),
     }
 
