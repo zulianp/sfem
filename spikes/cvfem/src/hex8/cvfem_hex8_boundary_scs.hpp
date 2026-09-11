@@ -12,6 +12,11 @@
 
 #include "cvfem_portability.hpp"
 
+#include <algorithm>
+#include <cstdint>
+#include <utility>
+#include <vector>
+
 // Prescribed boundary data, carried alongside the face masks.
 //
 // A default-constructed instance means "nothing prescribed", which reproduces the existing
@@ -156,8 +161,172 @@ static SFEM_INLINE SFEM_HOST_DEVICE int hex8_face_on_domain(const int f, const s
 template <typename MeshT>
 static void cvfem_hex8_compact_boundary_elems(MeshT &d) {
     d.bnd_elems.clear();
+    // The gather map is indexed by position in bnd_elems, so it describes the list that
+    // was current when it was built and nothing else.
+    d.bnd_gather_valid = false;
     for (ptrdiff_t e = 0; e < d.nelements; ++e)
         if (d.face_mask_eff[(size_t)e]) d.bnd_elems.push_back(e);
+}
+
+// ------------------------------------------------- the shell's node gather map
+//
+// A node-indexed CSR over the boundary shell, so the closure can be summed in an order
+// fixed by the index array instead of by thread timing.
+//
+// The two boundary passes used to scatter their element contribution into the shared node
+// arrays with `atomic_add` under `schedule(static)`. Static scheduling fixes WHICH thread
+// owns a face, but not the order in which two threads holding faces that meet at a node
+// commit to it, and floating-point addition is not associative -- so the operator was not
+// bit-reproducible with itself across threads. Measured on one case at 33,124 dof: five
+// runs at one thread all took 922 linear iterations and printed the same residual to every
+// digit at iteration 100, while five at 72 threads took 900, 839, 1595, 943 and 742.
+//
+// The map turns the scatter into a gather. Each entry is a slot `i * 8 + a` naming the
+// local node `a` of the i-th boundary element, grouped by the global node it lands on, so
+// a pass can stage its per-element contributions and then have each node sum the slots
+// that belong to it, alone and in a fixed order. That is deterministic for any thread
+// count, and the summation order is the same one a serial run would use.
+//
+// Built serially. It is O(boundary shell), which is a surface rather than a volume, and a
+// parallel build would have to be sorted afterwards to be reproducible anyway -- which is
+// the property the whole map exists to provide.
+template <typename MeshT>
+static void cvfem_hex8_build_bnd_gather(MeshT &d) {
+    const ptrdiff_t n_bnd = (ptrdiff_t)d.bnd_elems.size();
+    if (d.bnd_gather_valid && d.bnd_gather_n_bnd == n_bnd) return;
+
+    std::vector<std::pair<smesh::idx_t, int32_t>> pairs;
+    pairs.reserve((size_t)n_bnd * CVFEM_HEX8_N_NODES);
+    for (ptrdiff_t i = 0; i < n_bnd; ++i) {
+        const ptrdiff_t e = d.bnd_elems[(size_t)i];
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+            pairs.emplace_back(d.elems[a][e], (int32_t)(i * CVFEM_HEX8_N_NODES + a));
+    }
+    // By node first, then by slot, so the summation order within a node is the order the
+    // boundary list gives -- the order a serial sweep would have produced.
+    std::sort(pairs.begin(), pairs.end());
+
+    d.bnd_gather_dest.clear();
+    d.bnd_gather_ptr.clear();
+    d.bnd_gather_slot.clear();
+    d.bnd_gather_slot.reserve(pairs.size());
+    d.bnd_gather_ptr.push_back(0);
+    for (size_t j = 0; j < pairs.size();) {
+        const smesh::idx_t node = pairs[j].first;
+        d.bnd_gather_dest.push_back(node);
+        for (; j < pairs.size() && pairs[j].first == node; ++j) d.bnd_gather_slot.push_back(pairs[j].second);
+        d.bnd_gather_ptr.push_back((ptrdiff_t)d.bnd_gather_slot.size());
+    }
+    d.bnd_r.assign((size_t)n_bnd * CVFEM_HEX8_N_DOF, scalar_t(0));
+    d.bnd_gather_n_bnd = n_bnd;
+    d.bnd_gather_valid = true;
+}
+
+// Commit one boundary element's contribution.
+//
+// Into the stage, where cvfem_hex8_bnd_gather_* will sum it per node in a fixed order, or
+// straight into the node arrays when the atomic path is forced for measurement. The stage
+// is written rather than accumulated, because it is reused across calls and the gather
+// reads exactly the slots this sweep wrote.
+//
+// The all-zero early-out is kept on the atomic path only. There it skips four atomics; on
+// the staged path there is nothing to skip, and skipping the write would leave the previous
+// call's value in the slot for the gather to read.
+template <typename MeshT>
+static SFEM_INLINE void cvfem_hex8_bnd_commit(MeshT &d, const ptrdiff_t i, const ptrdiff_t e,
+                                              const scalar_t *const SFEM_RESTRICT r, const int force_atomic,
+                                              scalar_t *const SFEM_RESTRICT fx, scalar_t *const SFEM_RESTRICT fy,
+                                              scalar_t *const SFEM_RESTRICT fz, scalar_t *const SFEM_RESTRICT fc) {
+    if (!force_atomic) {
+        scalar_t *const SFEM_RESTRICT stage = d.bnd_r.data() + i * CVFEM_HEX8_N_DOF;
+        for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) stage[k] = r[k];
+        return;
+    }
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
+            r[a * 4 + 3] == scalar_t(0))
+            continue;
+        const smesh::idx_t g = d.elems[a][e];
+        CVFEM_ATOMIC_ADD(fx[g], r[a * 4 + 0]);
+        CVFEM_ATOMIC_ADD(fy[g], r[a * 4 + 1]);
+        CVFEM_ATOMIC_ADD(fz[g], r[a * 4 + 2]);
+        CVFEM_ATOMIC_ADD(fc[g], r[a * 4 + 3]);
+    }
+}
+
+// The same, for a destination that interleaves the four fields per node.
+template <typename MeshT>
+static SFEM_INLINE void cvfem_hex8_bnd_commit_interleaved(MeshT &d, const ptrdiff_t i, const ptrdiff_t e,
+                                                          const scalar_t *const SFEM_RESTRICT r,
+                                                          const int                           force_atomic,
+                                                          scalar_t *const SFEM_RESTRICT       jv) {
+    if (!force_atomic) {
+        scalar_t *const SFEM_RESTRICT stage = d.bnd_r.data() + i * CVFEM_HEX8_N_DOF;
+        for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) stage[k] = r[k];
+        return;
+    }
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
+            r[a * 4 + 3] == scalar_t(0))
+            continue;
+        const ptrdiff_t g = (ptrdiff_t)d.elems[a][e] * 4;
+        CVFEM_ATOMIC_ADD(jv[g + 0], r[a * 4 + 0]);
+        CVFEM_ATOMIC_ADD(jv[g + 1], r[a * 4 + 1]);
+        CVFEM_ATOMIC_ADD(jv[g + 2], r[a * 4 + 2]);
+        CVFEM_ATOMIC_ADD(jv[g + 3], r[a * 4 + 3]);
+    }
+}
+
+// Sum the staged contributions into the node arrays, one node per iteration.
+//
+// Each iteration owns its destination outright and reads its slots in the order the map
+// lists them, so the result does not depend on the thread count or on which thread got
+// which node -- which is the whole point. The sum is accumulated in locals and added to
+// the destination once, because the interior sweep has already written there.
+template <typename MeshT>
+static void cvfem_hex8_bnd_gather_soa(MeshT &d, scalar_t *const SFEM_RESTRICT fx, scalar_t *const SFEM_RESTRICT fy,
+                                      scalar_t *const SFEM_RESTRICT fz, scalar_t *const SFEM_RESTRICT fc) {
+    const ptrdiff_t                     n     = (ptrdiff_t)d.bnd_gather_dest.size();
+    const scalar_t *const SFEM_RESTRICT stage = d.bnd_r.data();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t k = 0; k < n; ++k) {
+        scalar_t sx = scalar_t(0), sy = scalar_t(0), sz = scalar_t(0), sc = scalar_t(0);
+        for (ptrdiff_t j = d.bnd_gather_ptr[(size_t)k]; j < d.bnd_gather_ptr[(size_t)k + 1]; ++j) {
+            const scalar_t *const SFEM_RESTRICT v = stage + (ptrdiff_t)d.bnd_gather_slot[(size_t)j] * 4;
+            sx += v[0];
+            sy += v[1];
+            sz += v[2];
+            sc += v[3];
+        }
+        const smesh::idx_t g = d.bnd_gather_dest[(size_t)k];
+        fx[g] += sx;
+        fy[g] += sy;
+        fz[g] += sz;
+        fc[g] += sc;
+    }
+}
+
+// The same, for a destination that interleaves the four fields per node.
+template <typename MeshT>
+static void cvfem_hex8_bnd_gather_interleaved(MeshT &d, scalar_t *const SFEM_RESTRICT jv) {
+    const ptrdiff_t                     n     = (ptrdiff_t)d.bnd_gather_dest.size();
+    const scalar_t *const SFEM_RESTRICT stage = d.bnd_r.data();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t k = 0; k < n; ++k) {
+        scalar_t s0 = scalar_t(0), s1 = scalar_t(0), s2 = scalar_t(0), s3 = scalar_t(0);
+        for (ptrdiff_t j = d.bnd_gather_ptr[(size_t)k]; j < d.bnd_gather_ptr[(size_t)k + 1]; ++j) {
+            const scalar_t *const SFEM_RESTRICT v = stage + (ptrdiff_t)d.bnd_gather_slot[(size_t)j] * 4;
+            s0 += v[0];
+            s1 += v[1];
+            s2 += v[2];
+            s3 += v[3];
+        }
+        const ptrdiff_t g = (ptrdiff_t)d.bnd_gather_dest[(size_t)k] * 4;
+        jv[g + 0] += s0;
+        jv[g + 1] += s1;
+        jv[g + 2] += s2;
+        jv[g + 3] += s3;
+    }
 }
 
 // ------------------------------------------------- effective boundary face mask
