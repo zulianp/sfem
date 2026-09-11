@@ -457,6 +457,11 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     f->apply_constraints(u_nm1->data());
     f->apply_constraints(u->data());
 
+    // Whether the linear operator reads a stored tangent decides whether the
+    // Newton loop has to assemble one.  Asked of the function rather than of the
+    // requested type, because the type falls back when nothing here supports it.
+    const bool        use_inexact_operator =
+            env.linear_op_type == sfem::op_type::INEXACT && f->inexact_supported();
     auto              linear_op      = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
     auto              cg             = sfem::create_cg<real_t>(linear_op, sfem::EXECUTION_SPACE_HOST);
     cg->verbose                      = env.verbose;
@@ -571,6 +576,13 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
             blas->zeros(ndofs, incr->data());
             f->copy_constrained_dofs(rhs->data(), incr->data());
+            // Partial assembly: the tangent is built here, once, at the iterate
+            // the Newton step linearizes about, and the CG below applies it for
+            // every one of its iterations.  That is where the split pays -- it
+            // breaks even at two or three applies per assembly and CG does tens.
+            if (use_inexact_operator && f->inexact_update(u->data()) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
             cg->set_op(linear_op);
             cg->apply(rhs->data(), incr->data());
             last_iterations = cg->iterations();

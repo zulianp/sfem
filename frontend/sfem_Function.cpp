@@ -487,6 +487,49 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    bool Function::inexact_supported() const {
+        for (auto &op : impl_->ops) {
+            if (op->inexact_supported()) return true;
+        }
+        return false;
+    }
+
+    int Function::inexact_update(const real_t *const x) {
+        SFEM_TRACE_SCOPE("Function::inexact_update");
+
+        for (auto &op : impl_->ops) {
+            if (!op->inexact_supported()) continue;
+            if (op->inexact_update(x) != SFEM_SUCCESS) {
+                std::cerr << "Failed inexact_update in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
+    int Function::inexact_apply(const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("Function::inexact_apply");
+
+        for (auto &op : impl_->ops) {
+            // An operator with no stored tangent is applied exactly.  Its state
+            // is whatever its own `update` last saw, which is the state this
+            // function's tangent was assembled at -- a Newton step drives both
+            // from the same iterate.
+            const int status = op->inexact_supported() ? op->inexact_apply(h, out)
+                                                       : op->apply(nullptr, h, out, ElementScope::ALL);
+            if (status != SFEM_SUCCESS) {
+                std::cerr << "Failed inexact_apply in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+
+        if (impl_->handle_constraints) {
+            copy_constrained_dofs(h, out);
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     int Function::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) {
         SFEM_TRACE_SCOPE("Function::apply");
 

@@ -491,6 +491,21 @@
       "l2": 12.00563649388,
       "material": "neohookean_ogden"
     },
+    "neohookean_ogden_inexact_apply_stored_3d_a_msoa": {
+      "l1": 0.1127634688318,
+      "l2": 0.01116640960901,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_inexact_apply_stored_packed_two_pass_3d_a_msoa": {
+      "l1": 0.1127634688318,
+      "l2": 0.01116640960901,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_inexact_apply_tangent_3d_a_msoa": {
+      "l1": 210.5348616779,
+      "l2": 11.68510425565,
+      "material": "neohookean_ogden"
+    },
     "neohookean_ogden_objective_steps_3d_a_msoa": {
       "l1": 0.2491137684661,
       "l2": 0.03345421841927,
@@ -743,6 +758,21 @@
       "l2": 15.61976317229,
       "material": "neohookean_ogden"
     },
+    "neohookean_ogden_inexact_apply_stored_3d_a_msoa": {
+      "l1": 0.3242959105753,
+      "l2": 0.02184544361351,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_inexact_apply_stored_packed_two_pass_3d_a_msoa": {
+      "l1": 0.3242959105753,
+      "l2": 0.02184544361351,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_inexact_apply_tangent_3d_a_msoa": {
+      "l1": 398.6787545167,
+      "l2": 14.75955492834,
+      "material": "neohookean_ogden"
+    },
     "neohookean_ogden_objective_steps_3d_a_msoa": {
       "l1": 0.4414621571263,
       "l2": 0.0395348537302,
@@ -993,6 +1023,21 @@
     "neohookean_ogden_hessian_bsr_3d_i_msoa": {
       "l1": 2014.710203032,
       "l2": 18.87480029961,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_inexact_apply_stored_3d_a_msoa": {
+      "l1": 0.3105049886493,
+      "l2": 0.01242685232013,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_inexact_apply_stored_packed_two_pass_3d_a_msoa": {
+      "l1": 0.3105049886493,
+      "l2": 0.01242685232013,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_inexact_apply_tangent_3d_a_msoa": {
+      "l1": 843.2455016544,
+      "l2": 15.8931102145,
       "material": "neohookean_ogden"
     },
     "neohookean_ogden_objective_steps_3d_a_msoa": {

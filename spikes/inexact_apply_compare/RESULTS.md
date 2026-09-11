@@ -951,6 +951,53 @@ right before any new kernel existed.
     PACKED=1 spikes/inexact_apply_compare/run_split.sh neohookean_ogden TET4
     PACKED=1 PACK_SIZE=256 spikes/inexact_apply_compare/run_split.sh neohookean_ogden HEX8
 
+## In the BDF2 driver, which is what it was for
+
+Everything above measures kernels. This measures a solve: `drivers/mech/hyperelasticity_bdf2.exe.cpp`
+with `SFEM_LINEAR_OP_TYPE=INEXACT`, which assembles the tangent once per Newton
+iteration and applies it for every CG iteration inside that step. A 32-cube of HEX8,
+107811 dof, a bar clamped at one end and pulled at the other, Newton to 1e-8.
+
+| | Newton its | CG its | ms per apply | wall, 8 threads |
+|---|---|---|---|---|
+| matrix-free | 5 | 270 | 3.63 | 1.43 s |
+| inexact | 10 | 505 | **0.94** | **1.15 s** |
+
+Both reach the same answer: displacement norm 1.435772969701 against 1.435772969561,
+ten significant figures.
+
+**The apply is 3.9x cheaper and the solve is 1.24x faster, and the gap between those
+two numbers is the whole story.** An approximate tangent is a worse Newton direction:
+it takes ten iterations where the exact one takes five, and 505 linear iterations
+where it takes 270. Partial assembly buys a cheaper apply and spends some of it back
+on convergence. It still wins, but a factor of four in the kernel is a factor of 1.24
+in the solve, and quoting the first as if it were the second would be wrong.
+
+The assembly itself is not the cost: 9 calls at 4.22 ms against applies at 0.94 ms is
+a break-even of **1.6 applies**, and CG does about 58 per Newton step. It is 3.7% of
+the run.
+
+**The advantage is largest where the machine is least busy.** Same problem, thread
+sweep:
+
+| threads | matrix-free | inexact | speed-up | ms/apply MF -> inexact |
+|---|---|---|---|---|
+| 1 | 5.12 s | 2.72 s | **1.88x** | 16.51 -> 3.24 |
+| 4 | 1.52 s | 1.07 s | 1.42x | 4.26 -> 0.91 |
+| 8 | 1.43 s | 1.15 s | 1.24x | 3.63 -> 0.94 |
+
+That shape is the roofline again. The exact apply is compute-bound and keeps scaling;
+the stored apply reads a precomputed tangent and saturates earlier, so the ratio
+between them narrows as threads are added. The kernel benchmarks above are
+single-socket numbers on a saturated machine, which is the *pessimistic* end for this
+technique -- and it is still ahead there.
+
+**How the function composes.** `Function::inexact_apply` applies the stored tangent
+where an operator has one and the exact apply where it does not. This driver needs
+that: its BDF2 inertia term has no stored tangent and is applied exactly, at the state
+its own `update` last saw -- which is the state the tangent was assembled at, because
+a Newton step drives both from the same iterate.
+
 ## What the first version of these measurements got wrong
 
 The throughput figures above replace an earlier set that was wrong, and the way it

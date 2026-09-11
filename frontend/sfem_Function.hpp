@@ -100,6 +100,35 @@ namespace sfem {
         int hessian_block_diag_sym(const real_t *const x, real_t *const values);
 
         int update(const real_t *const x);
+
+        /**
+         * @brief Whether any operator here can have its tangent stored and reapplied
+         *
+         * Any, not all. A function is a sum of operators and the split is worth
+         * taking wherever it is offered: an operator that does not support it
+         * keeps its exact apply, which is the same operator either way.
+         */
+        bool inexact_supported() const;
+
+        /**
+         * @brief Assemble the stored tangent of every operator that has one
+         *
+         * Explicit, like the per-operator call it forwards to: the tangent stays
+         * valid until the next call, so a Newton step assembles once here and
+         * then applies for every Krylov iteration. Nothing invalidates it
+         * implicitly.
+         */
+        int inexact_update(const real_t *const x);
+
+        /**
+         * @brief Apply the stored tangent, exactly where an operator has none
+         *
+         * Takes no state. An operator without a stored tangent is applied
+         * exactly, at the state its own `update` last saw -- which is why this
+         * is only correct when `inexact_update` and `update` are driven from
+         * the same `x`, as a Newton step does.
+         */
+        int inexact_apply(const real_t *const h, real_t *const out);
         int gradient(const real_t *const x, real_t *const out, const ElementScope scope = ElementScope::ALL);
         int apply(const real_t *const x,
                   const real_t *const h,
