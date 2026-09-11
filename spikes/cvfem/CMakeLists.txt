@@ -52,7 +52,7 @@ include(CVFEMCMakeFunctions)
 # directory goes on the include path. This mirrors the SFEM_MODULES / scan_directories
 # loop in SFEM's own top-level CMakeLists.txt, and reuses its function where the SFEM
 # source tree is reachable -- the spike already compiles against ../../algebra.
-set(CVFEM_MODULES src/core src/hex8 src/tet4 src/generated src/ss src/op src/cases)
+set(CVFEM_MODULES src/core src/hex8 src/tet4 src/generated src/ss src/op src/cases src/diag)
 
 set(_sfem_cmake_functions ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/SFEMCMakeFunctions.cmake)
 if(EXISTS ${_sfem_cmake_functions})
@@ -142,7 +142,7 @@ set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACRO
 file(GLOB CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
 list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_guard_selftest.cpp)
 
-set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test)
+set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test cvfem_flow_diag_test)
 foreach(TEST_SOURCE ${CVFEM_TESTS})
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
