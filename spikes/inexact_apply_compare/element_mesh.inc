@@ -15,22 +15,24 @@
 #include <cstdio>
 #include <cstdlib>
 
-// Mesh ordering.  `lex` is the lexicographic numbering these meshes are built
-// in; the rest are SFEM's own space-filling curves, reached through smesh's
-// encoders so that this measures the ordering the library ships rather than a
-// private reimplementation of one.
+// Mesh ordering.  The default is `morton3` because that is what SFEM runs:
+// `smesh::SFC::create_from_env()` defaults to it and `drivers/bench/*` reorder
+// with it before they measure.  A benchmark on a differently ordered mesh is
+// measuring a configuration the library does not use.
 //
+//   -DMESH_ORDER="morton3"    the default, and SFEM's
+//   -DMESH_ORDER="hilbert3"   smesh's other curve
 //   -DMESH_ORDER="lex"        as built: nodes (k*nn+j)*nn+i, elements likewise
-//   -DMESH_ORDER="morton3"    what `smesh::SFC::create_from_env()` defaults to
-//   -DMESH_ORDER="hilbert3"
-//   -DMESH_ORDER="random3"    the pessimistic control: no locality at all
+//   -DMESH_ORDER="random3"    `rand()` as the sort key.  Not a configuration
+//                             anything produces -- it is here only to confirm
+//                             that these measurements are sensitive to the
+//                             ordering at all, and no speed-up should be
+//                             quoted against it.
 //
-// This matters more than a mesh-generation detail.  How much of a gather is
-// compulsory rather than streamed is a property of the numbering, not of the
-// kernel, so it is the free parameter in the roofline of `RESULTS.md` -- on
-// HEX8 the band it spans is a factor of three in the bandwidth ceiling.
+// The curves come from smesh's own encoders, so this measures the library's
+// ordering rather than a private reimplementation of one.
 #ifndef MESH_ORDER
-#define MESH_ORDER "lex"
+#define MESH_ORDER "morton3"
 #endif
 #include "smesh_sfc.impl.hpp"
 
