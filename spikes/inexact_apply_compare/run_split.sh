@@ -13,6 +13,10 @@ set -euo pipefail
 # to it.  hilbert3 and lex are the other orderings worth comparing; random3 is a
 # sensitivity check and not a configuration anything produces.
 MESH_ORDER="${MESH_ORDER:-morton3}"
+# PACKED=1 additionally benchmarks the packed two-pass exact apply, which the
+# generator already publishes.  PACK_SIZE sets the elements per pack.
+PACKED="${PACKED:-}"
+PACK_SIZE="${PACK_SIZE:-}"
 
 MATERIAL="${1:-neohookean_ogden}"
 ELEMENT="${2:-TET4}"
@@ -85,6 +89,14 @@ if [ "$(uname -s)" = "Darwin" ]; then
     OMPFLAGS="-Xpreprocessor -fopenmp -I$OMPPREFIX/include -L$OMPPREFIX/lib -lomp"
 fi
 
+# The packed reference, derived from the emitted standard kernel.  Regenerated
+# every run: it is a function of the generated header and must not drift from it.
+if [ -n "$PACKED" ]; then
+    "$PYTHON" "$HERE/make_packed_reference.py" \
+        "$GEN/${MATERIAL}_${LOWER}_inexact_apply_inline.hpp" \
+        "$GEN/packed_reference.hpp" "${MATERIAL}_${LOWER}" 2>&1 | tee -a "$LOG"
+fi
+
 echo "[2/3] compiling with $CXX" | tee -a "$LOG"
 $CXX -std=c++17 -O3 -march=native -DNDEBUG $TAKES_STATE $OMPFLAGS \
     -DELEMENT_${ELEMENT} \
@@ -95,9 +107,14 @@ $CXX -std=c++17 -O3 -march=native -DNDEBUG $TAKES_STATE $OMPFLAGS \
     -DTANGENT_KERNEL=${MATERIAL}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
     -DSTORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_a_msoa_impl \
     -DCOMPRESSED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_compressed_a_msoa_impl \
+    ${PACKED:+-DPACKED_EXACT_APPLY=${MATERIAL}_${LOWER}_apply_packed_two_pass_a_msoa} \
+    ${PACKED:+-DPACKED_STORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_packed_two_pass_a_msoa_impl} \
+    ${PACKED:+-DMATERIAL_PACKED_REFERENCE="\"packed_reference.hpp\""} \
+    ${PACK_SIZE:+-DPACK_SIZE=$PACK_SIZE} \
     -o "$WORK/bench_split_${MATERIAL}_${LOWER}_${MESH_ORDER}" \
     "$HERE/bench_split.cpp" "$GEN/${MATERIAL}_${LOWER}_operator.cpp" $EXTRA_TU \
     -I "$GEN" -I "$WORK/gen/$MATERIAL" -I "$WORK/gen/$MATERIAL/d3" \
+    -I "$HERE" -I "$WORKTREE/python/codegen/framework/tools" \
     -I "$SFEM/base" -I "$SFEM/algebra" -I "$SFEM/operators" \
     -I "$BUILD" -I "$BUILD/external/smesh" \
     $(find "$SFEM/external/smesh/src" -type d | sed 's/^/-I /') \

@@ -863,6 +863,63 @@ stayed within 648-653.  The ordering comparison above is within one job on one
 node, so it is internally consistent, but no single f32 figure at 72 threads in
 this file should be trusted to better than 25% without repeats.
 
+## The packed mesh layout, and why it dwarfs everything else here
+
+The stored apply's cost was never the arithmetic.  The roofline puts 384 of its 788
+bytes per element on HEX8 in the scatter alone, and that scatter is `dim * n_nodes`
+separate `#pragma omp atomic update` into global arrays.  The packed mesh layout
+exists to remove exactly that: it partitions elements into packs, renumbers nodes so
+each pack owns a contiguous range, gathers each node **once per pack** into
+thread-private scratch, and accumulates into that scratch with **no atomic at all**.
+Only the pack boundary reaches global memory, and the two-pass form sends even that
+through a buffer which a second, disjoint-destination pass reduces.
+
+The generator does not emit a packed inexact kernel.  This is the reference
+implementation, derived from the emitted standard one by
+`make_packed_reference.py` -- a script rather than a pasted file, because the 900
+lines of arithmetic it carries across are precisely the part that does *not* change,
+and a transformation says that where a copy does not.
+
+Grace, 206763 dof, 72 threads, morton3, stored f32 apply, MDOF/s:
+
+| element | standard | packed | pack size | |
+|---|---|---|---|---|
+| TET4 | 295 | **744** | 256 | **+152%** |
+| HEX8 | 498 | **848** | 128 | **+70%** |
+
+The exact apply gains too, from the same layout and the kernel the generator already
+publishes: TET4 187 to 323, HEX8 217 to 260.
+
+Answers are identical -- 1.7e-07 on TET4 and 3.6e-05 on HEX8, the same figures the
+standard store produces, because it is the same arithmetic reading the same store.
+The tangent needs no transformation at all: packs are **contiguous element ranges**,
+so `tangent + evb + k * tangent_component_stride` addresses what it always did, and
+the store assembled on the standard mesh is valid for the packed one element for
+element.
+
+**Put beside everything else this file measures, the ordering is now clear.**  The SoA
+store was worth 13%, the store's precision 3%, lane-blocking the assembly nothing at
+all on Grace, and the choice between lexicographic and Morton ordering nothing
+either.  The layout is worth 70 to 152%.  Every other number in this file is a
+second-order effect on top of a kernel that was scattering through atomics.
+
+**Pack size barely matters** -- 128 to 1024 spans about 10%, with TET4 preferring 256
+and HEX8 128 -- which is worth knowing mostly because it means the knob does not have
+to be tuned per machine.
+
+This is the reference, not the deliverable: it is measured so that the emitter port
+has a number to be held to.  `spikes/inexact_apply_compare/packed_mesh.inc` builds the
+layout from `python/codegen/framework/tools/packed_layout.inc`, shared with
+`tools/reproducibility.py` rather than written twice -- and that sharing is what makes
+the layout trustworthy, because that harness drives the *generated* packed kernels
+through this same builder and checks their answers against the unpacked ones.  The
+first thing measured here was the generated packed **exact** apply on this layout: it
+agreed with the standard apply to 3.4e-16, which is how the layout was known to be
+right before any new kernel existed.
+
+    PACKED=1 spikes/inexact_apply_compare/run_split.sh neohookean_ogden TET4
+    PACKED=1 PACK_SIZE=256 spikes/inexact_apply_compare/run_split.sh neohookean_ogden HEX8
+
 ## What the first version of these measurements got wrong
 
 The throughput figures above replace an earlier set that was wrong, and the way it
