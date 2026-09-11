@@ -494,6 +494,65 @@ column -- because the four smaller meshes do not fill 72 cores.  Measuring the
 largest mesh alone is reproducible to three digits, and `bench_mixed` now takes
 an optional mesh size for exactly that.
 
+## Neohookean Ogden on Grace, and what it says about f16
+
+The same measurement for the single-unit material, on one Grace GH200 socket,
+`OMP_PLACES=cores`, `OMP_PROC_BIND=true`, twenty repetitions, largest mesh only.
+All three elements are at the same 206763 dof, so the rows compare directly.
+
+| element | threads | exact | st. f64 | st. f32 | st. f16 | assembly |
+|---|---|---|---|---|---|---|
+| TET4  |  1 |   3.12 |   7.05 |   6.92 |   7.01 |   2.71 |
+| TET4  |  8 |  24.96 |  53.28 |  56.51 |  56.11 |  21.68 |
+| TET4  | 32 |  95.12 | 208.63 | 205.73 | 204.68 |  86.33 |
+| TET4  | 72 | 202.03 | 431.92 | 421.19 | 413.35 | 192.98 |
+| HEX8  |  1 |   3.50 |  10.63 |  10.48 |   9.82 |   1.65 |
+| HEX8  |  8 |  27.54 |  80.71 |  78.56 |  74.64 |  13.19 |
+| HEX8  | 32 | 104.19 | 271.35 | 267.54 | 255.94 |  52.50 |
+| HEX8  | 72 | 220.74 | 530.63 | 518.11 | 517.26 | 116.59 |
+| TET10 |  1 |   6.28 |  13.65 |  13.49 |  14.25 |   1.58 |
+| TET10 |  8 |  48.86 | 100.33 | 100.05 | 104.56 |  12.61 |
+| TET10 | 32 | 176.77 | 334.78 | 334.19 | 345.93 |  50.40 |
+| TET10 | 72 | 360.22 | 641.08 | 638.55 | 652.87 | 110.20 |
+
+Split against exact at 72 threads: 2.1x, 2.4x, 1.8x.  Break-even is 2.0, 3.2 and
+7.4 applies per tangent -- lower than the two-unit material's 3.5, 4.4 and 11.6,
+because there is one tangent to assemble rather than two.
+
+**For neohookean, f16 is not a win on any element**: -4.3% on TET4, -2.5% on
+HEX8, +1.8% on TET10, against f64 at 72 threads.  f32 is within 2.5% of f64
+everywhere.
+
+Put beside the two-unit material, that kills the bandwidth explanation offered
+above.  Stored numbers per dof against what f16 buys, at 72 threads:
+
+| | store#/dof | f16 vs f64 |
+|---|---|---|
+| neohookean TET4  |  83.6 |  -4.3% |
+| neohookean HEX8  |  13.9 |  -2.5% |
+| neohookean TET10 |  10.4 |  +1.8% |
+| mooney TET4      | 234.0 | +16.2% |
+| mooney HEX8      |  39.0 |  -7.3% |
+| mooney TET10     |  30.3 |  +2.6% |
+
+There is no monotone relation.  TET10 has the least store traffic of all six and
+is the only element where f16 helps in both materials; HEX8 is negative in both;
+TET4 swings from -4.3% to +16.2% depending on whether the store is 45 numbers or
+126.  **The element decides the sign and the store size decides the size** --
+mooney's TET4 is the one case bandwidth-bound enough for f16 to pay, at 2.8x the
+store traffic per dof of any other row.
+
+So the rule to carry is narrow and empirical: **f32 by default everywhere**, and
+f16 only where it has been measured to pay, which so far is one case out of six.
+This retires the earlier reading, drawn from mooney alone, that f16 is worth
+carrying on the low-order simplex -- neohookean's TET4 is a low-order simplex and
+f16 loses there.
+
+Accuracy, for the record: the f64 store reproduces the exact apply to 1.4e-14 on
+TET4, which is the gate, and the projection error is 3.6e-05 on HEX8.  The 2.7e-02
+on TET10 is the smooth-increment metric artefact documented above, not the
+approximation.
+
 ## What the first version of these measurements got wrong
 
 The throughput figures above replace an earlier set that was wrong, and the way it

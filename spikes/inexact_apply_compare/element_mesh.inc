@@ -14,15 +14,21 @@
 #if defined(ELEMENT_HEX8)
 #define NXE 8
 #define ELEMENT_NAME "HEX8"
+#ifndef SIZES
 #define SIZES {8, 16, 24, 32, 40}
+#endif
 #elif defined(ELEMENT_TET10)
 #define NXE 10
 #define ELEMENT_NAME "TET10"
+#ifndef SIZES
 #define SIZES {4, 8, 12, 16, 20}
+#endif
 #else
 #define NXE 4
 #define ELEMENT_NAME "TET4"
+#ifndef SIZES
 #define SIZES {8, 16, 24, 32, 40}
+#endif
 #endif
 
 struct Mesh {
