@@ -37,6 +37,13 @@ CONTAINERS = {
     "CVFEMNavierStokes::hessian_block_diag", "CVFEMNavierStokes::hessian_bsr",
     "CVFEMNavierStokes::apply_blocks", "CVFEMNavierStokes::initialize",
     "cvfem_hex8_ns_steady::apply_jacobian_action", "cvfem_hex8_ns_steady::apply_residual",
+    # The accumulate half of the Jacobian action wraps the packed element sweep, the
+    # direction-gradient reconstruction and the boundary closure. It used to share the name
+    # above -- the wrapper and the accumulate both announced themselves as
+    # apply_jacobian_action, which is why it was renamed -- and the rename left this list
+    # behind, so the container came back as a leaf and every second inside it was counted
+    # twice. It read 47% of a run whose children already accounted for the same seconds.
+    "cvfem_hex8_ns_steady::apply_jacobian_action_accumulate",
     "cvfem_hex8_ns_steady::assemble_jacobian", "cvfem_hex8_ns_steady::assemble_nodal_p_grad",
     "cvfem_hex8_ns_steady::assemble_nodal_q_grad",
     "sscvfem::apply", "sscvfem::residual", "sscvfem::apply_blocks",

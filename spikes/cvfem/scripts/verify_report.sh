@@ -29,6 +29,11 @@ fi
 BUILD=${BUILD:-$SPIKE_ROOT/build}
 DRIVER=${DRIVER:-$BUILD/cvfem_hex8_ns_ssgmg}
 OUT=${OUT:-$SPIKE_ROOT/verification_runs/$(date +%Y%m%d-%H%M%S)}
+# Absolute, because each case is run from its own directory so that the tracer's
+# hard-coded smesh.trace.csv lands per run rather than being overwritten twenty-two times.
+case "$DRIVER" in /*) ;; *) DRIVER="$PWD/$DRIVER" ;; esac
+mkdir -p "$OUT"
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 # VERIFY_GROUPS and not GROUPS: GROUPS is a bash built-in array holding the caller's
 # group IDs, so ${GROUPS:-...} silently expands to a numeric GID and never to the
 # default. That is exactly what happened -- a job ran with "groups : 33203" and
@@ -131,7 +136,16 @@ run() {
     # The default goes first so a per-run SFEM_NL_MAX_IT in the argument list wins. A
     # `VAR=x run ...` prefix would not do: bash keeps such an assignment after a *function*
     # returns, so it would leak into every later case.
-    ( export SFEM_NL_MAX_IT=$NL_MAX_IT
+    # Each run in its own directory, because the tracer writes smesh.trace.csv into the
+    # CURRENT one and its name is hard-coded. Sharing a directory meant twenty-two runs
+    # overwrote each other's trace and only the last survived -- and that file is where the
+    # per-operator throughput breakdown comes from, so the evidence for every case but one
+    # was being discarded. DRIVER and OUT are resolved to absolute paths above for exactly
+    # this reason.
+    local rundir="$OUT/trace_${group}_${label}"
+    mkdir -p "$rundir"
+    ( cd "$rundir" || exit 1
+      export SFEM_NL_MAX_IT=$NL_MAX_IT
       for kv in "$@"; do export "$kv"; done
       "$DRIVER" "$OUT/out_${group}_${label}" ) > "$OUT/$log" 2>&1
     local rc=$?
