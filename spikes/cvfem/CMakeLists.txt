@@ -189,6 +189,16 @@ add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
 
+# ------------------------------------------------------------------- restart round trip
+#
+# A run cut in two must be the run that was not cut. The pump is used because it is the
+# cheapest case with an exact identity AND a time-varying boundary condition, so a segment
+# that mistook its own step index for the absolute one drives the diaphragm at the wrong
+# phase and the identity reports it.
+add_test(NAME cvfem_restart
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_restart_test.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
+
 # ------------------------------------------------ generated headers match their generators
 #
 # The three headers under src/generated/ and src/cases/ are committed artifacts compiled as

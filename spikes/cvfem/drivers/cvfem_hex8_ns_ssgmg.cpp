@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -2697,6 +2698,15 @@ int main(int argc, char **argv) {
     // boundary mask, since a coordinate test cannot see the two step faces.
     const bool        want_step   = case_req == "step" || case_req == "backward_facing_step" ||
                            case_req == "bfs";
+    // The same geometry family as the step and the same generator, but a different case:
+    // a wide, spanwise-slip, wall-graded box with a perturbed initial state, run until the
+    // shear layer breaks down. Sharing `step` would put all of that into the case the
+    // verification matrix checks conservation on. See parse_case for the full argument.
+    const bool        want_step_turb = case_req == "step_turb" || case_req == "turbulent_step" ||
+                                case_req == "bfs_turb";
+    // Everything that is true of the step's GEOMETRY is true of this one's, so the two share
+    // every branch that asks about shape rather than about physics.
+    const bool        want_any_step  = want_step || want_step_turb;
     const bool        want_cavity = smesh::Env::read_string("SFEM_CASE", "") == "cavity" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid_driven_cavity";
@@ -2706,9 +2716,13 @@ int main(int argc, char **argv) {
     // arithmetic in that identity is visible rather than buried.
     const bool        want_pump   = case_req == "pump" || case_req == "diaphragm" ||
                            case_req == "diaphragm_pump";
-    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", want_step ? 10 : ((want_mms || want_cavreg) ? 2 : ((want_cavity || want_pump) ? 1 : 4)));
-    const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg || want_step) ? 2 : 1);
-    const real_t      Lz         = smesh::Env::read<real_t>("SFEM_LZ", (want_mms || want_cavreg) ? 2 : 1);
+    // 21 x 2 x 4 for the turbulent step: one step height of inlet, twenty downstream so the
+    // shear layer has room to break down and reattach well clear of the outflow, and a span
+    // of four step heights -- the box width the reference DNS uses, which is the narrowest
+    // that does not constrain the spanwise structures it is there to permit.
+    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", want_step_turb ? 21 : (want_step ? 10 : ((want_mms || want_cavreg) ? 2 : ((want_cavity || want_pump) ? 1 : 4))));
+    const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg || want_any_step) ? 2 : 1);
+    const real_t      Lz         = smesh::Env::read<real_t>("SFEM_LZ", want_step_turb ? 4 : ((want_mms || want_cavreg) ? 2 : 1));
     const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", 1);
     const real_t      mu         = smesh::Env::read<real_t>("SFEM_MU", 0.01);
     const real_t      U          = smesh::Env::read<real_t>("SFEM_U", 1);
@@ -2774,13 +2788,60 @@ int main(int argc, char **argv) {
 
     const double tick = smesh::time_seconds();
 
-    auto mesh = want_step ? smesh::Mesh::create_hex8_lshape(ctx->communicator(), nx, ny, nz, Lx, Ly, Lz,
-                                                            smesh::Env::read<real_t>("SFEM_STEP_X", 1),
-                                                            smesh::Env::read<real_t>("SFEM_STEP_Y", 1))
-                          : smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
+    const real_t step_x = smesh::Env::read<real_t>("SFEM_STEP_X", 1);
+    const real_t step_y = smesh::Env::read<real_t>("SFEM_STEP_Y", 1);
+    auto mesh = want_any_step ? smesh::Mesh::create_hex8_lshape(ctx->communicator(), nx, ny, nz, Lx, Ly, Lz,
+                                                            step_x, step_y)
+                              : smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
     if (!mesh) {
         std::fprintf(stderr, "mesh generation failed\n");
         return EXIT_FAILURE;
+    }
+
+    // Wall grading, before anything else touches the mesh.
+    //
+    // A separated shear layer at Re_h in the thousands has its action in two thin places --
+    // the wall layers and the lip -- and a uniform mesh spends its cells in the middle where
+    // nothing happens. SFEM_STEP_GRADE = 0, the default, is the uniform mesh bit for bit, so
+    // no existing run moves.
+    //
+    // There is no grading API in smesh and none is needed: the points buffer is writable and
+    // this is what create_wall_mounted_hump does to build its geometry. Three properties are
+    // required of the map and all three are why it is piecewise:
+    //
+    //   * y = 0, y = step_y and y = Ly must be fixed EXACTLY. The generator refuses a step
+    //     that is off a grid line, and a map that moved the lip off the node plane would
+    //     produce a mesh whose step corner is not a corner.
+    //   * it must stay rectilinear, so SFEM_GEOM=affine remains valid. A warped mesh forces
+    //     the isoparametric kernels and a slower operator for no gain here.
+    //   * it must be monotone, or elements invert.
+    //
+    // Clustering within [0, step_y] and within [step_y, Ly] separately gives all of that and
+    // clusters toward all three planes at once. The map is the standard symmetric tanh
+    // stretch, normalised so f(0)=0 and f(1)=1.
+    //
+    // It runs BEFORE SFC::reorder and before any sideset: sidesets select on face centroids
+    // of the current points, so moving points afterwards would change which faces a
+    // predicate would have chosen without changing the ones it already did.
+    const real_t step_grade = smesh::Env::read<real_t>("SFEM_STEP_GRADE", 0);
+    if (want_any_step && step_grade > real_t(0)) {
+        auto *const     py     = mesh->points()->data()[1];
+        const ptrdiff_t nn     = mesh->n_nodes();
+        const double    beta   = (double)step_grade;
+        const double    tanhb  = std::tanh(0.5 * beta);
+        auto            spread = [&](const double t) {
+            return 0.5 * (1.0 + std::tanh(beta * (t - 0.5)) / tanhb);
+        };
+        for (ptrdiff_t i = 0; i < nn; ++i) {
+            const double yv = (double)py[i];
+            double       a = 0, b = (double)step_y;
+            if (yv > (double)step_y) { a = (double)step_y; b = (double)Ly; }
+            if (b <= a) continue;
+            const double t = (yv - a) / (b - a);
+            py[i]          = (smesh::geom_t)(a + (b - a) * spread(t < 0 ? 0 : (t > 1 ? 1 : t)));
+        }
+        std::printf("mesh: y graded toward y=0, %g and %g (tanh beta %g)\n",
+                    (double)step_y, (double)Ly, beta);
     }
 
     // Space-fill the element and node order before anything derives indices from the mesh.
@@ -2835,8 +2896,8 @@ int main(int argc, char **argv) {
     // case in the outlet treatment and nothing else -- and it is off by default, so no
     // existing run changes.
     const bool want_natural_outlet =
-            want_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet"
-                      : smesh::Env::read_string("SFEM_OUTLET", "dirichlet") == "natural";
+            want_any_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet"
+                          : smesh::Env::read_string("SFEM_OUTLET", "dirichlet") == "natural";
     // A traction or pressure condition names one of these sidesets, so they have to exist
     // whether or not the outlet is natural. Read here rather than where the operator is
     // configured, several hundred lines below, because the sidesets are built now and a
@@ -2863,7 +2924,7 @@ int main(int argc, char **argv) {
     std::shared_ptr<smesh::Sideset> step_skin, step_outlet;
     // Kept so they survive to_semistructured, which builds a new Mesh and copies none.
     std::shared_ptr<smesh::Sideset> pump_skin, pump_port, pump_diaphragm;
-    if (!want_pump && (want_step || want_natural_outlet || want_named_bc)) {
+    if (!want_pump && (want_any_step || want_natural_outlet || want_named_bc)) {
         step_skin = smesh::skin_sideset(mesh);
         auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)Lx, 1e-6);
         if (!step_skin || outs.empty()) {
@@ -3115,6 +3176,7 @@ int main(int argc, char **argv) {
     const ptrdiff_t     ndof   = nnodes * N_FIELDS;
     std::vector<real_t> p_exact;
     ptrdiff_t           pin_node = 0;  // pressure pin, needed again by the MMS diagnostics
+    double mesh_coord_checksum = 0;
     std::shared_ptr<sfem::DirichletConditions> dirichlet;
 
     // Built after op->initialize(), and that order is required rather than incidental:
@@ -3132,7 +3194,7 @@ int main(int argc, char **argv) {
 
         {
             // Checksum the mesh coordinates. p_exact is a serial function of these, so if
-            // it varies between runs, they do.
+            // it varies between runs, they do. It doubles as the restart's identity guard.
             long double cx = 0, cy = 0, cz = 0;
             for (ptrdiff_t i = 0; i < nnodes; ++i) {
                 cx += (long double)px[i];
@@ -3140,6 +3202,13 @@ int main(int argc, char **argv) {
                 cz += (long double)pz[i];
             }
             std::printf("mesh coords checksum: %.17g %.17g %.17g\n", (double)cx, (double)cy, (double)cz);
+            // Kept, because it is exactly the guard a restart needs. Reading a state back
+            // into a different node numbering is silent: every array is the right LENGTH, so
+            // nothing fails, and the run continues from a scrambled field. SFC::reorder and
+            // op->initialize() both renumber, so the numbering is a function of the mesh, the
+            // resolution and a handful of environment variables -- and this sum over the
+            // coordinates in node order changes if any of them do.
+            mesh_coord_checksum = (double)(cx + cy + cz);
         }
 
         const bool step_outflow_natural =
@@ -3147,7 +3216,7 @@ int main(int argc, char **argv) {
 
         // Which nodes lie on the domain skin. Topological, so the step faces are included.
         std::vector<char> skin_node((size_t)nnodes, 0);
-        if (flow == cvfem_case::FlowCase::Step) {
+        if (flow == cvfem_case::FlowCase::Step || flow == cvfem_case::FlowCase::StepTurb) {
             auto skin = smesh::skin_sideset(mesh);
             if (!skin) {
                 std::fprintf(stderr, "step: skin_sideset failed\n");
@@ -3186,7 +3255,46 @@ int main(int argc, char **argv) {
             const bool outlet = cvfem_case::on_plane(x, Lx, Lx);
             const bool span   = cvfem_case::on_plane(z, real_t(0), Lz) || cvfem_case::on_plane(z, Lz, Lz);
 
-            if (flow == cvfem_case::FlowCase::Step) {
+            if (flow == cvfem_case::FlowCase::StepTurb) {
+                // The step's skin treatment, with two differences that are the case.
+                //
+                // FIRST, the span slips. The reference DNS is spanwise-periodic, which this
+                // discretisation cannot express -- sfem::Constraint eliminates dofs and has
+                // no way to say u_left = u_right. No-slip side walls are the wrong surrogate:
+                // they grow boundary layers the periodic box does not have, and in a span
+                // four step heights wide those layers are a large fraction of the domain.
+                // Free slip -- constrain u_z alone, leave u_x and u_y free -- is the closest
+                // thing available, and it is what the channel cases already do on their
+                // spanwise planes. It is an approximation and is reported as one.
+                //
+                // SECOND, the corners belong to the walls. A node on z=0 that is also on a
+                // real wall, or on either step face, must be no-slip; only a node whose ONLY
+                // skin membership is the spanwise plane may slip. `on_step_face` is exactly
+                // "on the skin but on none of the bounding-box planes", which is what the
+                // two step faces are and what no coordinate test can find directly.
+                const bool outflow     = cvfem_case::on_plane(x, Lx, Lx);
+                const bool free_outlet = step_outflow_natural && outflow;
+                if (skin_node[(size_t)i] && !free_outlet) {
+                    const bool on_step_face =
+                            !inlet && !outflow && !wall_y && !span;
+                    const bool slip_only = span && !inlet && !wall_y && !on_step_face;
+                    if (slip_only) {
+                        uz_nodes.push_back((idx_t)i);
+                        uz_vals.push_back(real_t(0));
+                    } else {
+                        // The inflow profile needs step_y and Lz, which exact_state's
+                        // signature does not carry, so it is evaluated here. Everything not
+                        // on the inlet plane is no-slip, which is the zero exact_state left.
+                        const real_t uin =
+                                inlet ? cvfem_case::step_inflow_ux<real_t>(y, z, step_y, Ly, Lz, U)
+                                      : real_t(0);
+                        uvw_nodes.push_back((idx_t)i);
+                        uvw_ux.push_back(uin);
+                        uvw_uy.push_back(real_t(0));
+                        uvw_uz.push_back(real_t(0));
+                    }
+                }
+            } else if (flow == cvfem_case::FlowCase::Step) {
                 // Constrain the skin, minus the outflow plane. The skin comes from the same
                 // smesh::skin_sideset that builds the boundary mask, so the Dirichlet set and
                 // the control-volume closure agree by construction.
@@ -3337,6 +3445,24 @@ int main(int argc, char **argv) {
     std::printf("case: %s  geom: %s  refine_level: %d  semi_structured: %d\n",
                 case_name.c_str(), geom_name.c_str(), refine_level, op->is_semi_structured() ? 1 : 0);
     std::printf("channel: L=(%g,%g,%g)  cells=(%d,%d,%d)\n", Lx, Ly, Lz, nx, ny, nz);
+    if (want_any_step) {
+        // The step Reynolds number, which is NOT the one the continuation reports.
+        //
+        // The ramp works in Re_phys = rho U Ly / mu, a number about the channel height and
+        // the peak velocity, because that is what it needs to schedule rho. Every step
+        // result in the literature is quoted on Re_h = rho U_b h / mu with h the step height
+        // and U_b the inlet BULK velocity -- for this profile (4/9) of the peak. At the
+        // default geometry the two differ by a factor of 4.5, which is more than enough to
+        // make a run look like it reached a Reynolds number it never approached. Print both,
+        // labelled, so a reader cannot take one for the other.
+        const real_t u_bulk = (real_t(4) / real_t(9)) * U;
+        const real_t re_h   = rho * u_bulk * step_y / std::max(mu, real_t(1e-30));
+        std::printf("step: h=%g  inlet %g x %g  U_peak=%g  U_bulk=%g  Re_h=%g  (continuation Re_phys=%g)\n",
+                    (double)step_y, (double)(Ly - step_y), (double)Lz, (double)U, (double)u_bulk,
+                    (double)re_h, (double)(rho * U * Ly / std::max(mu, real_t(1e-30))));
+        std::printf("step: exact inflow flux %.12g\n",
+                    (double)cvfem_case::step_inflow_flux<real_t>(step_y, Ly, Lz, U));
+    }
     std::printf("nnodes: %td  nelements: %td  ndof: %td\n", nnodes, mesh->n_elements(0), ndof);
     if (flow == cvfem_case::FlowCase::MMS) {
         // Two different quantities would otherwise both be printed as "Re": the driver's
@@ -3364,6 +3490,71 @@ int main(int argc, char **argv) {
     // iterations for the same answer. Verification drivers against an analytic solution
     // are entitled to the better initial guess; the two must simply agree about it.
     for (ptrdiff_t i = 0; i < nnodes; ++i) x[(size_t)i * 4 + 3] = p_exact[(size_t)i];
+
+    // A solenoidal kick, without which a turbulent case cannot start.
+    //
+    // The initial state is symmetric in z and the boundary data is too, so a step fed a
+    // laminar profile has nothing that can break spanwise symmetry: it will converge to a
+    // two-dimensional solution and stay there, however high the Reynolds number. The
+    // instability is physical and real, but it has to be given something to amplify.
+    //
+    // The perturbation is a sum of Fourier modes each built as a vector orthogonal to its own
+    // wavevector, so every mode is divergence free by construction and the pressure solve has
+    // no spurious transient to project away on the first step. It is deliberately NOT
+    // windowed onto the region downstream of the lip: multiplying a solenoidal field by a
+    // spatial window destroys exactly the property it was constructed for. Confinement comes
+    // instead from re-applying the constraints afterwards, which zeroes the kick on every
+    // no-slip and inflow node.
+    //
+    // Seeded and reproducible. SFEM_IC_PERTURB=0, the default, leaves the state bit for bit
+    // what it was, which tests/ asserts.
+    const real_t ic_perturb = smesh::Env::read<real_t>("SFEM_IC_PERTURB", 0);
+    if (ic_perturb != real_t(0)) {
+        const unsigned seed  = (unsigned)smesh::Env::read<int>("SFEM_IC_SEED", 20260911);
+        const int      modes = std::max(1, smesh::Env::read<int>("SFEM_IC_MODES", 12));
+        std::mt19937                           rng(seed);
+        std::uniform_real_distribution<double> uni(-1.0, 1.0);
+        std::vector<double>                    kx(modes), ky(modes), kz(modes), ax(modes), ay(modes),
+                az(modes), ph(modes);
+        for (int m = 0; m < modes; ++m) {
+            // Wavenumbers of a few box lengths, so the kick is a large-scale stirring rather
+            // than grid noise the upwind term would erase in one step.
+            const double n1 = std::round(1 + 3 * std::fabs(uni(rng)));
+            const double n2 = std::round(1 + 3 * std::fabs(uni(rng)));
+            const double n3 = std::round(1 + 3 * std::fabs(uni(rng)));
+            kx[m] = 2 * M_PI * n1 / (double)Lx;
+            ky[m] = 2 * M_PI * n2 / (double)Ly;
+            kz[m] = 2 * M_PI * n3 / (double)Lz;
+            // a = e x k is orthogonal to k for any e, which is what makes div(a cos(k.x)) = 0.
+            const double ex = uni(rng), ey = uni(rng), ez = uni(rng);
+            ax[m] = ey * kz[m] - ez * ky[m];
+            ay[m] = ez * kx[m] - ex * kz[m];
+            az[m] = ex * ky[m] - ey * kx[m];
+            const double an = std::sqrt(ax[m] * ax[m] + ay[m] * ay[m] + az[m] * az[m]);
+            if (an > 0) { ax[m] /= an; ay[m] /= an; az[m] /= an; }
+            ph[m] = M_PI * uni(rng);
+        }
+        const auto *const gx = mesh->points()->data()[0];
+        const auto *const gy = mesh->points()->data()[1];
+        const auto *const gz = mesh->points()->data()[2];
+        const double      amp = (double)ic_perturb / std::sqrt((double)modes);
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            double px = 0, pyv = 0, pz = 0;
+            for (int m = 0; m < modes; ++m) {
+                const double c = std::cos(kx[m] * gx[i] + ky[m] * gy[i] + kz[m] * gz[i] + ph[m]);
+                px += ax[m] * c;
+                pyv += ay[m] * c;
+                pz += az[m] * c;
+            }
+            x[(size_t)i * 4 + 0] += (real_t)(amp * px);
+            x[(size_t)i * 4 + 1] += (real_t)(amp * pyv);
+            x[(size_t)i * 4 + 2] += (real_t)(amp * pz);
+        }
+        // Last, so no prescribed boundary value is disturbed by the kick.
+        f->apply_constraints(x);
+        std::printf("ic: solenoidal perturbation amp %g, %d modes, seed %u\n",
+                    (double)ic_perturb, modes, seed);
+    }
     {
         // Checksum the state at construction, before any solver has touched it, to say
         // whether the variation seen later is built in or acquired.
@@ -3649,6 +3840,17 @@ int main(int argc, char **argv) {
     // works unchanged inside a step. With SFEM_DT = 0 the loop runs exactly once and the
     // operator has no time term, which is bit-for-bit the steady solve.
     std::vector<real_t> u_hist, u_hist2;
+    // Segmented runs. A long transient does not have to fit one allocation: SFEM_RESTART_OUT
+    // writes the state every SFEM_RESTART_EVERY steps and at the end of the segment, and
+    // SFEM_RESTART_IN picks it up. `tstep0` and `t0` are the absolute step and time the
+    // segment starts from, so a run cut into pieces reports the same times as one that was
+    // not, and SFEM_NSTEPS means "steps in THIS segment" rather than "steps in total".
+    const std::string restart_in    = smesh::Env::read_string("SFEM_RESTART_IN", "");
+    const std::string restart_out   = smesh::Env::read_string("SFEM_RESTART_OUT", "");
+    const int         restart_every = smesh::Env::read<int>("SFEM_RESTART_EVERY", 0);
+    int               tstep0        = 0;
+    real_t            t0            = 0;
+    bool              resumed       = false;
     if (dt_step > real_t(0)) {
         op->set_time_step(dt_step, bdf_order);
         u_hist.assign((size_t)nnodes * 3, real_t(0));
@@ -3658,6 +3860,83 @@ int main(int argc, char **argv) {
             for (int c = 0; c < 3; ++c) u_hist[(size_t)i * 3 + (size_t)c] = x[(size_t)i * 4 + (size_t)c];
         op->set_velocity_history(u_hist.data(), nullptr);
         std::printf("transient: dt %g, %d steps, BDF%d\n", (double)dt_step, nsteps, bdf_order);
+
+        // ------------------------------------------------------------------ restart in
+        //
+        // Resume from a saved state, so a long run can be cut into segments that each fit a
+        // queue's wall clock. SFEM_RESTART_IN names a folder written by the block at the end
+        // of the step loop.
+        //
+        // The layout is the one sfem::TwoPhaseFlowTimeIntegration already uses for the same
+        // job: Buffer::to_file / from_file for the arrays, the scalar type in the extension
+        // via TypeToString, and a plain-text restart.txt beside them. Nothing here is a new
+        // format.
+        //
+        // What is saved is exactly what the next step needs and nothing else: the state, and
+        // the one or two velocity history levels BDF needs. The mesh is not saved -- it is
+        // regenerated -- which is why the coordinate checksum is written and checked. Reading
+        // a state into a different node numbering is otherwise silent: every array has the
+        // right length, nothing fails, and the run continues from a scrambled field.
+        if (!restart_in.empty()) {
+            const std::string ext   = std::string(smesh::TypeToString<real_t>::value());
+            auto              st    = smesh::Buffer<real_t>::from_file(smesh::Path(restart_in) / ("state." + ext));
+            auto              h1    = smesh::Buffer<real_t>::from_file(smesh::Path(restart_in) / ("u_prev." + ext));
+            std::ifstream     meta((smesh::Path(restart_in) / "restart.txt").c_str());
+            double            m_t = 0, m_dt = 0, m_sum = 0;
+            int               m_step = 0, m_bdf = 0;
+            long long         m_nnodes = 0;
+            if (!st || !h1 || !meta || !(meta >> m_step >> m_t >> m_dt >> m_bdf >> m_nnodes >> m_sum)) {
+                std::fprintf(stderr, "restart: cannot read a complete restart from '%s'\n", restart_in.c_str());
+                return EXIT_FAILURE;
+            }
+            if ((ptrdiff_t)st->size() != ndof || (ptrdiff_t)h1->size() != nnodes * 3 || m_nnodes != (long long)nnodes) {
+                std::fprintf(stderr,
+                             "restart: size mismatch -- saved %lld nodes, this run has %td. The mesh or the "
+                             "resolution differs.\n",
+                             m_nnodes, nnodes);
+                return EXIT_FAILURE;
+            }
+            // Relative, because the sum is O(nnodes * L) and its last bits move with the
+            // summation order of a different build; a scrambled numbering moves it by O(1).
+            const double tol = 1e-9 * std::fmax(std::fabs(m_sum), 1.0);
+            if (std::fabs(m_sum - mesh_coord_checksum) > tol) {
+                std::fprintf(stderr,
+                             "restart: mesh coordinate checksum %.17g does not match this run's %.17g. The node "
+                             "numbering differs, and loading would silently scramble the field.\n",
+                             m_sum, mesh_coord_checksum);
+                return EXIT_FAILURE;
+            }
+            if (m_bdf != bdf_order || std::fabs(m_dt - (double)dt_step) > 1e-12 * std::fmax(m_dt, 1.0)) {
+                // Refused rather than warned. The history levels ARE the timestep: reading
+                // u^{n-1} saved at one dt and differencing it at another is not a small
+                // error, it is a different equation, and BDF2 fed a BDF1 history is worse.
+                std::fprintf(stderr,
+                             "restart: saved dt %.17g BDF%d, this run dt %.17g BDF%d -- the history belongs to the "
+                             "timestep it was written at.\n",
+                             m_dt, m_bdf, (double)dt_step, bdf_order);
+                return EXIT_FAILURE;
+            }
+            std::copy(st->data(), st->data() + ndof, x);
+            std::copy(h1->data(), h1->data() + nnodes * 3, u_hist.begin());
+            auto h2 = smesh::Buffer<real_t>::from_file(smesh::Path(restart_in) / ("u_prev2." + ext));
+            if (h2 && (ptrdiff_t)h2->size() == nnodes * 3) {
+                u_hist2.assign((size_t)nnodes * 3, real_t(0));
+                std::copy(h2->data(), h2->data() + nnodes * 3, u_hist2.begin());
+            }
+            // BDF2 from the first step of the segment when the second level came back: a
+            // resumed run is mid-sequence, not starting up, and dropping to BDF1 for one step
+            // would put a first-order error into the middle of a second-order run.
+            const bool have_h2 = !u_hist2.empty();
+            op->set_velocity_history(u_hist.data(), (bdf_order >= 2 && have_h2) ? u_hist2.data() : nullptr);
+            tstep0 = m_step;
+            t0     = (real_t)m_t;
+            resumed = true;
+            // The state carries its own constraint values; re-applying is what makes a
+            // time-varying condition correct at the resumed instant rather than the saved one.
+            f->apply_constraints(x);
+            std::printf("restart: resumed from '%s' at step %d, t = %.17g%s\n", restart_in.c_str(), tstep0,
+                        (double)t0, have_h2 ? " (BDF2 history)" : " (BDF1 history only)");
+        }
     }
 
     // The diaphragm waveform. A steady run leaves this at 1, which is a diaphragm held at
@@ -3673,10 +3952,14 @@ int main(int argc, char **argv) {
     real_t       pump_scale  = 1;
 
     for (int tstep = 0; tstep < (dt_step > real_t(0) ? nsteps : 1); ++tstep) {
-    if (dt_step > real_t(0)) std::printf("=== step %d/%d  t = %g ===\n", tstep + 1, nsteps,
-                                         (double)((tstep + 1) * dt_step));
+    // Absolute, so a segmented run and a single one report the same instants and a frame
+    // written in segment three is not labelled as though it were the third frame overall.
+    const int    abs_step = tstep0 + tstep + 1;
+    const real_t t_abs    = t0 + (real_t)(tstep + 1) * dt_step;
+    if (dt_step > real_t(0)) std::printf("=== step %d (segment %d/%d)  t = %g ===\n", abs_step, tstep + 1,
+                                         nsteps, (double)t_abs);
     if (want_pump && dt_step > real_t(0) && dirichlet) {
-        const real_t t_now = (tstep + 1) * dt_step;
+        const real_t t_now = t_abs;
         pump_scale         = std::sin(real_t(2) * real_t(M_PI) * t_now / pump_period);
         // set_time snapshots the base values on its first call and thereafter writes
         // scale * base, so passing the waveform as the global scale drives every prescribed
@@ -4511,7 +4794,11 @@ int main(int argc, char **argv) {
         if (bdf_order >= 2) u_hist2 = u_hist;
         for (ptrdiff_t i = 0; i < nnodes; ++i)
             for (int c = 0; c < 3; ++c) u_hist[(size_t)i * 3 + (size_t)c] = x[(size_t)i * 4 + (size_t)c];
-        op->set_velocity_history(u_hist.data(), bdf_order >= 2 && tstep >= 1 ? u_hist2.data() : nullptr);
+        // `tstep >= 1` is the start-up rule: a fresh run has no second level before its
+        // second step. A RESUMED run does -- it was loaded -- so the condition is about
+        // whether u_hist2 has been filled, not about where we are in this segment.
+        const bool h2_ready = (ptrdiff_t)u_hist2.size() == nnodes * 3 && (tstep >= 1 || resumed);
+        op->set_velocity_history(u_hist.data(), bdf_order >= 2 && h2_ready ? u_hist2.data() : nullptr);
     }
 
     // A transient run's whole point is the sequence, and the writer at the end of this file
@@ -4525,7 +4812,9 @@ int main(int argc, char **argv) {
     // for every frame to share.
     if (dt_step > real_t(0) && smesh::Env::read<int>("SFEM_WRITE_STEPS", 0)) {
         char sub[64];
-        std::snprintf(sub, sizeof(sub), "step_%04d", tstep);
+        // Absolute, so segments concatenate into one animation instead of each
+        // overwriting the other's step_0000.
+        std::snprintf(sub, sizeof(sub), "step_%04d", abs_step - 1);
         const smesh::Path step_dir = smesh::Path(out_folder) / sub;
         smesh::create_directory(smesh::Path(out_folder));
         smesh::create_directory(step_dir);
@@ -4547,8 +4836,57 @@ int main(int argc, char **argv) {
         // The time each frame is AT, so the XDMF can carry real times rather than indices.
         FILE *tf = std::fopen((std::string(step_dir.c_str()) + "/time.txt").c_str(), "w");
         if (tf) {
-            std::fprintf(tf, "%.17g\n", (double)((tstep + 1) * dt_step));
+            std::fprintf(tf, "%.17g\n", (double)t_abs);
             std::fclose(tf);
+        }
+    }
+
+    // ----------------------------------------------------------------- restart out
+    //
+    // Written after the history shift, so what lands on disk is a state and the history that
+    // belongs to it -- a pair the next segment can step from directly. Writing before the
+    // shift would save u^{n-1} beside u^n and the resumed run would take one step with a
+    // stale history, which is the kind of error that shows up as a small wrong answer rather
+    // than as a failure.
+    //
+    // Every SFEM_RESTART_EVERY steps and always at the end of the segment. The folder is
+    // overwritten in place rather than numbered: a restart is a resume point, not an archive,
+    // and keeping one bounded folder is what makes it safe to call this from a job that may
+    // be killed by the wall clock at any moment.
+    if (dt_step > real_t(0) && !restart_out.empty()) {
+        const bool last  = (tstep + 1 == nsteps);
+        const bool cadence = restart_every > 0 && ((tstep + 1) % restart_every == 0);
+        if (last || cadence) {
+            const std::string ext = std::string(smesh::TypeToString<real_t>::value());
+            smesh::create_directory(smesh::Path(restart_out));
+            auto st = smesh::create_host_buffer<real_t>(ndof);
+            std::copy(x, x + ndof, st->data());
+            auto h1 = smesh::create_host_buffer<real_t>(nnodes * 3);
+            std::copy(u_hist.begin(), u_hist.end(), h1->data());
+            int rc = st->to_file(smesh::Path(restart_out) / ("state." + ext));
+            rc |= h1->to_file(smesh::Path(restart_out) / ("u_prev." + ext));
+            if ((ptrdiff_t)u_hist2.size() == nnodes * 3) {
+                auto h2 = smesh::create_host_buffer<real_t>(nnodes * 3);
+                std::copy(u_hist2.begin(), u_hist2.end(), h2->data());
+                rc |= h2->to_file(smesh::Path(restart_out) / ("u_prev2." + ext));
+            }
+            // The metadata last, so a folder whose restart.txt is present and complete is a
+            // folder whose arrays are too. A job killed mid-write then leaves a restart that
+            // fails to load rather than one that loads a half-written state.
+            std::ofstream meta((smesh::Path(restart_out) / "restart.txt").c_str());
+            meta.precision(17);
+            meta << abs_step << "\n"
+                 << (double)t_abs << "\n"
+                 << (double)dt_step << "\n"
+                 << bdf_order << "\n"
+                 << (long long)nnodes << "\n"
+                 << mesh_coord_checksum << "\n";
+            if (rc != SFEM_SUCCESS || !meta) {
+                std::fprintf(stderr, "restart: failed to write '%s'\n", restart_out.c_str());
+                return EXIT_FAILURE;
+            }
+            std::printf("restart: wrote step %d, t = %.17g to '%s'\n", abs_step, (double)t_abs,
+                        restart_out.c_str());
         }
     }
     }  // time step
