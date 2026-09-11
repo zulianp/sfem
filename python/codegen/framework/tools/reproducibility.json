@@ -391,6 +391,21 @@
       "l2": 11.21792480995,
       "material": "linear_elasticity"
     },
+    "linear_elasticity_inexact_apply_stored_3d_a_msoa": {
+      "l1": 0.1127634688318,
+      "l2": 0.01116640960901,
+      "material": "linear_elasticity"
+    },
+    "linear_elasticity_inexact_apply_stored_packed_two_pass_3d_a_msoa": {
+      "l1": 0.1127634688318,
+      "l2": 0.01116640960901,
+      "material": "linear_elasticity"
+    },
+    "linear_elasticity_inexact_apply_tangent_3d_a_msoa": {
+      "l1": 183.1410030127,
+      "l2": 10.62470964329,
+      "material": "linear_elasticity"
+    },
     "linear_elasticity_objective_steps_3d_a_msoa": {
       "l1": 0.2358600597415,
       "l2": 0.03068641717556,
@@ -628,6 +643,21 @@
       "l2": 13.76364459969,
       "material": "linear_elasticity"
     },
+    "linear_elasticity_inexact_apply_stored_3d_a_msoa": {
+      "l1": 0.3242959105753,
+      "l2": 0.02184544361351,
+      "material": "linear_elasticity"
+    },
+    "linear_elasticity_inexact_apply_stored_packed_two_pass_3d_a_msoa": {
+      "l1": 0.3242959105753,
+      "l2": 0.02184544361351,
+      "material": "linear_elasticity"
+    },
+    "linear_elasticity_inexact_apply_tangent_3d_a_msoa": {
+      "l1": 325.5839996338,
+      "l2": 12.26835793381,
+      "material": "linear_elasticity"
+    },
     "linear_elasticity_objective_steps_3d_a_msoa": {
       "l1": 0.4173044381804,
       "l2": 0.03632765513296,
@@ -863,6 +893,21 @@
     "linear_elasticity_hessian_bsr_3d_i_msoa": {
       "l1": 1798.092,
       "l2": 17.88312485948,
+      "material": "linear_elasticity"
+    },
+    "linear_elasticity_inexact_apply_stored_3d_a_msoa": {
+      "l1": 0.3105049886493,
+      "l2": 0.01242685232013,
+      "material": "linear_elasticity"
+    },
+    "linear_elasticity_inexact_apply_stored_packed_two_pass_3d_a_msoa": {
+      "l1": 0.3105049886493,
+      "l2": 0.01242685232013,
+      "material": "linear_elasticity"
+    },
+    "linear_elasticity_inexact_apply_tangent_3d_a_msoa": {
+      "l1": 732.5640120506,
+      "l2": 15.02560847382,
       "material": "linear_elasticity"
     },
     "linear_elasticity_objective_steps_3d_a_msoa": {
