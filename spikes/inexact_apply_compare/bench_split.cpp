@@ -46,6 +46,9 @@
 // `half_t` comes from sfem_config.h: __fp16 on some targets, _Float16 on
 // others.  Declaring it here would conflict on whichever one it is not.
 
+#ifndef LANE_VS
+#define LANE_VS 16
+#endif
 #include "generated_abi.inc"
 
 extern "C" int EXACT_APPLY(
@@ -180,7 +183,7 @@ int main(int argc, char **argv) {
         auto run_stored = [&](auto *store) {
             zero(cx,cy,cz);
             sfem::codegen::STORED_APPLY<double, typename std::remove_const<
-                typename std::remove_pointer<decltype(store)>::type>::type>(
+                typename std::remove_pointer<decltype(store)>::type>::type, LANE_VS>(
                 m.nelements, m.evp.data(), 1, cstride, store,
                 1, hx.data(), hy.data(), hz.data(), 1, cx.data(), cy.data(), cz.data());
         };

@@ -45,6 +45,12 @@ from codegen.framework.targets import current_target
 #: both layouts are expressible by the caller without a second kernel: element
 #: major is `(components, 1)`, component major is `(1, nelements)`.
 _TANGENT_ADDRESS = "element * tangent_element_stride + %d * tangent_component_stride"
+#: The same address with the block's lane as the element.  Component-major --
+#: element stride 1, component stride the element count, which the ABI has
+#: always allowed -- makes this contiguous across lanes, so it needs no staging.
+_BLOCKED_TANGENT_ADDRESS = (
+    "(evb + lane) * tangent_element_stride + %d * tangent_component_stride"
+)
 
 
 def inexact_apply_kernel_source(
@@ -346,15 +352,45 @@ def _tangent_lines(
 
 def _stored_lines(prefix, n_nodes, component, plan, action_body):
     """The apply: stored tangent and the vector, and nothing else."""
-    body = _element_lines(n_nodes)
-    body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
-    body.extend(
-        "    const s_t tangent%d = s_t(tangent[%s]);"
-        % (slot, _TANGENT_ADDRESS % slot)
+    wanted = _all_names("h", component, n_nodes)
+    gathered = [
+        ("h%s_%d" % (name, node), "h%s" % name, node)
+        for name in component
+        for node in range(n_nodes)
+        if sp.Symbol("h%s_%d" % (name, node)) in wanted
+    ]
+    scratch = _connectivity_scratch(n_nodes)
+    scratch.extend("    s_t b%s[VS];" % value for value, _s, _n in gathered)
+    scratch.extend(
+        "    s_t bout%d_%d[VS];" % (index, node)
+        for index in range(len(component))
+        for node in range(n_nodes)
+    )
+    # Staged outside the arithmetic loop, one pass each: these are indirect and
+    # will not vectorise, and leaving them inside stops the arithmetic
+    # vectorising with them.  The tangent is not staged -- component-major makes
+    # it contiguous across the lanes already.
+    gathers = _lane_loop(
+        [
+            "      b%s[lane] = %s[bev%d[lane] * h_stride];" % (value, source, node)
+            for value, source, node in gathered
+        ]
+    )
+    compute = [
+        "      const s_t %s = b%s[lane];" % (value, value) for value, _s, _n in gathered
+    ]
+    compute.extend(
+        "      const s_t tangent%d = s_t(tangent[%s]);"
+        % (slot, _BLOCKED_TANGENT_ADDRESS % slot)
         for slot in range(plan.tangent_components)
     )
-    body.extend(action_body)
-    body.extend(_scatter_body(component, n_nodes))
+    compute.extend("  %s" % line for line in action_body)
+    compute.extend(
+        "      bout%d_%d[lane] = element_out%d_%d;" % (index, node, index, node)
+        for index in range(len(component))
+        for node in range(n_nodes)
+    )
+    store = _blocked_scatter(component, n_nodes)
 
     signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]
     signature.extend(
@@ -366,11 +402,10 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body):
     )
     signature.extend(_stream_arguments("h", component))
     signature.extend(_output_arguments(component))
-    return _function_lines(
+    return _blocked_function_lines(
         "%s_inexact_apply_stored_a_msoa" % prefix,
-        "template <typename s_t, typename tangent_t>",
-        signature,
-        body,
+        "template <typename s_t, typename tangent_t, int VS>",
+        signature, scratch, gathers, compute, store,
     )
 
 
@@ -429,6 +464,96 @@ def _all_names(role, component, n_nodes):
     )
 
 
+def _simd_pragma(indent):
+    """The lane loop's vectorize pragma, from the bound target.
+
+    Spelled by the target rather than here, like the element loop above it: a
+    backend that does not vectorise this way returns nothing and the loop is
+    emitted plain.
+    """
+    target = current_target()
+    if target is None or not hasattr(target, "vectorize_pragma"):
+        return []
+    pragma = target.vectorize_pragma()
+    return ["%s%s" % (indent, pragma)] if pragma else []
+
+
+def _lane_loop(body, indent="    "):
+    return _simd_pragma(indent) + [
+        "%sfor (int lane = 0; lane < ne; ++lane) {" % indent, *body, "%s}" % indent,
+    ]
+
+
+def _connectivity_scratch(n_nodes):
+    """The block's connectivity, gathered in one pass.
+
+    One loop with `n_nodes` statements rather than `n_nodes` loops with one
+    each: the stores belong in a single SIMD region, and opening one per node
+    is the pattern `tests/test_kernels_are_lean.py` gates against.
+    """
+    scratch = ["    idx_t bev%d[VS];" % node for node in range(n_nodes)]
+    scratch.extend(
+        _lane_loop(
+            [
+                "      bev%d[lane] = elements[%d][evb + lane];" % (node, node)
+                for node in range(n_nodes)
+            ]
+        )
+    )
+    return scratch
+
+
+def _blocked_function_lines(name, template, signature, scratch, gathers, compute, store):
+    """One kernel, blocked over `VS` elements, with the gathers staged.
+
+    The values this kernel reads come through the mesh connectivity, so their
+    loads are indirect and cannot vectorise.  They are staged into lane-major
+    scratch in their own passes, which is how the exact apply in this framework
+    gets vector code out of the arithmetic that follows: by the time the
+    arithmetic loop runs, everything it touches is contiguous in the lane.
+    """
+    lines = [template, "static SFEM_INLINE int %s_impl(" % name]
+    lines.extend(signature)
+    lines.append(") {")
+    lines.extend(_parallel_loop_lines())
+    lines.append("  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {")
+    lines.append(
+        "    const int ne = (int)((nelements - evb) < (ptrdiff_t)VS "
+        "? (nelements - evb) : (ptrdiff_t)VS);"
+    )
+    lines.extend(scratch)
+    lines.extend(gathers)
+    lines.extend(_simd_pragma("    "))
+    lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+    lines.extend(compute)
+    lines.append("    }")
+    lines.extend(store)
+    lines.extend(["  }", "", "  return SFEM_SUCCESS;", "}", ""])
+    return lines
+
+
+def _blocked_scatter(component, n_nodes, scale=""):
+    """Scatter the block's outputs, serially over the lanes.
+
+    Not a lane loop: two lanes in one block can land on the same node, so this
+    stays an atomic read-modify-write per lane, as the framework's other mesh
+    kernels do.
+    """
+    lines = []
+    for index, name in enumerate(component):
+        for node in range(n_nodes):
+            lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+            lines.extend(
+                _scatter_lines(
+                    "out%s[bev%d[lane] * out_stride]" % (name, node),
+                    "%sbout%d_%d[lane]" % (scale, index, node),
+                    "      ",
+                )
+            )
+            lines.append("    }")
+    return lines
+
+
 def _function_lines(name, template, signature, body):
     lines = [template, "static SFEM_INLINE int %s_impl(" % name]
     lines.extend(signature)
@@ -440,6 +565,9 @@ def _function_lines(name, template, signature, body):
     return lines
 
 
+
+#: The block width the published C entry points instantiate with.
+_ABI_VECTOR_SIZE = 16
 
 #: How the tangent is stored at the ABI boundary.  These are SFEM's own types
 #: for exactly this object: `metric_tensor_t` is what the hand-written partial
@@ -537,7 +665,7 @@ def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
             [
                 ") {",
                 "  return sfem::codegen::%s_inexact_apply_stored_a_msoa_impl<"
-                "%s, metric_tensor_t>(" % (prefix, scalar),
+                "%s, metric_tensor_t, %d>(" % (prefix, scalar, _ABI_VECTOR_SIZE),
                 "      nelements, elements,",
                 "      tangent_element_stride, tangent_component_stride, tangent,",
                 "      h_stride, %s," % ", ".join("h%s" % n for n in component),

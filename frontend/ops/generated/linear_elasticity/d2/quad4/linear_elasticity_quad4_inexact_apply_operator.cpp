@@ -39,7 +39,7 @@ extern "C" int linear_elasticity_quad4_inexact_apply_stored_a_msoa(
     double *const RSTR outx,
     double *const RSTR outy
 ) {
-  return sfem::codegen::linear_elasticity_quad4_inexact_apply_stored_a_msoa_impl<double, metric_tensor_t>(
+  return sfem::codegen::linear_elasticity_quad4_inexact_apply_stored_a_msoa_impl<double, metric_tensor_t, 16>(
       nelements, elements,
       tangent_element_stride, tangent_component_stride, tangent,
       h_stride, hx, hy,
@@ -104,7 +104,7 @@ extern "C" int linear_elasticity_quad4_inexact_apply_stored_a_msoa_float(
     float *const RSTR outx,
     float *const RSTR outy
 ) {
-  return sfem::codegen::linear_elasticity_quad4_inexact_apply_stored_a_msoa_impl<float, metric_tensor_t>(
+  return sfem::codegen::linear_elasticity_quad4_inexact_apply_stored_a_msoa_impl<float, metric_tensor_t, 16>(
       nelements, elements,
       tangent_element_stride, tangent_component_stride, tangent,
       h_stride, hx, hy,

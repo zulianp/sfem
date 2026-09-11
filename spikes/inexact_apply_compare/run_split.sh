@@ -69,8 +69,18 @@ if [ "$ELEMENT" = "HEX8" ]; then
     done
 fi
 
+# OpenMP, without which every `#pragma omp simd` in the generated kernels is a
+# no-op.  It was missing, so these benchmarks measured unvectorised code and any
+# comparison of a lane-blocked kernel against a scalar one was meaningless --
+# the blocking showed up as pure overhead because its pragmas did nothing.
+OMPFLAGS="-fopenmp"
+if [ "$(uname -s)" = "Darwin" ]; then
+    OMPPREFIX="$(brew --prefix libomp 2>/dev/null || echo /opt/homebrew/opt/libomp)"
+    OMPFLAGS="-Xpreprocessor -fopenmp -I$OMPPREFIX/include -L$OMPPREFIX/lib -lomp"
+fi
+
 echo "[2/3] compiling with $CXX" | tee -a "$LOG"
-$CXX -std=c++17 -O3 -march=native -DNDEBUG $TAKES_STATE \
+$CXX -std=c++17 -O3 -march=native -DNDEBUG $TAKES_STATE $OMPFLAGS \
     -DELEMENT_${ELEMENT} \
     -DMATERIAL_LABEL="\"$MATERIAL\"" \
     -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${LOWER}_inexact_apply_inline.hpp\"" \

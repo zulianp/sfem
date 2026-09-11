@@ -184,7 +184,7 @@ static SFEM_INLINE int linear_elasticity_tet4_inexact_apply_tangent_a_msoa_impl(
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, typename tangent_t>
+template <typename s_t, typename tangent_t, int VS>
 static SFEM_INLINE int linear_elasticity_tet4_inexact_apply_stored_a_msoa_impl(
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
@@ -201,143 +201,229 @@ static SFEM_INLINE int linear_elasticity_tet4_inexact_apply_stored_a_msoa_impl(
     s_t *const RSTR outz
 ) {
   #pragma omp parallel for schedule(static)
-  for (ptrdiff_t element = 0; element < nelements; ++element) {
-    const idx_t ev0 = elements[0][element];
-    const idx_t ev1 = elements[1][element];
-    const idx_t ev2 = elements[2][element];
-    const idx_t ev3 = elements[3][element];
-    const s_t hx_0 = hx[ev0 * h_stride];
-    const s_t hx_1 = hx[ev1 * h_stride];
-    const s_t hx_2 = hx[ev2 * h_stride];
-    const s_t hx_3 = hx[ev3 * h_stride];
-    const s_t hy_0 = hy[ev0 * h_stride];
-    const s_t hy_1 = hy[ev1 * h_stride];
-    const s_t hy_2 = hy[ev2 * h_stride];
-    const s_t hy_3 = hy[ev3 * h_stride];
-    const s_t hz_0 = hz[ev0 * h_stride];
-    const s_t hz_1 = hz[ev1 * h_stride];
-    const s_t hz_2 = hz[ev2 * h_stride];
-    const s_t hz_3 = hz[ev3 * h_stride];
-    const s_t tangent0 = s_t(tangent[element * tangent_element_stride + 0 * tangent_component_stride]);
-    const s_t tangent1 = s_t(tangent[element * tangent_element_stride + 1 * tangent_component_stride]);
-    const s_t tangent2 = s_t(tangent[element * tangent_element_stride + 2 * tangent_component_stride]);
-    const s_t tangent3 = s_t(tangent[element * tangent_element_stride + 3 * tangent_component_stride]);
-    const s_t tangent4 = s_t(tangent[element * tangent_element_stride + 4 * tangent_component_stride]);
-    const s_t tangent5 = s_t(tangent[element * tangent_element_stride + 5 * tangent_component_stride]);
-    const s_t tangent6 = s_t(tangent[element * tangent_element_stride + 6 * tangent_component_stride]);
-    const s_t tangent7 = s_t(tangent[element * tangent_element_stride + 7 * tangent_component_stride]);
-    const s_t tangent8 = s_t(tangent[element * tangent_element_stride + 8 * tangent_component_stride]);
-    const s_t tangent9 = s_t(tangent[element * tangent_element_stride + 9 * tangent_component_stride]);
-    const s_t tangent10 = s_t(tangent[element * tangent_element_stride + 10 * tangent_component_stride]);
-    const s_t tangent11 = s_t(tangent[element * tangent_element_stride + 11 * tangent_component_stride]);
-    const s_t tangent12 = s_t(tangent[element * tangent_element_stride + 12 * tangent_component_stride]);
-    const s_t tangent13 = s_t(tangent[element * tangent_element_stride + 13 * tangent_component_stride]);
-    const s_t tangent14 = s_t(tangent[element * tangent_element_stride + 14 * tangent_component_stride]);
-    const s_t tangent15 = s_t(tangent[element * tangent_element_stride + 15 * tangent_component_stride]);
-    const s_t tangent16 = s_t(tangent[element * tangent_element_stride + 16 * tangent_component_stride]);
-    const s_t tangent17 = s_t(tangent[element * tangent_element_stride + 17 * tangent_component_stride]);
-    const s_t tangent18 = s_t(tangent[element * tangent_element_stride + 18 * tangent_component_stride]);
-    const s_t tangent19 = s_t(tangent[element * tangent_element_stride + 19 * tangent_component_stride]);
-    const s_t tangent20 = s_t(tangent[element * tangent_element_stride + 20 * tangent_component_stride]);
-    const s_t tangent21 = s_t(tangent[element * tangent_element_stride + 21 * tangent_component_stride]);
-    const s_t tangent22 = s_t(tangent[element * tangent_element_stride + 22 * tangent_component_stride]);
-    const s_t tangent23 = s_t(tangent[element * tangent_element_stride + 23 * tangent_component_stride]);
-    const s_t tangent24 = s_t(tangent[element * tangent_element_stride + 24 * tangent_component_stride]);
-    const s_t tangent25 = s_t(tangent[element * tangent_element_stride + 25 * tangent_component_stride]);
-    const s_t tangent26 = s_t(tangent[element * tangent_element_stride + 26 * tangent_component_stride]);
-    const s_t tangent27 = s_t(tangent[element * tangent_element_stride + 27 * tangent_component_stride]);
-    const s_t tangent28 = s_t(tangent[element * tangent_element_stride + 28 * tangent_component_stride]);
-    const s_t tangent29 = s_t(tangent[element * tangent_element_stride + 29 * tangent_component_stride]);
-    const s_t tangent30 = s_t(tangent[element * tangent_element_stride + 30 * tangent_component_stride]);
-    const s_t tangent31 = s_t(tangent[element * tangent_element_stride + 31 * tangent_component_stride]);
-    const s_t tangent32 = s_t(tangent[element * tangent_element_stride + 32 * tangent_component_stride]);
-    const s_t tangent33 = s_t(tangent[element * tangent_element_stride + 33 * tangent_component_stride]);
-    const s_t tangent34 = s_t(tangent[element * tangent_element_stride + 34 * tangent_component_stride]);
-    const s_t tangent35 = s_t(tangent[element * tangent_element_stride + 35 * tangent_component_stride]);
-    const s_t tangent36 = s_t(tangent[element * tangent_element_stride + 36 * tangent_component_stride]);
-    const s_t tangent37 = s_t(tangent[element * tangent_element_stride + 37 * tangent_component_stride]);
-    const s_t tangent38 = s_t(tangent[element * tangent_element_stride + 38 * tangent_component_stride]);
-    const s_t tangent39 = s_t(tangent[element * tangent_element_stride + 39 * tangent_component_stride]);
-    const s_t tangent40 = s_t(tangent[element * tangent_element_stride + 40 * tangent_component_stride]);
-    const s_t tangent41 = s_t(tangent[element * tangent_element_stride + 41 * tangent_component_stride]);
-    const s_t tangent42 = s_t(tangent[element * tangent_element_stride + 42 * tangent_component_stride]);
-    const s_t tangent43 = s_t(tangent[element * tangent_element_stride + 43 * tangent_component_stride]);
-    const s_t tangent44 = s_t(tangent[element * tangent_element_stride + 44 * tangent_component_stride]);
-    const s_t compressed_increment_t0 = ((s_t(1) / s_t(6)))*hx_0;
-    const s_t compressed_increment_t1 = ((s_t(1) / s_t(6)))*hy_0;
-    const s_t compressed_increment_t2 = ((s_t(1) / s_t(6)))*hz_0;
-    const s_t pa_p0_0_0 = compressed_increment_t0 - (s_t(1) / s_t(6))*hx_1;
-    const s_t pa_p0_0_1 = compressed_increment_t0 - (s_t(1) / s_t(6))*hx_2;
-    const s_t pa_p0_0_2 = compressed_increment_t0 - (s_t(1) / s_t(6))*hx_3;
-    const s_t pa_p1_0_0 = compressed_increment_t1 - (s_t(1) / s_t(6))*hy_1;
-    const s_t pa_p1_0_1 = compressed_increment_t1 - (s_t(1) / s_t(6))*hy_2;
-    const s_t pa_p1_0_2 = compressed_increment_t1 - (s_t(1) / s_t(6))*hy_3;
-    const s_t pa_p2_0_0 = compressed_increment_t2 - (s_t(1) / s_t(6))*hz_1;
-    const s_t pa_p2_0_1 = compressed_increment_t2 - (s_t(1) / s_t(6))*hz_2;
-    const s_t pa_p2_0_2 = compressed_increment_t2 - (s_t(1) / s_t(6))*hz_3;
-    const s_t pa_y0_0_0 = pa_p0_0_0*tangent0 + pa_p0_0_1*tangent1 + pa_p0_0_2*tangent2 + pa_p1_0_0*tangent3 + pa_p1_0_1*tangent4 + pa_p1_0_2*tangent5 + pa_p2_0_0*tangent6 + pa_p2_0_1*tangent7 + pa_p2_0_2*tangent8;
-    const s_t pa_y0_0_1 = pa_p0_0_0*tangent1 + pa_p0_0_1*tangent9 + pa_p0_0_2*tangent10 + pa_p1_0_0*tangent11 + pa_p1_0_1*tangent12 + pa_p1_0_2*tangent13 + pa_p2_0_0*tangent14 + pa_p2_0_1*tangent15 + pa_p2_0_2*tangent16;
-    const s_t pa_y0_0_2 = pa_p0_0_0*tangent2 + pa_p0_0_1*tangent10 + pa_p0_0_2*tangent17 + pa_p1_0_0*tangent18 + pa_p1_0_1*tangent19 + pa_p1_0_2*tangent20 + pa_p2_0_0*tangent21 + pa_p2_0_1*tangent22 + pa_p2_0_2*tangent23;
-    const s_t pa_y1_0_0 = pa_p0_0_0*tangent3 + pa_p0_0_1*tangent11 + pa_p0_0_2*tangent18 + pa_p1_0_0*tangent24 + pa_p1_0_1*tangent25 + pa_p1_0_2*tangent26 + pa_p2_0_0*tangent27 + pa_p2_0_1*tangent28 + pa_p2_0_2*tangent29;
-    const s_t pa_y1_0_1 = pa_p0_0_0*tangent4 + pa_p0_0_1*tangent12 + pa_p0_0_2*tangent19 + pa_p1_0_0*tangent25 + pa_p1_0_1*tangent30 + pa_p1_0_2*tangent31 + pa_p2_0_0*tangent32 + pa_p2_0_1*tangent33 + pa_p2_0_2*tangent34;
-    const s_t pa_y1_0_2 = pa_p0_0_0*tangent5 + pa_p0_0_1*tangent13 + pa_p0_0_2*tangent20 + pa_p1_0_0*tangent26 + pa_p1_0_1*tangent31 + pa_p1_0_2*tangent35 + pa_p2_0_0*tangent36 + pa_p2_0_1*tangent37 + pa_p2_0_2*tangent38;
-    const s_t pa_y2_0_0 = pa_p0_0_0*tangent6 + pa_p0_0_1*tangent14 + pa_p0_0_2*tangent21 + pa_p1_0_0*tangent27 + pa_p1_0_1*tangent32 + pa_p1_0_2*tangent36 + pa_p2_0_0*tangent39 + pa_p2_0_1*tangent40 + pa_p2_0_2*tangent41;
-    const s_t pa_y2_0_1 = pa_p0_0_0*tangent7 + pa_p0_0_1*tangent15 + pa_p0_0_2*tangent22 + pa_p1_0_0*tangent28 + pa_p1_0_1*tangent33 + pa_p1_0_2*tangent37 + pa_p2_0_0*tangent40 + pa_p2_0_1*tangent42 + pa_p2_0_2*tangent43;
-    const s_t pa_y2_0_2 = pa_p0_0_0*tangent8 + pa_p0_0_1*tangent16 + pa_p0_0_2*tangent23 + pa_p1_0_0*tangent29 + pa_p1_0_1*tangent34 + pa_p1_0_2*tangent38 + pa_p2_0_0*tangent41 + pa_p2_0_1*tangent43 + pa_p2_0_2*tangent44;
-    const s_t pa_q0_0_0 = s_t(6)*pa_y0_0_0;
-    const s_t pa_q0_0_1 = s_t(6)*pa_y0_0_1;
-    const s_t pa_q0_0_2 = s_t(6)*pa_y0_0_2;
-    const s_t pa_q1_0_0 = s_t(6)*pa_y1_0_0;
-    const s_t pa_q1_0_1 = s_t(6)*pa_y1_0_1;
-    const s_t pa_q1_0_2 = s_t(6)*pa_y1_0_2;
-    const s_t pa_q2_0_0 = s_t(6)*pa_y2_0_0;
-    const s_t pa_q2_0_1 = s_t(6)*pa_y2_0_1;
-    const s_t pa_q2_0_2 = s_t(6)*pa_y2_0_2;
-    const s_t output_t0 = ((s_t(1) / s_t(6)))*pa_q0_0_0;
-    const s_t output_t1 = ((s_t(1) / s_t(6)))*pa_q0_0_1;
-    const s_t output_t2 = ((s_t(1) / s_t(6)))*pa_q0_0_2;
-    const s_t output_t3 = ((s_t(1) / s_t(6)))*pa_q1_0_0;
-    const s_t output_t4 = ((s_t(1) / s_t(6)))*pa_q1_0_1;
-    const s_t output_t5 = ((s_t(1) / s_t(6)))*pa_q1_0_2;
-    const s_t output_t6 = ((s_t(1) / s_t(6)))*pa_q2_0_0;
-    const s_t output_t7 = ((s_t(1) / s_t(6)))*pa_q2_0_1;
-    const s_t output_t8 = ((s_t(1) / s_t(6)))*pa_q2_0_2;
-    const s_t element_out0_0 = output_t0 + output_t1 + output_t2;
-    const s_t element_out0_1 = -output_t0;
-    const s_t element_out0_2 = -output_t1;
-    const s_t element_out0_3 = -output_t2;
-    const s_t element_out1_0 = output_t3 + output_t4 + output_t5;
-    const s_t element_out1_1 = -output_t3;
-    const s_t element_out1_2 = -output_t4;
-    const s_t element_out1_3 = -output_t5;
-    const s_t element_out2_0 = output_t6 + output_t7 + output_t8;
-    const s_t element_out2_1 = -output_t6;
-    const s_t element_out2_2 = -output_t7;
-    const s_t element_out2_3 = -output_t8;
-    #pragma omp atomic update
-    outx[ev0 * out_stride] += element_out0_0;
-    #pragma omp atomic update
-    outx[ev1 * out_stride] += element_out0_1;
-    #pragma omp atomic update
-    outx[ev2 * out_stride] += element_out0_2;
-    #pragma omp atomic update
-    outx[ev3 * out_stride] += element_out0_3;
-    #pragma omp atomic update
-    outy[ev0 * out_stride] += element_out1_0;
-    #pragma omp atomic update
-    outy[ev1 * out_stride] += element_out1_1;
-    #pragma omp atomic update
-    outy[ev2 * out_stride] += element_out1_2;
-    #pragma omp atomic update
-    outy[ev3 * out_stride] += element_out1_3;
-    #pragma omp atomic update
-    outz[ev0 * out_stride] += element_out2_0;
-    #pragma omp atomic update
-    outz[ev1 * out_stride] += element_out2_1;
-    #pragma omp atomic update
-    outz[ev2 * out_stride] += element_out2_2;
-    #pragma omp atomic update
-    outz[ev3 * out_stride] += element_out2_3;
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)((nelements - evb) < (ptrdiff_t)VS ? (nelements - evb) : (ptrdiff_t)VS);
+    idx_t bev0[VS];
+    idx_t bev1[VS];
+    idx_t bev2[VS];
+    idx_t bev3[VS];
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      bev0[lane] = elements[0][evb + lane];
+      bev1[lane] = elements[1][evb + lane];
+      bev2[lane] = elements[2][evb + lane];
+      bev3[lane] = elements[3][evb + lane];
+    }
+    s_t bhx_0[VS];
+    s_t bhx_1[VS];
+    s_t bhx_2[VS];
+    s_t bhx_3[VS];
+    s_t bhy_0[VS];
+    s_t bhy_1[VS];
+    s_t bhy_2[VS];
+    s_t bhy_3[VS];
+    s_t bhz_0[VS];
+    s_t bhz_1[VS];
+    s_t bhz_2[VS];
+    s_t bhz_3[VS];
+    s_t bout0_0[VS];
+    s_t bout0_1[VS];
+    s_t bout0_2[VS];
+    s_t bout0_3[VS];
+    s_t bout1_0[VS];
+    s_t bout1_1[VS];
+    s_t bout1_2[VS];
+    s_t bout1_3[VS];
+    s_t bout2_0[VS];
+    s_t bout2_1[VS];
+    s_t bout2_2[VS];
+    s_t bout2_3[VS];
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      bhx_0[lane] = hx[bev0[lane] * h_stride];
+      bhx_1[lane] = hx[bev1[lane] * h_stride];
+      bhx_2[lane] = hx[bev2[lane] * h_stride];
+      bhx_3[lane] = hx[bev3[lane] * h_stride];
+      bhy_0[lane] = hy[bev0[lane] * h_stride];
+      bhy_1[lane] = hy[bev1[lane] * h_stride];
+      bhy_2[lane] = hy[bev2[lane] * h_stride];
+      bhy_3[lane] = hy[bev3[lane] * h_stride];
+      bhz_0[lane] = hz[bev0[lane] * h_stride];
+      bhz_1[lane] = hz[bev1[lane] * h_stride];
+      bhz_2[lane] = hz[bev2[lane] * h_stride];
+      bhz_3[lane] = hz[bev3[lane] * h_stride];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      const s_t hx_0 = bhx_0[lane];
+      const s_t hx_1 = bhx_1[lane];
+      const s_t hx_2 = bhx_2[lane];
+      const s_t hx_3 = bhx_3[lane];
+      const s_t hy_0 = bhy_0[lane];
+      const s_t hy_1 = bhy_1[lane];
+      const s_t hy_2 = bhy_2[lane];
+      const s_t hy_3 = bhy_3[lane];
+      const s_t hz_0 = bhz_0[lane];
+      const s_t hz_1 = bhz_1[lane];
+      const s_t hz_2 = bhz_2[lane];
+      const s_t hz_3 = bhz_3[lane];
+      const s_t tangent0 = s_t(tangent[(evb + lane) * tangent_element_stride + 0 * tangent_component_stride]);
+      const s_t tangent1 = s_t(tangent[(evb + lane) * tangent_element_stride + 1 * tangent_component_stride]);
+      const s_t tangent2 = s_t(tangent[(evb + lane) * tangent_element_stride + 2 * tangent_component_stride]);
+      const s_t tangent3 = s_t(tangent[(evb + lane) * tangent_element_stride + 3 * tangent_component_stride]);
+      const s_t tangent4 = s_t(tangent[(evb + lane) * tangent_element_stride + 4 * tangent_component_stride]);
+      const s_t tangent5 = s_t(tangent[(evb + lane) * tangent_element_stride + 5 * tangent_component_stride]);
+      const s_t tangent6 = s_t(tangent[(evb + lane) * tangent_element_stride + 6 * tangent_component_stride]);
+      const s_t tangent7 = s_t(tangent[(evb + lane) * tangent_element_stride + 7 * tangent_component_stride]);
+      const s_t tangent8 = s_t(tangent[(evb + lane) * tangent_element_stride + 8 * tangent_component_stride]);
+      const s_t tangent9 = s_t(tangent[(evb + lane) * tangent_element_stride + 9 * tangent_component_stride]);
+      const s_t tangent10 = s_t(tangent[(evb + lane) * tangent_element_stride + 10 * tangent_component_stride]);
+      const s_t tangent11 = s_t(tangent[(evb + lane) * tangent_element_stride + 11 * tangent_component_stride]);
+      const s_t tangent12 = s_t(tangent[(evb + lane) * tangent_element_stride + 12 * tangent_component_stride]);
+      const s_t tangent13 = s_t(tangent[(evb + lane) * tangent_element_stride + 13 * tangent_component_stride]);
+      const s_t tangent14 = s_t(tangent[(evb + lane) * tangent_element_stride + 14 * tangent_component_stride]);
+      const s_t tangent15 = s_t(tangent[(evb + lane) * tangent_element_stride + 15 * tangent_component_stride]);
+      const s_t tangent16 = s_t(tangent[(evb + lane) * tangent_element_stride + 16 * tangent_component_stride]);
+      const s_t tangent17 = s_t(tangent[(evb + lane) * tangent_element_stride + 17 * tangent_component_stride]);
+      const s_t tangent18 = s_t(tangent[(evb + lane) * tangent_element_stride + 18 * tangent_component_stride]);
+      const s_t tangent19 = s_t(tangent[(evb + lane) * tangent_element_stride + 19 * tangent_component_stride]);
+      const s_t tangent20 = s_t(tangent[(evb + lane) * tangent_element_stride + 20 * tangent_component_stride]);
+      const s_t tangent21 = s_t(tangent[(evb + lane) * tangent_element_stride + 21 * tangent_component_stride]);
+      const s_t tangent22 = s_t(tangent[(evb + lane) * tangent_element_stride + 22 * tangent_component_stride]);
+      const s_t tangent23 = s_t(tangent[(evb + lane) * tangent_element_stride + 23 * tangent_component_stride]);
+      const s_t tangent24 = s_t(tangent[(evb + lane) * tangent_element_stride + 24 * tangent_component_stride]);
+      const s_t tangent25 = s_t(tangent[(evb + lane) * tangent_element_stride + 25 * tangent_component_stride]);
+      const s_t tangent26 = s_t(tangent[(evb + lane) * tangent_element_stride + 26 * tangent_component_stride]);
+      const s_t tangent27 = s_t(tangent[(evb + lane) * tangent_element_stride + 27 * tangent_component_stride]);
+      const s_t tangent28 = s_t(tangent[(evb + lane) * tangent_element_stride + 28 * tangent_component_stride]);
+      const s_t tangent29 = s_t(tangent[(evb + lane) * tangent_element_stride + 29 * tangent_component_stride]);
+      const s_t tangent30 = s_t(tangent[(evb + lane) * tangent_element_stride + 30 * tangent_component_stride]);
+      const s_t tangent31 = s_t(tangent[(evb + lane) * tangent_element_stride + 31 * tangent_component_stride]);
+      const s_t tangent32 = s_t(tangent[(evb + lane) * tangent_element_stride + 32 * tangent_component_stride]);
+      const s_t tangent33 = s_t(tangent[(evb + lane) * tangent_element_stride + 33 * tangent_component_stride]);
+      const s_t tangent34 = s_t(tangent[(evb + lane) * tangent_element_stride + 34 * tangent_component_stride]);
+      const s_t tangent35 = s_t(tangent[(evb + lane) * tangent_element_stride + 35 * tangent_component_stride]);
+      const s_t tangent36 = s_t(tangent[(evb + lane) * tangent_element_stride + 36 * tangent_component_stride]);
+      const s_t tangent37 = s_t(tangent[(evb + lane) * tangent_element_stride + 37 * tangent_component_stride]);
+      const s_t tangent38 = s_t(tangent[(evb + lane) * tangent_element_stride + 38 * tangent_component_stride]);
+      const s_t tangent39 = s_t(tangent[(evb + lane) * tangent_element_stride + 39 * tangent_component_stride]);
+      const s_t tangent40 = s_t(tangent[(evb + lane) * tangent_element_stride + 40 * tangent_component_stride]);
+      const s_t tangent41 = s_t(tangent[(evb + lane) * tangent_element_stride + 41 * tangent_component_stride]);
+      const s_t tangent42 = s_t(tangent[(evb + lane) * tangent_element_stride + 42 * tangent_component_stride]);
+      const s_t tangent43 = s_t(tangent[(evb + lane) * tangent_element_stride + 43 * tangent_component_stride]);
+      const s_t tangent44 = s_t(tangent[(evb + lane) * tangent_element_stride + 44 * tangent_component_stride]);
+      const s_t compressed_increment_t0 = ((s_t(1) / s_t(6)))*hx_0;
+      const s_t compressed_increment_t1 = ((s_t(1) / s_t(6)))*hy_0;
+      const s_t compressed_increment_t2 = ((s_t(1) / s_t(6)))*hz_0;
+      const s_t pa_p0_0_0 = compressed_increment_t0 - (s_t(1) / s_t(6))*hx_1;
+      const s_t pa_p0_0_1 = compressed_increment_t0 - (s_t(1) / s_t(6))*hx_2;
+      const s_t pa_p0_0_2 = compressed_increment_t0 - (s_t(1) / s_t(6))*hx_3;
+      const s_t pa_p1_0_0 = compressed_increment_t1 - (s_t(1) / s_t(6))*hy_1;
+      const s_t pa_p1_0_1 = compressed_increment_t1 - (s_t(1) / s_t(6))*hy_2;
+      const s_t pa_p1_0_2 = compressed_increment_t1 - (s_t(1) / s_t(6))*hy_3;
+      const s_t pa_p2_0_0 = compressed_increment_t2 - (s_t(1) / s_t(6))*hz_1;
+      const s_t pa_p2_0_1 = compressed_increment_t2 - (s_t(1) / s_t(6))*hz_2;
+      const s_t pa_p2_0_2 = compressed_increment_t2 - (s_t(1) / s_t(6))*hz_3;
+      const s_t pa_y0_0_0 = pa_p0_0_0*tangent0 + pa_p0_0_1*tangent1 + pa_p0_0_2*tangent2 + pa_p1_0_0*tangent3 + pa_p1_0_1*tangent4 + pa_p1_0_2*tangent5 + pa_p2_0_0*tangent6 + pa_p2_0_1*tangent7 + pa_p2_0_2*tangent8;
+      const s_t pa_y0_0_1 = pa_p0_0_0*tangent1 + pa_p0_0_1*tangent9 + pa_p0_0_2*tangent10 + pa_p1_0_0*tangent11 + pa_p1_0_1*tangent12 + pa_p1_0_2*tangent13 + pa_p2_0_0*tangent14 + pa_p2_0_1*tangent15 + pa_p2_0_2*tangent16;
+      const s_t pa_y0_0_2 = pa_p0_0_0*tangent2 + pa_p0_0_1*tangent10 + pa_p0_0_2*tangent17 + pa_p1_0_0*tangent18 + pa_p1_0_1*tangent19 + pa_p1_0_2*tangent20 + pa_p2_0_0*tangent21 + pa_p2_0_1*tangent22 + pa_p2_0_2*tangent23;
+      const s_t pa_y1_0_0 = pa_p0_0_0*tangent3 + pa_p0_0_1*tangent11 + pa_p0_0_2*tangent18 + pa_p1_0_0*tangent24 + pa_p1_0_1*tangent25 + pa_p1_0_2*tangent26 + pa_p2_0_0*tangent27 + pa_p2_0_1*tangent28 + pa_p2_0_2*tangent29;
+      const s_t pa_y1_0_1 = pa_p0_0_0*tangent4 + pa_p0_0_1*tangent12 + pa_p0_0_2*tangent19 + pa_p1_0_0*tangent25 + pa_p1_0_1*tangent30 + pa_p1_0_2*tangent31 + pa_p2_0_0*tangent32 + pa_p2_0_1*tangent33 + pa_p2_0_2*tangent34;
+      const s_t pa_y1_0_2 = pa_p0_0_0*tangent5 + pa_p0_0_1*tangent13 + pa_p0_0_2*tangent20 + pa_p1_0_0*tangent26 + pa_p1_0_1*tangent31 + pa_p1_0_2*tangent35 + pa_p2_0_0*tangent36 + pa_p2_0_1*tangent37 + pa_p2_0_2*tangent38;
+      const s_t pa_y2_0_0 = pa_p0_0_0*tangent6 + pa_p0_0_1*tangent14 + pa_p0_0_2*tangent21 + pa_p1_0_0*tangent27 + pa_p1_0_1*tangent32 + pa_p1_0_2*tangent36 + pa_p2_0_0*tangent39 + pa_p2_0_1*tangent40 + pa_p2_0_2*tangent41;
+      const s_t pa_y2_0_1 = pa_p0_0_0*tangent7 + pa_p0_0_1*tangent15 + pa_p0_0_2*tangent22 + pa_p1_0_0*tangent28 + pa_p1_0_1*tangent33 + pa_p1_0_2*tangent37 + pa_p2_0_0*tangent40 + pa_p2_0_1*tangent42 + pa_p2_0_2*tangent43;
+      const s_t pa_y2_0_2 = pa_p0_0_0*tangent8 + pa_p0_0_1*tangent16 + pa_p0_0_2*tangent23 + pa_p1_0_0*tangent29 + pa_p1_0_1*tangent34 + pa_p1_0_2*tangent38 + pa_p2_0_0*tangent41 + pa_p2_0_1*tangent43 + pa_p2_0_2*tangent44;
+      const s_t pa_q0_0_0 = s_t(6)*pa_y0_0_0;
+      const s_t pa_q0_0_1 = s_t(6)*pa_y0_0_1;
+      const s_t pa_q0_0_2 = s_t(6)*pa_y0_0_2;
+      const s_t pa_q1_0_0 = s_t(6)*pa_y1_0_0;
+      const s_t pa_q1_0_1 = s_t(6)*pa_y1_0_1;
+      const s_t pa_q1_0_2 = s_t(6)*pa_y1_0_2;
+      const s_t pa_q2_0_0 = s_t(6)*pa_y2_0_0;
+      const s_t pa_q2_0_1 = s_t(6)*pa_y2_0_1;
+      const s_t pa_q2_0_2 = s_t(6)*pa_y2_0_2;
+      const s_t output_t0 = ((s_t(1) / s_t(6)))*pa_q0_0_0;
+      const s_t output_t1 = ((s_t(1) / s_t(6)))*pa_q0_0_1;
+      const s_t output_t2 = ((s_t(1) / s_t(6)))*pa_q0_0_2;
+      const s_t output_t3 = ((s_t(1) / s_t(6)))*pa_q1_0_0;
+      const s_t output_t4 = ((s_t(1) / s_t(6)))*pa_q1_0_1;
+      const s_t output_t5 = ((s_t(1) / s_t(6)))*pa_q1_0_2;
+      const s_t output_t6 = ((s_t(1) / s_t(6)))*pa_q2_0_0;
+      const s_t output_t7 = ((s_t(1) / s_t(6)))*pa_q2_0_1;
+      const s_t output_t8 = ((s_t(1) / s_t(6)))*pa_q2_0_2;
+      const s_t element_out0_0 = output_t0 + output_t1 + output_t2;
+      const s_t element_out0_1 = -output_t0;
+      const s_t element_out0_2 = -output_t1;
+      const s_t element_out0_3 = -output_t2;
+      const s_t element_out1_0 = output_t3 + output_t4 + output_t5;
+      const s_t element_out1_1 = -output_t3;
+      const s_t element_out1_2 = -output_t4;
+      const s_t element_out1_3 = -output_t5;
+      const s_t element_out2_0 = output_t6 + output_t7 + output_t8;
+      const s_t element_out2_1 = -output_t6;
+      const s_t element_out2_2 = -output_t7;
+      const s_t element_out2_3 = -output_t8;
+      bout0_0[lane] = element_out0_0;
+      bout0_1[lane] = element_out0_1;
+      bout0_2[lane] = element_out0_2;
+      bout0_3[lane] = element_out0_3;
+      bout1_0[lane] = element_out1_0;
+      bout1_1[lane] = element_out1_1;
+      bout1_2[lane] = element_out1_2;
+      bout1_3[lane] = element_out1_3;
+      bout2_0[lane] = element_out2_0;
+      bout2_1[lane] = element_out2_1;
+      bout2_2[lane] = element_out2_2;
+      bout2_3[lane] = element_out2_3;
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outx[bev0[lane] * out_stride] += bout0_0[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outx[bev1[lane] * out_stride] += bout0_1[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outx[bev2[lane] * out_stride] += bout0_2[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outx[bev3[lane] * out_stride] += bout0_3[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outy[bev0[lane] * out_stride] += bout1_0[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outy[bev1[lane] * out_stride] += bout1_1[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outy[bev2[lane] * out_stride] += bout1_2[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outy[bev3[lane] * out_stride] += bout1_3[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outz[bev0[lane] * out_stride] += bout2_0[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outz[bev1[lane] * out_stride] += bout2_1[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outz[bev2[lane] * out_stride] += bout2_2[lane];
+    }
+    for (int lane = 0; lane < ne; ++lane) {
+      #pragma omp atomic update
+      outz[bev3[lane] * out_stride] += bout2_3[lane];
+    }
   }
 
   return SFEM_SUCCESS;

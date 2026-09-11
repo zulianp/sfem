@@ -47,7 +47,7 @@ extern "C" int linear_elasticity_hex8_inexact_apply_stored_a_msoa(
     double *const RSTR outy,
     double *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_hex8_inexact_apply_stored_a_msoa_impl<double, metric_tensor_t>(
+  return sfem::codegen::linear_elasticity_hex8_inexact_apply_stored_a_msoa_impl<double, metric_tensor_t, 16>(
       nelements, elements,
       tangent_element_stride, tangent_component_stride, tangent,
       h_stride, hx, hy, hz,
@@ -122,7 +122,7 @@ extern "C" int linear_elasticity_hex8_inexact_apply_stored_a_msoa_float(
     float *const RSTR outy,
     float *const RSTR outz
 ) {
-  return sfem::codegen::linear_elasticity_hex8_inexact_apply_stored_a_msoa_impl<float, metric_tensor_t>(
+  return sfem::codegen::linear_elasticity_hex8_inexact_apply_stored_a_msoa_impl<float, metric_tensor_t, 16>(
       nelements, elements,
       tangent_element_stride, tangent_component_stride, tangent,
       h_stride, hx, hy, hz,
