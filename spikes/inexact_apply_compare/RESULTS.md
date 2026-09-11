@@ -956,29 +956,41 @@ right before any new kernel existed.
 Everything above measures kernels. This measures a solve: `drivers/mech/hyperelasticity_bdf2.exe.cpp`
 with `SFEM_LINEAR_OP_TYPE=INEXACT`, which assembles the tangent once per Newton
 iteration and applies it for every CG iteration inside that step. A 32-cube of HEX8,
-107811 dof, a bar clamped at one end and pulled at the other, Newton to 1e-8.
+107811 dof, a bar clamped at one end and pulled at the other, Newton to 1e-8, eight
+threads.
 
-| | Newton its | CG its | ms per apply | wall, 8 threads |
-|---|---|---|---|---|
-| matrix-free | 5 | 270 | 3.63 | 1.43 s |
-| inexact | 10 | 505 | **0.94** | **1.15 s** |
+**The inner tolerance is the driver's own.** CG inside a Newton step stops at 1e-2 or
+1e-3 -- this is an inexact Newton method and solving the linear system past the
+accuracy of the direction is wasted work. That matters here more than as a
+configuration detail: a tight inner solve does many applies per assembly, and *any*
+technique that trades a fixed setup for a cheaper apply is flattered by it. The first
+version of this table used 1e-8 and reported 1.24x. It is 1.15x where the solver
+actually runs.
+
+| rtol | | Newton its | CG its | ms per apply | wall |
+|---|---|---|---|---|---|
+| 1e-2 | matrix-free | 5 | 68 | 4.35 | 0.69 s |
+| 1e-2 | inexact | 10 | 125 | **0.93** | **0.60 s** |
+| 1e-3 | matrix-free | 5 | 103 | 3.88 | 0.76 s |
+| 1e-3 | inexact | 10 | 190 | **0.87** | **0.66 s** |
 
 Both reach the same answer: displacement norm 1.435772969701 against 1.435772969561,
 ten significant figures.
 
-**The apply is 3.9x cheaper and the solve is 1.24x faster, and the gap between those
-two numbers is the whole story.** An approximate tangent is a worse Newton direction:
-it takes ten iterations where the exact one takes five, and 505 linear iterations
-where it takes 270. Partial assembly buys a cheaper apply and spends some of it back
-on convergence. It still wins, but a factor of four in the kernel is a factor of 1.24
-in the solve, and quoting the first as if it were the second would be wrong.
+**The apply is 4.7x cheaper and the solve is 1.15x faster, and the gap is the
+result.** An approximate tangent is a worse Newton direction: ten iterations where
+the exact one takes five. Partial assembly buys a cheaper apply and spends most of it
+back on convergence. Quoting the kernel ratio as if it were the solve ratio would be
+wrong by a factor of four.
 
-The assembly itself is not the cost: 9 calls at 4.22 ms against applies at 0.94 ms is
-a break-even of **1.6 applies**, and CG does about 58 per Newton step. It is 3.7% of
-the run.
+The assembly is a real but small cost, and it grows as the inner solve loosens: 4.43
+ms against applies at 0.93 ms is a break-even of **1.3 applies**, CG does about 12
+per Newton step at 1e-2, and the assembly is **6.6%** of the run -- against 3.7% at
+the 1e-8 tolerance nobody uses. Tighten the inner solve and this technique looks
+better than it is; that is the direction the bias runs.
 
-**The advantage is largest where the machine is least busy.** Same problem, thread
-sweep:
+**The advantage is largest where the machine is least busy.** At 1e-8, where the
+thread sweep was taken:
 
 | threads | matrix-free | inexact | speed-up | ms/apply MF -> inexact |
 |---|---|---|---|---|
@@ -986,17 +998,20 @@ sweep:
 | 4 | 1.52 s | 1.07 s | 1.42x | 4.26 -> 0.91 |
 | 8 | 1.43 s | 1.15 s | 1.24x | 3.63 -> 0.94 |
 
-That shape is the roofline again. The exact apply is compute-bound and keeps scaling;
+That shape is the roofline again: the exact apply is compute-bound and keeps scaling,
 the stored apply reads a precomputed tangent and saturates earlier, so the ratio
-between them narrows as threads are added. The kernel benchmarks above are
-single-socket numbers on a saturated machine, which is the *pessimistic* end for this
-technique -- and it is still ahead there.
+narrows as threads are added. Read the ratios, not the wall times -- those are at the
+wrong tolerance.
 
 **How the function composes.** `Function::inexact_apply` applies the stored tangent
 where an operator has one and the exact apply where it does not. This driver needs
 that: its BDF2 inertia term has no stored tangent and is applied exactly, at the state
 its own `update` last saw -- which is the state the tangent was assembled at, because
 a Newton step drives both from the same iterate.
+
+**What this run does not include.** It is on the standard mesh layout. The packed
+layout, worth 70 to 150% on the apply above, needs a `FunctionSpace` built on a packed
+mesh, which this driver does not create.
 
 ## What the first version of these measurements got wrong
 
