@@ -82,6 +82,21 @@ class TargetPlatform:
     def parallel_for_pragma(self, schedule=None, reduction=None):
         return None
 
+    def parallel_region_pragma(self):
+        """The pragma opening a parallel region, or `None`.
+
+        Distinct from `parallel_for_pragma` because a kernel that stages through
+        thread-private scratch has to open the region *before* the loop, allocate
+        into it, and only then share the iterations out -- which is one pragma too
+        few for the combined form.  A target without one emits neither and runs
+        the loop serially, which is correct if slow.
+        """
+        return None
+
+    def worksharing_for_pragma(self, schedule=None):
+        """The pragma sharing a loop's iterations inside an open region."""
+        return None
+
     def vectorize_pragma(self):
         return None
 
@@ -210,6 +225,15 @@ class OpenMPTarget(TargetPlatform):
             pragma += " schedule(%s)" % str(schedule)
         if reduction:
             pragma += " reduction(%s)" % str(reduction)
+        return pragma
+
+    def parallel_region_pragma(self):
+        return "#pragma omp parallel"
+
+    def worksharing_for_pragma(self, schedule=None):
+        pragma = "#pragma omp for"
+        if schedule:
+            pragma += " schedule(%s)" % str(schedule)
         return pragma
 
     def vectorize_pragma(self):

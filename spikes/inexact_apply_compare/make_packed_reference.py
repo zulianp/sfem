@@ -57,7 +57,6 @@ static SFEM_INLINE int %(name)s(
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
     const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
     const ptrdiff_t max_nodes_per_pack,
     uint16_t **const RSTR elements,
     const ptrdiff_t *const RSTR owned_nodes_ptr,
@@ -80,7 +79,6 @@ static SFEM_INLINE int %(name)s(
     s_t *const RSTR outy,
     s_t *const RSTR outz
 ) {
-  (void)nnodes;
   static constexpr int NC = %(nc)d;
   const s_t *const h_components[NC] = {%(h_list)s};
   s_t *const out_components[NC] = {%(out_list)s};
@@ -181,7 +179,10 @@ def packed_stored(source, prefix, components=("x", "y", "z")):
         raise SystemExit("a global stride survived the transformation")
 
     return PACKED_SIGNATURE % {
-        "name": "%s_inexact_apply_stored_packed_two_pass_a_msoa_impl" % prefix,
+        # A distinct name so the reference and the generated kernel can live in
+        # one binary and be timed against each other in one run.  Comparing them
+        # across runs measures the machine's mood as much as the kernels.
+        "name": "%s_inexact_apply_stored_packed_two_pass_reference_impl" % prefix,
         "nc": len(components),
         "h_list": ", ".join("h%s" % name for name in components),
         "out_list": ", ".join("out%s" % name for name in components),

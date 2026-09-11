@@ -448,7 +448,16 @@ def abi_qualifier(name):
         slot = head[index + len(verb) + 1 :]
         if not slot:
             return ""
-        known = tuple(short for _, short in ABI_TRAVERSAL_SPELLING) + ABI_INEXACT_MODES
+        traversals = tuple(short for _, short in ABI_TRAVERSAL_SPELLING)
+        # The slot may hold a store, a traversal, or -- since the inexact apply
+        # grew a packed variant -- a store followed by a traversal.  Two
+        # occupants, because they answer different questions about the same
+        # kernel: which store it reads, and how it walks the mesh.
+        known = tuple(
+            "%s_%s" % (mode, traversal)
+            for mode in ABI_INEXACT_MODES
+            for traversal in traversals
+        ) + traversals + ABI_INEXACT_MODES
         for candidate in known:
             if slot == "_%s" % candidate:
                 return candidate
@@ -457,6 +466,21 @@ def abi_qualifier(name):
             "geometry; the naming table and the emitters disagree" % (name, slot)
         )
     raise ValueError("no verb from the table appears in %s" % name)
+
+
+def abi_traversal(qualifier):
+    """The traversal half of a qualifier slot, or `""` when it holds none.
+
+    `stored_packed_two_pass` is one slot with two occupants; everything that
+    routes by traversal wants only the second.  Splitting it here rather than at
+    each consumer is what keeps the pair in one place.
+    """
+    for mode in ABI_INEXACT_MODES:
+        if qualifier == mode:
+            return ""
+        if qualifier.startswith("%s_" % mode):
+            return qualifier[len(mode) + 1 :]
+    return qualifier
 
 
 def abi_geometry(name):

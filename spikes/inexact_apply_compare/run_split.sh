@@ -16,6 +16,9 @@ MESH_ORDER="${MESH_ORDER:-morton3}"
 # PACKED=1 additionally benchmarks the packed two-pass exact apply, which the
 # generator already publishes.  PACK_SIZE sets the elements per pack.
 PACKED="${PACKED:-}"
+# PACKED_REFERENCE=1 measures the hand-written reference instead of the generated
+# kernel -- the two must agree, and that is what makes the port verifiable.
+PACKED_REFERENCE="${PACKED_REFERENCE:-}"
 PACK_SIZE="${PACK_SIZE:-}"
 
 MATERIAL="${1:-neohookean_ogden}"
@@ -91,7 +94,7 @@ fi
 
 # The packed reference, derived from the emitted standard kernel.  Regenerated
 # every run: it is a function of the generated header and must not drift from it.
-if [ -n "$PACKED" ]; then
+if [ -n "$PACKED_REFERENCE" ]; then
     "$PYTHON" "$HERE/make_packed_reference.py" \
         "$GEN/${MATERIAL}_${LOWER}_inexact_apply_inline.hpp" \
         "$GEN/packed_reference.hpp" "${MATERIAL}_${LOWER}" 2>&1 | tee -a "$LOG"
@@ -109,7 +112,8 @@ $CXX -std=c++17 -O3 -march=native -DNDEBUG $TAKES_STATE $OMPFLAGS \
     -DCOMPRESSED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_compressed_a_msoa_impl \
     ${PACKED:+-DPACKED_EXACT_APPLY=${MATERIAL}_${LOWER}_apply_packed_two_pass_a_msoa} \
     ${PACKED:+-DPACKED_STORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_packed_two_pass_a_msoa_impl} \
-    ${PACKED:+-DMATERIAL_PACKED_REFERENCE="\"packed_reference.hpp\""} \
+    ${PACKED_REFERENCE:+-DMATERIAL_PACKED_REFERENCE="\"packed_reference.hpp\""} \
+    ${PACKED_REFERENCE:+-DPACKED_REFERENCE_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_packed_two_pass_reference_impl} \
     ${PACK_SIZE:+-DPACK_SIZE=$PACK_SIZE} \
     -o "$WORK/bench_split_${MATERIAL}_${LOWER}_${MESH_ORDER}" \
     "$HERE/bench_split.cpp" "$GEN/${MATERIAL}_${LOWER}_operator.cpp" $EXTRA_TU \

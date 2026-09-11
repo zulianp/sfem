@@ -6,6 +6,7 @@ from codegen.framework.plans.conventions import (
     ABI_TRAVERSAL_UNIT,
     abi_geometry,
     abi_qualifier,
+    abi_traversal,
     abi_local_level,
     abi_with_geometry_qualifier,
     ABI_TRAVERSAL_SPELLING,
@@ -5267,7 +5268,9 @@ def _dispatch_source_kind(function_name):
     """
     qualifier = abi_qualifier(function_name)
     geometry = abi_geometry(function_name)
-    unit = ABI_TRAVERSAL_UNIT.get(qualifier)
+    # The slot can hold a store *and* a traversal -- a packed inexact apply does
+    # -- and only the traversal decides the translation unit.
+    unit = ABI_TRAVERSAL_UNIT.get(abi_traversal(qualifier))
     if unit is None:
         # No traversal: a plain kernel, or an inexact-apply store, which shares
         # the slot but not the translation unit.

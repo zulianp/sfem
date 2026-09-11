@@ -585,6 +585,162 @@ extern "C" int linear_elasticity_tet4_gradient_packed_two_pass_a_msoa(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int linear_elasticity_hex8_inexact_apply_stored_packed_two_pass_a_msoa(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    double *const RSTR ghost_buf,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const double *const RSTR hx,
+    const double *const RSTR hy,
+    const double *const RSTR hz,
+    const ptrdiff_t out_stride,
+    double *const RSTR outx,
+    double *const RSTR outy,
+    double *const RSTR outz
+);
+extern "C" int linear_elasticity_hex8_inexact_apply_stored_packed_two_pass_a_msoa_float(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    float *const RSTR ghost_buf,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const float *const RSTR hx,
+    const float *const RSTR hy,
+    const float *const RSTR hz,
+    const ptrdiff_t out_stride,
+    float *const RSTR outx,
+    float *const RSTR outy,
+    float *const RSTR outz
+);
+extern "C" int linear_elasticity_tet10_inexact_apply_stored_packed_two_pass_a_msoa(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    double *const RSTR ghost_buf,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const double *const RSTR hx,
+    const double *const RSTR hy,
+    const double *const RSTR hz,
+    const ptrdiff_t out_stride,
+    double *const RSTR outx,
+    double *const RSTR outy,
+    double *const RSTR outz
+);
+extern "C" int linear_elasticity_tet10_inexact_apply_stored_packed_two_pass_a_msoa_float(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    float *const RSTR ghost_buf,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const float *const RSTR hx,
+    const float *const RSTR hy,
+    const float *const RSTR hz,
+    const ptrdiff_t out_stride,
+    float *const RSTR outx,
+    float *const RSTR outy,
+    float *const RSTR outz
+);
+extern "C" int linear_elasticity_tet4_inexact_apply_stored_packed_two_pass_a_msoa(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    double *const RSTR ghost_buf,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const double *const RSTR hx,
+    const double *const RSTR hy,
+    const double *const RSTR hz,
+    const ptrdiff_t out_stride,
+    double *const RSTR outx,
+    double *const RSTR outy,
+    double *const RSTR outz
+);
+extern "C" int linear_elasticity_tet4_inexact_apply_stored_packed_two_pass_a_msoa_float(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    float *const RSTR ghost_buf,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const float *const RSTR hx,
+    const float *const RSTR hy,
+    const float *const RSTR hz,
+    const ptrdiff_t out_stride,
+    float *const RSTR outx,
+    float *const RSTR outy,
+    float *const RSTR outz
+);
 extern "C" int linear_elasticity_hex8_objective_steps_packed_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
@@ -956,6 +1112,82 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_packed_two_p
   }
   return sfem::codegen::unsupported_dispatch(
       "linear_elasticity_gradient_packed_two_pass_3d_a_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_inexact_apply_stored_packed_two_pass_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const RSTR tangent,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX8: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_hex8_inexact_apply_stored_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, tangent_component_stride, tangent, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_hex8_inexact_apply_stored_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, tangent_component_stride, tangent, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET10: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet10_inexact_apply_stored_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, tangent_component_stride, tangent, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet10_inexact_apply_stored_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, tangent_component_stride, tangent, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        default:
+          break;
+      }
+      break;
+    }
+    case smesh::TET4: {
+      switch (resolved_real_type) {
+        case smesh::SMESH_FLOAT64:
+          return linear_elasticity_tet4_inexact_apply_stored_packed_two_pass_a_msoa(n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, tangent_component_stride, tangent, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        case smesh::SMESH_FLOAT32:
+          return linear_elasticity_tet4_inexact_apply_stored_packed_two_pass_a_msoa_float(n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, tangent_component_stride, tangent, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  std::fprintf(stderr,
+      "linear_elasticity_inexact_apply_stored_packed_two_pass_3d_a_msoa does not support element type %d with real type %d\n",
+      (int)element_type,
+      (int)real_type);
+  return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_packed_3d_a_msoa(

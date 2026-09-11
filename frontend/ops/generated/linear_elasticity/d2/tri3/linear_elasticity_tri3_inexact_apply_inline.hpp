@@ -1,3 +1,4 @@
+#pragma once
 #include "../../../kernel_math.hpp"
 
 namespace sfem {

@@ -1,4 +1,6 @@
+#pragma once
 #include "../../../kernel_math.hpp"
+#include "../../../packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -975,6 +977,794 @@ static SFEM_INLINE int linear_elasticity_tet10_inexact_apply_stored_a_msoa_impl(
     }
   }
 
+  return SFEM_SUCCESS;
+}
+
+template <typename s_t, typename tangent_t, int VS>
+static SFEM_INLINE int linear_elasticity_tet10_inexact_apply_stored_packed_two_pass_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const ptrdiff_t tangent_component_stride,
+    const tangent_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
+) {
+  static constexpr int NC = 3;
+  const s_t *const h_components[NC] = {hx, hy, hz};
+  s_t *const out_components[NC] = {outx, outy, outz};
+
+  #pragma omp parallel
+  {
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+    #pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = (nelements < (pack + 1) * n_elements_per_pack)
+                                  ? nelements
+                                  : (pack + 1) * n_elements_per_pack;
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_off];
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_contiguous + n_ghost; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          pk_h_component[k] = h_component[(owned_nodes_ptr[pack] + k) * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          pk_h_component[n_contiguous + k] = h_component[ghosts[k] * h_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)((e_end - evb) < (ptrdiff_t)VS ? (e_end - evb) : (ptrdiff_t)VS);
+        uint16_t bev0[VS];
+        uint16_t bev1[VS];
+        uint16_t bev2[VS];
+        uint16_t bev3[VS];
+        uint16_t bev4[VS];
+        uint16_t bev5[VS];
+        uint16_t bev6[VS];
+        uint16_t bev7[VS];
+        uint16_t bev8[VS];
+        uint16_t bev9[VS];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          bev0[lane] = elements[0][evb + lane];
+          bev1[lane] = elements[1][evb + lane];
+          bev2[lane] = elements[2][evb + lane];
+          bev3[lane] = elements[3][evb + lane];
+          bev4[lane] = elements[4][evb + lane];
+          bev5[lane] = elements[5][evb + lane];
+          bev6[lane] = elements[6][evb + lane];
+          bev7[lane] = elements[7][evb + lane];
+          bev8[lane] = elements[8][evb + lane];
+          bev9[lane] = elements[9][evb + lane];
+        }
+        s_t bhx_0[VS];
+        s_t bhx_1[VS];
+        s_t bhx_2[VS];
+        s_t bhx_3[VS];
+        s_t bhx_4[VS];
+        s_t bhx_5[VS];
+        s_t bhx_6[VS];
+        s_t bhx_7[VS];
+        s_t bhx_8[VS];
+        s_t bhx_9[VS];
+        s_t bhy_0[VS];
+        s_t bhy_1[VS];
+        s_t bhy_2[VS];
+        s_t bhy_3[VS];
+        s_t bhy_4[VS];
+        s_t bhy_5[VS];
+        s_t bhy_6[VS];
+        s_t bhy_7[VS];
+        s_t bhy_8[VS];
+        s_t bhy_9[VS];
+        s_t bhz_0[VS];
+        s_t bhz_1[VS];
+        s_t bhz_2[VS];
+        s_t bhz_3[VS];
+        s_t bhz_4[VS];
+        s_t bhz_5[VS];
+        s_t bhz_6[VS];
+        s_t bhz_7[VS];
+        s_t bhz_8[VS];
+        s_t bhz_9[VS];
+        s_t bout0_0[VS];
+        s_t bout0_1[VS];
+        s_t bout0_2[VS];
+        s_t bout0_3[VS];
+        s_t bout0_4[VS];
+        s_t bout0_5[VS];
+        s_t bout0_6[VS];
+        s_t bout0_7[VS];
+        s_t bout0_8[VS];
+        s_t bout0_9[VS];
+        s_t bout1_0[VS];
+        s_t bout1_1[VS];
+        s_t bout1_2[VS];
+        s_t bout1_3[VS];
+        s_t bout1_4[VS];
+        s_t bout1_5[VS];
+        s_t bout1_6[VS];
+        s_t bout1_7[VS];
+        s_t bout1_8[VS];
+        s_t bout1_9[VS];
+        s_t bout2_0[VS];
+        s_t bout2_1[VS];
+        s_t bout2_2[VS];
+        s_t bout2_3[VS];
+        s_t bout2_4[VS];
+        s_t bout2_5[VS];
+        s_t bout2_6[VS];
+        s_t bout2_7[VS];
+        s_t bout2_8[VS];
+        s_t bout2_9[VS];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          bhx_0[lane] = pk_h[0 * max_nodes_per_pack + bev0[lane]];
+          bhx_1[lane] = pk_h[0 * max_nodes_per_pack + bev1[lane]];
+          bhx_2[lane] = pk_h[0 * max_nodes_per_pack + bev2[lane]];
+          bhx_3[lane] = pk_h[0 * max_nodes_per_pack + bev3[lane]];
+          bhx_4[lane] = pk_h[0 * max_nodes_per_pack + bev4[lane]];
+          bhx_5[lane] = pk_h[0 * max_nodes_per_pack + bev5[lane]];
+          bhx_6[lane] = pk_h[0 * max_nodes_per_pack + bev6[lane]];
+          bhx_7[lane] = pk_h[0 * max_nodes_per_pack + bev7[lane]];
+          bhx_8[lane] = pk_h[0 * max_nodes_per_pack + bev8[lane]];
+          bhx_9[lane] = pk_h[0 * max_nodes_per_pack + bev9[lane]];
+          bhy_0[lane] = pk_h[1 * max_nodes_per_pack + bev0[lane]];
+          bhy_1[lane] = pk_h[1 * max_nodes_per_pack + bev1[lane]];
+          bhy_2[lane] = pk_h[1 * max_nodes_per_pack + bev2[lane]];
+          bhy_3[lane] = pk_h[1 * max_nodes_per_pack + bev3[lane]];
+          bhy_4[lane] = pk_h[1 * max_nodes_per_pack + bev4[lane]];
+          bhy_5[lane] = pk_h[1 * max_nodes_per_pack + bev5[lane]];
+          bhy_6[lane] = pk_h[1 * max_nodes_per_pack + bev6[lane]];
+          bhy_7[lane] = pk_h[1 * max_nodes_per_pack + bev7[lane]];
+          bhy_8[lane] = pk_h[1 * max_nodes_per_pack + bev8[lane]];
+          bhy_9[lane] = pk_h[1 * max_nodes_per_pack + bev9[lane]];
+          bhz_0[lane] = pk_h[2 * max_nodes_per_pack + bev0[lane]];
+          bhz_1[lane] = pk_h[2 * max_nodes_per_pack + bev1[lane]];
+          bhz_2[lane] = pk_h[2 * max_nodes_per_pack + bev2[lane]];
+          bhz_3[lane] = pk_h[2 * max_nodes_per_pack + bev3[lane]];
+          bhz_4[lane] = pk_h[2 * max_nodes_per_pack + bev4[lane]];
+          bhz_5[lane] = pk_h[2 * max_nodes_per_pack + bev5[lane]];
+          bhz_6[lane] = pk_h[2 * max_nodes_per_pack + bev6[lane]];
+          bhz_7[lane] = pk_h[2 * max_nodes_per_pack + bev7[lane]];
+          bhz_8[lane] = pk_h[2 * max_nodes_per_pack + bev8[lane]];
+          bhz_9[lane] = pk_h[2 * max_nodes_per_pack + bev9[lane]];
+        }
+        const tangent_t *const RSTR btangent0 = tangent + evb + 0 * tangent_component_stride;
+        const tangent_t *const RSTR btangent1 = tangent + evb + 1 * tangent_component_stride;
+        const tangent_t *const RSTR btangent2 = tangent + evb + 2 * tangent_component_stride;
+        const tangent_t *const RSTR btangent3 = tangent + evb + 3 * tangent_component_stride;
+        const tangent_t *const RSTR btangent4 = tangent + evb + 4 * tangent_component_stride;
+        const tangent_t *const RSTR btangent5 = tangent + evb + 5 * tangent_component_stride;
+        const tangent_t *const RSTR btangent6 = tangent + evb + 6 * tangent_component_stride;
+        const tangent_t *const RSTR btangent7 = tangent + evb + 7 * tangent_component_stride;
+        const tangent_t *const RSTR btangent8 = tangent + evb + 8 * tangent_component_stride;
+        const tangent_t *const RSTR btangent9 = tangent + evb + 9 * tangent_component_stride;
+        const tangent_t *const RSTR btangent10 = tangent + evb + 10 * tangent_component_stride;
+        const tangent_t *const RSTR btangent11 = tangent + evb + 11 * tangent_component_stride;
+        const tangent_t *const RSTR btangent12 = tangent + evb + 12 * tangent_component_stride;
+        const tangent_t *const RSTR btangent13 = tangent + evb + 13 * tangent_component_stride;
+        const tangent_t *const RSTR btangent14 = tangent + evb + 14 * tangent_component_stride;
+        const tangent_t *const RSTR btangent15 = tangent + evb + 15 * tangent_component_stride;
+        const tangent_t *const RSTR btangent16 = tangent + evb + 16 * tangent_component_stride;
+        const tangent_t *const RSTR btangent17 = tangent + evb + 17 * tangent_component_stride;
+        const tangent_t *const RSTR btangent18 = tangent + evb + 18 * tangent_component_stride;
+        const tangent_t *const RSTR btangent19 = tangent + evb + 19 * tangent_component_stride;
+        const tangent_t *const RSTR btangent20 = tangent + evb + 20 * tangent_component_stride;
+        const tangent_t *const RSTR btangent21 = tangent + evb + 21 * tangent_component_stride;
+        const tangent_t *const RSTR btangent22 = tangent + evb + 22 * tangent_component_stride;
+        const tangent_t *const RSTR btangent23 = tangent + evb + 23 * tangent_component_stride;
+        const tangent_t *const RSTR btangent24 = tangent + evb + 24 * tangent_component_stride;
+        const tangent_t *const RSTR btangent25 = tangent + evb + 25 * tangent_component_stride;
+        const tangent_t *const RSTR btangent26 = tangent + evb + 26 * tangent_component_stride;
+        const tangent_t *const RSTR btangent27 = tangent + evb + 27 * tangent_component_stride;
+        const tangent_t *const RSTR btangent28 = tangent + evb + 28 * tangent_component_stride;
+        const tangent_t *const RSTR btangent29 = tangent + evb + 29 * tangent_component_stride;
+        const tangent_t *const RSTR btangent30 = tangent + evb + 30 * tangent_component_stride;
+        const tangent_t *const RSTR btangent31 = tangent + evb + 31 * tangent_component_stride;
+        const tangent_t *const RSTR btangent32 = tangent + evb + 32 * tangent_component_stride;
+        const tangent_t *const RSTR btangent33 = tangent + evb + 33 * tangent_component_stride;
+        const tangent_t *const RSTR btangent34 = tangent + evb + 34 * tangent_component_stride;
+        const tangent_t *const RSTR btangent35 = tangent + evb + 35 * tangent_component_stride;
+        const tangent_t *const RSTR btangent36 = tangent + evb + 36 * tangent_component_stride;
+        const tangent_t *const RSTR btangent37 = tangent + evb + 37 * tangent_component_stride;
+        const tangent_t *const RSTR btangent38 = tangent + evb + 38 * tangent_component_stride;
+        const tangent_t *const RSTR btangent39 = tangent + evb + 39 * tangent_component_stride;
+        const tangent_t *const RSTR btangent40 = tangent + evb + 40 * tangent_component_stride;
+        const tangent_t *const RSTR btangent41 = tangent + evb + 41 * tangent_component_stride;
+        const tangent_t *const RSTR btangent42 = tangent + evb + 42 * tangent_component_stride;
+        const tangent_t *const RSTR btangent43 = tangent + evb + 43 * tangent_component_stride;
+        const tangent_t *const RSTR btangent44 = tangent + evb + 44 * tangent_component_stride;
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const s_t hx_0 = bhx_0[lane];
+          const s_t hx_1 = bhx_1[lane];
+          const s_t hx_2 = bhx_2[lane];
+          const s_t hx_3 = bhx_3[lane];
+          const s_t hx_4 = bhx_4[lane];
+          const s_t hx_5 = bhx_5[lane];
+          const s_t hx_6 = bhx_6[lane];
+          const s_t hx_7 = bhx_7[lane];
+          const s_t hx_8 = bhx_8[lane];
+          const s_t hx_9 = bhx_9[lane];
+          const s_t hy_0 = bhy_0[lane];
+          const s_t hy_1 = bhy_1[lane];
+          const s_t hy_2 = bhy_2[lane];
+          const s_t hy_3 = bhy_3[lane];
+          const s_t hy_4 = bhy_4[lane];
+          const s_t hy_5 = bhy_5[lane];
+          const s_t hy_6 = bhy_6[lane];
+          const s_t hy_7 = bhy_7[lane];
+          const s_t hy_8 = bhy_8[lane];
+          const s_t hy_9 = bhy_9[lane];
+          const s_t hz_0 = bhz_0[lane];
+          const s_t hz_1 = bhz_1[lane];
+          const s_t hz_2 = bhz_2[lane];
+          const s_t hz_3 = bhz_3[lane];
+          const s_t hz_4 = bhz_4[lane];
+          const s_t hz_5 = bhz_5[lane];
+          const s_t hz_6 = bhz_6[lane];
+          const s_t hz_7 = bhz_7[lane];
+          const s_t hz_8 = bhz_8[lane];
+          const s_t hz_9 = bhz_9[lane];
+          const s_t tangent0 = s_t(btangent0[lane]);
+          const s_t tangent1 = s_t(btangent1[lane]);
+          const s_t tangent2 = s_t(btangent2[lane]);
+          const s_t tangent3 = s_t(btangent3[lane]);
+          const s_t tangent4 = s_t(btangent4[lane]);
+          const s_t tangent5 = s_t(btangent5[lane]);
+          const s_t tangent6 = s_t(btangent6[lane]);
+          const s_t tangent7 = s_t(btangent7[lane]);
+          const s_t tangent8 = s_t(btangent8[lane]);
+          const s_t tangent9 = s_t(btangent9[lane]);
+          const s_t tangent10 = s_t(btangent10[lane]);
+          const s_t tangent11 = s_t(btangent11[lane]);
+          const s_t tangent12 = s_t(btangent12[lane]);
+          const s_t tangent13 = s_t(btangent13[lane]);
+          const s_t tangent14 = s_t(btangent14[lane]);
+          const s_t tangent15 = s_t(btangent15[lane]);
+          const s_t tangent16 = s_t(btangent16[lane]);
+          const s_t tangent17 = s_t(btangent17[lane]);
+          const s_t tangent18 = s_t(btangent18[lane]);
+          const s_t tangent19 = s_t(btangent19[lane]);
+          const s_t tangent20 = s_t(btangent20[lane]);
+          const s_t tangent21 = s_t(btangent21[lane]);
+          const s_t tangent22 = s_t(btangent22[lane]);
+          const s_t tangent23 = s_t(btangent23[lane]);
+          const s_t tangent24 = s_t(btangent24[lane]);
+          const s_t tangent25 = s_t(btangent25[lane]);
+          const s_t tangent26 = s_t(btangent26[lane]);
+          const s_t tangent27 = s_t(btangent27[lane]);
+          const s_t tangent28 = s_t(btangent28[lane]);
+          const s_t tangent29 = s_t(btangent29[lane]);
+          const s_t tangent30 = s_t(btangent30[lane]);
+          const s_t tangent31 = s_t(btangent31[lane]);
+          const s_t tangent32 = s_t(btangent32[lane]);
+          const s_t tangent33 = s_t(btangent33[lane]);
+          const s_t tangent34 = s_t(btangent34[lane]);
+          const s_t tangent35 = s_t(btangent35[lane]);
+          const s_t tangent36 = s_t(btangent36[lane]);
+          const s_t tangent37 = s_t(btangent37[lane]);
+          const s_t tangent38 = s_t(btangent38[lane]);
+          const s_t tangent39 = s_t(btangent39[lane]);
+          const s_t tangent40 = s_t(btangent40[lane]);
+          const s_t tangent41 = s_t(btangent41[lane]);
+          const s_t tangent42 = s_t(btangent42[lane]);
+          const s_t tangent43 = s_t(btangent43[lane]);
+          const s_t tangent44 = s_t(btangent44[lane]);
+          const s_t compressed_increment_t0 = -(s_t(2) / s_t(15))*hx_4;
+          const s_t compressed_increment_t1 = ((s_t(1) / s_t(30)))*hx_1;
+          const s_t compressed_increment_t2 = ((s_t(1) / s_t(30)))*hx_7;
+          const s_t compressed_increment_t3 = ((s_t(1) / s_t(10)))*hx_0;
+          const s_t compressed_increment_t4 = ((s_t(1) / s_t(30)))*hx_5;
+          const s_t compressed_increment_t5 = -compressed_increment_t2 + compressed_increment_t3 + compressed_increment_t4;
+          const s_t compressed_increment_t6 = ((s_t(1) / s_t(30)))*hx_6;
+          const s_t compressed_increment_t7 = ((s_t(1) / s_t(30)))*hx_8;
+          const s_t compressed_increment_t8 = -compressed_increment_t6 + compressed_increment_t7;
+          const s_t compressed_increment_t9 = -(s_t(2) / s_t(15))*hx_6;
+          const s_t compressed_increment_t10 = ((s_t(1) / s_t(30)))*hx_2;
+          const s_t compressed_increment_t11 = ((s_t(1) / s_t(30)))*hx_4;
+          const s_t compressed_increment_t12 = ((s_t(1) / s_t(30)))*hx_9;
+          const s_t compressed_increment_t13 = -compressed_increment_t11 + compressed_increment_t12;
+          const s_t compressed_increment_t14 = -(s_t(2) / s_t(15))*hx_7;
+          const s_t compressed_increment_t15 = ((s_t(1) / s_t(30)))*hx_3;
+          const s_t compressed_increment_t16 = -compressed_increment_t7;
+          const s_t compressed_increment_t17 = ((s_t(1) / s_t(30)))*hx_0;
+          const s_t compressed_increment_t18 = compressed_increment_t17 + compressed_increment_t2 - compressed_increment_t4;
+          const s_t compressed_increment_t19 = compressed_increment_t0 + ((s_t(1) / s_t(10)))*hx_1;
+          const s_t compressed_increment_t20 = -compressed_increment_t10 + compressed_increment_t17;
+          const s_t compressed_increment_t21 = -compressed_increment_t12;
+          const s_t compressed_increment_t22 = compressed_increment_t21 - (s_t(1) / s_t(10))*hx_4;
+          const s_t compressed_increment_t23 = compressed_increment_t2 + ((s_t(1) / s_t(10)))*hx_5;
+          const s_t compressed_increment_t24 = -compressed_increment_t15 + compressed_increment_t17;
+          const s_t compressed_increment_t25 = compressed_increment_t16 - (s_t(1) / s_t(10))*hx_6;
+          const s_t compressed_increment_t26 = -(s_t(4) / s_t(15))*hx_4 + ((s_t(2) / s_t(15)))*hx_9;
+          const s_t compressed_increment_t27 = -(s_t(2) / s_t(15))*hy_4;
+          const s_t compressed_increment_t28 = ((s_t(1) / s_t(30)))*hy_1;
+          const s_t compressed_increment_t29 = ((s_t(1) / s_t(30)))*hy_7;
+          const s_t compressed_increment_t30 = ((s_t(1) / s_t(10)))*hy_0;
+          const s_t compressed_increment_t31 = ((s_t(1) / s_t(30)))*hy_5;
+          const s_t compressed_increment_t32 = -compressed_increment_t29 + compressed_increment_t30 + compressed_increment_t31;
+          const s_t compressed_increment_t33 = ((s_t(1) / s_t(30)))*hy_6;
+          const s_t compressed_increment_t34 = ((s_t(1) / s_t(30)))*hy_8;
+          const s_t compressed_increment_t35 = -compressed_increment_t33 + compressed_increment_t34;
+          const s_t compressed_increment_t36 = -(s_t(2) / s_t(15))*hy_6;
+          const s_t compressed_increment_t37 = ((s_t(1) / s_t(30)))*hy_2;
+          const s_t compressed_increment_t38 = ((s_t(1) / s_t(30)))*hy_4;
+          const s_t compressed_increment_t39 = ((s_t(1) / s_t(30)))*hy_9;
+          const s_t compressed_increment_t40 = -compressed_increment_t38 + compressed_increment_t39;
+          const s_t compressed_increment_t41 = -(s_t(2) / s_t(15))*hy_7;
+          const s_t compressed_increment_t42 = ((s_t(1) / s_t(30)))*hy_3;
+          const s_t compressed_increment_t43 = -compressed_increment_t34;
+          const s_t compressed_increment_t44 = ((s_t(1) / s_t(30)))*hy_0;
+          const s_t compressed_increment_t45 = compressed_increment_t29 - compressed_increment_t31 + compressed_increment_t44;
+          const s_t compressed_increment_t46 = compressed_increment_t27 + ((s_t(1) / s_t(10)))*hy_1;
+          const s_t compressed_increment_t47 = -compressed_increment_t37 + compressed_increment_t44;
+          const s_t compressed_increment_t48 = -compressed_increment_t39;
+          const s_t compressed_increment_t49 = compressed_increment_t48 - (s_t(1) / s_t(10))*hy_4;
+          const s_t compressed_increment_t50 = compressed_increment_t29 + ((s_t(1) / s_t(10)))*hy_5;
+          const s_t compressed_increment_t51 = -compressed_increment_t42 + compressed_increment_t44;
+          const s_t compressed_increment_t52 = compressed_increment_t43 - (s_t(1) / s_t(10))*hy_6;
+          const s_t compressed_increment_t53 = -(s_t(4) / s_t(15))*hy_4 + ((s_t(2) / s_t(15)))*hy_9;
+          const s_t compressed_increment_t54 = -(s_t(2) / s_t(15))*hz_4;
+          const s_t compressed_increment_t55 = ((s_t(1) / s_t(30)))*hz_1;
+          const s_t compressed_increment_t56 = ((s_t(1) / s_t(30)))*hz_7;
+          const s_t compressed_increment_t57 = ((s_t(1) / s_t(10)))*hz_0;
+          const s_t compressed_increment_t58 = ((s_t(1) / s_t(30)))*hz_5;
+          const s_t compressed_increment_t59 = -compressed_increment_t56 + compressed_increment_t57 + compressed_increment_t58;
+          const s_t compressed_increment_t60 = ((s_t(1) / s_t(30)))*hz_6;
+          const s_t compressed_increment_t61 = ((s_t(1) / s_t(30)))*hz_8;
+          const s_t compressed_increment_t62 = -compressed_increment_t60 + compressed_increment_t61;
+          const s_t compressed_increment_t63 = -(s_t(2) / s_t(15))*hz_6;
+          const s_t compressed_increment_t64 = ((s_t(1) / s_t(30)))*hz_2;
+          const s_t compressed_increment_t65 = ((s_t(1) / s_t(30)))*hz_4;
+          const s_t compressed_increment_t66 = ((s_t(1) / s_t(30)))*hz_9;
+          const s_t compressed_increment_t67 = -compressed_increment_t65 + compressed_increment_t66;
+          const s_t compressed_increment_t68 = -(s_t(2) / s_t(15))*hz_7;
+          const s_t compressed_increment_t69 = ((s_t(1) / s_t(30)))*hz_3;
+          const s_t compressed_increment_t70 = -compressed_increment_t61;
+          const s_t compressed_increment_t71 = ((s_t(1) / s_t(30)))*hz_0;
+          const s_t compressed_increment_t72 = compressed_increment_t56 - compressed_increment_t58 + compressed_increment_t71;
+          const s_t compressed_increment_t73 = compressed_increment_t54 + ((s_t(1) / s_t(10)))*hz_1;
+          const s_t compressed_increment_t74 = -compressed_increment_t64 + compressed_increment_t71;
+          const s_t compressed_increment_t75 = -compressed_increment_t66;
+          const s_t compressed_increment_t76 = compressed_increment_t75 - (s_t(1) / s_t(10))*hz_4;
+          const s_t compressed_increment_t77 = compressed_increment_t56 + ((s_t(1) / s_t(10)))*hz_5;
+          const s_t compressed_increment_t78 = -compressed_increment_t69 + compressed_increment_t71;
+          const s_t compressed_increment_t79 = compressed_increment_t70 - (s_t(1) / s_t(10))*hz_6;
+          const s_t compressed_increment_t80 = -(s_t(4) / s_t(15))*hz_4 + ((s_t(2) / s_t(15)))*hz_9;
+          const s_t pa_p0_0_0 = compressed_increment_t0 + compressed_increment_t1 + compressed_increment_t5 + compressed_increment_t8;
+          const s_t pa_p0_0_1 = compressed_increment_t10 + compressed_increment_t13 + compressed_increment_t5 + compressed_increment_t9;
+          const s_t pa_p0_0_2 = compressed_increment_t13 + compressed_increment_t14 + compressed_increment_t15 + compressed_increment_t3 + compressed_increment_t8;
+          const s_t pa_p0_1_0 = compressed_increment_t16 + compressed_increment_t18 + compressed_increment_t19 + compressed_increment_t6;
+          const s_t pa_p0_1_1 = compressed_increment_t20 + compressed_increment_t22 + compressed_increment_t23;
+          const s_t pa_p0_1_2 = compressed_increment_t22 + compressed_increment_t24 + compressed_increment_t6 + ((s_t(1) / s_t(10)))*hx_8;
+          const s_t pa_p0_2_0 = -compressed_increment_t1 + compressed_increment_t17 + compressed_increment_t23 + compressed_increment_t25;
+          const s_t pa_p0_2_1 = compressed_increment_t11 + compressed_increment_t18 + compressed_increment_t21 + compressed_increment_t9 + ((s_t(1) / s_t(10)))*hx_2;
+          const s_t pa_p0_2_2 = compressed_increment_t11 + compressed_increment_t24 + compressed_increment_t25 + ((s_t(1) / s_t(10)))*hx_9;
+          const s_t pa_p0_3_0 = -compressed_increment_t14 - compressed_increment_t17 - compressed_increment_t19 - compressed_increment_t9 - (s_t(2) / s_t(15))*hx_5 - (s_t(2) / s_t(15))*hx_8;
+          const s_t pa_p0_3_1 = -compressed_increment_t14 - compressed_increment_t20 - compressed_increment_t26 - (s_t(4) / s_t(15))*hx_5;
+          const s_t pa_p0_3_2 = -compressed_increment_t24 - compressed_increment_t26 - compressed_increment_t9 - (s_t(4) / s_t(15))*hx_8;
+          const s_t pa_p1_0_0 = compressed_increment_t27 + compressed_increment_t28 + compressed_increment_t32 + compressed_increment_t35;
+          const s_t pa_p1_0_1 = compressed_increment_t32 + compressed_increment_t36 + compressed_increment_t37 + compressed_increment_t40;
+          const s_t pa_p1_0_2 = compressed_increment_t30 + compressed_increment_t35 + compressed_increment_t40 + compressed_increment_t41 + compressed_increment_t42;
+          const s_t pa_p1_1_0 = compressed_increment_t33 + compressed_increment_t43 + compressed_increment_t45 + compressed_increment_t46;
+          const s_t pa_p1_1_1 = compressed_increment_t47 + compressed_increment_t49 + compressed_increment_t50;
+          const s_t pa_p1_1_2 = compressed_increment_t33 + compressed_increment_t49 + compressed_increment_t51 + ((s_t(1) / s_t(10)))*hy_8;
+          const s_t pa_p1_2_0 = -compressed_increment_t28 + compressed_increment_t44 + compressed_increment_t50 + compressed_increment_t52;
+          const s_t pa_p1_2_1 = compressed_increment_t36 + compressed_increment_t38 + compressed_increment_t45 + compressed_increment_t48 + ((s_t(1) / s_t(10)))*hy_2;
+          const s_t pa_p1_2_2 = compressed_increment_t38 + compressed_increment_t51 + compressed_increment_t52 + ((s_t(1) / s_t(10)))*hy_9;
+          const s_t pa_p1_3_0 = -compressed_increment_t36 - compressed_increment_t41 - compressed_increment_t44 - compressed_increment_t46 - (s_t(2) / s_t(15))*hy_5 - (s_t(2) / s_t(15))*hy_8;
+          const s_t pa_p1_3_1 = -compressed_increment_t41 - compressed_increment_t47 - compressed_increment_t53 - (s_t(4) / s_t(15))*hy_5;
+          const s_t pa_p1_3_2 = -compressed_increment_t36 - compressed_increment_t51 - compressed_increment_t53 - (s_t(4) / s_t(15))*hy_8;
+          const s_t pa_p2_0_0 = compressed_increment_t54 + compressed_increment_t55 + compressed_increment_t59 + compressed_increment_t62;
+          const s_t pa_p2_0_1 = compressed_increment_t59 + compressed_increment_t63 + compressed_increment_t64 + compressed_increment_t67;
+          const s_t pa_p2_0_2 = compressed_increment_t57 + compressed_increment_t62 + compressed_increment_t67 + compressed_increment_t68 + compressed_increment_t69;
+          const s_t pa_p2_1_0 = compressed_increment_t60 + compressed_increment_t70 + compressed_increment_t72 + compressed_increment_t73;
+          const s_t pa_p2_1_1 = compressed_increment_t74 + compressed_increment_t76 + compressed_increment_t77;
+          const s_t pa_p2_1_2 = compressed_increment_t60 + compressed_increment_t76 + compressed_increment_t78 + ((s_t(1) / s_t(10)))*hz_8;
+          const s_t pa_p2_2_0 = -compressed_increment_t55 + compressed_increment_t71 + compressed_increment_t77 + compressed_increment_t79;
+          const s_t pa_p2_2_1 = compressed_increment_t63 + compressed_increment_t65 + compressed_increment_t72 + compressed_increment_t75 + ((s_t(1) / s_t(10)))*hz_2;
+          const s_t pa_p2_2_2 = compressed_increment_t65 + compressed_increment_t78 + compressed_increment_t79 + ((s_t(1) / s_t(10)))*hz_9;
+          const s_t pa_p2_3_0 = -compressed_increment_t63 - compressed_increment_t68 - compressed_increment_t71 - compressed_increment_t73 - (s_t(2) / s_t(15))*hz_5 - (s_t(2) / s_t(15))*hz_8;
+          const s_t pa_p2_3_1 = -compressed_increment_t68 - compressed_increment_t74 - compressed_increment_t80 - (s_t(4) / s_t(15))*hz_5;
+          const s_t pa_p2_3_2 = -compressed_increment_t63 - compressed_increment_t78 - compressed_increment_t80 - (s_t(4) / s_t(15))*hz_8;
+          const s_t pa_y0_0_0 = pa_p0_0_0*tangent0 + pa_p0_0_1*tangent1 + pa_p0_0_2*tangent2 + pa_p1_0_0*tangent3 + pa_p1_0_1*tangent4 + pa_p1_0_2*tangent5 + pa_p2_0_0*tangent6 + pa_p2_0_1*tangent7 + pa_p2_0_2*tangent8;
+          const s_t pa_y0_0_1 = pa_p0_0_0*tangent1 + pa_p0_0_1*tangent9 + pa_p0_0_2*tangent10 + pa_p1_0_0*tangent11 + pa_p1_0_1*tangent12 + pa_p1_0_2*tangent13 + pa_p2_0_0*tangent14 + pa_p2_0_1*tangent15 + pa_p2_0_2*tangent16;
+          const s_t pa_y0_0_2 = pa_p0_0_0*tangent2 + pa_p0_0_1*tangent10 + pa_p0_0_2*tangent17 + pa_p1_0_0*tangent18 + pa_p1_0_1*tangent19 + pa_p1_0_2*tangent20 + pa_p2_0_0*tangent21 + pa_p2_0_1*tangent22 + pa_p2_0_2*tangent23;
+          const s_t pa_y0_1_0 = pa_p0_1_0*tangent0 + pa_p0_1_1*tangent1 + pa_p0_1_2*tangent2 + pa_p1_1_0*tangent3 + pa_p1_1_1*tangent4 + pa_p1_1_2*tangent5 + pa_p2_1_0*tangent6 + pa_p2_1_1*tangent7 + pa_p2_1_2*tangent8;
+          const s_t pa_y0_1_1 = pa_p0_1_0*tangent1 + pa_p0_1_1*tangent9 + pa_p0_1_2*tangent10 + pa_p1_1_0*tangent11 + pa_p1_1_1*tangent12 + pa_p1_1_2*tangent13 + pa_p2_1_0*tangent14 + pa_p2_1_1*tangent15 + pa_p2_1_2*tangent16;
+          const s_t pa_y0_1_2 = pa_p0_1_0*tangent2 + pa_p0_1_1*tangent10 + pa_p0_1_2*tangent17 + pa_p1_1_0*tangent18 + pa_p1_1_1*tangent19 + pa_p1_1_2*tangent20 + pa_p2_1_0*tangent21 + pa_p2_1_1*tangent22 + pa_p2_1_2*tangent23;
+          const s_t pa_y0_2_0 = pa_p0_2_0*tangent0 + pa_p0_2_1*tangent1 + pa_p0_2_2*tangent2 + pa_p1_2_0*tangent3 + pa_p1_2_1*tangent4 + pa_p1_2_2*tangent5 + pa_p2_2_0*tangent6 + pa_p2_2_1*tangent7 + pa_p2_2_2*tangent8;
+          const s_t pa_y0_2_1 = pa_p0_2_0*tangent1 + pa_p0_2_1*tangent9 + pa_p0_2_2*tangent10 + pa_p1_2_0*tangent11 + pa_p1_2_1*tangent12 + pa_p1_2_2*tangent13 + pa_p2_2_0*tangent14 + pa_p2_2_1*tangent15 + pa_p2_2_2*tangent16;
+          const s_t pa_y0_2_2 = pa_p0_2_0*tangent2 + pa_p0_2_1*tangent10 + pa_p0_2_2*tangent17 + pa_p1_2_0*tangent18 + pa_p1_2_1*tangent19 + pa_p1_2_2*tangent20 + pa_p2_2_0*tangent21 + pa_p2_2_1*tangent22 + pa_p2_2_2*tangent23;
+          const s_t pa_y0_3_0 = pa_p0_3_0*tangent0 + pa_p0_3_1*tangent1 + pa_p0_3_2*tangent2 + pa_p1_3_0*tangent3 + pa_p1_3_1*tangent4 + pa_p1_3_2*tangent5 + pa_p2_3_0*tangent6 + pa_p2_3_1*tangent7 + pa_p2_3_2*tangent8;
+          const s_t pa_y0_3_1 = pa_p0_3_0*tangent1 + pa_p0_3_1*tangent9 + pa_p0_3_2*tangent10 + pa_p1_3_0*tangent11 + pa_p1_3_1*tangent12 + pa_p1_3_2*tangent13 + pa_p2_3_0*tangent14 + pa_p2_3_1*tangent15 + pa_p2_3_2*tangent16;
+          const s_t pa_y0_3_2 = pa_p0_3_0*tangent2 + pa_p0_3_1*tangent10 + pa_p0_3_2*tangent17 + pa_p1_3_0*tangent18 + pa_p1_3_1*tangent19 + pa_p1_3_2*tangent20 + pa_p2_3_0*tangent21 + pa_p2_3_1*tangent22 + pa_p2_3_2*tangent23;
+          const s_t pa_y1_0_0 = pa_p0_0_0*tangent3 + pa_p0_0_1*tangent11 + pa_p0_0_2*tangent18 + pa_p1_0_0*tangent24 + pa_p1_0_1*tangent25 + pa_p1_0_2*tangent26 + pa_p2_0_0*tangent27 + pa_p2_0_1*tangent28 + pa_p2_0_2*tangent29;
+          const s_t pa_y1_0_1 = pa_p0_0_0*tangent4 + pa_p0_0_1*tangent12 + pa_p0_0_2*tangent19 + pa_p1_0_0*tangent25 + pa_p1_0_1*tangent30 + pa_p1_0_2*tangent31 + pa_p2_0_0*tangent32 + pa_p2_0_1*tangent33 + pa_p2_0_2*tangent34;
+          const s_t pa_y1_0_2 = pa_p0_0_0*tangent5 + pa_p0_0_1*tangent13 + pa_p0_0_2*tangent20 + pa_p1_0_0*tangent26 + pa_p1_0_1*tangent31 + pa_p1_0_2*tangent35 + pa_p2_0_0*tangent36 + pa_p2_0_1*tangent37 + pa_p2_0_2*tangent38;
+          const s_t pa_y1_1_0 = pa_p0_1_0*tangent3 + pa_p0_1_1*tangent11 + pa_p0_1_2*tangent18 + pa_p1_1_0*tangent24 + pa_p1_1_1*tangent25 + pa_p1_1_2*tangent26 + pa_p2_1_0*tangent27 + pa_p2_1_1*tangent28 + pa_p2_1_2*tangent29;
+          const s_t pa_y1_1_1 = pa_p0_1_0*tangent4 + pa_p0_1_1*tangent12 + pa_p0_1_2*tangent19 + pa_p1_1_0*tangent25 + pa_p1_1_1*tangent30 + pa_p1_1_2*tangent31 + pa_p2_1_0*tangent32 + pa_p2_1_1*tangent33 + pa_p2_1_2*tangent34;
+          const s_t pa_y1_1_2 = pa_p0_1_0*tangent5 + pa_p0_1_1*tangent13 + pa_p0_1_2*tangent20 + pa_p1_1_0*tangent26 + pa_p1_1_1*tangent31 + pa_p1_1_2*tangent35 + pa_p2_1_0*tangent36 + pa_p2_1_1*tangent37 + pa_p2_1_2*tangent38;
+          const s_t pa_y1_2_0 = pa_p0_2_0*tangent3 + pa_p0_2_1*tangent11 + pa_p0_2_2*tangent18 + pa_p1_2_0*tangent24 + pa_p1_2_1*tangent25 + pa_p1_2_2*tangent26 + pa_p2_2_0*tangent27 + pa_p2_2_1*tangent28 + pa_p2_2_2*tangent29;
+          const s_t pa_y1_2_1 = pa_p0_2_0*tangent4 + pa_p0_2_1*tangent12 + pa_p0_2_2*tangent19 + pa_p1_2_0*tangent25 + pa_p1_2_1*tangent30 + pa_p1_2_2*tangent31 + pa_p2_2_0*tangent32 + pa_p2_2_1*tangent33 + pa_p2_2_2*tangent34;
+          const s_t pa_y1_2_2 = pa_p0_2_0*tangent5 + pa_p0_2_1*tangent13 + pa_p0_2_2*tangent20 + pa_p1_2_0*tangent26 + pa_p1_2_1*tangent31 + pa_p1_2_2*tangent35 + pa_p2_2_0*tangent36 + pa_p2_2_1*tangent37 + pa_p2_2_2*tangent38;
+          const s_t pa_y1_3_0 = pa_p0_3_0*tangent3 + pa_p0_3_1*tangent11 + pa_p0_3_2*tangent18 + pa_p1_3_0*tangent24 + pa_p1_3_1*tangent25 + pa_p1_3_2*tangent26 + pa_p2_3_0*tangent27 + pa_p2_3_1*tangent28 + pa_p2_3_2*tangent29;
+          const s_t pa_y1_3_1 = pa_p0_3_0*tangent4 + pa_p0_3_1*tangent12 + pa_p0_3_2*tangent19 + pa_p1_3_0*tangent25 + pa_p1_3_1*tangent30 + pa_p1_3_2*tangent31 + pa_p2_3_0*tangent32 + pa_p2_3_1*tangent33 + pa_p2_3_2*tangent34;
+          const s_t pa_y1_3_2 = pa_p0_3_0*tangent5 + pa_p0_3_1*tangent13 + pa_p0_3_2*tangent20 + pa_p1_3_0*tangent26 + pa_p1_3_1*tangent31 + pa_p1_3_2*tangent35 + pa_p2_3_0*tangent36 + pa_p2_3_1*tangent37 + pa_p2_3_2*tangent38;
+          const s_t pa_y2_0_0 = pa_p0_0_0*tangent6 + pa_p0_0_1*tangent14 + pa_p0_0_2*tangent21 + pa_p1_0_0*tangent27 + pa_p1_0_1*tangent32 + pa_p1_0_2*tangent36 + pa_p2_0_0*tangent39 + pa_p2_0_1*tangent40 + pa_p2_0_2*tangent41;
+          const s_t pa_y2_0_1 = pa_p0_0_0*tangent7 + pa_p0_0_1*tangent15 + pa_p0_0_2*tangent22 + pa_p1_0_0*tangent28 + pa_p1_0_1*tangent33 + pa_p1_0_2*tangent37 + pa_p2_0_0*tangent40 + pa_p2_0_1*tangent42 + pa_p2_0_2*tangent43;
+          const s_t pa_y2_0_2 = pa_p0_0_0*tangent8 + pa_p0_0_1*tangent16 + pa_p0_0_2*tangent23 + pa_p1_0_0*tangent29 + pa_p1_0_1*tangent34 + pa_p1_0_2*tangent38 + pa_p2_0_0*tangent41 + pa_p2_0_1*tangent43 + pa_p2_0_2*tangent44;
+          const s_t pa_y2_1_0 = pa_p0_1_0*tangent6 + pa_p0_1_1*tangent14 + pa_p0_1_2*tangent21 + pa_p1_1_0*tangent27 + pa_p1_1_1*tangent32 + pa_p1_1_2*tangent36 + pa_p2_1_0*tangent39 + pa_p2_1_1*tangent40 + pa_p2_1_2*tangent41;
+          const s_t pa_y2_1_1 = pa_p0_1_0*tangent7 + pa_p0_1_1*tangent15 + pa_p0_1_2*tangent22 + pa_p1_1_0*tangent28 + pa_p1_1_1*tangent33 + pa_p1_1_2*tangent37 + pa_p2_1_0*tangent40 + pa_p2_1_1*tangent42 + pa_p2_1_2*tangent43;
+          const s_t pa_y2_1_2 = pa_p0_1_0*tangent8 + pa_p0_1_1*tangent16 + pa_p0_1_2*tangent23 + pa_p1_1_0*tangent29 + pa_p1_1_1*tangent34 + pa_p1_1_2*tangent38 + pa_p2_1_0*tangent41 + pa_p2_1_1*tangent43 + pa_p2_1_2*tangent44;
+          const s_t pa_y2_2_0 = pa_p0_2_0*tangent6 + pa_p0_2_1*tangent14 + pa_p0_2_2*tangent21 + pa_p1_2_0*tangent27 + pa_p1_2_1*tangent32 + pa_p1_2_2*tangent36 + pa_p2_2_0*tangent39 + pa_p2_2_1*tangent40 + pa_p2_2_2*tangent41;
+          const s_t pa_y2_2_1 = pa_p0_2_0*tangent7 + pa_p0_2_1*tangent15 + pa_p0_2_2*tangent22 + pa_p1_2_0*tangent28 + pa_p1_2_1*tangent33 + pa_p1_2_2*tangent37 + pa_p2_2_0*tangent40 + pa_p2_2_1*tangent42 + pa_p2_2_2*tangent43;
+          const s_t pa_y2_2_2 = pa_p0_2_0*tangent8 + pa_p0_2_1*tangent16 + pa_p0_2_2*tangent23 + pa_p1_2_0*tangent29 + pa_p1_2_1*tangent34 + pa_p1_2_2*tangent38 + pa_p2_2_0*tangent41 + pa_p2_2_1*tangent43 + pa_p2_2_2*tangent44;
+          const s_t pa_y2_3_0 = pa_p0_3_0*tangent6 + pa_p0_3_1*tangent14 + pa_p0_3_2*tangent21 + pa_p1_3_0*tangent27 + pa_p1_3_1*tangent32 + pa_p1_3_2*tangent36 + pa_p2_3_0*tangent39 + pa_p2_3_1*tangent40 + pa_p2_3_2*tangent41;
+          const s_t pa_y2_3_1 = pa_p0_3_0*tangent7 + pa_p0_3_1*tangent15 + pa_p0_3_2*tangent22 + pa_p1_3_0*tangent28 + pa_p1_3_1*tangent33 + pa_p1_3_2*tangent37 + pa_p2_3_0*tangent40 + pa_p2_3_1*tangent42 + pa_p2_3_2*tangent43;
+          const s_t pa_y2_3_2 = pa_p0_3_0*tangent8 + pa_p0_3_1*tangent16 + pa_p0_3_2*tangent23 + pa_p1_3_0*tangent29 + pa_p1_3_1*tangent34 + pa_p1_3_2*tangent38 + pa_p2_3_0*tangent41 + pa_p2_3_1*tangent43 + pa_p2_3_2*tangent44;
+          const s_t mixed_t0 = ((s_t(15) / s_t(2)))*pa_y0_1_0;
+          const s_t mixed_t1 = ((s_t(15) / s_t(2)))*pa_y0_2_0;
+          const s_t mixed_t2 = ((s_t(15) / s_t(2)))*pa_y0_1_1;
+          const s_t mixed_t3 = ((s_t(15) / s_t(2)))*pa_y0_2_1;
+          const s_t mixed_t4 = ((s_t(15) / s_t(2)))*pa_y0_1_2;
+          const s_t mixed_t5 = ((s_t(15) / s_t(2)))*pa_y0_2_2;
+          const s_t mixed_t6 = -(s_t(15) / s_t(2))*pa_y0_0_0;
+          const s_t mixed_t7 = s_t(6)*pa_y0_3_0;
+          const s_t mixed_t8 = -(s_t(15) / s_t(2))*pa_y0_0_1;
+          const s_t mixed_t9 = s_t(6)*pa_y0_3_1;
+          const s_t mixed_t10 = -(s_t(15) / s_t(2))*pa_y0_0_2;
+          const s_t mixed_t11 = s_t(6)*pa_y0_3_2;
+          const s_t mixed_t12 = ((s_t(15) / s_t(2)))*pa_y1_1_0;
+          const s_t mixed_t13 = ((s_t(15) / s_t(2)))*pa_y1_2_0;
+          const s_t mixed_t14 = ((s_t(15) / s_t(2)))*pa_y1_1_1;
+          const s_t mixed_t15 = ((s_t(15) / s_t(2)))*pa_y1_2_1;
+          const s_t mixed_t16 = ((s_t(15) / s_t(2)))*pa_y1_1_2;
+          const s_t mixed_t17 = ((s_t(15) / s_t(2)))*pa_y1_2_2;
+          const s_t mixed_t18 = -(s_t(15) / s_t(2))*pa_y1_0_0;
+          const s_t mixed_t19 = s_t(6)*pa_y1_3_0;
+          const s_t mixed_t20 = -(s_t(15) / s_t(2))*pa_y1_0_1;
+          const s_t mixed_t21 = s_t(6)*pa_y1_3_1;
+          const s_t mixed_t22 = -(s_t(15) / s_t(2))*pa_y1_0_2;
+          const s_t mixed_t23 = s_t(6)*pa_y1_3_2;
+          const s_t mixed_t24 = ((s_t(15) / s_t(2)))*pa_y2_1_0;
+          const s_t mixed_t25 = ((s_t(15) / s_t(2)))*pa_y2_2_0;
+          const s_t mixed_t26 = ((s_t(15) / s_t(2)))*pa_y2_1_1;
+          const s_t mixed_t27 = ((s_t(15) / s_t(2)))*pa_y2_2_1;
+          const s_t mixed_t28 = ((s_t(15) / s_t(2)))*pa_y2_1_2;
+          const s_t mixed_t29 = ((s_t(15) / s_t(2)))*pa_y2_2_2;
+          const s_t mixed_t30 = -(s_t(15) / s_t(2))*pa_y2_0_0;
+          const s_t mixed_t31 = s_t(6)*pa_y2_3_0;
+          const s_t mixed_t32 = -(s_t(15) / s_t(2))*pa_y2_0_1;
+          const s_t mixed_t33 = s_t(6)*pa_y2_3_1;
+          const s_t mixed_t34 = -(s_t(15) / s_t(2))*pa_y2_0_2;
+          const s_t mixed_t35 = s_t(6)*pa_y2_3_2;
+          const s_t pa_q0_0_0 = -mixed_t0 - mixed_t1 + s_t(15)*pa_y0_0_0;
+          const s_t pa_q0_0_1 = -mixed_t2 - mixed_t3 + s_t(15)*pa_y0_0_1;
+          const s_t pa_q0_0_2 = -mixed_t4 - mixed_t5 + s_t(15)*pa_y0_0_2;
+          const s_t pa_q0_1_0 = mixed_t1 + mixed_t6 + mixed_t7 + s_t(21)*pa_y0_1_0;
+          const s_t pa_q0_1_1 = mixed_t3 + mixed_t8 + mixed_t9 + s_t(21)*pa_y0_1_1;
+          const s_t pa_q0_1_2 = mixed_t10 + mixed_t11 + mixed_t5 + s_t(21)*pa_y0_1_2;
+          const s_t pa_q0_2_0 = mixed_t0 + mixed_t6 + s_t(15)*pa_y0_2_0;
+          const s_t pa_q0_2_1 = mixed_t2 + mixed_t8 + s_t(15)*pa_y0_2_1;
+          const s_t pa_q0_2_2 = mixed_t10 + mixed_t4 + s_t(15)*pa_y0_2_2;
+          const s_t pa_q0_3_0 = mixed_t7 + s_t(6)*pa_y0_1_0;
+          const s_t pa_q0_3_1 = mixed_t9 + s_t(6)*pa_y0_1_1;
+          const s_t pa_q0_3_2 = mixed_t11 + s_t(6)*pa_y0_1_2;
+          const s_t pa_q1_0_0 = -mixed_t12 - mixed_t13 + s_t(15)*pa_y1_0_0;
+          const s_t pa_q1_0_1 = -mixed_t14 - mixed_t15 + s_t(15)*pa_y1_0_1;
+          const s_t pa_q1_0_2 = -mixed_t16 - mixed_t17 + s_t(15)*pa_y1_0_2;
+          const s_t pa_q1_1_0 = mixed_t13 + mixed_t18 + mixed_t19 + s_t(21)*pa_y1_1_0;
+          const s_t pa_q1_1_1 = mixed_t15 + mixed_t20 + mixed_t21 + s_t(21)*pa_y1_1_1;
+          const s_t pa_q1_1_2 = mixed_t17 + mixed_t22 + mixed_t23 + s_t(21)*pa_y1_1_2;
+          const s_t pa_q1_2_0 = mixed_t12 + mixed_t18 + s_t(15)*pa_y1_2_0;
+          const s_t pa_q1_2_1 = mixed_t14 + mixed_t20 + s_t(15)*pa_y1_2_1;
+          const s_t pa_q1_2_2 = mixed_t16 + mixed_t22 + s_t(15)*pa_y1_2_2;
+          const s_t pa_q1_3_0 = mixed_t19 + s_t(6)*pa_y1_1_0;
+          const s_t pa_q1_3_1 = mixed_t21 + s_t(6)*pa_y1_1_1;
+          const s_t pa_q1_3_2 = mixed_t23 + s_t(6)*pa_y1_1_2;
+          const s_t pa_q2_0_0 = -mixed_t24 - mixed_t25 + s_t(15)*pa_y2_0_0;
+          const s_t pa_q2_0_1 = -mixed_t26 - mixed_t27 + s_t(15)*pa_y2_0_1;
+          const s_t pa_q2_0_2 = -mixed_t28 - mixed_t29 + s_t(15)*pa_y2_0_2;
+          const s_t pa_q2_1_0 = mixed_t25 + mixed_t30 + mixed_t31 + s_t(21)*pa_y2_1_0;
+          const s_t pa_q2_1_1 = mixed_t27 + mixed_t32 + mixed_t33 + s_t(21)*pa_y2_1_1;
+          const s_t pa_q2_1_2 = mixed_t29 + mixed_t34 + mixed_t35 + s_t(21)*pa_y2_1_2;
+          const s_t pa_q2_2_0 = mixed_t24 + mixed_t30 + s_t(15)*pa_y2_2_0;
+          const s_t pa_q2_2_1 = mixed_t26 + mixed_t32 + s_t(15)*pa_y2_2_1;
+          const s_t pa_q2_2_2 = mixed_t28 + mixed_t34 + s_t(15)*pa_y2_2_2;
+          const s_t pa_q2_3_0 = mixed_t31 + s_t(6)*pa_y2_1_0;
+          const s_t pa_q2_3_1 = mixed_t33 + s_t(6)*pa_y2_1_1;
+          const s_t pa_q2_3_2 = mixed_t35 + s_t(6)*pa_y2_1_2;
+          const s_t output_t0 = ((s_t(1) / s_t(30)))*pa_q0_3_1;
+          const s_t output_t1 = ((s_t(1) / s_t(30)))*pa_q0_3_2;
+          const s_t output_t2 = ((s_t(1) / s_t(30)))*pa_q0_1_0;
+          const s_t output_t3 = ((s_t(1) / s_t(30)))*pa_q0_2_0;
+          const s_t output_t4 = ((s_t(1) / s_t(30)))*pa_q0_2_2;
+          const s_t output_t5 = output_t2 + output_t3 + output_t4;
+          const s_t output_t6 = ((s_t(1) / s_t(30)))*pa_q0_1_1;
+          const s_t output_t7 = ((s_t(1) / s_t(30)))*pa_q0_1_2;
+          const s_t output_t8 = ((s_t(1) / s_t(30)))*pa_q0_2_1;
+          const s_t output_t9 = output_t6 + output_t7 + output_t8;
+          const s_t output_t10 = ((s_t(1) / s_t(30)))*pa_q0_0_0;
+          const s_t output_t11 = ((s_t(1) / s_t(30)))*pa_q0_0_1;
+          const s_t output_t12 = -output_t4;
+          const s_t output_t13 = ((s_t(1) / s_t(30)))*pa_q0_0_2;
+          const s_t output_t14 = output_t13 - output_t7;
+          const s_t output_t15 = ((s_t(2) / s_t(15)))*pa_q0_3_0;
+          const s_t output_t16 = -output_t15;
+          const s_t output_t17 = ((s_t(4) / s_t(15)))*pa_q0_3_2;
+          const s_t output_t18 = ((s_t(1) / s_t(10)))*pa_q0_1_2;
+          const s_t output_t19 = output_t11 - output_t8 + ((s_t(1) / s_t(10)))*pa_q0_1_1 - (s_t(4) / s_t(15))*pa_q0_3_1;
+          const s_t output_t20 = output_t10 + output_t16 - output_t2 + ((s_t(1) / s_t(10)))*pa_q0_2_0;
+          const s_t output_t21 = ((s_t(2) / s_t(15)))*pa_q0_3_2;
+          const s_t output_t22 = ((s_t(1) / s_t(10)))*pa_q0_2_2;
+          const s_t output_t23 = -output_t10 + output_t15;
+          const s_t output_t24 = -output_t11 + ((s_t(2) / s_t(15)))*pa_q0_3_1;
+          const s_t output_t25 = -output_t13;
+          const s_t output_t26 = ((s_t(1) / s_t(30)))*pa_q1_3_1;
+          const s_t output_t27 = ((s_t(1) / s_t(30)))*pa_q1_3_2;
+          const s_t output_t28 = ((s_t(1) / s_t(30)))*pa_q1_1_0;
+          const s_t output_t29 = ((s_t(1) / s_t(30)))*pa_q1_2_0;
+          const s_t output_t30 = ((s_t(1) / s_t(30)))*pa_q1_2_2;
+          const s_t output_t31 = output_t28 + output_t29 + output_t30;
+          const s_t output_t32 = ((s_t(1) / s_t(30)))*pa_q1_1_1;
+          const s_t output_t33 = ((s_t(1) / s_t(30)))*pa_q1_1_2;
+          const s_t output_t34 = ((s_t(1) / s_t(30)))*pa_q1_2_1;
+          const s_t output_t35 = output_t32 + output_t33 + output_t34;
+          const s_t output_t36 = ((s_t(1) / s_t(30)))*pa_q1_0_0;
+          const s_t output_t37 = ((s_t(1) / s_t(30)))*pa_q1_0_1;
+          const s_t output_t38 = -output_t30;
+          const s_t output_t39 = ((s_t(1) / s_t(30)))*pa_q1_0_2;
+          const s_t output_t40 = -output_t33 + output_t39;
+          const s_t output_t41 = ((s_t(2) / s_t(15)))*pa_q1_3_0;
+          const s_t output_t42 = -output_t41;
+          const s_t output_t43 = ((s_t(4) / s_t(15)))*pa_q1_3_2;
+          const s_t output_t44 = ((s_t(1) / s_t(10)))*pa_q1_1_2;
+          const s_t output_t45 = -output_t34 + output_t37 + ((s_t(1) / s_t(10)))*pa_q1_1_1 - (s_t(4) / s_t(15))*pa_q1_3_1;
+          const s_t output_t46 = -output_t28 + output_t36 + output_t42 + ((s_t(1) / s_t(10)))*pa_q1_2_0;
+          const s_t output_t47 = ((s_t(2) / s_t(15)))*pa_q1_3_2;
+          const s_t output_t48 = ((s_t(1) / s_t(10)))*pa_q1_2_2;
+          const s_t output_t49 = -output_t36 + output_t41;
+          const s_t output_t50 = -output_t37 + ((s_t(2) / s_t(15)))*pa_q1_3_1;
+          const s_t output_t51 = -output_t39;
+          const s_t output_t52 = ((s_t(1) / s_t(30)))*pa_q2_3_1;
+          const s_t output_t53 = ((s_t(1) / s_t(30)))*pa_q2_3_2;
+          const s_t output_t54 = ((s_t(1) / s_t(30)))*pa_q2_1_0;
+          const s_t output_t55 = ((s_t(1) / s_t(30)))*pa_q2_2_0;
+          const s_t output_t56 = ((s_t(1) / s_t(30)))*pa_q2_2_2;
+          const s_t output_t57 = output_t54 + output_t55 + output_t56;
+          const s_t output_t58 = ((s_t(1) / s_t(30)))*pa_q2_1_1;
+          const s_t output_t59 = ((s_t(1) / s_t(30)))*pa_q2_1_2;
+          const s_t output_t60 = ((s_t(1) / s_t(30)))*pa_q2_2_1;
+          const s_t output_t61 = output_t58 + output_t59 + output_t60;
+          const s_t output_t62 = ((s_t(1) / s_t(30)))*pa_q2_0_0;
+          const s_t output_t63 = ((s_t(1) / s_t(30)))*pa_q2_0_1;
+          const s_t output_t64 = -output_t56;
+          const s_t output_t65 = ((s_t(1) / s_t(30)))*pa_q2_0_2;
+          const s_t output_t66 = -output_t59 + output_t65;
+          const s_t output_t67 = ((s_t(2) / s_t(15)))*pa_q2_3_0;
+          const s_t output_t68 = -output_t67;
+          const s_t output_t69 = ((s_t(4) / s_t(15)))*pa_q2_3_2;
+          const s_t output_t70 = ((s_t(1) / s_t(10)))*pa_q2_1_2;
+          const s_t output_t71 = -output_t60 + output_t63 + ((s_t(1) / s_t(10)))*pa_q2_1_1 - (s_t(4) / s_t(15))*pa_q2_3_1;
+          const s_t output_t72 = -output_t54 + output_t62 + output_t68 + ((s_t(1) / s_t(10)))*pa_q2_2_0;
+          const s_t output_t73 = ((s_t(2) / s_t(15)))*pa_q2_3_2;
+          const s_t output_t74 = ((s_t(1) / s_t(10)))*pa_q2_2_2;
+          const s_t output_t75 = -output_t62 + output_t67;
+          const s_t output_t76 = -output_t63 + ((s_t(2) / s_t(15)))*pa_q2_3_1;
+          const s_t output_t77 = -output_t65;
+          const s_t element_out0_0 = -output_t0 - output_t1 + output_t5 + output_t9 + ((s_t(1) / s_t(10)))*pa_q0_0_0 + ((s_t(1) / s_t(10)))*pa_q0_0_1 + ((s_t(1) / s_t(10)))*pa_q0_0_2 - (s_t(1) / s_t(30))*pa_q0_3_0;
+          const s_t element_out0_1 = output_t10 - output_t3 + ((s_t(1) / s_t(10)))*pa_q0_1_0 - (s_t(1) / s_t(10))*pa_q0_3_0;
+          const s_t element_out0_2 = output_t0 + output_t11 - output_t6 + ((s_t(1) / s_t(10)))*pa_q0_2_1;
+          const s_t element_out0_3 = output_t1 + output_t12 + output_t14;
+          const s_t element_out0_4 = -output_t12 - output_t13 - output_t16 + output_t17 - output_t18 - output_t19 - (s_t(2) / s_t(15))*pa_q0_0_0 - (s_t(2) / s_t(15))*pa_q0_1_0;
+          const s_t element_out0_5 = output_t19 + output_t20;
+          const s_t element_out0_6 = -output_t14 - output_t20 + output_t21 - output_t22 - (s_t(2) / s_t(15))*pa_q0_0_1 - (s_t(2) / s_t(15))*pa_q0_2_1;
+          const s_t element_out0_7 = output_t2 + output_t23 + output_t24 + output_t3 + output_t6 + output_t8 - (s_t(2) / s_t(15))*pa_q0_0_2;
+          const s_t element_out0_8 = -output_t17 + output_t18 - output_t23 - output_t25 - output_t5;
+          const s_t element_out0_9 = -output_t21 + output_t22 - output_t24 - output_t25 - output_t9;
+          const s_t element_out1_0 = -output_t26 - output_t27 + output_t31 + output_t35 + ((s_t(1) / s_t(10)))*pa_q1_0_0 + ((s_t(1) / s_t(10)))*pa_q1_0_1 + ((s_t(1) / s_t(10)))*pa_q1_0_2 - (s_t(1) / s_t(30))*pa_q1_3_0;
+          const s_t element_out1_1 = -output_t29 + output_t36 + ((s_t(1) / s_t(10)))*pa_q1_1_0 - (s_t(1) / s_t(10))*pa_q1_3_0;
+          const s_t element_out1_2 = output_t26 - output_t32 + output_t37 + ((s_t(1) / s_t(10)))*pa_q1_2_1;
+          const s_t element_out1_3 = output_t27 + output_t38 + output_t40;
+          const s_t element_out1_4 = -output_t38 - output_t39 - output_t42 + output_t43 - output_t44 - output_t45 - (s_t(2) / s_t(15))*pa_q1_0_0 - (s_t(2) / s_t(15))*pa_q1_1_0;
+          const s_t element_out1_5 = output_t45 + output_t46;
+          const s_t element_out1_6 = -output_t40 - output_t46 + output_t47 - output_t48 - (s_t(2) / s_t(15))*pa_q1_0_1 - (s_t(2) / s_t(15))*pa_q1_2_1;
+          const s_t element_out1_7 = output_t28 + output_t29 + output_t32 + output_t34 + output_t49 + output_t50 - (s_t(2) / s_t(15))*pa_q1_0_2;
+          const s_t element_out1_8 = -output_t31 - output_t43 + output_t44 - output_t49 - output_t51;
+          const s_t element_out1_9 = -output_t35 - output_t47 + output_t48 - output_t50 - output_t51;
+          const s_t element_out2_0 = -output_t52 - output_t53 + output_t57 + output_t61 + ((s_t(1) / s_t(10)))*pa_q2_0_0 + ((s_t(1) / s_t(10)))*pa_q2_0_1 + ((s_t(1) / s_t(10)))*pa_q2_0_2 - (s_t(1) / s_t(30))*pa_q2_3_0;
+          const s_t element_out2_1 = -output_t55 + output_t62 + ((s_t(1) / s_t(10)))*pa_q2_1_0 - (s_t(1) / s_t(10))*pa_q2_3_0;
+          const s_t element_out2_2 = output_t52 - output_t58 + output_t63 + ((s_t(1) / s_t(10)))*pa_q2_2_1;
+          const s_t element_out2_3 = output_t53 + output_t64 + output_t66;
+          const s_t element_out2_4 = -output_t64 - output_t65 - output_t68 + output_t69 - output_t70 - output_t71 - (s_t(2) / s_t(15))*pa_q2_0_0 - (s_t(2) / s_t(15))*pa_q2_1_0;
+          const s_t element_out2_5 = output_t71 + output_t72;
+          const s_t element_out2_6 = -output_t66 - output_t72 + output_t73 - output_t74 - (s_t(2) / s_t(15))*pa_q2_0_1 - (s_t(2) / s_t(15))*pa_q2_2_1;
+          const s_t element_out2_7 = output_t54 + output_t55 + output_t58 + output_t60 + output_t75 + output_t76 - (s_t(2) / s_t(15))*pa_q2_0_2;
+          const s_t element_out2_8 = -output_t57 - output_t69 + output_t70 - output_t75 - output_t77;
+          const s_t element_out2_9 = -output_t61 - output_t73 + output_t74 - output_t76 - output_t77;
+          bout0_0[lane] = element_out0_0;
+          bout0_1[lane] = element_out0_1;
+          bout0_2[lane] = element_out0_2;
+          bout0_3[lane] = element_out0_3;
+          bout0_4[lane] = element_out0_4;
+          bout0_5[lane] = element_out0_5;
+          bout0_6[lane] = element_out0_6;
+          bout0_7[lane] = element_out0_7;
+          bout0_8[lane] = element_out0_8;
+          bout0_9[lane] = element_out0_9;
+          bout1_0[lane] = element_out1_0;
+          bout1_1[lane] = element_out1_1;
+          bout1_2[lane] = element_out1_2;
+          bout1_3[lane] = element_out1_3;
+          bout1_4[lane] = element_out1_4;
+          bout1_5[lane] = element_out1_5;
+          bout1_6[lane] = element_out1_6;
+          bout1_7[lane] = element_out1_7;
+          bout1_8[lane] = element_out1_8;
+          bout1_9[lane] = element_out1_9;
+          bout2_0[lane] = element_out2_0;
+          bout2_1[lane] = element_out2_1;
+          bout2_2[lane] = element_out2_2;
+          bout2_3[lane] = element_out2_3;
+          bout2_4[lane] = element_out2_4;
+          bout2_5[lane] = element_out2_5;
+          bout2_6[lane] = element_out2_6;
+          bout2_7[lane] = element_out2_7;
+          bout2_8[lane] = element_out2_8;
+          bout2_9[lane] = element_out2_9;
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev0[lane]] += bout0_0[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev1[lane]] += bout0_1[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev2[lane]] += bout0_2[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev3[lane]] += bout0_3[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev4[lane]] += bout0_4[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev5[lane]] += bout0_5[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev6[lane]] += bout0_6[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev7[lane]] += bout0_7[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev8[lane]] += bout0_8[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[0 * max_nodes_per_pack + bev9[lane]] += bout0_9[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev0[lane]] += bout1_0[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev1[lane]] += bout1_1[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev2[lane]] += bout1_2[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev3[lane]] += bout1_3[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev4[lane]] += bout1_4[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev5[lane]] += bout1_5[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev6[lane]] += bout1_6[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev7[lane]] += bout1_7[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev8[lane]] += bout1_8[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[1 * max_nodes_per_pack + bev9[lane]] += bout1_9[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev0[lane]] += bout2_0[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev1[lane]] += bout2_1[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev2[lane]] += bout2_2[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev3[lane]] += bout2_3[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev4[lane]] += bout2_4[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev5[lane]] += bout2_5[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev6[lane]] += bout2_6[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev7[lane]] += bout2_7[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev8[lane]] += bout2_8[lane];
+        }
+        for (int lane = 0; lane < ne; ++lane) {
+          pk_out[2 * max_nodes_per_pack + bev9[lane]] += bout2_9[lane];
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+        }
+      }
+    }
+  }
+
+  #pragma omp parallel for schedule(static)
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
+    }
+  }
   return SFEM_SUCCESS;
 }
 
