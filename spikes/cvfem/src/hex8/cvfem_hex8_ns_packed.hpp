@@ -164,6 +164,31 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa(PackedData &p, scalar_t *con
     }
 }
 
+// The same reduction at an arbitrary width, for destinations that carry more than the four
+// fields per node -- the 4x4 block diagonal is sixteen. Separate rather than a template
+// parameter on the one above, because that one is on the matvec's hot path and is compiled
+// for exactly one width; this one runs once per Newton step.
+//
+// `buf` is field-major, n_ghost_entries apart, which is the layout the packs write.
+static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide(PackedData                         &p,
+                                                     const scalar_t *const SFEM_RESTRICT buf,
+                                                     const int                           width,
+                                                     scalar_t *const SFEM_RESTRICT       dst) {
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        scalar_t *const    out   = dst + (ptrdiff_t)dest * width;
+        for (int f = 0; f < width; ++f) {
+            const scalar_t *const SFEM_RESTRICT ghost = buf + (ptrdiff_t)f * p.n_ghost_entries;
+            scalar_t                            sum   = 0;
+            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
+            out[f] += sum;
+        }
+    }
+}
+
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved(PackedData &p, scalar_t *const SFEM_RESTRICT jv) {
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {

@@ -175,6 +175,9 @@ struct MeshData {
     std::vector<scalar_t> jacobian_determinant;
     PackedData           *packed{nullptr};
     const PackColoring   *coloring{nullptr};
+    // Field-major ghost staging for the block diagonal's packed sweep, 16 wide where
+    // PackedData::ghost_buf is N_FIELDS wide. Sized on the pack decomposition and reused.
+    std::vector<scalar_t> diag_ghost_buf;
     scalar_t              rhie_chow_scale{1};
     // Harten band for the upwind switch, as an absolute mass-flux magnitude; 0 is the
     // hard switch. See cvfem_upwind_abs.
@@ -735,9 +738,8 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
     smesh::count_t sl[64];
     for (int k = 0; k < 64; ++k) sl[k] = (smesh::count_t)k;
 
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t loc[64 * 16];
+    // One element's local matrix, from which only the eight diagonal blocks are wanted.
+    const auto element_blocks = [&](const ptrdiff_t e, scalar_t *const SFEM_RESTRICT loc) {
         for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
 
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
@@ -762,11 +764,94 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
                                          d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         }
 
+    };
+
+    // Into a pack-private buffer at pack-local node ids: no other thread can be writing
+    // these rows, so a plain `+=` is both correct and the reason there is no atomic.
+    const auto one_element = [&](const ptrdiff_t e, scalar_t *const SFEM_RESTRICT pack_diag,
+                                 pack_idx_t **const SFEM_RESTRICT pelems) {
+        scalar_t loc[64 * 16];
+        element_blocks(e, loc);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t          g   = d.elems[a][e];
-            const scalar_t *const       blk = loc + (size_t)(a * 8 + a) * 16;
+            const scalar_t *const         blk = loc + (size_t)(a * 8 + a) * 16;
+            scalar_t *const SFEM_RESTRICT dst = pack_diag + (ptrdiff_t)pelems[a][e] * 16;
+            for (int k = 0; k < 16; ++k) dst[k] += blk[k];
+        }
+    };
+
+    // The unpacked fallback, which still has to scatter atomically because nothing
+    // partitions the mesh for it. Not reproducible across thread counts, and that is why
+    // it is the fallback rather than the path.
+    const auto one_element_global = [&](const ptrdiff_t e) {
+        scalar_t loc[64 * 16];
+        element_blocks(e, loc);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t    g   = d.elems[a][e];
+            const scalar_t *const blk = loc + (size_t)(a * 8 + a) * 16;
             for (int k = 0; k < 16; ++k) CVFEM_ATOMIC_ADD(out[(size_t)g * 16 + k], blk[k]);
         }
+    };
+
+    // The two-pass packed algorithm, which is deterministic by design.
+    //
+    // This is the preconditioner's data, and accumulating it with CVFEM_ATOMIC_ADD made it
+    // depend on thread timing: the summation order for a node followed whichever threads
+    // reached it first, and floating-point addition is not associative. With the boundary
+    // closure gathered the matvec is bit-reproducible, and this was what was left -- a solve
+    // with no multigrid at all still varied run to run, because the block-Jacobi blocks it
+    // inverts were not the same blocks twice.
+    //
+    // The shape is the one cvfem_hex8_apply_jacobian_action_packed already uses, at width 16
+    // instead of N_FIELDS: each pack accumulates into a pack-private buffer with a plain
+    // `+=`, its owned rows are written straight out because no other pack owns them, and the
+    // nodes it touches but does not own are closed by the ghost reduction, which sums a CSR
+    // in an order the index array fixes rather than thread timing. No atomic anywhere, and
+    // the same answer for any thread count.
+    //
+    // SFEM_DIAG_ATOMIC=1 restores the atomic sweep, as a measurement escape hatch.
+    static const int diag_atomic = smesh::Env::read<int>("SFEM_DIAG_ATOMIC", 0);
+    if (!diag_atomic && d.packed && d.packed->n_packs > 0) {
+        PackedData &p = *d.packed;
+        const int   W = 16;
+        if ((ptrdiff_t)d.diag_ghost_buf.size() != (ptrdiff_t)W * p.n_ghost_entries)
+            d.diag_ghost_buf.assign((size_t)W * (size_t)p.n_ghost_entries, scalar_t(0));
+        scalar_t *const SFEM_RESTRICT gbuf = d.diag_ghost_buf.data();
+
+#pragma omp parallel
+        {
+            // Allocated per thread rather than taken from the shared scratch slots: this
+            // routine runs once per Newton step, so the allocation is free at this scale and
+            // it cannot collide with a matvec's scratch.
+            std::vector<scalar_t> pack_diag((size_t)p.max_nodes_per_pack * (size_t)W, scalar_t(0));
+#pragma omp for schedule(static)
+            for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+                const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
+                const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+                const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+                const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+                const ptrdiff_t ghost_off    = p.ghost_ptr[pack];
+
+                std::memset(pack_diag.data(), 0, (size_t)n_pack_nodes * (size_t)W * sizeof(scalar_t));
+
+                const ptrdiff_t e_start = pack * p.n_elements_per_pack;
+                const ptrdiff_t e_end   = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+                for (ptrdiff_t e = e_start; e < e_end; ++e) one_element(e, pack_diag.data(), p.elems);
+
+                // Owned rows are this pack's alone, so they are written rather than added.
+                std::memcpy(out + owned * W, pack_diag.data(), (size_t)n_contiguous * (size_t)W * sizeof(scalar_t));
+
+                // Field-major, matching the layout cvfem_hex8_ghost_reduce_interleaved reads.
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const scalar_t *const SFEM_RESTRICT blk = pack_diag.data() + (n_contiguous + k) * W;
+                    for (int f = 0; f < W; ++f) gbuf[(ptrdiff_t)f * p.n_ghost_entries + ghost_off + k] = blk[f];
+                }
+            }
+        }
+
+        cvfem_hex8_ghost_reduce_wide(p, gbuf, 16, out);
+    } else {
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t e = 0; e < d.nelements; ++e) one_element_global(e);
     }
 
     // The transient term's diagonal. It is rho V a0 / dt on each velocity component and
