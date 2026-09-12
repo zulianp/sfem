@@ -1425,10 +1425,36 @@ dropping `-march=native` for a generic `-O3` only reaches 145 s. The memory is t
 hazard: 3.2 GB for one kernel, `dead store elim2` alone holding 1.47 GB, which is what
 would make a parallel build of several such kernels exhaust a node.
 
-Every one of those passes is superlinear in basic-block size, so the fix that would help
-every compiler is on the generator's side: the tangent emits its whole CSE chain into a
-single scope. The cheap fix here is to split the two units into separate translation
-units, which share nothing but the mesh, so they compile concurrently.
+Every one of those passes is superlinear in basic-block size, and compiling the eight
+kernels one at a time says which one and by how much:
+
+| unit | kernel | wall | peak RSS | longest simd block |
+|---|---|---|---|---|
+| **viscous** | **`inexact_apply_tangent`** | **234.8 s** | **4.45 GB** | 3855 |
+| elastic | `inexact_apply_tangent` | 83.0 s | 1.35 GB | 2654 |
+| viscous | `..._stored_packed_two_pass` | 11.0 s | 295 MB | 769 |
+| viscous | `..._stored` | 9.7 s | 221 MB | 683 |
+| elastic | `..._stored_packed_two_pass` | 8.3 s | 258 MB | 733 |
+| elastic | `..._stored` | 7.0 s | 147 MB | 647 |
+| viscous | `..._compressed` | 0.57 s | 37 MB | -- |
+| elastic | `..._compressed` | 0.48 s | 37 MB | -- |
+
+The two tangents are 318 s of 355 s, and the viscous one alone is two thirds. Against the
+stored apply of its own unit it is **5.6x the block size, 24x the compile time and 20x the
+memory** -- close to quadratic, which is what those passes are.
+
+The memory is the part to watch rather than the wall time: a `-j` build compiling both
+tangents at once wants about 5.8 GB, and anything wider exhausts a node. Note also that
+these eight sum to six minutes, not thirty-eight; the larger figure is a login-node build
+of a bigger unit that also compiles the exact-apply operator sources in the same serial
+invocation, and the two are not directly comparable.
+
+So the fix that would help every compiler is on the generator's side, and it has an
+address: `_tangent_lines` in `emitters/inexact_apply_codegen.py` emits the whole CSE chain
+into one `#pragma omp simd` scope. Splitting that block should return roughly quadratic
+savings and cut the memory more than the time. The cheap fix here is to split the two
+units into separate translation units, which share nothing but the mesh, so they compile
+concurrently.
 
 ### What the first version of these driver numbers got wrong
 
