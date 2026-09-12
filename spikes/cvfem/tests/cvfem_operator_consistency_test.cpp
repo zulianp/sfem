@@ -69,6 +69,8 @@
 // SFEM_RC_EXACT_JAC is a process-wide static, so it cannot be swept in-process; CMake
 // registers this binary twice, once per setting, the way cvfem_flat_vs_ss_packed is.
 
+#include "cvfem_hex8_ns_op.hpp"
+
 #include "cvfem_hex8_ns_core.hpp"
 #include "cvfem_sshex8_ns.hpp"
 
@@ -327,6 +329,74 @@ namespace {
         }
     }
 
+    // ---- the operator the SOLVER drives ----
+    //
+    // Everything above tests the reference kernels through MeshData. The driver does not use
+    // those: it drives sfem::CVFEMNavierStokes, which owns the FunctionSpace-derived mesh
+    // state, the packed layout, the boundary sub-control surfaces and the transient history,
+    // and which renumbers the mesh in initialize(). A consistency result on the kernels says
+    // nothing about the object the solve actually calls, and the three forms it exposes --
+    // apply, hessian_bsr and hessian_block_diag -- are the three that have to agree.
+    void run_op_variant(sfem::Context &ctx, const char *name, const real_t dt, const int bdf_order,
+                        const bool exact) {
+        std::printf("\n-- solver operator, %s --\n", name);
+        const int      nx = 3, ny = 2, nz = 2;
+        const scalar_t rho = 1, mu = 0.01;
+
+        auto mesh = smesh::Mesh::create_hex8_cube(ctx.communicator(), nx, ny, nz, 0, 0, 0, 2, 1, 1);
+        auto fs   = sfem::FunctionSpace::create(mesh, N_FIELDS);
+        auto op   = std::make_shared<sfem::CVFEMNavierStokes>(fs);
+        op->rho             = rho;
+        op->mu              = mu;
+        op->rhie_chow_scale = 1;
+        op->geom            = sfem::CVFEMGeometry::Affine;
+        op->initialize();
+        if (dt > 0) op->set_time_step(dt, bdf_order);
+
+        const ptrdiff_t ndof = fs->n_dofs();
+        const auto *const px = mesh->points()->data()[0];
+        const auto *const py = mesh->points()->data()[1];
+        const auto *const pz = mesh->points()->data()[2];
+        std::vector<real_t> x((size_t)ndof);
+        for (ptrdiff_t i = 0; i < ndof / N_FIELDS; ++i) {
+            const real_t X = px[i], Y = py[i], Z = pz[i];
+            x[(size_t)i * 4 + 0] = std::sin(real_t(1.7) * X) * std::cos(real_t(2.3) * Y) + real_t(0.3) * Z;
+            x[(size_t)i * 4 + 1] = std::cos(real_t(1.1) * Y) * (real_t(1) + real_t(0.2) * X) - real_t(0.15) * Z;
+            x[(size_t)i * 4 + 2] = std::sin(real_t(0.9) * Z) * (real_t(0.5) + real_t(0.1) * Y);
+            x[(size_t)i * 4 + 3] = real_t(0.7) * X - real_t(0.4) * Y + real_t(0.25) * Z * Z;
+        }
+
+        // The action's diagonal, from the Op itself.
+        std::vector<scalar_t> probed((size_t)(ndof / N_FIELDS) * 16, scalar_t(0));
+        std::vector<real_t>   h((size_t)ndof), y((size_t)ndof);
+        for (ptrdiff_t col = 0; col < ndof; ++col) {
+            std::fill(h.begin(), h.end(), real_t(0));
+            h[(size_t)col] = real_t(1);
+            std::fill(y.begin(), y.end(), real_t(0));
+            op->apply(x.data(), h.data(), y.data());
+            const ptrdiff_t node = col / N_FIELDS;
+            const int       c    = (int)(col % N_FIELDS);
+            for (int r = 0; r < N_FIELDS; ++r)
+                probed[(size_t)node * 16 + (size_t)r * 4 + (size_t)c] = (scalar_t)y[(size_t)node * N_FIELDS + r];
+        }
+
+        std::vector<real_t> bd((size_t)(ndof / N_FIELDS) * 16, real_t(0));
+        op->hessian_block_diag(x.data(), bd.data());
+        std::vector<scalar_t> bds(bd.begin(), bd.end());
+
+        scalar_t scale = 0;
+        for (const scalar_t v : probed) scale = std::max(scale, std::fabs(v));
+        check(scale > scalar_t(1e-8), "the probed solver-operator diagonal is not trivially zero");
+
+        const scalar_t r = worst_rel(bds, probed);
+        if (exact) {
+            report(r, "[O1] Op block diagonal vs Op action diagonal (exact form)");
+            check(r < scalar_t(0.25), "[O1] the solver operator's gap stays bounded");
+        } else {
+            check_rel(r, scalar_t(1), scalar_t(1e-10), "[O1] Op block diagonal == Op action diagonal");
+        }
+    }
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -343,6 +413,10 @@ int main(int argc, char **argv) {
     run_ss_variant(*ctx, "steady", scalar_t(0), 1, false, exact);
     run_ss_variant(*ctx, "transient BDF1", scalar_t(0.05), 1, false, exact);
     run_ss_variant(*ctx, "transient BDF2", scalar_t(0.05), 2, true, exact);
+
+    run_op_variant(*ctx, "steady", real_t(0), 1, exact);
+    run_op_variant(*ctx, "transient BDF1", real_t(0.05), 1, exact);
+    run_op_variant(*ctx, "transient BDF2", real_t(0.05), 2, exact);
 
     std::printf("\n%s\n", g_failures ? "operator consistency: FAILED" : "all operator forms agree");
     return g_failures ? EXIT_FAILURE : EXIT_SUCCESS;
