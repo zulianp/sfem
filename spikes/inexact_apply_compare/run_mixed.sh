@@ -96,9 +96,13 @@ $CXX -std=c++17 -O3 -march=native -DNDEBUG \
     -DVISCOUS_TANGENT=sfem::codegen::${VISCOUS}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
     -DVISCOUS_STORED=sfem::codegen::${VISCOUS}_${LOWER}_inexact_apply_stored_a_msoa_impl \
     -DVISCOUS_COMPRESS=sfem::codegen::${VISCOUS}_${LOWER}_inexact_apply_compressed_a_msoa_impl \
+    -DPACKED_STORED_APPLY \
+    -DELASTIC_PACKED_STORED=sfem::codegen::${ELASTIC}_${LOWER}_inexact_apply_stored_packed_two_pass_a_msoa_impl \
+    -DVISCOUS_PACKED_STORED=sfem::codegen::${VISCOUS}_${LOWER}_inexact_apply_stored_packed_two_pass_a_msoa_impl \
     -o "$WORK/bench_mixed_${LOWER}" \
     "$HERE/bench_mixed.cpp" $UNIT_TU $EXTRA_TU \
     -I "$GEN" -I "$WORK/gen/$MATERIAL" -I "$WORK/gen/$MATERIAL/d3" \
+    -I "$HERE" -I "$WORKTREE/python/codegen/framework/tools" \
     -I "$SFEM/base" -I "$SFEM/algebra" -I "$SFEM/operators" \
     -I "$BUILD" -I "$BUILD/external/smesh" \
     $(find "$SFEM/external/smesh/src" -type d | sed 's/^/-I /') \

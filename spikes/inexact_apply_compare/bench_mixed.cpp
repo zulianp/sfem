@@ -28,6 +28,7 @@
 #include ELASTIC_INEXACT_HEADER
 #include VISCOUS_INEXACT_HEADER
 #include "element_mesh.inc"
+#include "packed_mesh.inc"
 
 #define TC_ELASTIC 45
 #define TC_VISCOUS 81
@@ -113,11 +114,19 @@ int main(int argc, char **argv) {
     std::printf("mooney_rivlin_kelvin_voigt_newmark (elastic + viscous), %s, threads %d, best of %d\n\n",
                 ELEMENT_NAME,
                 threads, repeats);
-    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s %9s\n",
+    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s %9s",
                 "elements", "nodes", "ndof", "exact", "st.f64", "st.f32", "st.f16",
                 "assembly", "f64 diff", "f32 diff", "f16 diff");
-    std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s\n", "", "", "",
+#ifdef PACKED_STORED_APPLY
+    std::printf(" | %8s %8s %9s", "pk.f64", "pk.f32", "pk diff");
+#endif
+    std::printf("\n");
+    std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s", "", "", "",
                 "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
+#ifdef PACKED_STORED_APPLY
+    std::printf(" | %8s %8s %9s", "MDOF/s", "MDOF/s", "rel");
+#endif
+    std::printf("\n");
 
     for (int n : {8, 16, 24, 32, 40}) {
         if (only && n != only) continue;
@@ -204,6 +213,61 @@ int main(int argc, char **argv) {
                 EC, m.evp.data(), CS, vp, 1, hx.data(),hy.data(),hz.data(),
                 1, bx.data(),by.data(),bz.data());
         };
+#ifdef PACKED_STORED_APPLY
+        // The same mesh partitioned into packs, with the increment placed through
+        // its permutation so this is the same problem relabelled.  The stores are
+        // assembled on the standard mesh and read unchanged: packing renumbers
+        // nodes, never elements, so element e is element e in both layouts and its
+        // tangent components are the same numbers.
+        // Compile-time default, overridable at run time: the pack size is the
+        // layout's one tuning knob and this translation unit takes forty minutes
+        // to build, so a sweep must not need a rebuild per point.
+        const char *const pack_env = std::getenv("PACK_SIZE");
+        const int pack_size = pack_env ? std::atoi(pack_env) : (int)PACK_SIZE;
+        PackedMeshView pk = build_packed_mesh(m, pack_size);
+        std::vector<double> phx, phy, phz;
+        place_packed(hx, pk.layout, phx);
+        place_packed(hy, pk.layout, phy);
+        place_packed(hz, pk.layout, phz);
+        std::vector<double> pkx(N), pky(N), pkz(N);
+        std::vector<double> ghost_buf((size_t)pk.layout.n_ghost_entries * 3, 0.0);
+        auto run_packed_stored = [&](auto *ep, auto *vp) {
+            ELASTIC_PACKED_STORED<double, typename std::remove_const<
+                typename std::remove_pointer<decltype(ep)>::type>::type, 16>(
+                pk.layout.n_packs, pk.layout.n_elements_per_pack, EC,
+                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.owned_nodes_ptr.data(),
+                pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
+                pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
+                pk.layout.ghost_reduce_ptr.data(), pk.layout.ghost_reduce_idx.data(),
+                pk.layout.ghost_reduce_dest.data(), ghost_buf.data(),
+                CS, ep, 1, phx.data(), phy.data(), phz.data(),
+                1, pkx.data(), pky.data(), pkz.data());
+            VISCOUS_PACKED_STORED<double, typename std::remove_const<
+                typename std::remove_pointer<decltype(vp)>::type>::type, 16>(
+                pk.layout.n_packs, pk.layout.n_elements_per_pack, EC,
+                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.owned_nodes_ptr.data(),
+                pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
+                pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
+                pk.layout.ghost_reduce_ptr.data(), pk.layout.ghost_reduce_idx.data(),
+                pk.layout.ghost_reduce_dest.data(), ghost_buf.data(),
+                CS, vp, 1, phx.data(), phy.data(), phz.data(),
+                1, pkx.data(), pky.data(), pkz.data());
+        };
+        // The packed answer is in packed node order, so it is compared against the
+        // exact one through the same permutation rather than element-wise.
+        auto rel_packed = [&] {
+            double num = 0, den = 0;
+            for (ptrdiff_t v = 0; v < N; ++v) {
+                const ptrdiff_t pv = pk.layout.to_new[v];
+                num += std::fabs(ax[v] - pkx[pv]) + std::fabs(ay[v] - pky[pv])
+                     + std::fabs(az[v] - pkz[pv]);
+                den += std::fabs(ax[v]) + std::fabs(ay[v]) + std::fabs(az[v]);
+            }
+            return num / den;
+        };
+#endif
         auto run_compressed = [&] {
             ELASTIC_COMPRESS<double, half_t, float>(EC, m.evp.data(), CS, E16.data(), ES.data(),
                 1, hx.data(),hy.data(),hz.data(), 1, bx.data(),by.data(),bz.data());
@@ -219,19 +283,36 @@ int main(int argc, char **argv) {
         z3(bx,by,bz); run_stored(E64.data(), V64.data()); const double d64 = rel();
         z3(bx,by,bz); run_stored(E32.data(), V32.data()); const double d32 = rel();
         z3(bx,by,bz); run_compressed();                   const double d16 = rel();
+#ifdef PACKED_STORED_APPLY
+        z3(pkx,pky,pkz); run_packed_stored(E64.data(), V64.data());
+        const double dpk = rel_packed();
+#endif
 
         const double e   = best_mdof(repeats, ndof, run_exact);
         const double s64 = best_mdof(repeats, ndof, [&]{ run_stored(E64.data(), V64.data()); });
         const double s32 = best_mdof(repeats, ndof, [&]{ run_stored(E32.data(), V32.data()); });
         const double s16 = best_mdof(repeats, ndof, run_compressed);
         const double a   = best_mdof(repeats, ndof, assemble);
+#ifdef PACKED_STORED_APPLY
+        const double p64 = best_mdof(repeats, ndof, [&]{ run_packed_stored(E64.data(), V64.data()); });
+        const double p32 = best_mdof(repeats, ndof, [&]{ run_packed_stored(E32.data(), V32.data()); });
+#endif
         // All three error columns per row: f64 is the projection error alone,
         // and what f32 and f16 add over it is the store's own contribution.
-        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e\n",
+        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e",
                     (long)EC, (long)N, (long)ndof, e, s64, s32, s16, a, d64, d32, d16);
+#ifdef PACKED_STORED_APPLY
+        std::printf(" | %8.2f %8.2f %9.1e", p64, p32, dpk);
+#endif
+        std::printf("\n");
         if (n == 40 || (only && n == only)) {
             std::printf("\n  stored-f64 vs exact rel diff %.2e\n", d64);
             auto be = [&](double s){ return s <= e ? -1.0 : (1.0/a)/(1.0/e - 1.0/s); };
+#ifdef PACKED_STORED_APPLY
+            std::printf("  packed pack size %d, %ld packs, %d threads\n",
+                        pack_size, (long)pk.layout.n_packs, threads);
+            std::printf("  packed vs standard stored f64: %.2fx\n", p64 / s64);
+#endif
             std::printf("  break-even applies per tangent: f64 %.1f  f32 %.1f  f16 %.1f\n",
                         be(s64), be(s32), be(s16));
             std::printf("  store bytes/element: f64 %d  f32 %d  f16+scale %d   (45 elastic + 81 viscous)\n",
