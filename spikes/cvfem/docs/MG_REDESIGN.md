@@ -69,27 +69,60 @@ Their honest caveat, which applies to us: their ASM is implemented naively — i
 sparse matrix to extract the blocks — so its memory is comparable to a matrix-based code, and
 they flag this as the thing to improve.
 
-## 3. Coarse levels need the linearization point and the transient history
+## 3. The coarse operator differs in its stabilization scale, not in its state
 
-The paper states that the transfer operators carry, in addition to the defect and residual,
+An earlier draft of this section claimed we fail to transfer the linearization point to the
+coarse levels. That is false, and the correction is worth stating because it moves the real
+issue somewhere more interesting.
 
-> the solutions of previous transient iterations, as required for the time-stepping scheme
-> (uⁿ and uⁿ⁻¹), and the linearization point (û, p̂) to all the multigrid levels.
+**The linearization point is already restricted to every level.** Once per Newton step the
+driver runs `restrictions[i-1]->apply(states[i-1], states[i])`, divides by the transfer weight,
+and calls `apply_constraints` on each level's state. The level operators are then updated
+against it. We do what Lethe does here.
 
-The code agrees: Lethe's `MFNavierStokesPreconditionGMG::initialize()` takes the previous
-solution needed to evaluate the non-linear term and a vector of time derivatives of previous
-solutions.
+**The transient history provably cannot change the applied operator.**
+`transient_diag_weight` returns `a0·ρ/dt` when a history is present and `1.5·ρ/dt` for BDF2
+when it is not — and for BDF2, `a0 = 1.5`. The two are identical. The history enters the
+*residual* and nothing else, and a coarse operator is only ever applied to a correction. The
+existing comment declining to require a history on coarse levels is correct, not a loophole.
 
-**We do the opposite.** Our `clone_onto` passes `dt` and the BDF order to coarse levels but
-deliberately not the history, on the reasoning that a coarse operator is applied to a
-correction and never asked for a residual. That reasoning is about the *residual*; it does not
-license linearizing the coarse operator around a different state than the fine one. A coarse
-operator carrying the right `dt` but the wrong convecting velocity is not a coarse version of
-the fine operator, and a multigrid whose levels disagree about the operator is exactly the
-failure mode we are seeing.
+So Lethe transferring `uⁿ` and `uⁿ⁻¹` to all levels is about *their* formulation, where the
+time derivative appears inside the SUPG/PSPG residual `∂ₜu + (u·∇)u + ∇p − νΔu − f` and
+therefore does reach the Jacobian. Ours is a lumped diagonal term that does not.
 
-Action: transfer `û` (and `uⁿ`, `uⁿ⁻¹` when transient) to every level and rebuild the level
-operators against them.
+### What actually differs
+
+Both we and they rediscretize rather than Galerkin-coarsen, and for the same reason: the
+stabilization parameter is a function of element size, so `PᵀAP` inherits the fine-grid
+stabilization and is inconsistent. The difference is what happens to that parameter.
+
+| coarse operator | applied operator | Rhie–Chow `D_f = rc_scale·h²/(2μ)` |
+|---|---|---|
+| Lethe, matrix-free rediscretization | `A_H(I_H û)` | τ recomputed per level; consistent by construction |
+| ours, `derefine_op` | `A_H(R û)` | recomputed at coarse `h`, so `D_f` rises ~8× per level in 3D, then hand-corrected by `SFEM_GMG_RC_DECAY` |
+| ours, element-wise Galerkin (`SFEM_GMG_EGAL=1`, **the default**) | `Σ_e P_eᵀ A_e P_e` | frozen at the **fine** `h` |
+
+Two consequences.
+
+First, our default coarse operator is the element-wise Galerkin one, which freezes the fine
+grid's stabilization — the very inconsistency `derefine_op`'s own comment gives as the reason
+not to use `PᵀAP`. Worse, element-wise Galerkin is exact only when the operator is a sum of
+element contributions, and Rhie–Chow couples through a **nodal** pressure gradient, which is
+not element-local unless it is frozen from the state. The driver already contains a gate that
+tests exactly this and prints `LOCAL (element-wise Galerkin is exact)` or `NON-LOCAL`.
+
+Second, `SFEM_GMG_RC_DECAY` is a hand-tuned scalar standing in for a per-level spectral
+property — its comment says 0.25 "keeps `D_f` fixed at the fine level's value". That is the
+same quantity item 1 proposes to *measure*. The paper does not tune a decay factor; it
+estimates each level operator's spectrum and sets ω from it, for the stated reason that the
+stabilization depends on element size and changes per level. Our decay knob and their power
+iteration are two answers to one question, and only one of them is calibrated against the
+operator it is correcting.
+
+Action, replacing the earlier one: settle which coarse operator the hierarchy actually uses
+(`SFEM_GMG_EGAL`, `galerkin_mode`), check the element-locality gate on a Rhie–Chow-active
+case, and treat `SFEM_GMG_RC_DECAY` as a symptom — if per-level ω from item 1 works, the decay
+factor should become unnecessary rather than merely better-chosen.
 
 ## 4. Smaller things worth taking
 
@@ -119,7 +152,10 @@ none of their constants are ours.
 
 1. **Per-level ω from power iteration.** Smallest change, addresses a known-divergent smoother,
    and item 3 is hard to evaluate while the smoother is mistuned.
-2. **Transfer the linearization point to coarse levels.** Correctness, not tuning.
+2. **Settle the coarse operator.** Which of element-wise Galerkin and rediscretization the
+   hierarchy uses, whether the element-locality assumption holds with Rhie–Chow active, and
+   whether `SFEM_GMG_RC_DECAY` survives a calibrated ω. Not a state-transfer problem: the
+   linearization point already reaches every level.
 3. **Re-measure the step case.** The yardstick is 2–5 linear iterations per Newton step; if it
    is still in the thousands after 1 and 2, the fault is elsewhere and this document is wrong
    about where.
