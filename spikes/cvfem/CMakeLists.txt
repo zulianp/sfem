@@ -142,7 +142,7 @@ set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACRO
 file(GLOB CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
 list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_guard_selftest.cpp)
 
-set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test cvfem_flow_diag_test)
+set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test cvfem_flow_diag_test cvfem_ss_packed_probe)
 foreach(TEST_SOURCE ${CVFEM_TESTS})
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
@@ -188,6 +188,16 @@ endif()
 add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+
+# --------------------------------------------- the packed macro path is the same operator
+#
+# cvfem_flat_vs_ss_test compares the flat and semi-structured operators by COORDINATE, which
+# is what a renumbering demands, and it already carries the tolerance the two discretisations
+# agree to. Running it again with the macro-element mesh packed asks the one question packing
+# raises -- whether the faster reconstruction computes the same thing -- without introducing a
+# second place for that tolerance to drift.
+add_test(NAME cvfem_flat_vs_ss_packed COMMAND cvfem_flat_vs_ss_test)
+set_tests_properties(cvfem_flat_vs_ss_packed PROPERTIES ENVIRONMENT "SFEM_SS_PACK_SIZE=8")
 
 # ------------------------------------------------------------------- restart round trip
 #
