@@ -197,6 +197,14 @@ add_test(NAME cvfem_bench_staging
 # raises -- whether the faster reconstruction computes the same thing -- without introducing a
 # second place for that tolerance to drift.
 add_test(NAME cvfem_flat_vs_ss_packed COMMAND cvfem_flat_vs_ss_test)
+
+# The consistency test twice, because SFEM_RC_EXACT_JAC is a process-wide static and the two
+# settings have different invariants: the frozen form must have every operator form agreeing to
+# round-off, the exact form deliberately does not and is bounded instead. The glob above already
+# registers the default (exact) run.
+add_test(NAME cvfem_operator_consistency_frozen COMMAND cvfem_operator_consistency_test)
+set_tests_properties(cvfem_operator_consistency_frozen
+                     PROPERTIES ENVIRONMENT "SFEM_RC_EXACT_JAC=0")
 set_tests_properties(cvfem_flat_vs_ss_packed PROPERTIES ENVIRONMENT "SFEM_SS_PACK_SIZE=8")
 
 # ------------------------------------------------------------------- restart round trip

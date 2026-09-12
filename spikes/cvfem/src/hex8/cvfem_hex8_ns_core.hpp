@@ -782,7 +782,26 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                         nullptr, ux, uy, uz,  rcfg.tau};
 
-        // The block diagonal has to be the block diagonal of the operator that is APPLIED.
+        // A PARTIAL correction towards the diagonal of the operator that is APPLIED.
+        //
+        // Read the claim carefully, because an earlier version of this comment overstated it
+        // and tests/cvfem_operator_consistency_test is what caught that. This does not make
+        // the block diagonal equal to the action's diagonal. It cannot, from an element loop:
+        // qg_i sums over EVERY element containing node i before being scaled by 1/W_i, so
+        // d(qg_i)/d(q_i) is a property of i's whole element neighbourhood while a sub-control
+        // surface belongs to one element. What is added below is this element's share of it.
+        //
+        // Measured, exact form against a direct probe of the action: 8.2e-02 relative steady
+        // and 1.2e-02 on BDF2 with this term, against the frozen form's round-off. So the gap
+        // is narrowed and not closed, and the test reports it rather than asserting it away.
+        // Closing it needs a per-node pass for d(qg_i)/d(q_i) and a per-edge one for
+        // d(qg_j)/d(q_i), both structured like the reconstruction.
+        //
+        // It is kept because it is measured to help where the mismatch bites: on the
+        // pressure-port case the default preconditioner fails to converge without it and
+        // reaches Re=100 in 6 Newton steps with it. A preconditioner is allowed to be an
+        // approximation -- what it is not allowed to be is an approximation whose error nobody
+        // has measured.
         //
         // With SFEM_RC_EXACT_JAC=1 -- the default -- the apply differentiates through the
         // reconstructed nodal pressure gradient and this assembly did not, so the
