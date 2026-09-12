@@ -44,6 +44,43 @@ right measurement is a relative error against the exact apply, not agreement.
 That needs the kernel emitted for those elements and a driver that sweeps mesh
 resolution, and it is not done.
 
+## Building
+
+CMake, from the spike directory. It finds MPI and OpenMP, generates the kernels for
+the material and element you ask for, and builds whichever harnesses those kernels
+support.
+
+    cmake -S spikes/inexact_apply_compare -B build-spike \
+          -DSPIKE_MATERIAL=neohookean_ogden -DSPIKE_ELEMENT=HEX8
+    cmake --build build-spike -j
+    ./build-spike/bench_split 5
+
+The cache variables are `SPIKE_MATERIAL`, `SPIKE_ELEMENT` (TET4, HEX8, TET10),
+`SPIKE_MESH_ORDER`, `SPIKE_PACK_SIZE`, `SPIKE_ARCH_FLAGS`, and the paths
+`SPIKE_SFEM`, `SPIKE_SFEM_BUILD` and `SPIKE_GEN_ROOT`. On Apple silicon pass
+`-DSPIKE_ARCH_FLAGS=-mcpu=apple-m1` and `-DOpenMP_ROOT=$(brew --prefix libomp)`.
+
+Which harnesses appear depends on what the material publishes: a single-unit material
+gets `bench_split`, `warp_sweep` and `scale_probe`, and the two-unit Mooney-Rivlin
+Kelvin-Voigt material gets `bench_mixed`. `bench_op_split` and `op_inexact_check` go
+through the Op wrappers rather than the kernels and appear only when `libsfem` is found
+in `SPIKE_SFEM_BUILD`.
+
+**Kernels are generated while CMake configures, not while it builds.** The set of
+generated sources is not known until the generator has run, and CMake resolves source
+lists at configure time; generating during the build would need a second configure to
+see the results. Reconfigure after changing the material or the element. Generation is
+skipped when the output is already in `SPIKE_GEN_ROOT`, which matters -- it is 75
+seconds for TET4 and 1380 for a Mooney-Rivlin HEX8.
+
+The pack size is a cache variable *and* an environment variable: `PACK_SIZE=256
+./build-spike/bench_mixed 5` re-partitions without rebuilding, which is the only
+practical way to sweep it when the translation unit takes forty minutes to compile.
+
+The `run_*.sh` scripts predate this and still work; they hand-write the same compiler
+invocation, and the copies had drifted apart -- one knew about the packed layout and
+another did not, one found `mpi.h` and another did not. Prefer CMake.
+
 ## The split kernels
 
 `bench_split.cpp` / `run_split.sh` measure the form that pays: `Sbar` assembled
