@@ -58,12 +58,26 @@ refused() {
 
 # The term reaches the kernel: the same configuration with and without --rhie-chow must not
 # produce the same checksum. Both runs must also succeed.
+# Does turning a term on change the answer at all?
+#
+# The bitwise fingerprint, at one thread, rather than the checksum. Two reasons, and the
+# first one bit:
+#
+#   * the checksum is a SIGNED SUM, and on these residuals it cancels to ~2e-14 out of terms
+#     of order one. A term whose contribution is small relative to the state can then move
+#     every value in the vector and leave that sum looking untouched -- which is exactly what
+#     happened once the Rhie-Chow time scale stopped being a factor of Peclet too large. A
+#     fold over every value's bit pattern cannot be cancelled against itself.
+#   * the atomic layout -- the only one the isoparametric kernels support with this term -- has
+#     a thread-order-dependent scatter, so at more than one thread BOTH numbers move on their
+#     own and the comparison is measuring noise in either direction. One thread makes the
+#     scatter deterministic, which is what lets a difference mean something.
 differs() {
     desc="$1"; shift
-    off=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout atomic "$@" 2>&1 | sed -n 's/^ *checksum: //p')
-    on=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout atomic "$@" --rhie-chow 2>&1 | sed -n 's/^ *checksum: //p')
+    off=$(OMP_NUM_THREADS=1 "$BENCH" --n 8 --repeat 1 --warmup 0 --layout atomic "$@" 2>&1 | sed -n 's/^ *fingerprint: //p')
+    on=$(OMP_NUM_THREADS=1 "$BENCH" --n 8 --repeat 1 --warmup 0 --layout atomic "$@" --rhie-chow 2>&1 | sed -n 's/^ *fingerprint: //p')
     if [ -z "$off" ] || [ -z "$on" ]; then
-        printf '%-62s FAIL (a run produced no checksum: off=%s on=%s)\n' "$desc" "${off:-none}" "${on:-none}"
+        printf '%-62s FAIL (a run produced no fingerprint: off=%s on=%s)\n' "$desc" "${off:-none}" "${on:-none}"
         FAIL=$((FAIL + 1))
     elif [ "$off" = "$on" ]; then
         printf '%-62s FAIL (--rhie-chow changed nothing: %s)\n' "$desc" "$on"
@@ -113,11 +127,17 @@ differs "block diagonal, isoparam"             --assemble-diag --geom isoparam
 # all run the same scalar element kernel and differ only in how the result is scattered.
 # The checksums agree to about 1e-15 relative rather than exactly, because the scatter order
 # differs -- so this compares numerically, not as strings.
+# At one thread, for the reason the differs() comment gives: `atomic` is the reference here
+# and its scatter is thread-order-dependent, so above one thread the reference itself moves
+# between the four runs being compared against it. The checksum also cancels to ~5e-12 out of
+# terms of order one on the Rhie-Chow configurations, which turns that movement into a
+# relative difference of 1e-4 on a comparison made at 1e-12. Pinning the thread count makes
+# all four layouts agree bit for bit, which is the honest form of this check.
 same_across_layouts() {
     desc="$1"; shift
     ref=""
     for lay in atomic packed colored store; do
-        v=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout "$lay" "$@" 2>&1 | sed -n 's/^ *checksum: //p')
+        v=$(OMP_NUM_THREADS=1 "$BENCH" --n 8 --repeat 1 --warmup 0 --layout "$lay" "$@" 2>&1 | sed -n 's/^ *checksum: //p')
         if [ -z "$v" ]; then
             printf '%-62s FAIL (--layout %s produced no checksum)\n' "$desc" "$lay"
             FAIL=$((FAIL + 1))

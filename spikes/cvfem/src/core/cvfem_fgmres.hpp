@@ -73,6 +73,16 @@ namespace sfem {
             bnorm = std::sqrt(bnorm);
             if (bnorm == T(0)) bnorm = T(1);
 
+            // Divergence is growth relative to where THIS solve started, not relative to the
+            // right-hand side. The two agree whenever x0 is zero and disagree badly when it is
+            // not -- and the caller here reuses its correction vector across Newton steps, so
+            // x0 is the previous step's correction. Once the Jacobian is exact the residual
+            // collapses by orders of magnitude between steps while that stale x0 does not, and
+            // the old test fired before a single iteration: on the Re=100 cavity at 470,596
+            // dof it reported "diverged after 0 iterations" on a right-hand side of 4.2e-09
+            // that it had not touched, and the continuation abandoned a converged stage.
+            T beta0 = T(-1);
+
             while (iterations_ < max_it_) {
                 // r = b - A x. Operator::apply accumulates here, so the target is cleared
                 // first; this is the convention a stationary smoother also relies on.
@@ -90,7 +100,8 @@ namespace sfem {
                 // can never report growth. Growth is only visible across restarts -- and with
                 // a flexible (varying) preconditioner the estimate can drift from the true
                 // residual in any case, so the recomputed one is the honest measure.
-                if (!std::isfinite(beta) || (dtol_ > T(0) && beta > dtol_ * bnorm)) {
+                if (beta0 < T(0)) beta0 = beta > T(0) ? beta : bnorm;
+                if (!std::isfinite(beta) || (dtol_ > T(0) && beta > dtol_ * beta0)) {
                     if (!x_best.empty()) std::copy(x_best.begin(), x_best.end(), x);
                     diverged_ = true;
                     break;

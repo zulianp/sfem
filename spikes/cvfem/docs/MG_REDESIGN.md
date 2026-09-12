@@ -96,11 +96,52 @@ Both we and they rediscretize rather than Galerkin-coarsen, and for the same rea
 stabilization parameter is a function of element size, so `PᵀAP` inherits the fine-grid
 stabilization and is inconsistent. The difference is what happens to that parameter.
 
-| coarse operator | selected by | Rhie–Chow `D_f = rc_scale·h²/(2μ)` |
+| coarse operator | selected by | Rhie–Chow time scale |
 |---|---|---|
 | Lethe, matrix-free rediscretization | — | τ recomputed per level; consistent by construction |
-| ours, `derefine_op` rediscretization | `SFEM_GMG_GALERKIN=0`, **the default** | recomputed at coarse `h`, so `D_f` quadruples per level (it carries `h²`), then hand-corrected by `SFEM_GMG_RC_DECAY`, which defaults to 1 — i.e. uncorrected |
+| ours, `derefine_op` rediscretization | `SFEM_GMG_GALERKIN=0`, **the default** | recomputed at coarse `h`, then hand-corrected by `SFEM_GMG_RC_DECAY`, which defaults to 1 — i.e. uncorrected |
 | ours, element-wise Galerkin | `SFEM_GMG_GALERKIN=2` with `SFEM_GMG_EGAL=1` | frozen at the **fine** `h`; exact only under the frozen-pgrad Jacobian |
+
+### How much of this the time-scale fix removed
+
+The coefficient this section was written against no longer exists. It was `D_f = rc_scale·h²/(2μ)`
+— the Stokes limit of `V/a_P` — and it is now the full momentum-interpolation time scale,
+
+    τ = [ (2 a0/dt)² + (2|u|/h)² + (4 ν/h²)² ]^(−1/2)
+
+which matters here because **the three branches carry different powers of `h`**, and the one
+that was in use carried the worst. A discrete Laplacian row scales like `τ·h`, and the
+velocity block doubles per coarsening hop, so what the pressure block has to match is `τ·h`
+doubling too:
+
+| branch | τ per hop | p–p row per hop | against the velocity block |
+|---|---|---|---|
+| diffusive `h²/4ν` — **what was in use** | ×4 | ×8 | **4× too stiff** |
+| advective `h/2\|u\|` | ×2 | ×4 | 2× too stiff |
+| transient `dt/2a0` | ×1 | ×2 | **matched exactly** |
+
+So `SFEM_GMG_RC_DECAY = 0.25` was not a property of Rhie–Chow. It was a property of having
+picked the branch with the strongest `h`-dependence, and the right factor is regime-dependent:
+0.25 for a viscous-dominated coarsening, 0.5 for a convective one, and 1 — no correction at all
+— for a transient-dominated one.
+
+Measured, cavity on 4×4×4 macro-elements at L=4, 19,652 dof, steady (so the transient branch
+is off and this is the advective branch replacing part of the diffusive one). The pressure
+commutation defect `|A_H R v − R A_h v| / |R A_h v|`:
+
+| `SFEM_GMG_RC_DECAY` | old `D_f` | combined τ |
+|---|---|---|
+| 1 (default) | 7.525 | **4.611** |
+| 0.5 | 3.444 | **2.118** |
+| 0.25 | 1.409 | **0.881** |
+
+A uniform ~1.6× improvement, and at 0.25 the pressure block finally comes within a factor of
+two of the ~0.4 velocity baseline instead of sitting 3.5× above it. The velocity figures do not
+move at all, which is the control: nothing but the pressure block changed.
+
+This does not make the coarse space consistent — item 2 of the ordering below still stands, and
+`0.25` is still the best of the three. It removes roughly a third of the defect for free, and
+it explains where the rest comes from.
 
 (An earlier draft of this table said element-wise Galerkin was the default. It is not:
 `SFEM_GMG_EGAL` defaults to 1 but is gated on `galerkin_mode == 2`, and `SFEM_GMG_GALERKIN`

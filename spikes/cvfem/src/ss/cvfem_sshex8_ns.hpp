@@ -104,6 +104,10 @@ struct SSMeshData {
     // Deterministic scatter tables, built once. Null means the atomic path.
     std::shared_ptr<struct SSScatter> scatter;
 };
+// Defined below, next to the macro-element geometry it configures; the element sweeps that
+// need it sit above.
+inline scalar_t sscvfem_transient_diag_weight(const SSMeshData &d, const scalar_t rho);
+inline Hex8RcConfig sscvfem_rc_config(const SSMeshData &d);
 
 struct SSScatter;
 
@@ -768,7 +772,10 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho,
                         pgz[a] = d.pgz[(size_t)g[a]];
                     }
 
-                    const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+
+                    const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                    const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                          nullptr, ux, uy, uz,  rcfg.tau};
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(x, y, z, adj, &det);
                     cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
@@ -857,7 +864,9 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_
                             pgz[a]      = lpgz[(size_t)l];
                         }
 
-                        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                        const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                              nullptr, ux, uy, uz,  rcfg.tau};
                         scalar_t           adj[9], det;
                         sscvfem_micro_geom(x, y, z, adj, &det);
                         cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
@@ -977,7 +986,9 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
                             pgz[a]      = lpgz[(size_t)l];
                         }
 
-                        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                        const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                              nullptr, ux, uy, uz,  rcfg.tau};
                         cvfem_hex8_ns_upwind_jacobian_action(rho, mu, madj, mdet, ux, uy, uz, vx, vy, vz, q, r,
                                                              rc, p, d.upwind_eps);
                         boundary_scs_add_jacobian_action(rho, mu, 0, madj, mdet, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
@@ -1024,19 +1035,54 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
 // the shared kernel, which is why the benchmark checks it against the naive variant like
 // the others. If it stops agreeing, this is the copy that drifted.
 
+// The time-scale configuration for this level's solve.
+inline Hex8RcConfig sscvfem_rc_config(const SSMeshData &d) {
+    // a0/dt through the transient diagonal's own rule, at rho = 1.
+    //
+    // That function already settles the history question this one has to settle, and for the
+    // same reason: a coarse level built by clone_onto receives dt but never a history, so a
+    // rule keyed on u_prev2 would give every level below the finest a different time scale
+    // from the one it is correcting. Its comment records that this exact mistake once gave
+    // every coarse level a steady Jacobian. Deriving the time scale's a0 anywhere else would
+    // reintroduce it in the stabilisation instead.
+    return cvfem_hex8_rc_config(d.rhie_chow_scale, sscvfem_transient_diag_weight(d, scalar_t(1)));
+}
+
+// The micro-cells of a macro element are congruent, so everything here is computed once per
+// macro element and read by all L^3 of them. The Rhie-Chow time scale broke that: its
+// advective branch carries the velocity, which varies cell to cell.
+//
+// The split keeps the hoist. Only |u|^2 is per-cell, and it enters the time scale as
+// (2|u|/h)^2 = 4|u|^2/h^2, so the macro element can hold everything else --
+//
+//   rc_num[s]  = rc_scale * A2/Adotd     the whole geometric factor, zero where degenerate
+//   rc_base[s] = (2 a0/dt)^2 + (4 nu/h^2)^2   the transient and diffusive branches
+//   inv_h2[s]  = 1/|d|^2
+//
+// -- and a cell pays one add, one multiply, one square root and one divide rather than the
+// twelve full coefficient evaluations it would otherwise need.
 struct SSMacroGeom {
     scalar_t adj[9];
     scalar_t det;
     scalar_t A[3][3];
-    scalar_t coeff[CVFEM_HEX8_N_SCS];
+    scalar_t rc_num[CVFEM_HEX8_N_SCS];
+    scalar_t rc_base[CVFEM_HEX8_N_SCS];
+    scalar_t inv_h2[CVFEM_HEX8_N_SCS];
     scalar_t dvec[CVFEM_HEX8_N_SCS][3];
 };
 
+// The per-cell half of the coefficient. Identical to cvfem_hex8_rhie_chow_mdot_coeff by
+// construction -- the flat-versus-semi-structured parity test is what holds the two together.
+static SFEM_INLINE scalar_t sscvfem_rc_coeff(const SSMacroGeom &g, const int s, const scalar_t u2) {
+    return g.rc_num[s] / std::sqrt(g.rc_base[s] + scalar_t(4) * u2 * g.inv_h2[s]);
+}
+
 inline void sscvfem_macro_geom(const scalar_t x[8], const scalar_t y[8], const scalar_t z[8],
                                const scalar_t rho, const scalar_t mu, const scalar_t rc_scale,
-                               SSMacroGeom &g) {
+                               const Hex8RcTau &tau, SSMacroGeom &g) {
     sscvfem_micro_geom(x, y, z, g.adj, &g.det);
     cvfem_hex8_dir_areas(g.adj, g.A);
+    const scalar_t nu = (mu > scalar_t(1e-30) ? mu : scalar_t(1e-30)) / (rho > scalar_t(0) ? rho : scalar_t(1));
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
         const int i = CVFEM_HEX8_SCS[s].i;
         const int j = CVFEM_HEX8_SCS[s].j;
@@ -1044,9 +1090,26 @@ inline void sscvfem_macro_geom(const scalar_t x[8], const scalar_t y[8], const s
         g.dvec[s][0] = x[j] - x[i];
         g.dvec[s][1] = y[j] - y[i];
         g.dvec[s][2] = z[j] - z[i];
-        g.coeff[s]   = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc_scale,
-                                                       g.dvec[s][0], g.dvec[s][1], g.dvec[s][2],
-                                                       g.A[d][0], g.A[d][1], g.A[d][2]);
+
+        const scalar_t dx = g.dvec[s][0], dy = g.dvec[s][1], dz = g.dvec[s][2];
+        const scalar_t ax = g.A[d][0], ay = g.A[d][1], az = g.A[d][2];
+        const scalar_t h2    = dx * dx + dy * dy + dz * dz;
+        const scalar_t Adotd = ax * dx + ay * dy + az * dz;
+        const scalar_t A2    = ax * ax + ay * ay + az * az;
+        const scalar_t lim   = scalar_t(1e-30) * (std::sqrt(A2 * h2) + scalar_t(1e-30));
+        // A degenerate surface contributes nothing, exactly as the flat guard makes it:
+        // a zero numerator over a one denominator, so the divide below stays finite.
+        if (rc_scale == scalar_t(0) || rho == scalar_t(0) || std::fabs(Adotd) < lim) {
+            g.rc_num[s]  = scalar_t(0);
+            g.rc_base[s] = scalar_t(1);
+            g.inv_h2[s]  = scalar_t(0);
+            continue;
+        }
+        const scalar_t ct = scalar_t(2) * tau.inv_dt_a0;
+        const scalar_t cd = scalar_t(4) * nu / h2;
+        g.rc_num[s]  = rc_scale * (A2 / Adotd);
+        g.rc_base[s] = ct * ct + cd * cd;
+        g.inv_h2[s]  = tau.u2_scale / h2;
     }
 }
 
@@ -1096,11 +1159,11 @@ static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_
         const int      j  = CVFEM_HEX8_SCS[s].j;
         const int      d  = s >> 2;
         const scalar_t ax = g.A[d][0], ay = g.A[d][1], az = g.A[d][2];
-        const scalar_t c  = g.coeff[s];
 
         const scalar_t adv_x = half * (ux[i] + ux[j]);
         const scalar_t adv_y = half * (uy[i] + uy[j]);
         const scalar_t adv_z = half * (uz[i] + uz[j]);
+        const scalar_t c = sscvfem_rc_coeff(g, s, adv_x * adv_x + adv_y * adv_y + adv_z * adv_z);
 
         // -coeff * ((p_j - p_i) - avg(grad p) . d), with coeff and d both loop invariants.
         const scalar_t corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
@@ -1203,7 +1266,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
                     ey[a]       = ly[(size_t)l];
                     ez[a]       = lz[(size_t)l];
                 }
-                sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+                const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                sscvfem_macro_geom(ex, ey, ez, rho, mu, rcfg.scale, rcfg.tau, mg);
             }
 
             for (int zi = 0; zi < L; ++zi) {
@@ -1478,7 +1542,10 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
         const int      j  = CVFEM_HEX8_SCS[s].j;
         const int      dd = s >> 2;
         const scalar_t ax = g.A[dd][0], ay = g.A[dd][1], az = g.A[dd][2];
-        const scalar_t c  = g.coeff[s];
+        const scalar_t uax = half * (ux[i] + ux[j]);
+        const scalar_t uay = half * (uy[i] + uy[j]);
+        const scalar_t uaz = half * (uz[i] + uz[j]);
+        const scalar_t c   = sscvfem_rc_coeff(g, s, uax * uax + uay * uay + uaz * uaz);
 
         // The upwind weights are needed only by the momentum rows. The continuity row is
         // dmdot_v + dmdot_q with no sgn in it, so for a pressure-row evaluation the whole
@@ -1660,7 +1727,8 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                     ey[a]       = ly[(size_t)l];
                     ez[a]       = lz[(size_t)l];
                 }
-                sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+                const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                sscvfem_macro_geom(ex, ey, ez, rho, mu, rcfg.scale, rcfg.tau, mg);
             }
 
             for (int zi = 0; zi < L; ++zi) {
@@ -1788,7 +1856,6 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
 inline void     sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
                                                const scalar_t *const SFEM_RESTRICT dir,
                                                scalar_t *const SFEM_RESTRICT       jv);
-inline scalar_t sscvfem_transient_diag_weight(const SSMeshData &d, const scalar_t rho);
 
 inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar_t mu, const int blocks,
                                  const scalar_t *const SFEM_RESTRICT dir,
@@ -1974,7 +2041,9 @@ inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t r
                         pgy[a] = d.pgy[(size_t)g[a]];
                         pgz[a] = d.pgz[(size_t)g[a]];
                     }
-                    const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                    const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                    const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                          nullptr, ux, uy, uz,  rcfg.tau};
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(x, y, z, adj, &det);
                     cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
@@ -2042,7 +2111,8 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                     ey[a]       = ly[(size_t)l];
                     ez[a]       = lz[(size_t)l];
                 }
-                sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+                const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                sscvfem_macro_geom(ex, ey, ez, rho, mu, rcfg.scale, rcfg.tau, mg);
             }
 
             for (int zi = 0; zi < L; ++zi) {
@@ -2064,7 +2134,9 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                             pgy[a]      = lpgy[(size_t)l];
                             pgz[a]      = lpgz[(size_t)l];
                         }
-                        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                        const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                              nullptr, ux, uy, uz,  rcfg.tau};
                         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r,
                                                              rc, d.upwind_eps);
                         boundary_scs_add_residual(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
@@ -2165,7 +2237,9 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t
                         sl[a * 8 + a] = (smesh::count_t)g[a];
                     }
 
-                    const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                    const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                    const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                          nullptr, ux, uy, uz,  rcfg.tau};
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(x, y, z, adj, &det);
                     cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, out, rc, p);
@@ -2255,7 +2329,9 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
                         // buffer, so no thread can be writing the same entry.
                         for (int a = 0; a < 8; ++a) sl[a * 8 + a] = (smesh::count_t)(base + off[a]);
 
-                        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                        const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                              nullptr, ux, uy, uz,  rcfg.tau};
                         cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, madj, mdet, ux, uy, uz, sl,
                                                                        lout.data(), rc, p);
                         boundary_scs_add_jacobian<false>(rho, mu, 0, madj, mdet, d.Lx, d.Ly, d.Lz, x, y, z,
