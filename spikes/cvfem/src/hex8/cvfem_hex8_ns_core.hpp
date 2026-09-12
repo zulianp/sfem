@@ -95,6 +95,13 @@ struct MeshData {
     // computed where it is used.
     std::vector<scalar_t> rc_coeff[CVFEM_HEX8_N_SCS];
     scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
+    // The coefficient carries the advecting velocity now, so rho, mu and the scale no
+    // longer span everything it depends on. state_stamp is bumped by whoever moves the
+    // state; the cache compares it and rebuilds once per Newton step rather than once per
+    // matvec. A harness that sets the state once and never moves it leaves the stamp at
+    // zero and gets the same single build it always got.
+    uint64_t              state_stamp{0};
+    uint64_t              rc_coeff_stamp{~0ull};
     // Optional body force, one value per node, and the control volume it is weighted by.
     // Left empty for every case that has no source term, in which case nothing is added and
     // the residual is bit-identical to what it was before this existed. Used by the
@@ -187,6 +194,11 @@ struct MeshData {
 #include "cvfem_hex8_ns_packed.hpp"
 #include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #include "cvfem_hex8_boundary_scs.hpp"
+
+// The Rhie-Chow time-scale configuration for this mesh's solve. Declared here and defined
+// below, next to the BDF coefficients it reads: the element sweeps that need it all sit
+// above those.
+inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d);
 
 // The prescribed boundary data for one element. A default-constructed result -- what every
 // case with neither condition in use produces -- makes the boundary term behave exactly as
@@ -545,6 +557,7 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_sumfact");
     reset_residual(d);
 
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
@@ -552,7 +565,8 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc);
@@ -574,6 +588,7 @@ inline SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_isoparam");
     reset_residual(d);
 
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
@@ -581,7 +596,8 @@ inline SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
         cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r, rc);
         boundary_scs_add_residual(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
                                   d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
@@ -611,6 +627,7 @@ inline SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &
     scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
 #pragma omp parallel
     {
         for (int color = 0; color < c.n_colors; ++color) {
@@ -627,7 +644,8 @@ inline SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &
                     gather_element_fields(d, e, ux, uy, uz, pp);
                     scalar_t pgx[8], pgy[8], pgz[8];
                     gather_element_pgrad(d, e, pgx, pgy, pgz);
-                    const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                    const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                          nullptr, ux, uy, uz,  rcfg.tau};
                     scalar_t           adj[9], det;
                     cvfem_hex8_load_adj(d, e, adj, &det);
                     const smesh::count_t *const SFEM_RESTRICT es = slots + (size_t)e * 64;
@@ -655,6 +673,7 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
     scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
@@ -662,7 +681,8 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
         // See the note in assemble_jacobian_colored_sumfact: rc and p go through the same
@@ -680,6 +700,7 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
     scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
@@ -687,7 +708,8 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values, rc,
                                                               p);
         boundary_scs_add_jacobian<true>(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64,
@@ -738,6 +760,8 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
     smesh::count_t sl[64];
     for (int k = 0; k < 64; ++k) sl[k] = (smesh::count_t)k;
 
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+
     // One element's local matrix, from which only the eight diagonal blocks are wanted.
     const auto element_blocks = [&](const ptrdiff_t e, scalar_t *const SFEM_RESTRICT loc) {
         for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
@@ -747,7 +771,8 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
 
         if (geom == GeomKind::Isoparam) {
             cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(rho, mu, x, y, z, ux, uy, uz, sl, loc, rc, p);
@@ -916,6 +941,18 @@ inline BdfCoeffs bdf_coeffs(const MeshData &d) {
     return {scalar_t(1), scalar_t(-1), scalar_t(0), 1};
 }
 
+inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d) {
+    // a0/dt through the transient diagonal's own rule, at rho = 1.
+    //
+    // That function already settles the history question this one has to settle, and for the
+    // same reason: a coarse level built by clone_onto receives dt but never a history, so a
+    // rule keyed on u_prev2 would give every level below the finest a different time scale
+    // from the one it is correcting. Its comment records that this exact mistake once gave
+    // every coarse level a steady Jacobian. Deriving the time scale's a0 anywhere else would
+    // reintroduce it in the stabilisation instead.
+    return cvfem_hex8_rc_config(d.rhie_chow_scale, transient_diag_weight(d, scalar_t(1)));
+}
+
 // The transient term, as a per-node post-pass.
 //
 // In a control-volume scheme the mass matrix IS the control volume: the momentum equation
@@ -1076,6 +1113,7 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, cons
                                                                const scalar_t *const SFEM_RESTRICT dir,
                                                                scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_sumfact");
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
@@ -1086,9 +1124,9 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, cons
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const bool has_qg = !d.qgx.empty();
         if (has_qg) gather_element_qgrad(d, e, qgx, qgy, qgz);
-        const Hex8RhieChow rc{x,   y,   z,   pgx, pgy, pgz, d.rhie_chow_scale,
+        const Hex8RhieChow rc{x,   y,   z,   pgx, pgy, pgz, rcfg.scale,
                               has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
-                              has_qg ? qgz : nullptr};
+                              has_qg ? qgz : nullptr, ux, uy, uz, rcfg.tau};
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
@@ -1109,6 +1147,7 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
                                                                 const scalar_t *const SFEM_RESTRICT dir,
                                                                 scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_isoparam");
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
@@ -1119,9 +1158,9 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const bool has_qg = !d.qgx.empty();
         if (has_qg) gather_element_qgrad(d, e, qgx, qgy, qgz);
-        const Hex8RhieChow rc{x,   y,   z,   pgx, pgy, pgz, d.rhie_chow_scale,
+        const Hex8RhieChow rc{x,   y,   z,   pgx, pgy, pgz, rcfg.scale,
                               has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
-                              has_qg ? qgz : nullptr};
+                              has_qg ? qgz : nullptr, ux, uy, uz, rcfg.tau};
         cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, x, y, z, ux, uy, uz, vx, vy, vz, q, r, rc, p);
         boundary_scs_add_jacobian_action(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r,
                                          cvfem_hex8_face_mask_of(d, e),
@@ -1193,6 +1232,10 @@ inline void pack_fields(const MeshData &d, scalar_t *const SFEM_RESTRICT x) {
 }
 
 inline void unpack_fields(MeshData &d, const scalar_t *const SFEM_RESTRICT x) {
+    // The single route by which a new Newton iterate reaches MeshData, and therefore the
+    // right place to invalidate everything keyed on the state. The Rhie-Chow coefficient
+    // is the one such thing today.
+    ++d.state_stamp;
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
         d.ux[i] = x[(size_t)i * 4 + 0];

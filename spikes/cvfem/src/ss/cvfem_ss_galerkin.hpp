@@ -273,7 +273,8 @@ namespace cvfem_ss {
                         ey[a]       = ly[(size_t)l];
                         ez[a]       = lz[(size_t)l];
                     }
-                    sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+                    const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                    sscvfem_macro_geom(ex, ey, ez, rho, mu, rcfg.scale, rcfg.tau, mg);
                 }
 
                 scalar_t *const Ce = g.C.data() + (size_t)(e - e0) * (size_t)nc * 27 * 16;
@@ -301,7 +302,9 @@ namespace cvfem_ss {
                             scalar_t loc[64 * 16];
                             for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
 
-                            const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                            const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+                            const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                                  nullptr, ux, uy, uz,  rcfg.tau};
                             cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, mg.adj, mg.det, ux, uy, uz, sl,
                                                                            loc, rc, p);
                             // The coarse operator must carry the same boundary treatment as

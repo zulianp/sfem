@@ -237,12 +237,26 @@ int main(int argc, char **argv) {
         d.dt                          = 0;
         assemble_block_diag(d, rho, mu, GeomKind::Affine, diag_steady);
         d.dt = dt_save;
-        bool pressure_same = true, velocity_grew = false;
+        bool     velocity_grew = false;
+        scalar_t worst_p_rel  = 0;
         for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-            pressure_same = pressure_same && diag[(size_t)i * 16 + 15] == diag_steady[(size_t)i * 16 + 15];
+            const scalar_t pt = diag[(size_t)i * 16 + 15], ps = diag_steady[(size_t)i * 16 + 15];
+            const scalar_t sc = std::fabs(ps) > 0 ? std::fabs(ps) : scalar_t(1);
+            worst_p_rel       = std::max(worst_p_rel, std::fabs(pt - ps) / sc);
             if (diag[(size_t)i * 16 + 0] > diag_steady[(size_t)i * 16 + 0]) velocity_grew = true;
         }
-        check(pressure_same, "the block diagonal's pressure entry is unchanged");
+        // A tolerance rather than exact equality, and the tolerance is the whole content of
+        // the check: measured 2.17e-16, which is round-off.
+        //
+        // This was an exact comparison, and it held because the Rhie-Chow coefficient was
+        // Df = rc_scale h^2 / (2 mu), which has no dt in it at all. The coefficient is now a
+        // time scale that CAN carry one -- V/a_P sees rho V a0/dt, and Nalu's whole time scale
+        // is dt/gamma1 -- but that branch is off by default, because switching it on is what
+        // stopped the pump converging (see cvfem_hex8_rc_config). So the continuity row is
+        // still dt-independent in both its residual and its Jacobian, which is what this
+        // asserts; with SFEM_RC_TAU_TRANSIENT=1 it would not be, and that is the intended
+        // difference between the two settings rather than a violation of anything.
+        check(worst_p_rel < 1e-12, "the block diagonal's pressure entry is unchanged by the time term");
         check(velocity_grew, "the block diagonal's velocity entries grow with the time term");
     }
 

@@ -246,6 +246,13 @@ struct MeshData {
     // computed where it is used.
     std::vector<scalar_t> rc_coeff[CVFEM_HEX8_N_SCS];
     scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
+    // The coefficient carries the advecting velocity now, so rho, mu and the scale no
+    // longer span everything it depends on. state_stamp is bumped by whoever moves the
+    // state; the cache compares it and rebuilds once per Newton step rather than once per
+    // matvec. A harness that sets the state once and never moves it leaves the stamp at
+    // zero and gets the same single build it always got.
+    uint64_t              state_stamp{0};
+    uint64_t              rc_coeff_stamp{~0ull};
 
     std::vector<uint8_t>  face_mask;       // per element, bits 0..5 = the six CVFEM faces
 
@@ -783,6 +790,13 @@ static SFEM_NOINLINE void assemble_diag_transient_pass(MeshData &d, const scalar
 // With both off, `rc` keeps its null pointers, cvfem_hex8_rhie_chow_active() is false and
 // the element kernel's Rhie-Chow branch folds away, `fmask` stays 0 and the caller skips
 // the boundary term entirely. Nothing is gathered and nothing is written.
+// The Rhie-Chow time-scale configuration for this mesh. Mirrors the solver's
+// cvfem_hex8_rc_config_for in cvfem_hex8_ns_core.hpp; the two MeshData types never appear in
+// one translation unit, so the name is shared deliberately.
+inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d) {
+    return cvfem_hex8_rc_config(d.rhie_chow_scale, transient_diag_weight(d, scalar_t(1)));
+}
+
 struct Hex8Extras {
     int with_rc{0};
     int with_bnd{0};
@@ -790,11 +804,14 @@ struct Hex8Extras {
     // reconstruction as well. Only the Jacobian action fills qgx/qgy/qgz, so this is off
     // wherever they are empty and the kernel falls back to the frozen-gradient form.
     int with_qg{0};
+    // The Rhie-Chow time-scale configuration, resolved once here rather than per element.
+    Hex8RcConfig rcfg{};
 
     explicit Hex8Extras(const MeshData &d)
         : with_rc(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0)),
           with_bnd(!d.face_mask.empty()),
-          with_qg(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0) && !d.qgx.empty()) {}
+          with_qg(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0) && !d.qgx.empty()),
+          rcfg(cvfem_hex8_rc_config_for(d)) {}
 };
 
 // Per-element scratch for the above. Declared inside the element loop; `rc` points into
@@ -803,6 +820,8 @@ struct Hex8ExtraScratch {
     scalar_t     x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
     scalar_t     pgx[CVFEM_HEX8_N_NODES], pgy[CVFEM_HEX8_N_NODES], pgz[CVFEM_HEX8_N_NODES];
     scalar_t     qgx[CVFEM_HEX8_N_NODES], qgy[CVFEM_HEX8_N_NODES], qgz[CVFEM_HEX8_N_NODES];
+    // The advecting velocity, for the convective branch of the Rhie-Chow time scale.
+    scalar_t     ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES], uz[CVFEM_HEX8_N_NODES];
     Hex8RhieChow rc{};
     int          fmask{0};
 
@@ -816,8 +835,12 @@ struct Hex8ExtraScratch {
                 pgx[a]               = d.pgx[g];
                 pgy[a]               = d.pgy[g];
                 pgz[a]               = d.pgz[g];
+                ux[a]                = d.ux[g];
+                uy[a]                = d.uy[g];
+                uz[a]                = d.uz[g];
             }
-            rc = Hex8RhieChow{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+            rc = Hex8RhieChow{x,       y,  z,  pgx, pgy, pgz, opt.rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  opt.rcfg.tau};
             if (opt.with_qg) {
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                     const smesh::idx_t g = d.elems[a][e];

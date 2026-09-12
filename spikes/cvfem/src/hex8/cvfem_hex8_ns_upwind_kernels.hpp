@@ -61,6 +61,20 @@ struct Hex8CoordPack {
     alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
 };
 
+// What the Rhie-Chow time scale needs beyond the element's own geometry. Resolved once per
+// Newton step from the mesh state, never rediscovered per element, and carried as one object
+// so no path can end up half-converted.
+//
+// u2_scale is the mode selector rather than a physical quantity: 1 evaluates the combined
+// advective-diffusive-transient time scale, 0 suppresses the advective and transient
+// branches and, together with a doubled rc_scale, reproduces the previous diffusion-only
+// coefficient bit for bit. The scale itself stays on the channel it already travels --
+// Hex8RhieChowT::scale and the rc_scale argument -- rather than being duplicated here.
+struct Hex8RcTau {
+    scalar_t inv_dt_a0{0};
+    scalar_t u2_scale{1};
+};
+
 struct Hex8RhieChowPack {
     alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
@@ -102,6 +116,10 @@ struct Hex8RhieChowPack {
     // function directly. This is the arrangement the semi-structured path has always used
     // (SSMacroGeom::coeff, src/ss/cvfem_sshex8_ns.hpp) -- which is why it never paid this.
     alignas(ALIGN_BYTES) scalar_t coeff[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+    // The part of the time scale that belongs to the solve rather than to the element.
+    // Only the isoparametric path reads it; the affine path has the finished coefficient in
+    // the table above.
+    Hex8RcTau tau{};
 };
 
 // The partially assembled element tangent: the complete state dependence of one element's
@@ -157,6 +175,12 @@ struct Hex8RhieChowT {
     const T *qgx{};
     const T *qgy{};
     const T *qgz{};
+    // The advecting velocity, for the convective branch of the time scale. Same
+    // element-local indexing as x/y/z.
+    const T *ux{};
+    const T *uy{};
+    const T *uz{};
+    Hex8RcTau tau{};
 };
 
 // Every existing host call site names `Hex8RhieChow`, so keep that spelling bound
@@ -595,18 +619,79 @@ static SFEM_INLINE SFEM_HOST_DEVICE int cvfem_hex8_rhie_chow_active(const Hex8Rh
     return rc.scale != scalar_t(0) && rc.x && rc.y && rc.z && rc.pgx && rc.pgy && rc.pgz;
 }
 
+// The momentum-interpolation time scale.
+//
+// Rhie-Chow is not a stabilisation term someone chose; it is the momentum equation
+// evaluated at the face. Writing the discrete momentum equation at node P as
+// a_P u_P = H_P - V_P (grad p)_P and solving for u_P gives
+//
+//     u_f = ubar_f - (V/a_P) [ (grad p)_f^compact - (grad p)_f^interpolated ]
+//
+// so the coefficient is V/a_P -- the control volume over the momentum equation's own
+// diagonal. It answers one question: how much does a unit pressure difference across this
+// face actually move the velocity there?
+//
+// a_P carries three mechanisms, and they add in the denominator, so whichever is largest
+// wins:
+//
+//     inertia      rho V a0 / dt   ~ rho h^3 a0/dt      -> tau = dt / a0
+//     convection   ~ rho |u| h^2                        -> tau = h / |u|
+//     diffusion    ~ mu h                               -> tau = h^2 / nu
+//
+// This used to evaluate only the third, as Df = rc_scale h^2 / (2 mu). That is V/a_P
+// computed as though the momentum diagonal were purely viscous, and it overstates the
+// coefficient by roughly the cell Peclet number rho|u|h/mu -- about 31x on the cavity at
+// Re=1000 on 32 cells, about 159x on the backward-facing step at Re_h=5100. The correction
+// is then no longer the small one the derivation assumes: a substantial part of the face
+// mass flux ends up set by pressure smoothing rather than by the flow.
+//
+// The standard closed form reproducing all three limits (Shakib, Tezduyar; it is what Nalu
+// means by "a combined elemental advection and diffusion time scale") is
+//
+//     tau = [ (2 a0/dt)^2 + (2|u|/h)^2 + (4 nu/h^2)^2 ]^(-1/2)
+//
+// Only |u|^2 is ever needed, not |u|, so no square root is spent on the velocity.
+//
+// Callers pass u2 = |u|^2 at the sub-control surface and inv_dt_a0 = a0/dt (zero for a
+// steady solve). Passing u2 = 0, inv_dt_a0 = 0 and twice the scale reproduces the previous
+// diffusion-only coefficient exactly, which is how SFEM_RHIE_CHOW_TAU=diffusive keeps the
+// old form measurable; the factor two is the difference between this form's h^2/(4 nu) and
+// the old h^2/(2 nu).
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_mdot_coeff(const scalar_t rho, const scalar_t mu, const scalar_t rc_scale,
                                                             const scalar_t dx, const scalar_t dy, const scalar_t dz,
-                                                            const scalar_t ax, const scalar_t ay, const scalar_t az) {
+                                                            const scalar_t ax, const scalar_t ay, const scalar_t az,
+                                                            const scalar_t u2, const scalar_t inv_dt_a0) {
     if (rc_scale == scalar_t(0) || rho == scalar_t(0)) return scalar_t(0);
     const scalar_t h2    = dx * dx + dy * dy + dz * dz;
     const scalar_t Adotd = ax * dx + ay * dy + az * dz;
     const scalar_t A2    = ax * ax + ay * ay + az * az;
     const scalar_t lim   = scalar_t(1e-30) * (std::sqrt(A2 * h2) + scalar_t(1e-30));
     if (std::fabs(Adotd) < lim) return scalar_t(0);
-    const scalar_t Df = rc_scale * h2 / (scalar_t(2) * (mu > scalar_t(1e-30) ? mu : scalar_t(1e-30)));
-    return rho * Df * A2 / Adotd;
+    const scalar_t nu  = (mu > scalar_t(1e-30) ? mu : scalar_t(1e-30)) / rho;
+    const scalar_t ct  = scalar_t(2) * inv_dt_a0;
+    const scalar_t cd  = scalar_t(4) * nu / h2;
+    const scalar_t ca2 = scalar_t(4) * u2 / h2;
+    return rc_scale * (A2 / Adotd) / std::sqrt(ct * ct + ca2 + cd * cd);
+}
+
+// |u|^2 at a sub-control surface, from the element-local velocity the struct carries,
+// scaled by the mode selector.
+//
+// The null test is loop-invariant and selects a time scale rather than guarding against a
+// caller mistake: a struct with no velocity in it can only mean the diffusion-only
+// coefficient, which is what u2 = 0 with a doubled scale evaluates. It costs nothing the
+// packed path pays -- that path reads the finished coefficient out of MeshData::rc_coeff
+// and never reaches here.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_u2(const Hex8RhieChowT<scalar_t> &rc, const int i,
+                                                                    const int j) {
+    if (!rc.ux) return scalar_t(0);
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t ux   = half * (rc.ux[i] + rc.ux[j]);
+    const scalar_t uy   = half * (rc.uy[i] + rc.uy[j]);
+    const scalar_t uz   = half * (rc.uz[i] + rc.uz[j]);
+    return rc.tau.u2_scale * (ux * ux + uy * uy + uz * uz);
 }
 
 template <typename scalar_t>
@@ -617,7 +702,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_mdotc(const sc
     const scalar_t dx    = rc.x[j] - rc.x[i];
     const scalar_t dy    = rc.y[j] - rc.y[i];
     const scalar_t dz    = rc.z[j] - rc.z[i];
-    const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az);
+    const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
+                                                           cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
     const scalar_t half  = scalar_t(0.5);
     const scalar_t corr  = (p_j - p_i) - (half * (rc.pgx[i] + rc.pgx[j]) * dx + half * (rc.pgy[i] + rc.pgy[j]) * dy +
                                          half * (rc.pgz[i] + rc.pgz[j]) * dz);
@@ -632,7 +718,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_dmdotc(const s
     const scalar_t dx    = rc.x[j] - rc.x[i];
     const scalar_t dy    = rc.y[j] - rc.y[i];
     const scalar_t dz    = rc.z[j] - rc.z[i];
-    const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az);
+    const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
+                                                           cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
     // Mirror mdotc exactly: corr = (q_j - q_i) - avg(qg_i, qg_j) . d. Dropping the second
     // term -- as this did -- leaves the continuity rows of the Jacobian wrong by ~4%, which
     // caps Newton at a linear rate (contraction 0.675, independent of mesh) instead of
@@ -1031,7 +1118,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_rhie_chow_p(const scalar
     const scalar_t dx    = rc.x[j] - rc.x[i];
     const scalar_t dy    = rc.y[j] - rc.y[i];
     const scalar_t dz    = rc.z[j] - rc.z[i];
-    const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az);
+    const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
+                                                           cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
     if (coeff == scalar_t(0)) return;
 
     const scalar_t half     = scalar_t(0.5);
@@ -1529,7 +1617,10 @@ static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                
             const scalar_t dx    = rc->x[J][lane] - rc->x[I][lane];
             const scalar_t dy    = rc->y[J][lane] - rc->y[I][lane];
             const scalar_t dz    = rc->z[J][lane] - rc->z[I][lane];
-            const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc_scale, dx, dy, dz, ax, ay, az);
+            const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(
+                    rho, mu, rc_scale, dx, dy, dz, ax, ay, az,
+                    rc->tau.u2_scale * (adv_x * adv_x + adv_y * adv_y + adv_z * adv_z),
+                    rc->tau.inv_dt_a0);
             const scalar_t corr =
                     (in.p[J][lane] - in.p[I][lane]) -
                     (half * (rc->pgx[I][lane] + rc->pgx[J][lane]) * dx +

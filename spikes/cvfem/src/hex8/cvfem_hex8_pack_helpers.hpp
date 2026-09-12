@@ -197,6 +197,57 @@ static SFEM_INLINE void cvfem_hex8_gather_qg_from_pack(pack_idx_t **const SFEM_R
 
 // ------------------------------------------------------- hoisted Rhie-Chow coefficient
 //
+// The Rhie-Chow time scale's configuration, resolved once per solve.
+//
+// One definition for every path -- flat, packed, semi-structured, benchmark -- so none of
+// them can end up evaluating a different time scale than the others. Each caller supplies
+// a0/dt from its own transient history, which is the only part that differs.
+//
+// SFEM_RC_TAU=0 is the zero-severity control for the change: no advective branch, no
+// transient branch, and twice the scale, which reproduces the previous diffusion-only
+// coefficient Df = rc_scale h^2 / (2 mu) exactly. It is a measurement escape hatch, not a
+// supported mode -- see cvfem_hex8_rhie_chow_mdot_coeff for why that coefficient was wrong.
+struct Hex8RcConfig {
+    Hex8RcTau tau;
+    scalar_t  scale{0};
+};
+
+inline Hex8RcConfig cvfem_hex8_rc_config(const scalar_t rhie_chow_scale, const scalar_t a0_over_dt) {
+    // std::getenv rather than smesh::Env, because the benchmark shares this header and is
+    // driven by flags with no Env to read through -- the same reason cvfem_env_flag exists.
+    // Unset means combined; only an explicit 0 selects the old coefficient.
+    static const char *const raw      = std::getenv("SFEM_RC_TAU");
+    static const int         combined = !(raw && raw[0] == '0');
+    // The transient branch is OFF by default, and that is a measured decision rather than an
+    // oversight. SFEM_RC_TAU_TRANSIENT=1 turns it on.
+    //
+    // V/a_P does carry rho V a0/dt, so on the derivation alone the branch belongs here, and
+    // Nalu uses exactly it -- projTimeScale_ = dt/gamma1 -- as its whole time scale. But Nalu
+    // is a projection scheme, where dt/gamma1 is the right scaling for the pressure Poisson
+    // solve. Ours is a monolithic Newton formulation, and there the branch only shrinks the
+    // pressure block towards the unstabilised saddle point as dt falls, which is the failure
+    // the "allowing small time steps" line of Rhie-Chow papers exists to address.
+    //
+    // Measured on the pump at 2,916 dof, one step of dt = 0.1, BDF2, direct preconditioner:
+    // the old diffusion-only coefficient does not converge at all (highest Re solved 0 of 20,
+    // 21 Newton steps in one stage); advective + diffusive reaches the target in 20 Newton
+    // steps over four stages, quadratic in every one of them; adding the transient branch
+    // sends the continuation back to bisecting and past 216 Newton steps without converging.
+    // The advective branch is the fix and the transient branch is the regression, and they
+    // are separable exactly because this flag exists.
+    //
+    // What is left is Nalu's steady time scale -- "a combined elemental advection and
+    // diffusion time scale based on element length along with advection and diffusional
+    // parameters" -- which is the one our formulation wants.
+    static const char *const rawt     = std::getenv("SFEM_RC_TAU_TRANSIENT");
+    static const int         want_dt  = rawt && rawt[0] != '0';
+    Hex8RcConfig     c;
+    c.tau.u2_scale  = combined ? scalar_t(1) : scalar_t(0);
+    c.tau.inv_dt_a0 = (combined && want_dt) ? a0_over_dt : scalar_t(0);
+    c.scale         = combined ? rhie_chow_scale : scalar_t(2) * rhie_chow_scale;
+    return c;
+}
+
 // The Rhie-Chow mass-flux coefficient is pure geometry -- it depends on the element's
 // sub-control-surface area vectors and edge vectors, on rho and mu, and on the scale, and
 // on nothing that changes inside a Krylov solve. Building it here once per element and
@@ -220,14 +271,37 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
     }
     // Rebuilt only when something it depends on moves. rho and mu do move -- the Reynolds
     // continuation walks mu down between stages -- so this cannot be built once at setup
-    // and forgotten, and it must not be rebuilt on every matvec either.
+    // and forgotten, and it must not be rebuilt on every matvec either. The state moves too
+    // now that the time scale carries the advecting velocity, which is what state_stamp
+    // tracks; it changes once per Newton step, not once per matvec.
     if (!d.rc_coeff[0].empty() && d.rc_coeff_rho == rho && d.rc_coeff_mu == mu &&
-        d.rc_coeff_scale == d.rhie_chow_scale && (ptrdiff_t)d.rc_coeff[0].size() == d.nelements)
+        d.rc_coeff_scale == d.rhie_chow_scale && d.rc_coeff_stamp == d.state_stamp &&
+        (ptrdiff_t)d.rc_coeff[0].size() == d.nelements)
         return;
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) d.rc_coeff[s].resize((size_t)d.nelements);
     d.rc_coeff_rho   = rho;
     d.rc_coeff_mu    = mu;
     d.rc_coeff_scale = d.rhie_chow_scale;
+    d.rc_coeff_stamp = d.state_stamp;
+
+    // The two state-dependent inputs to the time scale, resolved once here rather than per
+    // element. bdf_coeffs is found by argument-dependent lookup at instantiation -- both
+    // MeshData variants declare their own alongside their own transient history, and this
+    // template is only ever instantiated where one of them is in scope.
+    //
+    // SFEM_RC_TAU=0 restores the previous diffusion-only coefficient exactly: no velocity,
+    // no transient branch, and twice the scale, because this form's diffusive limit is
+    // h^2/(4 nu) against the old h^2/(2 nu). It is the zero-severity control for the
+    // change, not a supported mode.
+    // Through the per-MeshData resolver rather than a second copy of the rule: both variants
+    // define one, and argument-dependent lookup picks the right one at instantiation.
+    const Hex8RcConfig cfg = cvfem_hex8_rc_config_for(d);
+    const scalar_t rc_scale  = cfg.scale;
+    const scalar_t inv_dt_a0 = cfg.tau.inv_dt_a0;
+    const scalar_t u2_scale  = cfg.tau.u2_scale;
+    const scalar_t *const SFEM_RESTRICT vx = d.ux.data();
+    const scalar_t *const SFEM_RESTRICT vy = d.uy.data();
+    const scalar_t *const SFEM_RESTRICT vz = d.uz.data();
 
     const auto *const px = d.points[0];
     const auto *const py = d.points[1];
@@ -248,12 +322,16 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
             // cvfem_hex8_rhie_chow_mdot_coeff -- a degenerate sub-control surface still
             // yields exactly zero, and the scalar paths get the same value from the same
             // function.
+            const scalar_t vax = scalar_t(0.5) * (vx[gi] + vx[gj]);
+            const scalar_t vay = scalar_t(0.5) * (vy[gi] + vy[gj]);
+            const scalar_t vaz = scalar_t(0.5) * (vz[gi] + vz[gj]);
+            const scalar_t u2  = u2_scale * (vax * vax + vay * vay + vaz * vaz);
             d.rc_coeff[s][(size_t)e] = cvfem_hex8_rhie_chow_mdot_coeff(
-                    rho, mu, d.rhie_chow_scale,
+                    rho, mu, rc_scale,
                     scalar_t(px[gj]) - scalar_t(px[gi]),
                     scalar_t(py[gj]) - scalar_t(py[gi]),
                     scalar_t(pz[gj]) - scalar_t(pz[gi]),
-                    A[q][0], A[q][1], A[q][2]);
+                    A[q][0], A[q][1], A[q][2], u2, inv_dt_a0);
         }
     }
 }

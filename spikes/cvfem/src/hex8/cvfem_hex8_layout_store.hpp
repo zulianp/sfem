@@ -207,11 +207,13 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
                 const int *const SFEM_RESTRICT slots = p.st_element_slot.data() + (size_t)e * 64;
 
                 scalar_t     rc_x[8], rc_y[8], rc_z[8], rc_pgx[8], rc_pgy[8], rc_pgz[8];
+                const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
                 Hex8RhieChow rc{};
                 if (with_rc) {
                     gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, rc_x, rc_y, rc_z);
                     gather_hex8_coords_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz, e, rc_pgx, rc_pgy, rc_pgz);
-                    rc = Hex8RhieChow{rc_x, rc_y, rc_z, rc_pgx, rc_pgy, rc_pgz, d.rhie_chow_scale};
+                    rc = Hex8RhieChow{rc_x,    rc_y,    rc_z,    rc_pgx, rc_pgy, rc_pgz, rcfg.scale,
+                                      nullptr, nullptr, nullptr, ux_e,   uy_e,   uz_e,   rcfg.tau};
                 }
                 const scalar_t *const rc_p = with_rc ? p_e : nullptr;
 
