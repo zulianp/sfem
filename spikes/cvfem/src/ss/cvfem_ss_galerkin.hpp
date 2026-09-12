@@ -307,6 +307,38 @@ namespace cvfem_ss {
                                                   nullptr, ux, uy, uz,  rcfg.tau};
                             cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, mg.adj, mg.det, ux, uy, uz, sl,
                                                                            loc, rc, p);
+
+                            // The transient term. It was MISSING, and this is the whole of the
+                            // fix: every element-wise Galerkin level operator was the STEADY
+                            // operator, so a transient run preconditioned with the wrong one.
+                            //
+                            // It hid because the term is a nodal post-pass everywhere else --
+                            // sscvfem_apply_transient walks nodes and adds rho V_i a0/dt -- and
+                            // an element loop that assembles a cell matrix never sees a nodal
+                            // pass. Nothing compared the assembly against the action until the
+                            // q=1 gate in tests/cvfem_operator_consistency_test, where the
+                            // steady case agreed to 3.3e-16 and the BDF2 case was 8.5e-01 out.
+                            //
+                            // In control-volume form the mass matrix IS the control volume, so
+                            // the element's share is |det|/8 per node -- exactly what
+                            // sscvfem_node_volume accumulates, and from the same hoisted macro
+                            // geometry, so the two agree term for term rather than nearly. The
+                            // three velocity components carry it and pressure does not: the
+                            // continuity equation is a constraint, not an evolution equation.
+                            //
+                            // Putting it in the CELL matrix rather than adding it to the coarse
+                            // operator afterwards is what makes it correct for q > 1 as well:
+                            // P^T (A + D) P coarsens the mass term by the same contraction as
+                            // everything else, which is what a Galerkin coarse operator means.
+                            if (const scalar_t tdw = sscvfem_transient_diag_weight(d, rho); tdw != scalar_t(0)) {
+                                const scalar_t tw = tdw * std::fabs(mg.det) / scalar_t(8);
+                                for (int a = 0; a < 8; ++a) {
+                                    scalar_t *const blk = loc + (size_t)(a * 8 + a) * 16;
+                                    blk[0] += tw;
+                                    blk[5] += tw;
+                                    blk[10] += tw;
+                                }
+                            }
                             // The coarse operator must carry the same boundary treatment as
                             // the fine one. Without the masks here the element-wise Galerkin
                             // coarse operator closes control volumes by the bounding-box test

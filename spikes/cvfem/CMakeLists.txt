@@ -205,6 +205,15 @@ add_test(NAME cvfem_flat_vs_ss_packed COMMAND cvfem_flat_vs_ss_test)
 add_test(NAME cvfem_operator_consistency_frozen COMMAND cvfem_operator_consistency_test)
 set_tests_properties(cvfem_operator_consistency_frozen
                      PROPERTIES ENVIRONMENT "SFEM_RC_EXACT_JAC=0")
+
+# And once more with the ATOMIC layouts forced, which is how packed and standard are compared.
+# Not against each other -- against the operator. If the block diagonal reproduces the probed
+# action on both layouts then they agree with the action and therefore with one another, which
+# is a stronger statement than a direct diff and needs no coordinate-keyed matching across the
+# renumbering a PackedMesh performs.
+add_test(NAME cvfem_operator_consistency_atomic COMMAND cvfem_operator_consistency_test)
+set_tests_properties(cvfem_operator_consistency_atomic
+                     PROPERTIES ENVIRONMENT "SFEM_RC_EXACT_JAC=0;SFEM_DIAG_ATOMIC=1;SFEM_QGRAD_ATOMIC=1")
 set_tests_properties(cvfem_flat_vs_ss_packed PROPERTIES ENVIRONMENT "SFEM_SS_PACK_SIZE=8")
 
 # ------------------------------------------------------------------- restart round trip
