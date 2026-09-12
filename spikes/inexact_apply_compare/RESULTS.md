@@ -991,36 +991,48 @@ and lost a third of its apply to conflict misses -- 6.13 ms against 4.57 on TET4
 against 1.38x over matrix-free. The Op now pads, which is why the numbers above are
 what they are.
 
-**The packed layout now works here, and is worth 9%.** `SFEM_PACKED_MESH=1` builds it
-and the Op's packed branch fires. HEX8, 352947 dof, best of three:
+**The packed layout works here, and is worth nothing measurable.**
+`SFEM_PACKED_MESH=1` builds it and the Op's packed branch fires: identical CG counts
+and a *bit-identical* answer against the standard layout, 5.274539951542e-01, which is
+what says it is doing the same arithmetic on the same problem. What it is not is
+faster. HEX8, 352947 dof, eight threads, packed and unpacked runs **interleaved** so
+that drift cannot masquerade as a result:
 
-| | ms/apply | MDOF/s | displacement norm |
-|---|---|---|---|
-| matrix-free | 11.43 | 30.9 | 5.274539943032e-01 |
-| inexact, standard layout | 2.29 | 154.1 | 5.274539951542e-01 |
-| inexact, packed | **2.09** | **168.6** | 5.274539951542e-01 |
+| pair | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| packed gain | -2.6% | +12.8% | -9.9% | -1.5% | +7.3% | -9.7% | +0.3% | -3.5% |
 
-Identical CG counts and a *bit-identical* answer between the two inexact runs, which is
-what says the packed layout is doing the same arithmetic on the same problem.
+Median -2.0%; medians 1.490 ms against 1.486. The spread between repetitions is six
+times any difference between the two.
 
-9%, against the 70% the same kernel gains in the spike. Two reasons, and neither is a
-defect. The spike's number is the kernel alone; this one includes the Op's domain
-iteration and the BDF2 inertia term, which packing does not touch. And this mesh comes
-out of `cube` already SFC-ordered, so the gather locality packing recovers is largely
-there before it starts -- the ordering sweep above measured that same effect from the
-other side.
+An earlier version of this section reported 9%, from best-of-three runs taken twenty
+minutes apart. Between those two sets the whole machine moved by 40% -- the same
+unpacked configuration measured 2.66, 2.29 and 1.38 ms -- so the comparison was
+reading the laptop's mood. Best-of-N within a run does not defend against drift
+between runs; interleaving does, and it is what any A/B here needs.
 
-**Getting there needed the permutation kept.** `PackedMesh::create(..., modify_mesh=true)`
-renumbers the mesh in place and then drops the map it used, so a nodeset read from a
-file -- which speaks the on-disk numbering -- named different nodes and the solve
-converged to a different problem: displacement norm 3.894e-01 against 2.988e-01, with
-nothing in the output to say so. `FunctionSpace::initialize_packed_mesh` now builds the
-layout twice, once without modifying to capture the map and once to apply it, and
-`DirichletConditions` maps an explicit node list through it. A sideset needs no mapping,
-because packing does not move elements.
+Why nothing, when the same kernel gains 70% in the spike on Grace: at 352947 dof the
+vectors this apply touches are a few tens of megabytes against this laptop's 48 MB
+system-level cache, so the gather locality packing recovers is already there. The
+roofline said the same thing from the other side -- HEX8's stored apply is nowhere
+near the bandwidth ceiling, so it is not waiting on the traffic packing removes. The
+mesh ordering makes no difference either: `cartesian3` (mean node-id jump 1.2 between
+consecutive elements) and the default `morton3` (1097.7) measure the same to within
+this noise.
 
-Pack size barely matters: 128 through 1024 and smesh's own default (8192 elements per
-pack here) span 2.10 to 2.28 ms, with the default fastest.
+**So the packed layout's 70% is a Grace result and stays one.** Whether it reaches a
+solve has not been measured on a machine where it could; this laptop cannot answer it,
+and reporting a laptop number either way would be reporting noise.
+
+**Getting the packed path to run at all needed the permutation kept.**
+`PackedMesh::create(..., modify_mesh=true)` renumbers the mesh in place and then drops
+the map it used, so a nodeset read from a file -- which speaks the on-disk numbering --
+named different nodes and the solve converged to a different problem: displacement
+norm 3.894e-01 against 2.988e-01, with nothing in the output to say so.
+`FunctionSpace::initialize_packed_mesh` now builds the layout twice, once without
+modifying to capture the map and once to apply it, and `DirichletConditions` maps an
+explicit node list through it. A sideset needs no mapping, because packing does not
+move elements.
 
 ### What the first version of these driver numbers got wrong
 
