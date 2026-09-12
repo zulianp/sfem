@@ -854,11 +854,70 @@ namespace sfem {
     return SFEM_FAILURE;
   }
 
-  int GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_bsr(const real_t *const,
-              const count_t *const,
-              const idx_t *const,
-              real_t *const) {
+  int GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_bsr(const real_t *const state,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_bsr");
-    return SFEM_FAILURE;
+    const real_t *const current = state ? state : impl_->current;
+    if (!current || !impl_->previous) {
+      SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_bsr requires current and previous states\n");
+      return SFEM_FAILURE;
+    }
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      real_t storage[MAX_PARAMETERS];
+      parameter_array(*domain.parameters, storage);
+      const real_t *const previous = impl_->previous;
+      switch (domain.element_type) {
+        case smesh::TRI3: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          const real_t *const RSTR u_data[2] = {current + 0, current + 1};
+          const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
+          int status = mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 2, state + 0, state + 1, rowptr, colidx, values);
+          if (status != SFEM_SUCCESS) return status;
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], rowptr, colidx, values);
+        }
+        case smesh::TET4: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {current + 0, current + 1, current + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          int status = mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, rowptr, colidx, values);
+          if (status != SFEM_SUCCESS) return status;
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values);
+        }
+        case smesh::TET10: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {current + 0, current + 1, current + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          int status = mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, rowptr, colidx, values);
+          if (status != SFEM_SUCCESS) return status;
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values);
+        }
+        case smesh::QUAD4:
+        case smesh::PROTEUS_QUAD4: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          const real_t *const RSTR u_data[2] = {current + 0, current + 1};
+          const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
+          int status = mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 2, state + 0, state + 1, rowptr, colidx, values);
+          if (status != SFEM_SUCCESS) return status;
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], rowptr, colidx, values);
+        }
+        case smesh::HEX8:
+        case smesh::PROTEUS_HEX8: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {current + 0, current + 1, current + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          int status = mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, rowptr, colidx, values);
+          if (status != SFEM_SUCCESS) return status;
+          return mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values);
+        }
+        default:
+          SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigtNewmark does not support element type %d\n",
+                               domain.element_type);
+          return SFEM_FAILURE;
+      }
+    });
   }
 }  // namespace sfem

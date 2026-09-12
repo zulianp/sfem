@@ -775,3 +775,269 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_
   }
   return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_i_maos", -1, (int)scalar_bytes);
 }
+
+namespace sfem {
+namespace codegen {
+
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_crs_i_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(8)
+  for (int d = 0; d < 8; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(8)
+    for (int d = 0; d < 8; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_crs_i_msoa_scatter_crs(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NS = 8;
+  static constexpr int NC = 3;
+  static constexpr int N_ROW_STREAMS = 24;
+  static constexpr int N_COL_STREAMS = 24;
+  static constexpr int ROW_COMPONENT[24] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2};
+  static constexpr int ROW_SHAPE[24] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7};
+  static constexpr int COL_COMPONENT[24] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2};
+  static constexpr int COL_SHAPE[24] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7};
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const count_t row_begin = rowptr[ev[i]];
+    const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_crs_i_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {
+    const int row_shape = ROW_SHAPE[row_stream];
+    const int bi = ROW_COMPONENT[row_stream];
+    for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {
+      const int col_shape = COL_SHAPE[col_stream];
+      const int bj = COL_COMPONENT[col_stream];
+      s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
+#pragma omp atomic update
+      block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_crs_i_msoa_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const s_t eta_b,
+    const s_t eta_s,
+    const s_t newmark_velocity_alpha,
+    const ptrdiff_t current_stride,
+    const s_t *const RSTR u0,
+    const s_t *const RSTR u1,
+    const s_t *const RSTR u2,
+    const ptrdiff_t previous_stride,
+    const s_t *const RSTR u0_old,
+    const s_t *const RSTR u1_old,
+    const s_t *const RSTR u2_old,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values
+) {
+  static constexpr int ND = 3;
+  static constexpr int NQ = 8;
+  static constexpr int NS = 8;
+  static constexpr int NC = 3;
+  static constexpr int N_STREAMS = NC * NS;
+  static constexpr int VS = 1;
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    const ptrdiff_t evb = element;
+    const int ne = 1;
+    idx_t ev[NS];
+    s_t element_matrix[576];
+    s_t bcoordinates[ND * NS][VS];
+    s_t badjugate_data[ND * ND][NQ * VS];
+    s_t bdeterminant[NQ * VS];
+    s_t bcurrent[N_STREAMS][VS];
+    s_t bprevious[N_STREAMS][VS];
+    s_t bdirection[N_STREAMS][VS];
+    s_t boutput[N_STREAMS][VS];
+    const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      const idx_t coordinate_node = elements[shape][element];
+      ev[shape] = node;
+      for (int d = 0; d < ND; ++d) {
+        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);
+      }
+      bcurrent[shape * NC + 0][0] = u0[node * current_stride];
+      bcurrent[shape * NC + 1][0] = u1[node * current_stride];
+      bcurrent[shape * NC + 2][0] = u2[node * current_stride];
+      bprevious[shape * NC + 0][0] = u0_old[node * previous_stride];
+      bprevious[shape * NC + 1][0] = u1_old[node * previous_stride];
+      bprevious[shape * NC + 2][0] = u2_old[node * previous_stride];
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
+
+    const auto row_tensor_stream = [](const int local) -> int {
+      switch (local) {
+        case 0: return 0;
+        case 1: return 3;
+        case 2: return 6;
+        case 3: return 9;
+        case 4: return 12;
+        case 5: return 15;
+        case 6: return 18;
+        case 7: return 21;
+        case 8: return 1;
+        case 9: return 4;
+        case 10: return 7;
+        case 11: return 10;
+        case 12: return 13;
+        case 13: return 16;
+        case 14: return 19;
+        case 15: return 22;
+        case 16: return 2;
+        case 17: return 5;
+        case 18: return 8;
+        case 19: return 11;
+        case 20: return 14;
+        case 21: return 17;
+        case 22: return 20;
+        case 23: return 23;
+        default: return 0;
+      }
+    };
+    const auto col_tensor_stream = [](const int local) -> int {
+      switch (local) {
+        case 0: return 0;
+        case 1: return 3;
+        case 2: return 6;
+        case 3: return 9;
+        case 4: return 12;
+        case 5: return 15;
+        case 6: return 18;
+        case 7: return 21;
+        case 8: return 1;
+        case 9: return 4;
+        case 10: return 7;
+        case 11: return 10;
+        case 12: return 13;
+        case 13: return 16;
+        case 14: return 19;
+        case 15: return 22;
+        case 16: return 2;
+        case 17: return 5;
+        case 18: return 8;
+        case 19: return 11;
+        case 20: return 14;
+        case 21: return 17;
+        case 22: return 20;
+        case 23: return 23;
+        default: return 0;
+      }
+    };
+    for (int entry = 0; entry < 576; ++entry) {
+      element_matrix[entry] = s_t(0);
+    }
+    for (int trial_local = 0; trial_local < 24; ++trial_local) {
+      const int trial = col_tensor_stream(trial_local);
+      for (int stream = 0; stream < N_STREAMS; ++stream) {
+        bdirection[stream][0] = s_t(0);
+        boutput[stream][0] = s_t(0);
+      }
+      bdirection[trial][0] = s_t(1);
+      mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, newmark_velocity_alpha, boutput);
+      for (int test_local = 0; test_local < 24; ++test_local) {
+        const int test = row_tensor_stream(test_local);
+        element_matrix[test_local * 24 + trial_local] = boutput[test][0];
+      }
+    }
+
+    mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_crs_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_bsr_i_msoa(
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double eta_b,
+    const double eta_s,
+    const double newmark_velocity_alpha,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u0,
+    const double *const RSTR u1,
+    const double *const RSTR u2,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u0_old,
+    const double *const RSTR u1_old,
+    const double *const RSTR u2_old,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    double *const RSTR values
+) {
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_crs_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, rowptr, colidx, values);
+}
+
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_bsr_i_msoa_float(
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float eta_b,
+    const float eta_s,
+    const float newmark_velocity_alpha,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u0,
+    const float *const RSTR u1,
+    const float *const RSTR u2,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u0_old,
+    const float *const RSTR u1_old,
+    const float *const RSTR u2_old,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    float *const RSTR values
+) {
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_crs_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, rowptr, colidx, values);
+}

@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <type_traits>
 #include "../mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_local.hpp"
+#include "../mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_hessian.hpp"
 #include "../../../reference/line_p1_q2.hpp"
 #include "../../../reference/quad_line_q2.hpp"
 #include "../../../geometry_kernels.hpp"
@@ -3567,3 +3568,183 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_apply_pac
 
 } // namespace codegen
 } // namespace sfem
+
+
+namespace sfem {
+namespace codegen {
+
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_i_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(8)
+  for (int d = 0; d < 8; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(8)
+    for (int d = 0; d < 8; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_i_msoa_scatter_bsr(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 8;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
+#pragma omp atomic update
+          block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
+        }
+      }
+    }
+  }
+}
+
+template <typename s_t, typename g_t, int FORMAT>
+static int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_i_msoa_assemble_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const *const RSTR points,
+    const s_t lmbda,
+    const s_t mu,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values,
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 8;
+  static constexpr int NS = 8;
+  static constexpr int VS = 1;
+  static constexpr int NDOFS = NC * NS;
+  const s_t *const u_components[NC] = {ux, uy, uz};
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const g_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
+
+  static_assert(FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t bcoordinate_data[NS * ND][VS];
+    static constexpr int ne = VS;
+    s_t bu_data[NS * NC][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t badj4[NQ * VS];
+    s_t badj5[NQ * VS];
+    s_t badj6[NQ * VS];
+    s_t badj7[NQ * VS];
+    s_t badj8[NQ * VS];
+    s_t bdet0[NQ * VS];
+    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+      for (int d = 0; d < ND; ++d) {
+        bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
+        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+      }
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_data, element_matrix);
+
+    if constexpr (FORMAT == 1) {
+      mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
+}

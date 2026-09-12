@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <vector>
 
 namespace {
 
@@ -128,14 +129,99 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    int check_assembled_matches_matrix_free(const smesh::ElemType element_type,
+                                            const real_t mu_value,
+                                            const real_t lambda_value,
+                                            const real_t eta_s_value,
+                                            const real_t eta_b_value,
+                                            const char *const label) {
+        // The assembled Jacobian of this material is the sum of two units, the
+        // Mooney-Rivlin tangent and the Kelvin-Voigt one, accumulated into the
+        // same matrix.  A matrix carrying only the elastic half would assemble,
+        // solve and converge quietly to a different problem, so what is checked
+        // here is that the matrix reproduces the matrix-free action -- which it
+        // cannot do if either unit is missing.
+        auto mesh     = sfem::Mesh::create_cube(sfem::Communicator::self(), element_type, 3, 3, 3, 0, 0, 0, 1, 1, 1);
+        auto space    = sfem::FunctionSpace::create(mesh, 3);
+        auto function = sfem::Function::create(space);
+        auto op       = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigtNewmark", sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(op != nullptr);
+
+        SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+        set_material_parameter(op, mesh, "mu", mu_value);
+        set_material_parameter(op, mesh, "lmbda", lambda_value);
+        set_material_parameter(op, mesh, "eta_s", eta_s_value);
+        set_material_parameter(op, mesh, "eta_b", eta_b_value);
+        set_material_parameter(op, mesh, "newmark_velocity_alpha", 3.25);
+        function->add_operator(op);
+
+        const ptrdiff_t ndofs    = space->n_dofs();
+        auto            current  = sfem::create_host_buffer<real_t>(ndofs);
+        auto            previous = sfem::create_host_buffer<real_t>(ndofs);
+
+        const real_t grad_u[3][3] = {{0.12, 0.07, -0.03}, {0.04, -0.08, 0.05}, {-0.02, 0.03, 0.10}};
+        const real_t grad_p[3][3] = {{0.05, -0.02, 0.01}, {0.03, 0.06, -0.04}, {-0.01, 0.02, 0.07}};
+        fill_affine_field(mesh, grad_u, current->data());
+        fill_affine_field(mesh, grad_p, previous->data());
+        op->set_field("previous", previous, 0);
+
+        std::vector<real_t> direction(ndofs, 0);
+        geom_t **const      points = mesh->points()->data();
+        for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
+            const real_t x = points[0][node], y = points[1][node], z = points[2][node];
+            direction[node * 3 + 0] = 2e-2 * (1 + 0.5 * x + z);
+            direction[node * 3 + 1] = -3e-2 * (1 + y + 0.25 * x);
+            direction[node * 3 + 2] = 4e-2 * (1 + z + 0.5 * y);
+        }
+
+        std::vector<real_t> expected(ndofs, 0);
+        SFEM_TEST_ASSERT(function->apply(current->data(), direction.data(), expected.data()) == SFEM_SUCCESS);
+
+        auto bsr = sfem::hessian_bsr(function, current, sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(bsr != nullptr);
+        std::vector<real_t> assembled(ndofs, 0);
+        SFEM_TEST_ASSERT(bsr->apply(direction.data(), assembled.data()) == SFEM_SUCCESS);
+
+        real_t max_abs = 0, max_reference = 0;
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            max_abs       = std::max(max_abs, std::abs(assembled[i] - expected[i]));
+            max_reference = std::max(max_reference, std::abs(expected[i]));
+        }
+        const real_t tol = real_t(1e-10) * std::max(real_t(1), max_reference);
+        std::printf("assembled vs matrix-free %s [%s]: max_abs=%.6e reference=%.6e tol=%.6e\n",
+                    sfem::type_to_string(element_type),
+                    label,
+                    (double)max_abs,
+                    (double)max_reference,
+                    (double)tol);
+        SFEM_TEST_ASSERT(max_reference > 0);
+        SFEM_TEST_ASSERT(max_abs <= tol);
+        return SFEM_TEST_SUCCESS;
+    }
+
 }  // namespace
 
 int test_homogeneous_deformation_hex8() { return check_homogeneous_deformation(smesh::HEX8); }
+
+int test_assembled_matches_matrix_free_hex8() {
+    return check_assembled_matches_matrix_free(smesh::HEX8, 2.5, 7.0, 0.4, 0.2, "both");
+}
+
+int test_assembled_elastic_only_hex8() {
+    return check_assembled_matches_matrix_free(smesh::HEX8, 2.5, 7.0, 0.0, 0.0, "elastic only");
+}
+
+int test_assembled_viscous_only_hex8() {
+    return check_assembled_matches_matrix_free(smesh::HEX8, 0.0, 0.0, 0.4, 0.2, "viscous only");
+}
 
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_homogeneous_deformation_hex8);
+    SFEM_RUN_TEST(test_assembled_elastic_only_hex8);
+    SFEM_RUN_TEST(test_assembled_viscous_only_hex8);
+    SFEM_RUN_TEST(test_assembled_matches_matrix_free_hex8);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

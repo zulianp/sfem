@@ -4114,16 +4114,13 @@ namespace sfem {
     return SFEM_FAILURE;
   }
 
-  int %(op)s::hessian_bsr(const real_t *const,
-              const count_t *const,
-              const idx_t *const,
-              real_t *const) {
-    SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
-    return SFEM_FAILURE;
-  }
-}  // namespace sfem
+%(hessian_bsr_method)s}  // namespace sfem
 """ % {
         "op": material.op_name,
+        "hessian_bsr_method": _coupled_hessian_bsr_method(
+            material.op_name,
+            cases["hessian_bsr"],
+        ),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "declaration_block": "" if c_abi_header else "\n".join(declarations),
         "max_parameters": max_parameters,
@@ -4336,6 +4333,7 @@ def _coupled_cases(
     cases = {
         "gradient": [],
         "apply": [],
+        "hessian_bsr": [],
         "objective": [],
         "objective_steps": [],
         "performance": {"value": [], "gradient": [], "apply": []},
@@ -4371,6 +4369,14 @@ def _coupled_cases(
             kernel_sources, energy_stem, "apply"
         ) and _publishes_either_geometry(
             kernel_sources, residual_stem, "jacobian_action"
+        )
+        # Both units have to assemble or the matrix is not the operator: a
+        # matrix holding only the elastic tangent is a different problem from
+        # the one the apply solves, and it would converge quietly to it.
+        has_hessian_bsr = _c_abi_function_defined(
+            kernel_sources, "%s_hessian_bsr_i_msoa" % energy_stem
+        ) and _c_abi_function_defined(
+            kernel_sources, "%s_hessian_bsr_i_msoa" % residual_stem
         )
         if has_objective:
             cases["performance"]["value"].append(
@@ -4573,6 +4579,55 @@ def _coupled_cases(
                 )
             )
 
+        # The assembly is the apply without a direction and with the matrix graph
+        # instead of an output vector.  It is emitted only isoparametrically,
+        # because an element matrix reads the geometry per quadrature point.
+        energy_hessian_args = ", ".join(
+            _nonempty(
+                *_coupled_energy_field_args(
+                    energy_apply_dependencies,
+                    block_size,
+                    current=energy_data,
+                ),
+                "rowptr",
+                "colidx",
+                "values",
+            )
+        )
+        residual_hessian_args = []
+        residual_hessian_setup = []
+        if residual_apply_dependencies.current:
+            residual_hessian_setup.extend(residual_current_setup)
+            residual_hessian_args.extend((str(block_size), *residual_state_args))
+        if residual_apply_dependencies.previous:
+            residual_hessian_setup.extend(residual_previous_setup)
+            residual_hessian_args.extend((str(block_size), *residual_previous_args))
+        residual_hessian_args.extend(("rowptr", "colidx", "values"))
+        residual_hessian_args_common = ", ".join(
+            _nonempty(
+                residual_apply_params[2:] if residual_apply_params.startswith(", ") else residual_apply_params,
+                *residual_hessian_args,
+            )
+        )
+        if has_hessian_bsr:
+            cases["hessian_bsr"].append(
+                _coupled_case(
+                    element,
+                    block_size,
+                    residual_hessian_setup,
+                    (
+                        "          int status = %s_hessian_bsr_%dd_i_msoa(%s%s, %s);\n"
+                        "          if (status != SFEM_SUCCESS) return status;\n"
+                        "          return %s_hessian_bsr_%dd_i_msoa(%s, %s);"
+                    ) % (
+                        energy_dispatch_stem, dim, common_iso_dispatch,
+                        energy_apply_params, energy_hessian_args,
+                        residual_dispatch_stem, dim, common_iso_dispatch,
+                        residual_hessian_args_common,
+                    ),
+                )
+            )
+
         energy_objective_args = ", ".join(
             _nonempty(
                 *_coupled_energy_field_args(
@@ -4642,6 +4697,52 @@ def _coupled_cases(
                 }
             )
     return cases
+
+
+def _coupled_hessian_bsr_method(op_name, hessian_bsr_cases):
+    """The assembled Jacobian of a coupled material, or a refusal.
+
+    Both units contribute to the same matrix and both accumulate into `values`,
+    so the two calls are sequenced exactly the way `apply` sequences them.  A
+    material where either unit publishes no assembly kernel gets the refusal,
+    because half a Jacobian is worse than none: it assembles, it solves, and it
+    converges to a different problem.
+    """
+    if not hessian_bsr_cases:
+        return """  int %(op)s::hessian_bsr(const real_t *const,
+              const count_t *const,
+              const idx_t *const,
+              real_t *const) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+    return SFEM_FAILURE;
+  }
+""" % {"op": op_name}
+    return """  int %(op)s::hessian_bsr(const real_t *const state,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
+    SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+    const real_t *const current = state ? state : impl_->current;
+    if (!current || !impl_->previous) {
+      SFEM_ERROR("%(op)s::hessian_bsr requires current and previous states\\n");
+      return SFEM_FAILURE;
+    }
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      real_t storage[MAX_PARAMETERS];
+      parameter_array(*domain.parameters, storage);
+      const real_t *const previous = impl_->previous;
+      switch (domain.element_type) {
+%(cases)s
+        default:
+          SFEM_ERROR("%(op)s does not support element type %%d\\n",
+                               domain.element_type);
+          return SFEM_FAILURE;
+      }
+    });
+  }
+""" % {"op": op_name, "cases": "\n".join(hessian_bsr_cases)}
 
 
 def _coupled_case(element, block_size, setup_lines, body):

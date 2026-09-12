@@ -81,6 +81,26 @@
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_i_msoa"
     },
     {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_matrix_assembly_variant_count"
+    },
+    {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_2d_soa_diagnostics"
     },
@@ -113,6 +133,98 @@
       "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_i_msoa"
     },
     {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t newmark_velocity_alpha,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t newmark_velocity_alpha,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_matrix_assembly_variant_count"
+    },
+    {
       "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t newmark_velocity_alpha,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_a_msoa"
     },
@@ -137,6 +249,42 @@
       "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_msoa"
     },
     {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_matrix_assembly_variant_count"
+    },
+    {
       "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t newmark_velocity_alpha,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_a_msoa"
     },
@@ -159,6 +307,42 @@
     {
       "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t newmark_velocity_alpha,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
       "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_matrix_assembly_variant_count"
     }
   ],
   "factory": {
@@ -232,7 +416,64 @@
     }
   ],
   "material": "mooney_rivlin_kelvin_voigt_newmark",
-  "matrix_formats": [],
+  "matrix_formats": [
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/proteus_quad4/mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/proteus_quad4/mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/quad4/mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/quad4/mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/tri3/mooney_rivlin_kelvin_voigt_newmark_elastic_tri3_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/tri3/mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/hex8/mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/hex8/mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex8/mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex8/mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet10/mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet10/mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet4/mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet4/mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_matrix_format_operator.cpp"
+    }
+  ],
   "op_name": "GeneratedMooneyRivlinKelvinVoigtNewmark",
   "registration": {
     "function": "sfem::register_GeneratedMooneyRivlinKelvinVoigtNewmark_generated_op",
@@ -342,6 +583,35 @@
           "function": "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "mooney_rivlin_kelvin_voigt_newmark_elastic",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "hessian_bsr",
+      "variants": [
+        {
+          "function": "mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_newmark_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_newmark_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_newmark_viscous",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_newmark_viscous",
           "variant": "isoparametric"
         }
       ]

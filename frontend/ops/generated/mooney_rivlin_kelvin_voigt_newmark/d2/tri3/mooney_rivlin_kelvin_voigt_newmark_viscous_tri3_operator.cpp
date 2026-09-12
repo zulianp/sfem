@@ -379,3 +379,222 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_a
   }
   return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_a_msoa", -1, (int)scalar_bytes);
 }
+
+namespace sfem {
+namespace codegen {
+
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_crs_i_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(3)
+  for (int d = 0; d < 3; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(3)
+    for (int d = 0; d < 3; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_crs_i_msoa_scatter_crs(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NS = 3;
+  static constexpr int NC = 2;
+  static constexpr int N_ROW_STREAMS = 6;
+  static constexpr int N_COL_STREAMS = 6;
+  static constexpr int ROW_COMPONENT[6] = {0, 0, 0, 1, 1, 1};
+  static constexpr int ROW_SHAPE[6] = {0, 1, 2, 0, 1, 2};
+  static constexpr int COL_COMPONENT[6] = {0, 0, 0, 1, 1, 1};
+  static constexpr int COL_SHAPE[6] = {0, 1, 2, 0, 1, 2};
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const count_t row_begin = rowptr[ev[i]];
+    const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_crs_i_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {
+    const int row_shape = ROW_SHAPE[row_stream];
+    const int bi = ROW_COMPONENT[row_stream];
+    for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {
+      const int col_shape = COL_SHAPE[col_stream];
+      const int bj = COL_COMPONENT[col_stream];
+      s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
+#pragma omp atomic update
+      block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_crs_i_msoa_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const s_t eta_b,
+    const s_t eta_s,
+    const s_t newmark_velocity_alpha,
+    const ptrdiff_t current_stride,
+    const s_t *const RSTR u0,
+    const s_t *const RSTR u1,
+    const ptrdiff_t previous_stride,
+    const s_t *const RSTR u0_old,
+    const s_t *const RSTR u1_old,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values
+) {
+  static constexpr int ND = 2;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 3;
+  static constexpr int NC = 2;
+  static constexpr int N_STREAMS = NC * NS;
+  static constexpr int VS = 1;
+  const s_t *const isoparametric_shape = sfem::codegen::ref_tri3_q1<s_t>::shape();
+  const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+  const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
+  const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    const ptrdiff_t evb = element;
+    const int ne = 1;
+    idx_t ev[NS];
+    s_t element_matrix[36];
+    s_t bcoordinates[ND * NS][VS];
+    s_t badjugate_data[ND * ND][NQ * VS];
+    s_t bdeterminant[NQ * VS];
+    s_t bcurrent[N_STREAMS][VS];
+    s_t bprevious[N_STREAMS][VS];
+    s_t bdirection[N_STREAMS][VS];
+    s_t boutput[N_STREAMS][VS];
+    const geom_t *const coordinate_components[ND] = {points[0], points[1]};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      const idx_t coordinate_node = elements[shape][element];
+      ev[shape] = node;
+      for (int d = 0; d < ND; ++d) {
+        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);
+      }
+      bcurrent[shape * NC + 0][0] = u0[node * current_stride];
+      bcurrent[shape * NC + 1][0] = u1[node * current_stride];
+      bprevious[shape * NC + 0][0] = u0_old[node * previous_stride];
+      bprevious[shape * NC + 1][0] = u1_old[node * previous_stride];
+    }
+
+    s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
+    for (int q = 0; q < NQ; ++q) {
+      const int lane = 0;
+      const s_t J00 = bcoordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 2];
+      const s_t J01 = bcoordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 2];
+      const s_t J10 = bcoordinates[1][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[5][lane] * isoparametric_grad_ref_x[q * NS + 2];
+      const s_t J11 = bcoordinates[1][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[5][lane] * isoparametric_grad_ref_y[q * NS + 2];
+      geometry_jacobian_adjugate_and_determinant_2<s_t>(
+          J00, J01, J10, J11, badjugate_streams, bdeterminant, q * VS + lane);
+    }
+    const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
+
+    const auto row_tensor_stream = [](const int local) -> int {
+      switch (local) {
+        case 0: return 0;
+        case 1: return 2;
+        case 2: return 4;
+        case 3: return 1;
+        case 4: return 3;
+        case 5: return 5;
+        default: return 0;
+      }
+    };
+    const auto col_tensor_stream = [](const int local) -> int {
+      switch (local) {
+        case 0: return 0;
+        case 1: return 2;
+        case 2: return 4;
+        case 3: return 1;
+        case 4: return 3;
+        case 5: return 5;
+        default: return 0;
+      }
+    };
+    for (int entry = 0; entry < 36; ++entry) {
+      element_matrix[entry] = s_t(0);
+    }
+    for (int trial_local = 0; trial_local < 6; ++trial_local) {
+      const int trial = col_tensor_stream(trial_local);
+      for (int stream = 0; stream < N_STREAMS; ++stream) {
+        bdirection[stream][0] = s_t(0);
+        boutput[stream][0] = s_t(0);
+      }
+      bdirection[trial][0] = s_t(1);
+      mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, newmark_velocity_alpha, boutput);
+      for (int test_local = 0; test_local < 6; ++test_local) {
+        const int test = row_tensor_stream(test_local);
+        element_matrix[test_local * 6 + trial_local] = boutput[test][0];
+      }
+    }
+
+    mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_crs_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_bsr_i_msoa(
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const double eta_b,
+    const double eta_s,
+    const double newmark_velocity_alpha,
+    const ptrdiff_t current_stride,
+    const double *const RSTR u0,
+    const double *const RSTR u1,
+    const ptrdiff_t previous_stride,
+    const double *const RSTR u0_old,
+    const double *const RSTR u1_old,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    double *const RSTR values
+) {
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_crs_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
+}
+
+extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_bsr_i_msoa_float(
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const float eta_b,
+    const float eta_s,
+    const float newmark_velocity_alpha,
+    const ptrdiff_t current_stride,
+    const float *const RSTR u0,
+    const float *const RSTR u1,
+    const ptrdiff_t previous_stride,
+    const float *const RSTR u0_old,
+    const float *const RSTR u1_old,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    float *const RSTR values
+) {
+  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_hessian_crs_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
+}

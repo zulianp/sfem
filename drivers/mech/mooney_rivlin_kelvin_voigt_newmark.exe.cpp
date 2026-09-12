@@ -40,6 +40,7 @@ namespace {
         real_t load_pulse_time;
         real_t initial_disp_y;
         real_t initial_disp_z;
+        std::string linear_op_type;
         bool   verbose;
 
         static EnvOptions read() {
@@ -66,6 +67,7 @@ namespace {
             ret.load_pulse_time = smesh::Env::read("SFEM_LOAD_PULSE_TIME", 0.0);
             ret.initial_disp_y  = smesh::Env::read("SFEM_INITIAL_DISP_Y", 0.0);
             ret.initial_disp_z  = smesh::Env::read("SFEM_INITIAL_DISP_Z", 0.0);
+            ret.linear_op_type  = smesh::Env::read_string("SFEM_LINEAR_OP_TYPE", sfem::op_type::MATRIX_FREE);
             ret.verbose         = smesh::Env::read("SFEM_VERBOSE", false);
             return ret;
         }
@@ -190,6 +192,7 @@ namespace {
 }  // namespace
 
 int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    SFEM_TRACE_SCOPE("solve_mooney_rivlin_kelvin_voigt_newmark");
     if (argc != 5) {
         if (!comm->rank()) {
             std::fprintf(stderr, "usage: %s <mesh> <dirichlet.yaml|NONE> <neumann.yaml|NONE> <output>\n", argv[0]);
@@ -278,7 +281,17 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
         f->add_operator(neumann_conditions);
     }
 
-    auto linear_op = sfem::create_linear_operator("MF", f, u, sfem::EXECUTION_SPACE_HOST);
+    // An assembled operator holds the values it was built from, so it carries the
+    // Jacobian of the state it saw at construction.  The matrix-free operator reads
+    // the current state through `Function::update` and needs no rebuilding; an
+    // assembled one does, once per linearization, or the Newton method quietly
+    // becomes a modified Newton on the initial Jacobian.
+    const bool rebuild_linear_op = env.linear_op_type != sfem::op_type::MATRIX_FREE;
+    auto linear_op = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
+    if (!linear_op) {
+        SFEM_ERROR("failed to create the linear operator %s\n", env.linear_op_type.c_str());
+        return SFEM_FAILURE;
+    }
     auto bcgs      = sfem::create_bcgs<real_t>(linear_op, sfem::EXECUTION_SPACE_HOST);
     bcgs->verbose  = env.verbose;
     bcgs->set_max_it(env.lsolve_max_it);
@@ -346,6 +359,13 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
 
             blas->zeros(ndofs, incr->data());
             f->copy_constrained_dofs(rhs->data(), incr->data());
+            if (rebuild_linear_op) {
+                linear_op = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
+                if (!linear_op) {
+                    SFEM_ERROR("failed to rebuild the linear operator at step %d, Newton iteration %d\n", step, it);
+                    return SFEM_FAILURE;
+                }
+            }
             bcgs->set_op(linear_op);
             if (bcgs->apply(rhs->data(), incr->data()) != SFEM_SUCCESS) {
                 std::fprintf(stderr, "mooney_rivlin_kelvin_voigt_newmark: BiCGStab failed at step %d Newton iteration %d\n", step, it);
@@ -382,6 +402,11 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
 
     if (!comm->rank()) {
         std::printf("Total BiCGStab iterations: %td\n", total_linear_iterations);
+        // Two linear operators for the same Jacobian have to reach the same
+        // solution; without a number to compare, a wrong operator is invisible
+        // from the outside.
+        std::printf("Final displacement norm: %.12e\n", (double)blas->norm2(ndofs, u_n->data()));
+        std::printf("Final velocity norm: %.12e\n", (double)blas->norm2(ndofs, v_n->data()));
     }
 
     return SFEM_SUCCESS;
