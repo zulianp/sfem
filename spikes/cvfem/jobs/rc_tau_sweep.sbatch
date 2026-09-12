@@ -24,7 +24,7 @@
 # the standard time scale's diffusive branch is h^2/(4 nu) where the old coefficient was
 # h^2/(2 nu). So Re=1 measures that factor of two and nothing else; the Peclet effect is what
 # the ROWS ABOVE it add on top. A true zero-severity control needs the diffusive limits
-# matched -- SFEM_RC_TAU=0 with SFEM_RHIE_CHOW_SCALE=0.5 -- which is the last block below.
+# matched -- SFEM_RC_TAU=0 with SFEM_RC_SCALE=0.5 -- which is the last block below.
 #
 # Two axes that must not be confounded. At fixed mesh, raising Re raises Pe_cell and should
 # widen the gap. At fixed Re, refining the mesh LOWERS Pe_cell and should narrow it -- and
@@ -101,12 +101,14 @@ done
 echo
 
 echo "== the true zero-severity control: the diffusive limits matched"
-echo "   SFEM_RC_TAU=0 with half the scale has the same h^2/(4 nu) diffusive branch as the"
+echo "   SFEM_RC_TAU=0 with half the scale (SFEM_RC_SCALE -- this driver ignores"
+echo "   SFEM_RHIE_CHOW_SCALE, which belongs to the standalone one) has the same"
+echo "   h^2/(4 nu) diffusive branch as the"
 echo "   combined form, so at Re=1 -- where Pe_cell is 1/48 and the advective branch is"
 echo "   nothing -- these two must agree. If they do not, the change does something other"
 echo "   than what it claims and no row above this one means anything."
 hdr
-run_one "ctrl_Re1_tau0_half" SFEM_RC_TAU=0 SFEM_RHIE_CHOW_SCALE=0.5 SFEM_CASE=cavity SFEM_N=48 \
+run_one "ctrl_Re1_tau0_half" SFEM_RC_TAU=0 SFEM_RC_SCALE=0.5 SFEM_CASE=cavity SFEM_N=48 \
     SFEM_RHO=1 SFEM_U=1 SFEM_MU=1 SFEM_NL_MAX_IT=30 SFEM_ELEMENT_REFINE_LEVEL=1
 run_one "ctrl_Re1_tau1"      SFEM_RC_TAU=1 SFEM_CASE=cavity SFEM_N=48 \
     SFEM_RHO=1 SFEM_U=1 SFEM_MU=1 SFEM_NL_MAX_IT=30 SFEM_ELEMENT_REFINE_LEVEL=1
