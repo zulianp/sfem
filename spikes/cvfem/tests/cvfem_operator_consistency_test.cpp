@@ -524,25 +524,12 @@ namespace {
             report(r, "[O1] Op block diagonal vs Op action diagonal (exact form)");
             check(r < scalar_t(0.25), "[O1] the solver operator's gap stays bounded");
         } else {
-            // 1e-6 on the semi-structured path and 1e-10 on the flat one, and the gap between
-            // those two numbers is a real defect rather than a tolerance choice.
-            //
-            // Measured: flat Op 4.03e-17, semi-structured Op 4.23e-08, and the semi-structured
-            // figure collapses to 2.99e-16 the moment Rhie-Chow is switched off. So the two
-            // forms compute the Rhie-Chow term differently on that path. sscvfem_apply takes
-            // the HOISTED macro geometry -- one Jacobian per macro element, reused for all L^3
-            // micro-cells, which is legitimate because the lattice inside an affine macro
-            // element is uniform -- while sscvfem_block_diag gathers each micro-cell's own
-            // coordinates and builds geometry per cell. Those agree only to the precision the
-            // node coordinates are stored in, and smesh::geom_t is float32: 4e-08 is exactly
-            // that scale.
-            //
-            // Bounded rather than asserted at round-off so the suite stays honest about the
-            // size of it, and tightly enough that it cannot grow unnoticed. The fix is to give
-            // sscvfem_block_diag the same hoisted macro geometry the action uses, which is a
-            // change to a hot path and wants its own measurement.
-            check_rel(r, scalar_t(1), ss_level > 1 ? scalar_t(1e-6) : scalar_t(1e-10),
-                      "[O1] Op block diagonal == Op action diagonal");
+            // One tolerance for both paths. The semi-structured Op used to need 1e-6 here,
+            // because sscvfem_block_diag fed the Rhie-Chow struct each micro-cell's own
+            // float32 node coordinates while the action differenced micro-cell 0's -- 4.23e-08
+            // apart, where the flat Op was at 4.03e-17. That is fixed at the source, so the
+            // two paths now hold to the same round-off bound and a regression in either shows.
+            check_rel(r, scalar_t(1), scalar_t(1e-10), "[O1] Op block diagonal == Op action diagonal");
         }
     }
 
