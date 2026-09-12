@@ -200,6 +200,14 @@ struct MeshData {
 // above those.
 inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d);
 
+// SFEM_RC_EXACT_JAC, read once. Shared by the Jacobian action and by assemble_block_diag, so
+// the operator and the preconditioner built beside it cannot end up differentiating different
+// things -- which is exactly what they were doing.
+inline bool cvfem_hex8_rc_exact_jac() {
+    static const int v = smesh::Env::read<int>("SFEM_RC_EXACT_JAC", 1);
+    return v != 0;
+}
+
 // The prescribed boundary data for one element. A default-constructed result -- what every
 // case with neither condition in use produces -- makes the boundary term behave exactly as
 // it did before the conditions existed.
@@ -771,8 +779,29 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
-                              nullptr, ux, uy, uz,  rcfg.tau};
+        Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                        nullptr, ux, uy, uz,  rcfg.tau};
+
+        // The block diagonal has to be the block diagonal of the operator that is APPLIED.
+        //
+        // With SFEM_RC_EXACT_JAC=1 -- the default -- the apply differentiates through the
+        // reconstructed nodal pressure gradient and this assembly did not, so the
+        // preconditioner was built from a different operator than the one it preconditions.
+        // Measured at 5,508 dof that is a 3.5e-02 relative error in the block diagonal against
+        // a direct probe of the operator, and 5.7e-02 in the assembled fine operator, against
+        // round-off for both with the frozen form. It is not a rounding difference and it is
+        // load-bearing: on the pressure-port case the default fails to converge at all while
+        // the same run with SFEM_RC_EXACT_JAC=0 -- where the two agree by construction --
+        // reaches its target.
+        //
+        // Affine only. The isoparametric path rebuilds its Jacobian per sub-control surface,
+        // so there is no single element gradient to differentiate and dN would have to be
+        // carried per surface; that path keeps the frozen diagonal and is consistent with
+        // itself because nothing else on it is exact either.
+        scalar_t gw[CVFEM_HEX8_N_NODES], dNe[CVFEM_HEX8_N_NODES * 3];
+        const bool exact_diag = cvfem_hex8_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) &&
+                                !d.pgx.empty() && (ptrdiff_t)d.grad_w_inv.size() == d.nnodes &&
+                                geom != GeomKind::Isoparam;
 
         if (geom == GeomKind::Isoparam) {
             cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(rho, mu, x, y, z, ux, uy, uz, sl, loc, rc, p);
@@ -783,6 +812,20 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         } else {
             scalar_t adj[9], det;
             cvfem_hex8_load_adj(d, e, adj, &det);
+            if (exact_diag) {
+                // d(qg_a)/d(q_b) = grad_w_inv[a] * sgn(det) * (A^T dn_ref_b). The determinant
+                // cancels against the |det| the reconstruction weights by, exactly as the
+                // reconstruction sweep itself does it -- only the sign survives.
+                const scalar_t sgn = det > scalar_t(0) ? scalar_t(1) : scalar_t(-1);
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                    gw[a] = d.grad_w_inv[(size_t)d.elems[a][e]];
+                    cvfem_hex8_pushforward(adj, sgn, (scalar_t)CVFEM_HEX8_DN_REF[a][0],
+                                           (scalar_t)CVFEM_HEX8_DN_REF[a][1], (scalar_t)CVFEM_HEX8_DN_REF[a][2],
+                                           dNe[a * 3 + 0], dNe[a * 3 + 1], dNe[a * 3 + 2]);
+                }
+                rc.gw = gw;
+                rc.dN = dNe;
+            }
             cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj, det, ux, uy, uz, sl, loc, rc, p);
             boundary_scs_add_jacobian<false>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
                                          cvfem_hex8_face_mask_of(d, e),
@@ -1190,8 +1233,7 @@ inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, co
     // path, and it is what lets cvfem_ns_op_gate compare the assembled operator against the
     // matrix-free action like for like: the assembled Jacobian keeps the frozen form on
     // purpose, so with the exact term on they are *meant* to differ.
-    static const int rc_exact = smesh::Env::read<int>("SFEM_RC_EXACT_JAC", 1);
-    if (rc_exact && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
+    if (cvfem_hex8_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
         SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_q_grad");
         assemble_nodal_grad_strided(d, geom, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
     } else {
