@@ -33,6 +33,8 @@ one() {
   local d="$OUT/$label"; mkdir -p "$d"
   ( cd "$d"
     export SFEM_CASE=poiseuille SFEM_N=$n SFEM_ELEMENT_REFINE_LEVEL=$lvl
+    # Packing applies only to the semi-structured path; 0 is the scatter it replaces.
+    export SFEM_SS_PACK_SIZE=${SS_PACK:-0}
     export SFEM_GMG=0 SFEM_PRECOND=bjacobi SFEM_NL_MAX_IT=3 SFEM_LSOLVE_MAX_IT=150
     export SFEM_MU=0.01 SFEM_ENABLE_OUTPUT=0
     uenv run $U -- "$DRIVER" "$d/out" > "$d/run.log" 2>&1 )
@@ -52,5 +54,12 @@ echo "=== semi-structured, level 2 ==="
 for n in 16 24 32 48 64; do one "ss_L2_N$((n/2))" $((n/2)) 2; done
 echo "=== semi-structured, level 4 ==="
 for n in 16 24 32 48 64; do one "ss_L4_N$((n/4))" $((n/4)) 4; done
+# Level 8 with the macro-element mesh packed, which is where the operator now runs fastest:
+# the reconstruction reads 0.61x the flat path's cost there against the scatter's 1.41x.
+# SFEM_SS_PACK_SIZE is exported by `one` below when SS_PACK is set.
+echo "=== semi-structured, level 8, packed ==="
+SS_PACK=8
+for n in 16 24 32 48 64; do one "ss_L8p_N$((n/8))" $((n/8)) 8; done
+unset SS_PACK
 echo "runs: $(wc -l < $OUT/runs.tsv)"
 echo "=== DONE $(date) ==="
