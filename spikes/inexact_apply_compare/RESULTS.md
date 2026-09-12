@@ -1056,6 +1056,38 @@ At the default the packed apply is **2.7x slower than not packing at all** on 72
 threads, and 1.75x faster once tuned. The answer never changes. Report the pack size
 and the pack count with any packed measurement; the crossover moves with the mesh.
 
+### A larger example, where the linear solve is the run
+
+The 48-cube above is small enough that setup and I/O dominate at 72 threads. A 96-cube
+of HEX8 -- **2738019 dof**, 884736 elements -- over three time steps puts CG at 83% of
+the matrix-free solve, which is where a solver comparison belongs. Grace, 72 threads,
+pack size 256.
+
+| | CG | solve | ms/apply | applies | assembly | store |
+|---|---|---|---|---|---|---|
+| matrix-free | 9.290 s | 11.24 s | 12.07 | 747 | -- | -- |
+| inexact | 3.527 s | 5.14 s | 4.25 | 747 | 0.22 s | 159 MB |
+| inexact + packed | **2.362 s** | **4.19 s** | **2.73** | 747 | 0.22 s | 159 MB |
+| BSR | 58.014 s | 62.38 s | 4.74 | 11326 | 0.28 s | 1.77 GB |
+
+All the matrix-free rows take the same 747 applies and agree on the answer to ten
+figures. **The linear solve is 3.9x faster than matrix-free and the whole solve 2.7x**,
+at this size, with the store an eleventh of the assembled matrix.
+
+**The BSR row is not a fair comparison, and the reason is a driver defect.**
+`sfem::hessian_bsr(f, u, es)` assembles the matrix once, at construction, and the
+driver builds its linear operator *before* the Newton loop -- the trace shows
+`Function::hessian_bsr` called once against twelve Newton iterations. So the BSR path
+is a modified Newton carrying the Jacobian of the initial state, which is why it needs
+11206 linear iterations where the others need 747, and why its answer differs in the
+fifth digit. Its 62 seconds measure that, not the format.
+
+What can honestly be compared is the cost of one application: BSR 4.74 ms against the
+packed stored tangent's 2.73, for eleven times the memory. Partial assembly is the
+better stored operator on both axes. But a BSR comparison in this driver needs the
+matrix rebuilt per Newton step before its wall time means anything, and that is a
+change to `create_linear_operator`'s contract rather than to this spike.
+
 ### What the first version of these driver numbers got wrong
 
 The first three versions of this table were measured on a mis-constrained problem, and
