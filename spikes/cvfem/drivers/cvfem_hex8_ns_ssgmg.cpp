@@ -3822,10 +3822,27 @@ int main(int argc, char **argv) {
     const real_t div_grow  = smesh::Env::read<real_t>("SFEM_NL_DIVERGE", real_t(1e3));
     // Relative residual below which a line search that cannot improve means "converged", not
     // "failed": at the round-off floor there is no decrease left to find.
-    // Ten times nl_rtol, not a hundred: a line search that cannot improve a residual already
-    // this small has genuinely reached the floor, but anything looser starts accepting states
-    // that simply have not converged.
-    const real_t nl_ls_floor = smesh::Env::read<real_t>("SFEM_NL_LS_FLOOR", real_t(1e-7));
+    //
+    // A hundred times nl_rtol, and it used to be ten. The reason for ten was that "anything
+    // looser starts accepting states that simply have not converged", which is the right
+    // worry and is now a measured question rather than a guess, because rel is measured
+    // against the STAGE's own starting residual: a stage that begins nearly solved has no
+    // reachable rtol at all, and the corrected Rhie-Chow time scale makes stages begin nearly
+    // solved routinely.
+    //
+    // The two cases that have to be separated, from jobs/rc_tau_remedy.sbatch on 72 Grace
+    // cores:
+    //
+    //   cavity Re=100, 470,596 dof     rel 4.31e-07   at its floor, must be accepted
+    //   mms N=64, 1,098,500 dof        rel 3.81e-03   unconverged, must still be rejected
+    //
+    // At 1e-6 the cavity reaches its Re=100 target in 16 Newton steps and 7,159 linear
+    // iterations with no abandoned stage -- against 86 and 35,572 for the coefficient this
+    // replaced -- and the manufactured-solution case is refused exactly as before, 2 Newton
+    // steps and one abandoned stage, unchanged to the digit. So the loosening does not buy
+    // the cavity at the price of accepting the other, which is the only thing that would make
+    // it the wrong trade. Re-run that job before moving it again.
+    const real_t nl_ls_floor = smesh::Env::read<real_t>("SFEM_NL_LS_FLOOR", real_t(1e-6));
     std::vector<real_t> x_try((size_t)ndof, 0), r_try((size_t)ndof, 0);
     bool converged    = false;
     // Set once from the first nonzero residual and kept across stages, as in the
