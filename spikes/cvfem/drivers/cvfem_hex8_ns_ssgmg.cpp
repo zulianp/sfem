@@ -627,6 +627,7 @@ private:
                 for (int c = 0; c < 4; ++c) blocks[(size_t)i * 16 + 12 + c] *= prow;
 
         std::vector<real_t> inv((size_t)nnodes * 16, 0);
+        static const int schur = smesh::Env::read<int>("SFEM_PC_SCHUR", 0);
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < nnodes; ++i) {
             const real_t *const b = blocks.data() + (size_t)i * 16;
@@ -662,7 +663,64 @@ private:
             const real_t pp = b[15];
             real_t       prow2 = 0;
             for (int k = 12; k < 16; ++k) prow2 = std::max(prow2, std::fabs(b[k]));
-            m[15] = cvfem_invertible(pp, prow2) ? real_t(1) / pp : real_t(1);
+
+            // SFEM_PC_SCHUR=1: invert SIMPLE's Schur diagonal S = C_pp - D_pu F_uu^-1 G_up
+            // rather than C_pp alone.
+            //
+            // This block-Jacobi ignores the coupling blocks -- it inverts the 3x3 velocity
+            // block and takes 1/C_pp beside it -- and that was defensible while C_pp
+            // dominated. It no longer does. With the Rhie-Chow coefficient corrected from its
+            // viscous limit to the full momentum time scale, C_pp fell by about the cell
+            // Peclet number, so 1/C_pp is that factor too LARGE and the pressure correction
+            // overshoots: measured on the pressure-port sweep, cases that converged to Re=100
+            // under the old coefficient now fail on a line search that finds no decrease at
+            // rel 0.9, while the same cases with SFEM_PRECOND=direct converge under both
+            // coefficients. The discretisation is sound and this inverse is not.
+            //
+            // The 3x3 inverse is already in hand, so the Schur correction costs nine multiplies
+            // and no extra storage. It is also why the recorded finding that SIMPLE "matches
+            // block-Jacobi to four digits" no longer applies: that held because C_pp was about
+            // eighty-five times the momentum block and the coupling was a two percent
+            // perturbation on it. At the corrected scale the coupling is not a perturbation.
+            //
+            // IT IS OFF BY DEFAULT, AND DELIBERATELY SO -- it is a diagnostic, not a fix.
+            // Measured at 4,900 dof on the pressure port and at 75,140 and 19,652 on the rest,
+            // all under the corrected coefficient:
+            //
+            //   case          schur=0                      schur=2
+            //   port p=1.0    FAILS, Re 0                  converges, Re 100, 2406 lin_it
+            //   poiseuille    converges, 1081, 4.4e-12     FAILS,     u_linf 1.9e-04
+            //   couette       converges, 1892, 3.1e-11     converges, 2381,  1.1e-08
+            //   cavity Re=100 converges, 3143              converges, 10824
+            //   mms N=16      converges,  857              converges,  3576
+            //
+            // So the two families want different pressure scalings: 1/C_pp for velocity-driven
+            // flow and 1/|S| for pressure-driven. That is the same shape of problem as
+            // SFEM_GMG_RC_DECAY and it has the same answer -- a scalar choice between two
+            // regimes is not the fix. What this measures is that the block-Jacobi STRUCTURE
+            // cannot serve both: it inverts the 3x3, inverts the pressure scalar, and drops the
+            // coupling, so the only freedom it has is which scalar to use. A proper SIMPLE
+            // keeps the coupling and has the velocity correction that a signed S requires,
+            // which is where this should go next.
+            // Mode 1 uses S as computed and mode 2 its magnitude, and the difference is not
+            // cosmetic. C_pp is positive and D_pu F_uu^-1 G_up is positive definite, so once
+            // C_pp is small -- which is the whole regime this exists for -- S is NEGATIVE
+            // almost everywhere, and 1/S then flips the sign of every pressure correction.
+            // Measured: mode 1 fails the pressure-port case under BOTH coefficients, taking
+            // the old one from 2463 linear iterations and convergence to failure at 193, which
+            // is what a wrong-signed preconditioner looks like. The sign convention is the
+            // driver's own -- positive is correct for the continuity row as assembled here --
+            // so mode 2 keeps the sign and takes only the Schur magnitude as the scale.
+            real_t pdiag = pp;
+            if (schur) {
+                const real_t g[3] = {b[3], b[7], b[11]};
+                real_t       t[3];
+                for (int r = 0; r < 3; ++r)
+                    t[r] = m[r * 4 + 0] * g[0] + m[r * 4 + 1] * g[1] + m[r * 4 + 2] * g[2];
+                const real_t sc = pp - (b[12] * t[0] + b[13] * t[1] + b[14] * t[2]);
+                pdiag           = (schur == 2) ? std::fabs(sc) : sc;
+            }
+            m[15] = cvfem_invertible(pdiag, prow2) ? real_t(1) / pdiag : real_t(1);
 
             // Damping. Undamped block-Jacobi is fine as a Krylov preconditioner, where it
             // is applied once, and is not a smoother: as a stationary iteration on this
