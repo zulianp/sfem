@@ -75,7 +75,13 @@ struct PackedData {
 };
 
 // Per-thread scratch arena, CVFEM_PACK_SCRATCH_SLOTS slots, grown on demand and never shrunk.
-static constexpr int CVFEM_PACK_SCRATCH_SLOTS = 8;
+// Ten, not eight: the semi-structured packed gradient needs two of its own.
+//
+// It cannot share the flat gradient's slots 5 and 6. A semi-structured multigrid hierarchy
+// has semi-structured fine levels and a FLAT coarse level in the same process, and the two
+// want very different sizes from the same slot -- the scratch grows on demand and never
+// shrinks, so sharing would reallocate on every alternation rather than once.
+static constexpr int CVFEM_PACK_SCRATCH_SLOTS = 10;
 
 // Per-thread scratch, indexed by slot. An out-of-range slot used to walk straight off the
 // end of these arrays and corrupt whatever thread_local storage followed -- the symptom was

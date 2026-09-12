@@ -29,6 +29,7 @@ namespace sfem {
         MeshData                       d;
         // MeshData holds bare pointers into these, so the Op has to own them.
         PackedData   packed;
+        PackedData   ss_packed;
         PackColoring coloring;
         BSR4         bsr;  // slot caches only; values come from the caller
         bool         initialized{false};
@@ -410,6 +411,44 @@ namespace sfem {
             if (smesh::Env::read<int>("SFEM_SS_SCATTER", 1)) {
                 impl_->ss.scatter = std::make_shared<SSScatter>();
                 sscvfem_build_scatter(impl_->ss, *impl_->ss.scatter);
+            }
+            // The macro-element mesh, packed.
+            //
+            // Grouping macro-elements changes what counts as shared: a node between two of
+            // them inside a pack is owned by the pack, so only the pack's outer boundary is
+            // staged. Measured on a 64-macro mesh at eight per pack, the staged fraction
+            // falls from 96.3 / 78.4 / 52.9 percent at levels 2, 4 and 8 to 48.1 / 24.6 /
+            // 12.4 -- and the reconstruction's cost tracks that fraction almost exactly.
+            //
+            // The pack size is capped by arithmetic, not taste: pack_idx_t is uint16_t, so a
+            // pack cannot hold more than 65535 nodes, and a macro-element carries (L+1)^3 of
+            // them -- 729 at level 8, which allows 89 macro-elements. SFEM_SS_PACK_SIZE is
+            // clamped to that rather than being allowed to overflow silently.
+            //
+            // It must come after the scatter above and before anything reads node ids,
+            // because PackedMesh::create renumbers the mesh nodes in place.
+            const int ss_pack = smesh::Env::read<int>("SFEM_SS_PACK_SIZE", 0);
+            if (ss_pack > 0) {
+                const int nxe = impl_->ss.nxe > 0 ? impl_->ss.nxe : 1;
+                const int cap = 65535 / nxe;
+                const int use = ss_pack > cap ? (cap > 0 ? cap : 1) : ss_pack;
+                if (use != ss_pack)
+                    std::printf("ss: pack size %d exceeds the uint16 node limit at level %d, using %d\n",
+                                ss_pack, impl_->ss.level, use);
+                impl_->ss_packed = make_packed(mesh, use);
+                impl_->ss.packed = &impl_->ss_packed;
+                // The node numbering just changed, so anything captured from the mesh has to
+                // be re-read and anything keyed on it invalidated.
+                impl_->ss.elems  = mesh->elements(0)->data();
+                impl_->ss.points = mesh->points()->data();
+                impl_->ss.grad_w_inv.clear();
+                impl_->ss.grad_w_nmacro = -1;
+                if (impl_->ss.scatter) {
+                    impl_->ss.scatter = std::make_shared<SSScatter>();
+                    sscvfem_build_scatter(impl_->ss, *impl_->ss.scatter);
+                }
+                std::printf("ss: packed %td macro-elements into %td packs of %d\n",
+                            impl_->ss.nmacro, impl_->ss_packed.n_packs, use);
             }
             impl_->ss.rhie_chow_scale = rhie_chow_scale;
             impl_->ss.upwind_eps      = upwind_eps;

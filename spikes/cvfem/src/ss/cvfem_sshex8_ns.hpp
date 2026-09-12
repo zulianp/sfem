@@ -63,6 +63,15 @@ struct SSMeshData {
     // node. Pure geometry, so it is built once and kept, and the sweep that uses it neither
     // allocates nor accumulates it. Keyed on the mesh it was built for; see
     // sscvfem_build_grad_weight for why the key is what it is.
+    // The macro-element mesh, packed. Optional: null keeps the SSScatter path.
+    //
+    // Packing groups macro-elements so that a node shared between two of them IN THE SAME
+    // PACK stops being shared at all -- only the pack boundary needs staging. Measured on a
+    // 64-macro mesh at eight macro-elements per pack, the staged fraction falls from the
+    // macro skin's 96.3 / 78.4 / 52.9 percent at levels 2, 4 and 8 to 48.1 / 24.6 / 12.4.
+    // Since the gradient's cost tracks that fraction almost exactly across levels, this is
+    // the lever rather than the arithmetic.
+    PackedData           *packed{nullptr};
     std::vector<scalar_t> grad_w_inv;
     ptrdiff_t             grad_w_nmacro{-1};
     int                   grad_w_level{-1};
@@ -438,10 +447,162 @@ inline void sscvfem_build_grad_weight(SSMeshData &d) {
     d.grad_w_level  = d.level;
 }
 
+// The reconstruction over PACKED macro-elements.
+//
+// Same operator as the SSScatter path and the same summation structure as the flat packed
+// gradient, which this mirrors deliberately: gather the field into a pack-local buffer,
+// accumulate there with a plain `+=`, write the pack's owned rows straight out because no
+// other pack owns them, and close the rest with the ghost reduction.
+//
+// What packing buys here is not the writes but WHAT COUNTS AS SHARED. The SSScatter path
+// stages every macro-element face, edge and corner, because a node between two macro-elements
+// cannot be written by either alone. Group those macro-elements into a pack and the node
+// between two of them inside the pack is owned by the pack -- only the pack's outer boundary
+// is left. At level 8 that is the difference between staging 53% of the nodes and 12%.
+//
+// The denominator is folded into the owned writes and into the ghost reduction rather than
+// applied in a pass of its own, exactly as the flat twin does it, because the average is
+// linear in its numerator: (owned + ghost) * w is owned * w + ghost * w. That removes a full
+// read-modify-write over three nodal arrays from every call.
+inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
+                                      const scalar_t *const SFEM_RESTRICT src, const int stride,
+                                      std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
+                                      std::vector<scalar_t> &ogz) {
+    sscvfem_build_grad_weight(d);
+
+    // The owned ranges tile [0, nnodes) exactly, so every entry is written and there is
+    // nothing to pre-zero. Checked rather than assumed: a node no pack owned would otherwise
+    // keep whatever the buffer held.
+    const bool owns_all = p.n_packs > 0 && p.owned_nodes_ptr[0] == 0 && p.owned_nodes_ptr[p.n_packs] == d.nnodes;
+    if (owns_all && (ptrdiff_t)ogx.size() == d.nnodes) {
+        ogy.resize((size_t)d.nnodes);
+        ogz.resize((size_t)d.nnodes);
+    } else {
+        ogx.assign((size_t)d.nnodes, scalar_t(0));
+        ogy.assign((size_t)d.nnodes, scalar_t(0));
+        ogz.assign((size_t)d.nnodes, scalar_t(0));
+    }
+
+    scalar_t *const SFEM_RESTRICT       gx_out = ogx.data();
+    scalar_t *const SFEM_RESTRICT       gy_out = ogy.data();
+    scalar_t *const SFEM_RESTRICT       gz_out = ogz.data();
+    const scalar_t *const SFEM_RESTRICT w      = d.grad_w_inv.data();
+    const ptrdiff_t node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+
+    const int L = d.level;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+    const auto *const px = d.points[0];
+    const auto *const py = d.points[1];
+    const auto *const pz = d.points[2];
+
+#pragma omp parallel
+    {
+        // Slots 7 and 8, which belong to this routine; see CVFEM_PACK_SCRATCH_SLOTS.
+        scalar_t *const SFEM_RESTRICT pack_f   = thread_scratch<scalar_t>(7, (size_t)node_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(8, 3 * (size_t)node_n);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+            const ptrdiff_t e_start      = pack * p.n_elements_per_pack;
+            const ptrdiff_t e_end        = MIN(d.nmacro, (pack + 1) * p.n_elements_per_pack);
+            const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
+            const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+            const smesh::idx_t *const SFEM_RESTRICT ghosts    = &p.ghost_idx[p.ghost_ptr[pack]];
+            const ptrdiff_t                         ghost_off = p.ghost_ptr[pack];
+
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) pack_f[k] = src[(owned + k) * stride];
+            for (ptrdiff_t k = 0; k < n_ghost; ++k)
+                pack_f[n_contiguous + k] = src[(ptrdiff_t)ghosts[k] * stride];
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * 3 * sizeof(scalar_t));
+
+            for (ptrdiff_t e = e_start; e < e_end; ++e) {
+                // One geometry per macro-element: its micro-elements are translates and share
+                // a Jacobian exactly, which is what sscvfem_macro_geom has always relied on.
+                scalar_t ex[8], ey[8], ez[8], adj[9], det;
+                for (int a = 0; a < 8; ++a) {
+                    const smesh::idx_t g = pack_local_to_global(p, pack, n_contiguous, p.elems[off[a]][e]);
+                    ex[a]                = (scalar_t)px[g];
+                    ey[a]                = (scalar_t)py[g];
+                    ez[a]                = (scalar_t)pz[g];
+                }
+                sscvfem_micro_geom(ex, ey, ez, adj, &det);
+                if (std::fabs(det) < scalar_t(1e-30)) continue;
+                // |det| times a gradient carrying 1/det: only the sign survives.
+                const scalar_t sgn = det > 0 ? scalar_t(1) : scalar_t(-1);
+
+                for (int zi = 0; zi < L; ++zi) {
+                    for (int yi = 0; yi < L; ++yi) {
+                        for (int xi = 0; xi < L; ++xi) {
+                            const int base = sscvfem_lidx(L, xi, yi, zi);
+                            scalar_t  ep[8], gx, gy, gz;
+                            for (int a = 0; a < 8; ++a) ep[a] = pack_f[p.elems[base + off[a]][e]];
+                            cvfem_hex8_grad_scalar(adj, sgn, ep, gx, gy, gz);
+                            for (int a = 0; a < 8; ++a) {
+                                scalar_t *const SFEM_RESTRICT o =
+                                        pack_out + (ptrdiff_t)p.elems[base + off[a]][e] * 3;
+                                o[0] += gx;
+                                o[1] += gy;
+                                o[2] += gz;
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                const scalar_t wi = w[owned + k];
+                gx_out[owned + k] = pack_out[k * 3 + 0] * wi;
+                gy_out[owned + k] = pack_out[k * 3 + 1] * wi;
+                gz_out[owned + k] = pack_out[k * 3 + 2] * wi;
+            }
+            scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT bz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT o = pack_out + (n_contiguous + k) * 3;
+                bx[ghost_off + k]                     = o[0];
+                by[ghost_off + k]                     = o[1];
+                bz[ghost_off + k]                     = o[2];
+            }
+        }
+    }
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        const scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
+        const scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
+        const scalar_t *const SFEM_RESTRICT bz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+        scalar_t sx = 0, sy = 0, sz = 0;
+        for (ptrdiff_t j = begin; j < end; ++j) {
+            const ptrdiff_t idx = p.ghost_reduce_idx[j];
+            sx += bx[idx];
+            sy += by[idx];
+            sz += bz[idx];
+        }
+        const scalar_t wi = w[dest];
+        gx_out[dest] += sx * wi;
+        gy_out[dest] += sy * wi;
+        gz_out[dest] += sz * wi;
+    }
+}
+
 inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
                                        const int stride, std::vector<scalar_t> &ogx,
                                        std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz) {
     SFEM_TRACE_SCOPE("sscvfem::nodal_grad_strided");
+    // Over packed macro-elements where there is a packing, which leaves an eighth of the
+    // nodes staged instead of half. Same operator either way; the summation order differs, so
+    // the two agree to round-off rather than bit for bit.
+    if (d.packed) {
+        sscvfem_nodal_grad_packed(d, *d.packed, src, stride, ogx, ogy, ogz);
+        return;
+    }
     // Geometry, cached. Everything below is then about the field alone.
     sscvfem_build_grad_weight(d);
     const scalar_t *const SFEM_RESTRICT winv = d.grad_w_inv.data();
