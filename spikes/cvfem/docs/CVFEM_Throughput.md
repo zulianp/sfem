@@ -16,21 +16,26 @@ on the scope the Krylov iteration actually spends its time in.
 
 | run | dof | sweep | MDOF/s | sweep | nodal grad | boundary | constraints |
 |---|---|---|---|---|---|---|---|
-| flat_N16 | 75,140 | apply_jacobian_action_packed | 163 | 70% | 18% | 5% | 7% |
-| flat_N24 | 242,500 | apply_jacobian_action_packed | 530 | 72% | 13% | 6% | 6% |
-| flat_N32 | 561,924 | apply_jacobian_action_packed | 1240 | 56% | 22% | 8% | 5% |
-| flat_N48 | 1,853,572 | apply_jacobian_action_packed | 1114 | 72% | 14% | 8% | 2% |
-| flat_N64 | 4,343,300 | apply_jacobian_action_packed | 1022 | 74% | 14% | 7% | 1% |
-| ss_L2_N8 | 75,140 | apply_macro_local_hoisted | 674 | 37% | 23% | 0% | 14% |
-| ss_L2_N12 | 242,500 | apply_macro_local_hoisted | 855 | 53% | 24% | 0% | 8% |
-| ss_L2_N16 | 561,924 | apply_macro_local_hoisted | 890 | 68% | 25% | 0% | 5% |
-| ss_L2_N24 | 1,853,572 | apply_macro_local_hoisted | 868 | 69% | 27% | 0% | 2% |
-| ss_L2_N32 | 4,343,300 | apply_macro_local_hoisted | 794 | 67% | 30% | 0% | 1% |
-| ss_L4_N4 | 75,140 | apply_macro_local_hoisted | 734 | 47% | 31% | 0% | 20% |
-| ss_L4_N6 | 242,500 | apply_macro_local_hoisted | 932 | 53% | 24% | 0% | 9% |
-| ss_L4_N8 | 561,924 | apply_macro_local_hoisted | 973 | 62% | 23% | 0% | 5% |
-| ss_L4_N12 | 1,853,572 | apply_macro_local_hoisted | 941 | 70% | 24% | 0% | 2% |
-| ss_L4_N16 | 4,343,300 | apply_macro_local_hoisted | 921 | 71% | 27% | 0% | 1% |
+| flat_N16 | 75,140 | apply_jacobian_action_packed | 163 | 76% | 10% | 5% | 7% |
+| flat_N24 | 242,500 | apply_jacobian_action_packed | 519 | 75% | 10% | 7% | 7% |
+| flat_N32 | 561,924 | apply_jacobian_action_packed | 1205 | 53% | 26% | 8% | 5% |
+| flat_N48 | 1,853,572 | apply_jacobian_action_packed | 1100 | 70% | 15% | 8% | 2% |
+| flat_N64 | 4,343,300 | apply_jacobian_action_packed | 1019 | 74% | 14% | 7% | 1% |
+| ss_L2_N8 | 75,140 | apply_macro_local_hoisted | 666 | 39% | 22% | 0% | 15% |
+| ss_L2_N12 | 242,500 | apply_macro_local_hoisted | 834 | 64% | 23% | 0% | 11% |
+| ss_L2_N16 | 561,924 | apply_macro_local_hoisted | 868 | 64% | 19% | 0% | 5% |
+| ss_L2_N24 | 1,853,572 | apply_macro_local_hoisted | 831 | 73% | 21% | 0% | 2% |
+| ss_L2_N32 | 4,343,300 | apply_macro_local_hoisted | 773 | 71% | 25% | 0% | 1% |
+| ss_L4_N4 | 75,140 | apply_macro_local_hoisted | 699 | 39% | 22% | 0% | 17% |
+| ss_L4_N6 | 242,500 | apply_macro_local_hoisted | 921 | 49% | 18% | 0% | 8% |
+| ss_L4_N8 | 561,924 | apply_macro_local_hoisted | 950 | 67% | 19% | 0% | 5% |
+| ss_L4_N12 | 1,853,572 | apply_macro_local_hoisted | 911 | 72% | 19% | 0% | 2% |
+| ss_L4_N16 | 4,343,300 | apply_macro_local_hoisted | 894 | 75% | 22% | 0% | 1% |
+| ss_L8p_N2 | 75,140 | apply_macro_local_hoisted | 386 | 60% | 25% | 0% | 14% |
+| ss_L8p_N3 | 242,500 | apply_macro_local_hoisted | 702 | 64% | 16% | 0% | 8% |
+| ss_L8p_N4 | 561,924 | apply_macro_local_hoisted | 898 | 81% | 12% | 0% | 6% |
+| ss_L8p_N6 | 1,853,572 | apply_macro_local_hoisted | 957 | 84% | 11% | 0% | 2% |
+| ss_L8p_N8 | 4,343,300 | apply_macro_local_hoisted | 959 | 87% | 10% | 0% | 1% |
 
 The boundary closure is a separate pass on the flat operator and is FUSED into
 the macro-element sweep on the semi-structured one, where it is inside the micro
@@ -293,35 +298,35 @@ Reproduce with `jobs/bnd_skip.sbatch`.
 
 ### flat_N16
 
-75,140 dof, 72 threads, nid006558. 0.620 s in non-container scopes.
+75,140 dof, 72 threads, nid006544. 0.570 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 903 | 0.417 | 462.3 | 162.5 | 67.3% |
-| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 913 | 0.109 | 119.6 | 628.3 | 17.6% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.040 | 44.1 | 1702.9 | 6.4% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 903 | 0.027 | 29.6 | 2540.0 | 4.3% |
-| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 3 | 0.016 | 5218.7 | 14.4 | 2.5% |
-| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 7 | 0.004 | 509.9 | 147.3 | 0.6% |
-| `SFC::reorder` | other | 1 | 0.003 | 3122.6 | 24.1 | 0.5% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 7 | 0.002 | 218.9 | 343.3 | 0.2% |
-| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.001 | 783.0 | 96.0 | 0.1% |
-| `create_crs_graph_mem_conservative` | setup | 1 | 0.001 | 735.8 | 102.1 | 0.1% |
-| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.000 | 382.7 | 196.4 | 0.1% |
-| `create_n2e` | other | 1 | 0.000 | 303.3 | 247.8 | 0.0% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 43.3 | 1735.7 | 0.0% |
-| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 42.7 | 1759.3 | 0.0% |
-| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 903 | 0.000 | 0.2 | 429893.7 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 89.4 | 840.4 | 0.0% |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 903 | 0.417 | 461.3 | 162.9 | 73.1% |
+| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 913 | 0.057 | 62.9 | 1193.8 | 10.1% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.041 | 45.3 | 1657.8 | 7.2% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 903 | 0.027 | 30.3 | 2478.1 | 4.8% |
+| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 3 | 0.016 | 5248.9 | 14.3 | 2.8% |
+| `SFC::reorder` | other | 1 | 0.003 | 2916.8 | 25.8 | 0.5% |
+| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 7 | 0.003 | 412.6 | 182.1 | 0.5% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 7 | 0.002 | 283.0 | 265.5 | 0.3% |
+| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.001 | 1283.4 | 58.5 | 0.2% |
+| `create_crs_graph_mem_conservative` | setup | 1 | 0.001 | 1261.0 | 59.6 | 0.2% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 49.8 | 1509.0 | 0.1% |
+| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.000 | 339.3 | 221.5 | 0.1% |
+| `create_n2e` | other | 1 | 0.000 | 337.4 | 222.7 | 0.1% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 42.9 | 1752.3 | 0.1% |
+| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 903 | 0.000 | 0.2 | 453892.1 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 98.7 | 761.3 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 0.437 | 70.4% |
-| nodal gradient | 0.109 | 17.6% |
-| constraints | 0.041 | 6.6% |
-| boundary | 0.028 | 4.6% |
-| other | 0.004 | 0.6% |
-| setup | 0.002 | 0.3% |
+| element sweep | 0.435 | 76.3% |
+| nodal gradient | 0.057 | 10.1% |
+| constraints | 0.042 | 7.3% |
+| boundary | 0.029 | 5.2% |
+| other | 0.003 | 0.6% |
+| setup | 0.003 | 0.5% |
 | transient | 0.000 | 0.0% |
 
 Containers, listed apart because the rows above are inside them and adding
@@ -329,45 +334,45 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 3 | 0.920 | 306695.0 |
-| `Function::apply` | 903 | 0.551 | 610.0 |
-| `CVFEMNavierStokes::apply` | 903 | 0.510 | 565.2 |
-| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 903 | 0.500 | 553.4 |
-| `Function::gradient` | 7 | 0.061 | 8675.4 |
-| `CVFEMNavierStokes::gradient` | 7 | 0.060 | 8630.8 |
-| `cvfem_hex8_ns_steady::apply_residual` | 7 | 0.060 | 8568.0 |
-| `cvfem_hex8_ns_steady::assemble_nodal_p_grad` | 10 | 0.055 | 5498.9 |
+| `BiCGStab::apply` | 3 | 0.927 | 309038.0 |
+| `Function::apply` | 903 | 0.553 | 611.9 |
+| `CVFEMNavierStokes::apply` | 903 | 0.511 | 565.8 |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 903 | 0.500 | 553.8 |
+| `cvfem_hex8_ns_steady::assemble_nodal_q_grad` | 903 | 0.055 | 60.8 |
+| `Function::copy_constrained_dofs` | 903 | 0.041 | 45.6 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.016 | 5444.7 |
+| `Function::gradient` | 7 | 0.008 | 1207.7 |
 
 
 ### flat_N24
 
-242,500 dof, 72 threads, nid006558. 0.603 s in non-container scopes.
+242,500 dof, 72 threads, nid006544. 0.592 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 903 | 0.413 | 457.1 | 530.5 | 68.4% |
-| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 913 | 0.081 | 88.6 | 2736.5 | 13.4% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.038 | 42.3 | 5731.4 | 6.3% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 903 | 0.034 | 38.1 | 6361.5 | 5.7% |
-| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 3 | 0.017 | 5800.3 | 41.8 | 2.9% |
-| `SFC::reorder` | other | 1 | 0.005 | 5034.0 | 48.2 | 0.8% |
-| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 7 | 0.003 | 474.7 | 510.9 | 0.6% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 7 | 0.003 | 456.2 | 531.6 | 0.5% |
-| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.002 | 2154.1 | 112.6 | 0.4% |
-| `create_crs_graph_mem_conservative` | setup | 1 | 0.002 | 2142.4 | 113.2 | 0.4% |
-| `create_n2e` | other | 1 | 0.001 | 1223.8 | 198.2 | 0.2% |
-| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.001 | 1030.2 | 235.4 | 0.2% |
-| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 903 | 0.000 | 0.5 | 528457.6 | 0.1% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 50.8 | 4772.0 | 0.1% |
-| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 40.8 | 5943.1 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 102.3 | 2370.9 | 0.0% |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 903 | 0.422 | 466.8 | 519.4 | 71.2% |
+| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 913 | 0.057 | 62.9 | 3855.9 | 9.7% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.041 | 45.5 | 5328.4 | 6.9% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 903 | 0.036 | 39.6 | 6123.5 | 6.0% |
+| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 3 | 0.017 | 5504.8 | 44.1 | 2.8% |
+| `SFC::reorder` | other | 1 | 0.005 | 4955.5 | 48.9 | 0.8% |
+| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 7 | 0.003 | 467.9 | 518.3 | 0.6% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 7 | 0.003 | 463.0 | 523.8 | 0.5% |
+| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.002 | 2229.2 | 108.8 | 0.4% |
+| `create_crs_graph_mem_conservative` | setup | 1 | 0.002 | 2217.5 | 109.4 | 0.4% |
+| `create_n2e` | other | 1 | 0.001 | 1277.9 | 189.8 | 0.2% |
+| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.001 | 1046.2 | 231.8 | 0.2% |
+| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 903 | 0.000 | 0.5 | 538369.5 | 0.1% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 46.2 | 5254.5 | 0.1% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 43.4 | 5593.0 | 0.1% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 104.9 | 2311.6 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 0.434 | 71.9% |
-| nodal gradient | 0.081 | 13.4% |
-| constraints | 0.039 | 6.5% |
-| boundary | 0.038 | 6.2% |
+| element sweep | 0.441 | 74.6% |
+| nodal gradient | 0.057 | 9.7% |
+| constraints | 0.042 | 7.1% |
+| boundary | 0.039 | 6.6% |
 | other | 0.007 | 1.1% |
 | setup | 0.005 | 0.9% |
 | transient | 0.000 | 0.0% |
@@ -377,47 +382,47 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 3 | 1.458 | 485916.7 |
-| `Function::apply` | 903 | 0.550 | 608.6 |
-| `CVFEMNavierStokes::apply` | 903 | 0.511 | 565.6 |
-| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 903 | 0.499 | 553.0 |
-| `cvfem_hex8_ns_steady::assemble_nodal_q_grad` | 903 | 0.051 | 56.2 |
-| `Function::copy_constrained_dofs` | 903 | 0.038 | 42.6 |
-| `Function::gradient` | 7 | 0.038 | 5377.4 |
-| `CVFEMNavierStokes::gradient` | 7 | 0.037 | 5325.2 |
+| `BiCGStab::apply` | 3 | 1.502 | 500506.7 |
+| `Function::apply` | 903 | 0.567 | 628.3 |
+| `CVFEMNavierStokes::apply` | 903 | 0.525 | 581.8 |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 903 | 0.513 | 567.9 |
+| `cvfem_hex8_ns_steady::assemble_nodal_q_grad` | 903 | 0.054 | 59.8 |
+| `Function::copy_constrained_dofs` | 903 | 0.041 | 45.8 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.018 | 6060.2 |
+| `CVFEMNavierStokes::initialize` | 1 | 0.014 | 13529.3 |
 
 
 ### flat_N32
 
-561,924 dof, 72 threads, nid006558. 0.285 s in non-container scopes.
+561,924 dof, 72 threads, nid006544. 0.309 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 326 | 0.148 | 453.1 | 1240.3 | 51.8% |
-| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 331 | 0.062 | 187.8 | 2992.8 | 21.8% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 326 | 0.018 | 55.0 | 10208.4 | 6.3% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 326 | 0.015 | 44.7 | 12568.8 | 5.1% |
-| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 2 | 0.010 | 5118.8 | 109.8 | 3.6% |
-| `SFC::reorder` | other | 1 | 0.008 | 8441.4 | 66.6 | 3.0% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 3 | 0.005 | 1817.5 | 309.2 | 1.9% |
-| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.005 | 4884.7 | 115.0 | 1.7% |
-| `create_crs_graph_mem_conservative` | setup | 1 | 0.005 | 4868.0 | 115.4 | 1.7% |
-| `create_n2e` | other | 1 | 0.003 | 3160.7 | 177.8 | 1.1% |
-| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.002 | 2244.9 | 250.3 | 0.8% |
-| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 3 | 0.002 | 741.7 | 757.6 | 0.8% |
-| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 326 | 0.001 | 2.2 | 250437.8 | 0.3% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 182.6 | 3076.9 | 0.1% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 181.9 | 3089.0 | 0.1% |
-| `DirichletConditions::gradient` | constraints | 3 | 0.000 | 46.8 | 12004.4 | 0.0% |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 326 | 0.152 | 466.1 | 1205.5 | 49.2% |
+| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 331 | 0.081 | 246.0 | 2284.4 | 26.4% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 326 | 0.018 | 56.7 | 9911.0 | 6.0% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 326 | 0.015 | 46.3 | 12149.6 | 4.9% |
+| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 2 | 0.009 | 4557.7 | 123.3 | 3.0% |
+| `SFC::reorder` | other | 1 | 0.008 | 8453.6 | 66.5 | 2.7% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 3 | 0.006 | 1867.8 | 300.8 | 1.8% |
+| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.005 | 5159.8 | 108.9 | 1.7% |
+| `create_crs_graph_mem_conservative` | setup | 1 | 0.005 | 5150.1 | 109.1 | 1.7% |
+| `create_n2e` | other | 1 | 0.003 | 3181.9 | 176.6 | 1.0% |
+| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.002 | 2239.5 | 250.9 | 0.7% |
+| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 3 | 0.002 | 518.1 | 1084.6 | 0.5% |
+| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 326 | 0.001 | 2.5 | 222772.6 | 0.3% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 186.4 | 3013.9 | 0.1% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 184.8 | 3041.1 | 0.1% |
+| `DirichletConditions::gradient` | constraints | 3 | 0.000 | 46.9 | 11984.1 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 0.160 | 56.1% |
-| nodal gradient | 0.062 | 21.8% |
-| boundary | 0.023 | 8.2% |
-| constraints | 0.015 | 5.4% |
-| other | 0.012 | 4.3% |
-| setup | 0.012 | 4.2% |
+| element sweep | 0.163 | 52.6% |
+| nodal gradient | 0.081 | 26.4% |
+| boundary | 0.024 | 7.8% |
+| constraints | 0.016 | 5.1% |
+| setup | 0.013 | 4.1% |
+| other | 0.012 | 4.0% |
 | transient | 0.000 | 0.0% |
 
 Containers, listed apart because the rows above are inside them and adding
@@ -425,47 +430,47 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 2 | 0.934 | 466771.0 |
-| `Function::apply` | 326 | 0.210 | 642.8 |
-| `CVFEMNavierStokes::apply` | 326 | 0.195 | 597.1 |
-| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 326 | 0.189 | 580.1 |
-| `Function::gradient` | 3 | 0.048 | 15980.6 |
-| `CVFEMNavierStokes::gradient` | 3 | 0.048 | 15931.0 |
-| `cvfem_hex8_ns_steady::apply_residual` | 3 | 0.048 | 15841.0 |
-| `cvfem_hex8_ns_steady::assemble_nodal_p_grad` | 5 | 0.040 | 8002.6 |
+| `BiCGStab::apply` | 2 | 0.960 | 479992.5 |
+| `Function::apply` | 326 | 0.216 | 662.9 |
+| `CVFEMNavierStokes::apply` | 326 | 0.201 | 615.4 |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 326 | 0.195 | 598.0 |
+| `Function::gradient` | 3 | 0.066 | 21958.0 |
+| `CVFEMNavierStokes::gradient` | 3 | 0.066 | 21908.9 |
+| `cvfem_hex8_ns_steady::apply_residual` | 3 | 0.065 | 21813.5 |
+| `cvfem_hex8_ns_steady::assemble_nodal_p_grad` | 5 | 0.058 | 11685.6 |
 
 
 ### flat_N48
 
-1,853,572 dof, 72 threads, nid006558. 2.146 s in non-container scopes.
+1,853,572 dof, 72 threads, nid006544. 2.239 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 903 | 1.502 | 1663.8 | 1114.1 | 70.0% |
-| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 917 | 0.293 | 319.3 | 5804.4 | 13.6% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 903 | 0.163 | 180.1 | 10291.7 | 7.6% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.046 | 51.2 | 36205.6 | 2.2% |
-| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 3 | 0.032 | 10518.9 | 176.2 | 1.5% |
-| `SFC::reorder` | other | 1 | 0.023 | 22904.6 | 80.9 | 1.1% |
-| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.018 | 17736.4 | 104.5 | 0.8% |
-| `create_crs_graph_mem_conservative` | setup | 1 | 0.018 | 17705.9 | 104.7 | 0.8% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 11 | 0.014 | 1246.1 | 1487.5 | 0.6% |
-| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 11 | 0.013 | 1197.7 | 1547.6 | 0.6% |
-| `create_n2e` | other | 1 | 0.013 | 12665.5 | 146.3 | 0.6% |
-| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.008 | 7722.8 | 240.0 | 0.4% |
-| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 903 | 0.003 | 3.1 | 593484.8 | 0.1% |
-| `DirichletConditions::gradient` | constraints | 11 | 0.001 | 56.2 | 32980.7 | 0.0% |
-| `DirichletConditions::apply_value` | constraints | 11 | 0.001 | 48.9 | 37890.5 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 419.4 | 4419.8 | 0.0% |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 903 | 1.521 | 1684.7 | 1100.2 | 67.9% |
+| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 917 | 0.330 | 359.9 | 5150.3 | 14.7% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 903 | 0.168 | 185.9 | 9969.0 | 7.5% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.048 | 53.7 | 34511.3 | 2.2% |
+| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.034 | 33693.1 | 55.0 | 1.5% |
+| `create_crs_graph_mem_conservative` | setup | 1 | 0.034 | 33678.8 | 55.0 | 1.5% |
+| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 3 | 0.030 | 9993.9 | 185.5 | 1.3% |
+| `SFC::reorder` | other | 1 | 0.024 | 23525.2 | 78.8 | 1.1% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 11 | 0.014 | 1291.4 | 1435.4 | 0.6% |
+| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 11 | 0.013 | 1182.9 | 1566.9 | 0.6% |
+| `create_n2e` | other | 1 | 0.011 | 11285.5 | 164.2 | 0.5% |
+| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.007 | 7113.0 | 260.6 | 0.3% |
+| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 903 | 0.003 | 2.9 | 649487.8 | 0.1% |
+| `DirichletConditions::gradient` | constraints | 11 | 0.001 | 58.3 | 31779.6 | 0.0% |
+| `DirichletConditions::apply_value` | constraints | 11 | 0.000 | 43.3 | 42845.2 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 425.6 | 4355.4 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 1.547 | 72.1% |
-| nodal gradient | 0.293 | 13.6% |
-| boundary | 0.176 | 8.2% |
-| constraints | 0.048 | 2.3% |
-| setup | 0.043 | 2.0% |
-| other | 0.038 | 1.8% |
+| element sweep | 1.564 | 69.9% |
+| nodal gradient | 0.330 | 14.7% |
+| boundary | 0.182 | 8.1% |
+| setup | 0.074 | 3.3% |
+| constraints | 0.051 | 2.3% |
+| other | 0.037 | 1.7% |
 | transient | 0.000 | 0.0% |
 
 Containers, listed apart because the rows above are inside them and adding
@@ -473,47 +478,47 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 3 | 8.475 | 2825050.0 |
-| `Function::apply` | 903 | 2.049 | 2269.4 |
-| `CVFEMNavierStokes::apply` | 903 | 2.000 | 2214.6 |
-| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 903 | 1.928 | 2134.6 |
-| `cvfem_hex8_ns_steady::assemble_nodal_q_grad` | 903 | 0.256 | 283.5 |
-| `CVFEMNavierStokes::initialize` | 1 | 0.105 | 104988.0 |
-| `Function::gradient` | 11 | 0.068 | 6186.6 |
-| `CVFEMNavierStokes::gradient` | 11 | 0.067 | 6126.4 |
+| `BiCGStab::apply` | 3 | 8.699 | 2899616.7 |
+| `Function::apply` | 903 | 2.093 | 2317.4 |
+| `CVFEMNavierStokes::apply` | 903 | 2.041 | 2260.3 |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 903 | 1.967 | 2178.3 |
+| `cvfem_hex8_ns_steady::assemble_nodal_q_grad` | 903 | 0.271 | 300.2 |
+| `CVFEMNavierStokes::initialize` | 1 | 0.124 | 124138.0 |
+| `Function::gradient` | 11 | 0.091 | 8302.0 |
+| `CVFEMNavierStokes::gradient` | 11 | 0.091 | 8240.0 |
 
 
 ### flat_N64
 
-4,343,300 dof, 72 threads, nid006558. 5.276 s in non-container scopes.
+4,343,300 dof, 72 threads, nid006544. 5.319 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 903 | 3.836 | 4247.7 | 1022.5 | 72.7% |
-| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 913 | 0.734 | 804.4 | 5399.1 | 13.9% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 903 | 0.337 | 372.9 | 11646.1 | 6.4% |
-| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 3 | 0.069 | 23012.9 | 188.7 | 1.3% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.054 | 59.6 | 72897.6 | 1.0% |
-| `SFC::reorder` | other | 1 | 0.053 | 52538.2 | 82.7 | 1.0% |
-| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.044 | 44003.5 | 98.7 | 0.8% |
-| `create_crs_graph_mem_conservative` | setup | 1 | 0.044 | 43966.1 | 98.8 | 0.8% |
-| `create_n2e` | other | 1 | 0.034 | 33717.6 | 128.8 | 0.6% |
-| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 7 | 0.024 | 3433.8 | 1264.9 | 0.5% |
-| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 7 | 0.021 | 2953.9 | 1470.4 | 0.4% |
-| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.018 | 18349.2 | 236.7 | 0.3% |
-| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 903 | 0.006 | 6.7 | 643737.0 | 0.1% |
-| `Function::constraints_mask` | constraints | 1 | 0.001 | 769.4 | 5645.2 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.001 | 766.8 | 5664.5 | 0.0% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.001 | 85.1 | 51048.7 | 0.0% |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_packed` | element sweep | 903 | 3.851 | 4264.3 | 1018.5 | 72.4% |
+| `cvfem_hex8_ns_steady::nodal_grad_strided` | nodal gradient | 913 | 0.754 | 825.3 | 5262.6 | 14.2% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action` | boundary | 903 | 0.350 | 388.0 | 11192.8 | 6.6% |
+| `cvfem_hex8_ns_steady::assemble_block_diag` | element sweep | 3 | 0.067 | 22438.7 | 193.6 | 1.3% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.053 | 58.8 | 73807.4 | 1.0% |
+| `SFC::reorder` | other | 1 | 0.053 | 53015.2 | 81.9 | 1.0% |
+| `Mesh::initialize_node_to_node_graph` | setup | 1 | 0.044 | 43811.3 | 99.1 | 0.8% |
+| `create_crs_graph_mem_conservative` | setup | 1 | 0.044 | 43788.4 | 99.2 | 0.8% |
+| `create_n2e` | other | 1 | 0.033 | 33249.4 | 130.6 | 0.6% |
+| `cvfem_hex8_ns_steady::apply_boundary_scs_residual` | boundary | 7 | 0.025 | 3502.1 | 1240.2 | 0.5% |
+| `cvfem_hex8_ns_steady::apply_residual_packed` | element sweep | 7 | 0.020 | 2895.0 | 1500.3 | 0.4% |
+| `cvfem_hex8_ns_steady::precompute_element_bsr_slots` | setup | 1 | 0.017 | 16757.5 | 259.2 | 0.3% |
+| `cvfem_hex8_ns_steady::build_rc_coeff` | other | 903 | 0.005 | 6.1 | 716872.1 | 0.1% |
+| `Function::constraints_mask` | constraints | 1 | 0.001 | 818.3 | 5308.0 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.001 | 814.0 | 5336.0 | 0.0% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.001 | 72.9 | 59560.9 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 3.925 | 74.4% |
-| nodal gradient | 0.734 | 13.9% |
-| boundary | 0.361 | 6.8% |
-| setup | 0.106 | 2.0% |
-| other | 0.092 | 1.8% |
-| constraints | 0.056 | 1.1% |
+| element sweep | 3.938 | 74.0% |
+| nodal gradient | 0.754 | 14.2% |
+| boundary | 0.375 | 7.0% |
+| setup | 0.104 | 2.0% |
+| other | 0.092 | 1.7% |
+| constraints | 0.056 | 1.0% |
 | transient | 0.000 | 0.0% |
 
 Containers, listed apart because the rows above are inside them and adding
@@ -521,327 +526,45 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 3 | 18.636 | 6211833.3 |
-| `Function::apply` | 903 | 5.118 | 5668.3 |
-| `CVFEMNavierStokes::apply` | 903 | 5.061 | 5604.4 |
-| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 903 | 4.876 | 5400.1 |
-| `cvfem_hex8_ns_steady::assemble_nodal_q_grad` | 903 | 0.691 | 765.6 |
-| `CVFEMNavierStokes::initialize` | 1 | 0.225 | 225290.0 |
-| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.103 | 34204.0 |
-| `Function::gradient` | 7 | 0.094 | 13392.4 |
+| `BiCGStab::apply` | 3 | 19.088 | 6362833.3 |
+| `Function::apply` | 903 | 5.198 | 5756.9 |
+| `CVFEMNavierStokes::apply` | 903 | 5.141 | 5693.4 |
+| `cvfem_hex8_ns_steady::apply_jacobian_action_accumulate` | 903 | 4.954 | 5485.9 |
+| `cvfem_hex8_ns_steady::assemble_nodal_q_grad` | 903 | 0.740 | 820.0 |
+| `CVFEMNavierStokes::initialize` | 1 | 0.228 | 227950.0 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.102 | 33849.3 |
+| `Function::gradient` | 7 | 0.064 | 9205.8 |
 
 
 ### ss_L2_N8
 
-75,140 dof, 72 threads, nid006558. 0.277 s in non-container scopes.
+75,140 dof, 72 threads, nid006544. 0.260 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.101 | 111.4 | 674.4 | 36.3% |
-| `to_semistructured` | other | 1 | 0.068 | 67883.5 | 1.1 | 24.5% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.065 | 71.3 | 1054.5 | 23.5% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.039 | 42.8 | 1756.9 | 13.9% |
-| `SFC::reorder` | other | 1 | 0.002 | 2295.7 | 32.7 | 0.8% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.001 | 308.8 | 243.3 | 0.3% |
-| `sscvfem::build_scatter` | setup | 1 | 0.001 | 715.7 | 105.0 | 0.3% |
-| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 43.3 | 1737.1 | 0.1% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 42.8 | 1753.7 | 0.1% |
-| `create_dual_graph` | other | 1 | 0.000 | 255.3 | 294.3 | 0.1% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 95.8 | 784.0 | 0.0% |
-| `create_n2e` | other | 2 | 0.000 | 26.6 | 2826.5 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 46.5 | 1616.2 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 45.3 | 1658.7 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 1962685.7 | 0.0% |
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.102 | 112.8 | 665.9 | 39.2% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.057 | 62.8 | 1197.0 | 22.0% |
+| `to_semistructured` | other | 1 | 0.057 | 57129.9 | 1.3 | 22.0% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.039 | 43.2 | 1740.6 | 15.0% |
+| `SFC::reorder` | other | 1 | 0.002 | 2312.9 | 32.5 | 0.9% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.001 | 267.3 | 281.1 | 0.3% |
+| `sscvfem::build_scatter` | setup | 1 | 0.001 | 649.7 | 115.7 | 0.2% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 44.6 | 1684.1 | 0.1% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 40.8 | 1843.0 | 0.1% |
+| `create_dual_graph` | other | 1 | 0.000 | 258.4 | 290.7 | 0.1% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 97.8 | 768.7 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 26.3 | 2852.1 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 47.4 | 1583.7 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 46.5 | 1616.2 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 1884698.8 | 0.0% |
 | `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 0.0 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 0.102 | 36.6% |
-| other | 0.070 | 25.4% |
-| nodal gradient | 0.065 | 23.5% |
-| constraints | 0.039 | 14.2% |
-| setup | 0.001 | 0.3% |
-| transient | 0.000 | 0.0% |
-
-Containers, listed apart because the rows above are inside them and adding
-both would count the same seconds twice:
-
-| scope | calls | seconds | us/call |
-|---|---|---|---|
-| `BiCGStab::apply` | 3 | 0.577 | 192222.7 |
-| `Function::apply` | 903 | 0.215 | 238.0 |
-| `CVFEMNavierStokes::apply` | 903 | 0.176 | 194.6 |
-| `sscvfem::apply` | 903 | 0.166 | 183.4 |
-| `sscvfem::nodal_q_grad` | 903 | 0.065 | 71.5 |
-| `Function::copy_constrained_dofs` | 903 | 0.039 | 43.0 |
-| `Function::gradient` | 7 | 0.002 | 278.6 |
-| `CVFEMNavierStokes::gradient` | 7 | 0.002 | 234.5 |
-
-
-### ss_L2_N12
-
-242,500 dof, 72 threads, nid006558. 0.487 s in non-container scopes.
-
-| scope | kind | calls | seconds | us/call | MDOF/s | share |
-|---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.256 | 283.5 | 855.5 | 52.6% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.117 | 128.1 | 1893.3 | 24.0% |
-| `to_semistructured` | other | 1 | 0.066 | 66166.9 | 3.7 | 13.6% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.039 | 43.2 | 5616.3 | 8.0% |
-| `SFC::reorder` | other | 1 | 0.002 | 2417.1 | 100.3 | 0.5% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.002 | 759.0 | 319.5 | 0.5% |
-| `sscvfem::build_scatter` | setup | 1 | 0.002 | 2070.2 | 117.1 | 0.4% |
-| `create_dual_graph` | other | 1 | 0.001 | 850.2 | 285.2 | 0.2% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 42.7 | 5682.2 | 0.1% |
-| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 41.0 | 5913.5 | 0.1% |
-| `create_n2e` | other | 2 | 0.000 | 80.9 | 2995.9 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 122.8 | 1975.0 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 103.2 | 2349.0 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 101.6 | 2387.6 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 6607609.5 | 0.0% |
-| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 7119818.5 | 0.0% |
-
-| kind | seconds | share |
-|---|---|---|
-| element sweep | 0.258 | 53.1% |
-| nodal gradient | 0.117 | 24.0% |
-| other | 0.070 | 14.3% |
-| constraints | 0.040 | 8.2% |
-| setup | 0.002 | 0.4% |
-| transient | 0.000 | 0.0% |
-
-Containers, listed apart because the rows above are inside them and adding
-both would count the same seconds twice:
-
-| scope | calls | seconds | us/call |
-|---|---|---|---|
-| `BiCGStab::apply` | 3 | 1.329 | 443083.3 |
-| `Function::apply` | 903 | 0.425 | 470.3 |
-| `CVFEMNavierStokes::apply` | 903 | 0.385 | 426.5 |
-| `sscvfem::apply` | 903 | 0.372 | 412.3 |
-| `sscvfem::nodal_q_grad` | 903 | 0.116 | 128.3 |
-| `Function::copy_constrained_dofs` | 903 | 0.039 | 43.4 |
-| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.004 | 1286.5 |
-| `Function::gradient` | 7 | 0.004 | 547.2 |
-
-
-### ss_L2_N16
-
-561,924 dof, 72 threads, nid006558. 0.851 s in non-container scopes.
-
-| scope | kind | calls | seconds | us/call | MDOF/s | share |
-|---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.570 | 631.2 | 890.2 | 67.0% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.216 | 236.5 | 2375.8 | 25.4% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.039 | 43.5 | 12907.6 | 4.6% |
-| `to_semistructured` | other | 1 | 0.009 | 9289.7 | 60.5 | 1.1% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.006 | 1849.9 | 303.8 | 0.7% |
-| `sscvfem::build_scatter` | setup | 1 | 0.005 | 4911.2 | 114.4 | 0.6% |
-| `SFC::reorder` | other | 1 | 0.003 | 2683.6 | 209.4 | 0.3% |
-| `create_dual_graph` | other | 1 | 0.002 | 2120.0 | 265.1 | 0.2% |
-| `create_n2e` | other | 2 | 0.000 | 195.7 | 2870.7 | 0.0% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 43.5 | 12909.4 | 0.0% |
-| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 40.4 | 13910.8 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 182.6 | 3076.9 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 180.7 | 3109.3 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 108.7 | 5168.6 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 14283629.6 | 0.0% |
-| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 0.0 | 0.0% |
-
-| kind | seconds | share |
-|---|---|---|
-| element sweep | 0.576 | 67.6% |
-| nodal gradient | 0.216 | 25.4% |
-| constraints | 0.040 | 4.7% |
-| other | 0.014 | 1.7% |
-| setup | 0.005 | 0.6% |
-| transient | 0.000 | 0.0% |
-
-Containers, listed apart because the rows above are inside them and adding
-both would count the same seconds twice:
-
-| scope | calls | seconds | us/call |
-|---|---|---|---|
-| `BiCGStab::apply` | 3 | 2.802 | 933983.3 |
-| `Function::apply` | 903 | 0.839 | 929.2 |
-| `CVFEMNavierStokes::apply` | 903 | 0.799 | 885.0 |
-| `sscvfem::apply` | 903 | 0.784 | 868.1 |
-| `sscvfem::nodal_q_grad` | 903 | 0.213 | 236.0 |
-| `Function::copy_constrained_dofs` | 903 | 0.040 | 43.8 |
-| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.009 | 3155.4 |
-| `Function::gradient` | 7 | 0.008 | 1124.6 |
-
-
-### ss_L2_N24
-
-1,853,572 dof, 72 threads, nid006558. 2.831 s in non-container scopes.
-
-| scope | kind | calls | seconds | us/call | MDOF/s | share |
-|---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 1.929 | 2135.7 | 867.9 | 68.1% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 916 | 0.773 | 844.4 | 2195.1 | 27.3% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.048 | 53.1 | 34931.5 | 1.7% |
-| `to_semistructured` | other | 1 | 0.026 | 26235.8 | 70.7 | 0.9% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.020 | 6560.9 | 282.5 | 0.7% |
-| `sscvfem::build_scatter` | setup | 1 | 0.019 | 18735.6 | 98.9 | 0.7% |
-| `create_dual_graph` | other | 1 | 0.008 | 7845.4 | 236.3 | 0.3% |
-| `SFC::reorder` | other | 1 | 0.005 | 4745.0 | 390.6 | 0.2% |
-| `create_n2e` | other | 2 | 0.002 | 916.2 | 2023.0 | 0.1% |
-| `DirichletConditions::gradient` | constraints | 10 | 0.001 | 66.7 | 27805.6 | 0.0% |
-| `DirichletConditions::apply_value` | constraints | 10 | 0.000 | 43.9 | 42252.4 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 416.3 | 4452.7 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 413.4 | 4483.5 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 114.2 | 16230.6 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 26592135.9 | 0.0% |
-| `sscvfem::apply_transient` | transient | 10 | 0.000 | 0.0 | 38872235.2 | 0.0% |
-
-| kind | seconds | share |
-|---|---|---|
-| element sweep | 1.948 | 68.8% |
-| nodal gradient | 0.773 | 27.3% |
-| constraints | 0.050 | 1.8% |
-| other | 0.041 | 1.4% |
-| setup | 0.019 | 0.7% |
-| transient | 0.000 | 0.0% |
-
-Containers, listed apart because the rows above are inside them and adding
-both would count the same seconds twice:
-
-| scope | calls | seconds | us/call |
-|---|---|---|---|
-| `BiCGStab::apply` | 3 | 9.157 | 3052396.7 |
-| `Function::apply` | 903 | 2.810 | 3111.5 |
-| `CVFEMNavierStokes::apply` | 903 | 2.759 | 3055.9 |
-| `sscvfem::apply` | 903 | 2.695 | 2983.9 |
-| `sscvfem::nodal_q_grad` | 903 | 0.764 | 845.7 |
-| `Function::copy_constrained_dofs` | 903 | 0.049 | 53.9 |
-| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.035 | 11682.5 |
-| `Function::gradient` | 10 | 0.031 | 3118.8 |
-
-
-### ss_L2_N32
-
-4,343,300 dof, 72 threads, nid006558. 7.451 s in non-container scopes.
-
-| scope | kind | calls | seconds | us/call | MDOF/s | share |
-|---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 4.942 | 5473.0 | 793.6 | 66.3% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 919 | 2.198 | 2391.9 | 1815.9 | 29.5% |
-| `to_semistructured` | other | 1 | 0.096 | 96220.5 | 45.1 | 1.3% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.087 | 95.8 | 45335.7 | 1.2% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.046 | 15445.2 | 281.2 | 0.6% |
-| `sscvfem::build_scatter` | setup | 1 | 0.045 | 45487.2 | 95.5 | 0.6% |
-| `create_dual_graph` | other | 1 | 0.019 | 19135.5 | 227.0 | 0.3% |
-| `SFC::reorder` | other | 1 | 0.008 | 8268.8 | 525.3 | 0.1% |
-| `create_n2e` | other | 2 | 0.005 | 2299.5 | 1888.8 | 0.1% |
-| `DirichletConditions::gradient` | constraints | 13 | 0.002 | 125.1 | 34709.4 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.001 | 769.6 | 5643.5 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.001 | 766.5 | 5666.3 | 0.0% |
-| `DirichletConditions::apply_value` | constraints | 13 | 0.001 | 48.5 | 89637.6 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 141.1 | 30772.1 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 47134833.0 | 0.0% |
-| `sscvfem::apply_transient` | transient | 13 | 0.000 | 0.2 | 18217129.5 | 0.0% |
-
-| kind | seconds | share |
-|---|---|---|
-| element sweep | 4.988 | 67.0% |
-| nodal gradient | 2.198 | 29.5% |
-| other | 0.128 | 1.7% |
-| constraints | 0.090 | 1.2% |
-| setup | 0.045 | 0.6% |
-| transient | 0.000 | 0.0% |
-
-Containers, listed apart because the rows above are inside them and adding
-both would count the same seconds twice:
-
-| scope | calls | seconds | us/call |
-|---|---|---|---|
-| `BiCGStab::apply` | 3 | 20.931 | 6977066.7 |
-| `Function::apply` | 903 | 7.378 | 8171.0 |
-| `CVFEMNavierStokes::apply` | 903 | 7.289 | 8071.5 |
-| `sscvfem::apply` | 903 | 7.111 | 7874.9 |
-| `sscvfem::nodal_q_grad` | 903 | 2.164 | 2396.7 |
-| `Function::gradient` | 13 | 0.100 | 7720.5 |
-| `CVFEMNavierStokes::gradient` | 13 | 0.099 | 7591.6 |
-| `Function::copy_constrained_dofs` | 903 | 0.088 | 96.9 |
-
-
-### ss_L4_N4
-
-75,140 dof, 72 threads, nid006558. 0.327 s in non-container scopes.
-
-| scope | kind | calls | seconds | us/call | MDOF/s | share |
-|---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 1505 | 0.154 | 102.4 | 733.7 | 47.1% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 1525 | 0.101 | 66.4 | 1132.3 | 30.9% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 1505 | 0.065 | 43.1 | 1742.3 | 19.8% |
-| `SFC::reorder` | other | 1 | 0.002 | 2283.1 | 32.9 | 0.7% |
-| `to_semistructured` | other | 1 | 0.002 | 1807.2 | 41.6 | 0.6% |
-| `sscvfem::block_diag` | element sweep | 5 | 0.001 | 233.9 | 321.3 | 0.4% |
-| `DirichletConditions::gradient` | constraints | 15 | 0.001 | 44.3 | 1695.0 | 0.2% |
-| `DirichletConditions::apply_value` | constraints | 15 | 0.001 | 41.7 | 1800.2 | 0.2% |
-| `sscvfem::build_scatter` | setup | 1 | 0.000 | 383.6 | 195.9 | 0.1% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 97.0 | 774.3 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 1505 | 0.000 | 0.0 | 2001332.6 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 46.5 | 1616.2 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 45.8 | 1641.5 | 0.0% |
-| `create_dual_graph` | other | 1 | 0.000 | 32.4 | 2317.4 | 0.0% |
-| `create_n2e` | other | 2 | 0.000 | 3.6 | 21010.7 | 0.0% |
-| `sscvfem::apply_transient` | transient | 15 | 0.000 | 0.0 | 0.0 | 0.0% |
-
-| kind | seconds | share |
-|---|---|---|
-| element sweep | 0.155 | 47.4% |
-| nodal gradient | 0.101 | 30.9% |
-| constraints | 0.066 | 20.3% |
-| other | 0.004 | 1.3% |
-| setup | 0.000 | 0.1% |
-| transient | 0.000 | 0.0% |
-
-Containers, listed apart because the rows above are inside them and adding
-both would count the same seconds twice:
-
-| scope | calls | seconds | us/call |
-|---|---|---|---|
-| `BiCGStab::apply` | 5 | 0.960 | 191919.8 |
-| `Function::apply` | 1505 | 0.338 | 224.9 |
-| `CVFEMNavierStokes::apply` | 1505 | 0.273 | 181.3 |
-| `sscvfem::apply` | 1505 | 0.255 | 169.4 |
-| `sscvfem::nodal_q_grad` | 1505 | 0.100 | 66.5 |
-| `Function::copy_constrained_dofs` | 1505 | 0.065 | 43.3 |
-| `Function::gradient` | 15 | 0.004 | 283.7 |
-| `CVFEMNavierStokes::gradient` | 15 | 0.004 | 238.4 |
-
-
-### ss_L4_N6
-
-242,500 dof, 72 threads, nid006558. 0.446 s in non-container scopes.
-
-| scope | kind | calls | seconds | us/call | MDOF/s | share |
-|---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.235 | 260.2 | 931.9 | 52.7% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.105 | 115.4 | 2102.1 | 23.6% |
-| `to_semistructured` | other | 1 | 0.059 | 59188.8 | 4.1 | 13.3% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.040 | 44.3 | 5479.7 | 9.0% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.002 | 716.1 | 338.6 | 0.5% |
-| `SFC::reorder` | other | 1 | 0.002 | 2106.9 | 115.1 | 0.5% |
-| `sscvfem::build_scatter` | setup | 1 | 0.001 | 989.9 | 245.0 | 0.2% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 44.5 | 5447.5 | 0.1% |
-| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 41.7 | 5821.6 | 0.1% |
-| `create_dual_graph` | other | 1 | 0.000 | 107.3 | 2260.3 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 103.2 | 2349.0 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 101.8 | 2382.0 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 79.4 | 3054.4 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 6042492.2 | 0.0% |
-| `create_n2e` | other | 2 | 0.000 | 10.5 | 23116.4 | 0.0% |
-| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 7119818.5 | 0.0% |
-
-| kind | seconds | share |
-|---|---|---|
-| element sweep | 0.237 | 53.2% |
-| nodal gradient | 0.105 | 23.6% |
-| other | 0.061 | 13.8% |
-| constraints | 0.041 | 9.2% |
+| element sweep | 0.103 | 39.5% |
+| other | 0.060 | 23.0% |
+| nodal gradient | 0.057 | 22.0% |
+| constraints | 0.040 | 15.3% |
 | setup | 0.001 | 0.2% |
 | transient | 0.000 | 0.0% |
 
@@ -850,45 +573,327 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 3 | 1.304 | 434740.0 |
-| `Function::apply` | 903 | 0.393 | 435.6 |
-| `CVFEMNavierStokes::apply` | 903 | 0.353 | 390.7 |
-| `sscvfem::apply` | 903 | 0.340 | 376.2 |
-| `sscvfem::nodal_q_grad` | 903 | 0.104 | 115.5 |
-| `Function::copy_constrained_dofs` | 903 | 0.040 | 44.5 |
-| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.004 | 1249.6 |
-| `Function::gradient` | 7 | 0.004 | 505.1 |
+| `BiCGStab::apply` | 3 | 0.583 | 194357.7 |
+| `Function::apply` | 903 | 0.209 | 231.5 |
+| `CVFEMNavierStokes::apply` | 903 | 0.170 | 187.8 |
+| `sscvfem::apply` | 903 | 0.159 | 176.2 |
+| `sscvfem::nodal_q_grad` | 903 | 0.057 | 62.9 |
+| `Function::copy_constrained_dofs` | 903 | 0.039 | 43.4 |
+| `Function::gradient` | 7 | 0.002 | 313.7 |
+| `CVFEMNavierStokes::gradient` | 7 | 0.002 | 267.9 |
+
+
+### ss_L2_N12
+
+242,500 dof, 72 threads, nid006544. 0.414 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.263 | 290.8 | 834.0 | 63.4% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.095 | 103.6 | 2341.2 | 22.8% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.044 | 48.4 | 5011.8 | 10.5% |
+| `to_semistructured` | other | 1 | 0.005 | 5002.3 | 48.5 | 1.2% |
+| `SFC::reorder` | other | 1 | 0.002 | 2399.7 | 101.1 | 0.6% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.002 | 734.2 | 330.3 | 0.5% |
+| `sscvfem::build_scatter` | setup | 1 | 0.002 | 1981.7 | 122.4 | 0.5% |
+| `create_dual_graph` | other | 1 | 0.001 | 873.6 | 277.6 | 0.2% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 56.1 | 4322.9 | 0.1% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 42.7 | 5673.2 | 0.1% |
+| `create_n2e` | other | 2 | 0.000 | 81.2 | 2987.1 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 104.2 | 2327.5 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 103.0 | 2354.4 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 76.5 | 3168.6 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 6248020.5 | 0.0% |
+| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.1 | 3559916.7 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 0.265 | 63.9% |
+| nodal gradient | 0.095 | 22.8% |
+| constraints | 0.045 | 10.8% |
+| other | 0.008 | 2.0% |
+| setup | 0.002 | 0.5% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 1.358 | 452520.0 |
+| `Function::apply` | 903 | 0.413 | 457.8 |
+| `CVFEMNavierStokes::apply` | 903 | 0.369 | 408.7 |
+| `sscvfem::apply` | 903 | 0.356 | 394.6 |
+| `sscvfem::nodal_q_grad` | 903 | 0.093 | 103.2 |
+| `Function::copy_constrained_dofs` | 903 | 0.044 | 48.7 |
+| `Function::gradient` | 7 | 0.004 | 584.4 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.004 | 1265.4 |
+
+
+### ss_L2_N16
+
+561,924 dof, 72 threads, nid006544. 0.919 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.585 | 647.7 | 867.5 | 63.7% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.173 | 189.2 | 2969.9 | 18.8% |
+| `to_semistructured` | other | 1 | 0.102 | 102323.0 | 5.5 | 11.1% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.042 | 46.3 | 12128.2 | 4.6% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.006 | 1847.7 | 304.1 | 0.6% |
+| `sscvfem::build_scatter` | setup | 1 | 0.005 | 4863.3 | 115.5 | 0.5% |
+| `SFC::reorder` | other | 1 | 0.003 | 2816.0 | 199.5 | 0.3% |
+| `create_dual_graph` | other | 1 | 0.002 | 2176.3 | 258.2 | 0.2% |
+| `create_n2e` | other | 2 | 0.000 | 219.9 | 2554.9 | 0.0% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 52.0 | 10804.3 | 0.0% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 43.2 | 13000.9 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 184.1 | 3053.0 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 182.9 | 3072.9 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 113.2 | 4961.8 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 16627040.5 | 0.0% |
+| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 0.0 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 0.590 | 64.3% |
+| nodal gradient | 0.173 | 18.8% |
+| other | 0.108 | 11.7% |
+| constraints | 0.043 | 4.7% |
+| setup | 0.005 | 0.5% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 2.823 | 940853.3 |
+| `Function::apply` | 903 | 0.814 | 901.2 |
+| `CVFEMNavierStokes::apply` | 903 | 0.771 | 853.9 |
+| `sscvfem::apply` | 903 | 0.755 | 836.5 |
+| `sscvfem::nodal_q_grad` | 903 | 0.170 | 188.0 |
+| `Function::copy_constrained_dofs` | 903 | 0.042 | 46.7 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.009 | 3068.4 |
+| `Function::gradient` | 7 | 0.008 | 1211.0 |
+
+
+### ss_L2_N24
+
+1,853,572 dof, 72 threads, nid006544. 2.779 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 2.015 | 2231.2 | 830.7 | 72.5% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 914 | 0.582 | 636.3 | 2912.9 | 20.9% |
+| `to_semistructured` | other | 1 | 0.080 | 79556.7 | 23.3 | 2.9% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.049 | 54.2 | 34176.5 | 1.8% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.019 | 6478.2 | 286.1 | 0.7% |
+| `sscvfem::build_scatter` | setup | 1 | 0.018 | 18083.1 | 102.5 | 0.7% |
+| `create_dual_graph` | other | 1 | 0.008 | 8065.7 | 229.8 | 0.3% |
+| `SFC::reorder` | other | 1 | 0.005 | 4955.5 | 374.0 | 0.2% |
+| `create_n2e` | other | 2 | 0.002 | 902.2 | 2054.6 | 0.1% |
+| `DirichletConditions::gradient` | constraints | 8 | 0.000 | 55.6 | 33313.1 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 441.8 | 4195.6 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 439.9 | 4213.8 | 0.0% |
+| `DirichletConditions::apply_value` | constraints | 8 | 0.000 | 42.7 | 43432.7 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 123.0 | 15066.8 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 20231490.9 | 0.0% |
+| `sscvfem::apply_transient` | transient | 8 | 0.000 | 0.1 | 31097788.1 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 2.034 | 73.2% |
+| nodal gradient | 0.582 | 20.9% |
+| other | 0.094 | 3.4% |
+| constraints | 0.051 | 1.8% |
+| setup | 0.018 | 0.7% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 9.239 | 3079800.0 |
+| `Function::apply` | 903 | 2.708 | 2999.3 |
+| `CVFEMNavierStokes::apply` | 903 | 2.657 | 2942.1 |
+| `sscvfem::apply` | 903 | 2.590 | 2867.9 |
+| `sscvfem::nodal_q_grad` | 903 | 0.573 | 634.1 |
+| `Function::copy_constrained_dofs` | 903 | 0.050 | 55.4 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.034 | 11445.7 |
+| `Function::gradient` | 8 | 0.027 | 3336.6 |
+
+
+### ss_L2_N32
+
+4,343,300 dof, 72 threads, nid006544. 7.170 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 5.077 | 5622.3 | 772.5 | 70.8% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 919 | 1.757 | 1911.5 | 2272.2 | 24.5% |
+| `to_semistructured` | other | 1 | 0.129 | 129339.0 | 33.6 | 1.8% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.080 | 88.5 | 49067.1 | 1.1% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.048 | 15854.8 | 273.9 | 0.7% |
+| `sscvfem::build_scatter` | setup | 1 | 0.043 | 42918.2 | 101.2 | 0.6% |
+| `create_dual_graph` | other | 1 | 0.020 | 19644.7 | 221.1 | 0.3% |
+| `SFC::reorder` | other | 1 | 0.008 | 8488.9 | 511.6 | 0.1% |
+| `create_n2e` | other | 2 | 0.005 | 2327.4 | 1866.1 | 0.1% |
+| `DirichletConditions::gradient` | constraints | 13 | 0.001 | 110.5 | 39293.6 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.001 | 771.8 | 5627.8 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.001 | 767.9 | 5655.7 | 0.0% |
+| `DirichletConditions::apply_value` | constraints | 13 | 0.001 | 44.8 | 96979.0 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 134.9 | 32185.7 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 51567603.9 | 0.0% |
+| `sscvfem::apply_transient` | transient | 13 | 0.000 | 0.1 | 47364628.5 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 5.125 | 71.5% |
+| nodal gradient | 1.757 | 24.5% |
+| other | 0.162 | 2.3% |
+| constraints | 0.084 | 1.2% |
+| setup | 0.043 | 0.6% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 21.012 | 7003900.0 |
+| `Function::apply` | 903 | 7.074 | 7833.6 |
+| `CVFEMNavierStokes::apply` | 903 | 6.990 | 7740.8 |
+| `sscvfem::apply` | 903 | 6.806 | 7537.6 |
+| `sscvfem::nodal_q_grad` | 903 | 1.725 | 1909.8 |
+| `Function::gradient` | 13 | 0.102 | 7822.2 |
+| `CVFEMNavierStokes::gradient` | 13 | 0.100 | 7707.6 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.085 | 28413.9 |
+
+
+### ss_L4_N4
+
+75,140 dof, 72 threads, nid006544. 0.417 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 1505 | 0.162 | 107.5 | 699.1 | 38.8% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 1525 | 0.093 | 61.2 | 1228.2 | 22.4% |
+| `to_semistructured` | other | 1 | 0.087 | 86678.7 | 0.9 | 20.8% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 1505 | 0.069 | 46.1 | 1629.5 | 16.7% |
+| `SFC::reorder` | other | 1 | 0.002 | 2363.7 | 31.8 | 0.6% |
+| `sscvfem::block_diag` | element sweep | 5 | 0.001 | 234.9 | 319.9 | 0.3% |
+| `DirichletConditions::apply_value` | constraints | 15 | 0.001 | 44.1 | 1703.6 | 0.2% |
+| `DirichletConditions::gradient` | constraints | 15 | 0.001 | 43.7 | 1719.7 | 0.2% |
+| `sscvfem::build_scatter` | setup | 1 | 0.000 | 351.9 | 213.5 | 0.1% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 83.4 | 900.5 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 1505 | 0.000 | 0.0 | 1817303.4 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 47.7 | 1575.8 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 46.3 | 1624.5 | 0.0% |
+| `create_dual_graph` | other | 1 | 0.000 | 33.9 | 2219.4 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 3.9 | 19100.6 | 0.0% |
+| `sscvfem::apply_transient` | transient | 15 | 0.000 | 0.0 | 2363700.8 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 0.163 | 39.1% |
+| nodal gradient | 0.093 | 22.4% |
+| other | 0.089 | 21.4% |
+| constraints | 0.071 | 17.0% |
+| setup | 0.000 | 0.1% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 5 | 0.970 | 193909.0 |
+| `Function::apply` | 1505 | 0.343 | 227.8 |
+| `CVFEMNavierStokes::apply` | 1505 | 0.273 | 181.2 |
+| `sscvfem::apply` | 1505 | 0.255 | 169.1 |
+| `sscvfem::nodal_q_grad` | 1505 | 0.092 | 61.2 |
+| `Function::copy_constrained_dofs` | 1505 | 0.070 | 46.3 |
+| `Function::gradient` | 15 | 0.005 | 303.3 |
+| `CVFEMNavierStokes::gradient` | 15 | 0.004 | 258.6 |
+
+
+### ss_L4_N6
+
+242,500 dof, 72 threads, nid006544. 0.486 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.238 | 263.4 | 920.6 | 48.9% |
+| `to_semistructured` | other | 1 | 0.112 | 112135.0 | 2.2 | 23.1% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.090 | 98.3 | 2466.9 | 18.5% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.040 | 44.7 | 5423.6 | 8.3% |
+| `SFC::reorder` | other | 1 | 0.002 | 2131.0 | 113.8 | 0.4% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.002 | 670.4 | 361.7 | 0.4% |
+| `sscvfem::build_scatter` | setup | 1 | 0.001 | 1016.1 | 238.6 | 0.2% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 43.3 | 5601.8 | 0.1% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 42.1 | 5765.0 | 0.1% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 140.9 | 1721.0 | 0.0% |
+| `create_dual_graph` | other | 1 | 0.000 | 108.0 | 2245.3 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 104.2 | 2327.5 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 103.0 | 2354.4 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 5669496.5 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 10.7 | 22602.6 | 0.0% |
+| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 7119818.5 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 0.240 | 49.3% |
+| other | 0.114 | 23.5% |
+| nodal gradient | 0.090 | 18.5% |
+| constraints | 0.041 | 8.5% |
+| setup | 0.001 | 0.2% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 1.314 | 437993.3 |
+| `Function::apply` | 903 | 0.381 | 421.9 |
+| `CVFEMNavierStokes::apply` | 903 | 0.340 | 376.5 |
+| `sscvfem::apply` | 903 | 0.327 | 362.0 |
+| `sscvfem::nodal_q_grad` | 903 | 0.089 | 98.0 |
+| `Function::copy_constrained_dofs` | 903 | 0.041 | 45.0 |
+| `Function::gradient` | 7 | 0.004 | 586.6 |
+| `CVFEMNavierStokes::gradient` | 7 | 0.004 | 542.2 |
 
 
 ### ss_L4_N8
 
-561,924 dof, 72 threads, nid006558. 0.845 s in non-container scopes.
+561,924 dof, 72 threads, nid006544. 0.807 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.522 | 577.6 | 972.9 | 61.8% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.195 | 213.6 | 2631.2 | 23.1% |
-| `to_semistructured` | other | 1 | 0.077 | 77184.2 | 7.3 | 9.1% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.040 | 43.8 | 12833.5 | 4.7% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.005 | 1696.8 | 331.2 | 0.6% |
-| `sscvfem::build_scatter` | setup | 1 | 0.003 | 2527.7 | 222.3 | 0.3% |
-| `SFC::reorder` | other | 1 | 0.002 | 2229.0 | 252.1 | 0.3% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 44.0 | 12769.5 | 0.0% |
-| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 40.8 | 13759.9 | 0.0% |
-| `create_dual_graph` | other | 1 | 0.000 | 256.3 | 2192.4 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 181.9 | 3089.0 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 180.0 | 3121.7 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 102.8 | 5468.4 | 0.0% |
-| `create_n2e` | other | 2 | 0.000 | 25.4 | 22130.3 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 11823693.9 | 0.0% |
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.534 | 591.4 | 950.1 | 66.2% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.157 | 172.1 | 3264.6 | 19.5% |
+| `to_semistructured` | other | 1 | 0.063 | 63309.4 | 8.9 | 7.8% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.041 | 45.6 | 12333.7 | 5.1% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.005 | 1737.4 | 323.4 | 0.6% |
+| `sscvfem::build_scatter` | setup | 1 | 0.003 | 2548.2 | 220.5 | 0.3% |
+| `SFC::reorder` | other | 1 | 0.002 | 2231.6 | 251.8 | 0.3% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 45.7 | 12302.9 | 0.0% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 45.2 | 12442.1 | 0.0% |
+| `create_dual_graph` | other | 1 | 0.000 | 258.7 | 2172.2 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 186.4 | 3013.9 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 185.3 | 3033.3 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 112.8 | 4982.8 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 25.7 | 21823.0 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 12898550.6 | 0.0% |
 | `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 16498131.4 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 0.527 | 62.4% |
-| nodal gradient | 0.195 | 23.1% |
-| other | 0.080 | 9.4% |
-| constraints | 0.041 | 4.8% |
+| element sweep | 0.539 | 66.8% |
+| nodal gradient | 0.157 | 19.5% |
+| other | 0.066 | 8.2% |
+| constraints | 0.042 | 5.2% |
 | setup | 0.003 | 0.3% |
 | transient | 0.000 | 0.0% |
 
@@ -897,46 +902,46 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 3 | 2.732 | 910626.7 |
-| `Function::apply` | 903 | 0.770 | 852.9 |
-| `CVFEMNavierStokes::apply` | 903 | 0.730 | 808.3 |
-| `sscvfem::apply` | 903 | 0.715 | 791.3 |
-| `sscvfem::nodal_q_grad` | 903 | 0.192 | 213.1 |
-| `Function::copy_constrained_dofs` | 903 | 0.040 | 44.0 |
-| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.009 | 2884.6 |
-| `Function::gradient` | 7 | 0.007 | 1007.5 |
+| `BiCGStab::apply` | 3 | 2.760 | 919950.0 |
+| `Function::apply` | 903 | 0.747 | 827.1 |
+| `CVFEMNavierStokes::apply` | 903 | 0.705 | 780.6 |
+| `sscvfem::apply` | 903 | 0.689 | 763.0 |
+| `sscvfem::nodal_q_grad` | 903 | 0.154 | 170.9 |
+| `Function::copy_constrained_dofs` | 903 | 0.041 | 45.9 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.009 | 2870.8 |
+| `Function::gradient` | 7 | 0.007 | 1039.5 |
 
 
 ### ss_L4_N12
 
-1,853,572 dof, 72 threads, nid006558. 2.583 s in non-container scopes.
+1,853,572 dof, 72 threads, nid006544. 0.892 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 1.779 | 1970.0 | 940.9 | 68.9% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.630 | 689.5 | 2688.1 | 24.4% |
-| `to_semistructured` | other | 1 | 0.096 | 96316.3 | 19.2 | 3.7% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.045 | 49.7 | 37282.8 | 1.7% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.018 | 6022.5 | 307.8 | 0.7% |
-| `sscvfem::build_scatter` | setup | 1 | 0.010 | 9560.8 | 193.9 | 0.4% |
-| `SFC::reorder` | other | 1 | 0.003 | 2576.8 | 719.3 | 0.1% |
-| `create_dual_graph` | other | 1 | 0.001 | 867.1 | 2137.6 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.000 | 460.4 | 4026.1 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.000 | 458.0 | 4047.1 | 0.0% |
-| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 53.2 | 34840.6 | 0.0% |
-| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 42.0 | 44101.3 | 0.0% |
-| `create_n2e` | other | 2 | 0.000 | 82.6 | 22437.1 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 119.9 | 15456.1 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 23093184.2 | 0.0% |
-| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.1 | 27210564.6 | 0.0% |
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 310 | 0.630 | 2033.6 | 911.5 | 70.7% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 315 | 0.170 | 540.1 | 3431.8 | 19.1% |
+| `to_semistructured` | other | 1 | 0.046 | 46132.3 | 40.2 | 5.2% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 310 | 0.018 | 58.6 | 31642.1 | 2.0% |
+| `sscvfem::block_diag` | element sweep | 2 | 0.012 | 6092.6 | 304.2 | 1.4% |
+| `sscvfem::build_scatter` | setup | 1 | 0.009 | 9438.5 | 196.4 | 1.1% |
+| `SFC::reorder` | other | 1 | 0.003 | 2612.3 | 709.5 | 0.3% |
+| `create_dual_graph` | other | 1 | 0.001 | 962.3 | 1926.3 | 0.1% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 431.5 | 4295.3 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 428.7 | 4323.9 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 84.5 | 21930.7 | 0.0% |
+| `DirichletConditions::gradient` | constraints | 3 | 0.000 | 52.5 | 35284.9 | 0.0% |
+| `DirichletConditions::apply_value` | constraints | 3 | 0.000 | 41.8 | 44341.0 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 116.6 | 15898.6 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 310 | 0.000 | 0.1 | 23862132.9 | 0.0% |
+| `sscvfem::apply_transient` | transient | 3 | 0.000 | 0.0 | 0.0 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 1.797 | 69.6% |
-| nodal gradient | 0.630 | 24.4% |
-| other | 0.100 | 3.9% |
-| constraints | 0.047 | 1.8% |
-| setup | 0.010 | 0.4% |
+| element sweep | 0.643 | 72.1% |
+| nodal gradient | 0.170 | 19.1% |
+| other | 0.050 | 5.6% |
+| constraints | 0.019 | 2.2% |
+| setup | 0.009 | 1.1% |
 | transient | 0.000 | 0.0% |
 
 Containers, listed apart because the rows above are inside them and adding
@@ -944,46 +949,46 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 3 | 8.825 | 2941723.3 |
-| `Function::apply` | 903 | 2.516 | 2786.0 |
-| `CVFEMNavierStokes::apply` | 903 | 2.469 | 2734.0 |
-| `sscvfem::apply` | 903 | 2.404 | 2662.5 |
-| `sscvfem::nodal_q_grad` | 903 | 0.623 | 690.1 |
-| `Function::copy_constrained_dofs` | 903 | 0.046 | 50.5 |
-| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.033 | 10971.7 |
-| `Function::gradient` | 7 | 0.020 | 2823.0 |
+| `BiCGStab::apply` | 2 | 3.059 | 1529570.0 |
+| `Function::apply` | 310 | 0.836 | 2696.9 |
+| `CVFEMNavierStokes::apply` | 310 | 0.817 | 2635.8 |
+| `sscvfem::apply` | 310 | 0.795 | 2566.0 |
+| `sscvfem::nodal_q_grad` | 310 | 0.164 | 530.1 |
+| `CVFEMNavierStokes::hessian_block_diag` | 2 | 0.022 | 10896.8 |
+| `Function::copy_constrained_dofs` | 310 | 0.019 | 59.7 |
+| `Function::gradient` | 3 | 0.011 | 3739.0 |
 
 
 ### ss_L4_N16
 
-4,343,300 dof, 72 threads, nid006558. 6.089 s in non-container scopes.
+4,343,300 dof, 72 threads, nid006544. 5.872 s in non-container scopes.
 
 | scope | kind | calls | seconds | us/call | MDOF/s | share |
 |---|---|---|---|---|---|---|
-| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 4.259 | 4716.4 | 920.9 | 69.9% |
-| `sscvfem::nodal_grad_strided` | nodal gradient | 916 | 1.630 | 1779.0 | 2441.4 | 26.8% |
-| `to_semistructured` | other | 1 | 0.070 | 70184.5 | 61.9 | 1.2% |
-| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.055 | 61.0 | 71230.2 | 0.9% |
-| `sscvfem::block_diag` | element sweep | 3 | 0.042 | 13980.7 | 310.7 | 0.7% |
-| `sscvfem::build_scatter` | setup | 1 | 0.025 | 24791.7 | 175.2 | 0.4% |
-| `SFC::reorder` | other | 1 | 0.003 | 2902.8 | 1496.3 | 0.0% |
-| `create_dual_graph` | other | 1 | 0.002 | 2110.0 | 2058.4 | 0.0% |
-| `Function::constraints_mask` | constraints | 1 | 0.001 | 775.8 | 5598.4 | 0.0% |
-| `DirichletConditions::mask` | constraints | 1 | 0.001 | 773.4 | 5615.6 | 0.0% |
-| `DirichletConditions::gradient` | constraints | 10 | 0.001 | 71.7 | 60602.6 | 0.0% |
-| `DirichletConditions::apply_value` | constraints | 10 | 0.000 | 41.8 | 103979.1 | 0.0% |
-| `create_n2e` | other | 2 | 0.000 | 203.3 | 21369.0 | 0.0% |
-| `DirichletConditions::apply` | constraints | 1 | 0.000 | 149.5 | 29054.5 | 0.0% |
-| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 56529420.7 | 0.0% |
-| `sscvfem::apply_transient` | transient | 10 | 0.000 | 0.2 | 26024458.8 | 0.0% |
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 4.389 | 4860.1 | 893.7 | 74.7% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 916 | 1.287 | 1405.4 | 3090.4 | 21.9% |
+| `to_semistructured` | other | 1 | 0.066 | 66133.5 | 65.7 | 1.1% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.056 | 62.5 | 69525.9 | 1.0% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.041 | 13544.7 | 320.7 | 0.7% |
+| `sscvfem::build_scatter` | setup | 1 | 0.024 | 24306.3 | 178.7 | 0.4% |
+| `SFC::reorder` | other | 1 | 0.003 | 3034.8 | 1431.2 | 0.1% |
+| `create_dual_graph` | other | 1 | 0.002 | 2166.5 | 2004.7 | 0.0% |
+| `DirichletConditions::gradient` | constraints | 10 | 0.001 | 78.9 | 55069.9 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.001 | 776.3 | 5594.9 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.001 | 774.9 | 5605.3 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 237.9 | 18253.6 | 0.0% |
+| `DirichletConditions::apply_value` | constraints | 10 | 0.000 | 43.0 | 101094.0 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 126.8 | 34242.6 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 50000190.0 | 0.0% |
+| `sscvfem::apply_transient` | transient | 10 | 0.000 | 0.1 | 45542816.5 | 0.0% |
 
 | kind | seconds | share |
 |---|---|---|
-| element sweep | 4.301 | 70.6% |
-| nodal gradient | 1.630 | 26.8% |
-| other | 0.076 | 1.2% |
-| constraints | 0.058 | 1.0% |
-| setup | 0.025 | 0.4% |
+| element sweep | 4.429 | 75.4% |
+| nodal gradient | 1.287 | 21.9% |
+| other | 0.072 | 1.2% |
+| constraints | 0.059 | 1.0% |
+| setup | 0.024 | 0.4% |
 | transient | 0.000 | 0.0% |
 
 Containers, listed apart because the rows above are inside them and adding
@@ -991,14 +996,249 @@ both would count the same seconds twice:
 
 | scope | calls | seconds | us/call |
 |---|---|---|---|
-| `BiCGStab::apply` | 3 | 19.608 | 6535933.3 |
-| `Function::apply` | 903 | 6.111 | 6767.9 |
-| `CVFEMNavierStokes::apply` | 903 | 6.052 | 6702.6 |
-| `sscvfem::apply` | 903 | 5.874 | 6504.5 |
-| `sscvfem::nodal_q_grad` | 903 | 1.610 | 1783.4 |
-| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.079 | 26266.7 |
-| `Function::gradient` | 10 | 0.065 | 6524.1 |
-| `CVFEMNavierStokes::gradient` | 10 | 0.064 | 6448.6 |
+| `BiCGStab::apply` | 3 | 19.718 | 6572766.7 |
+| `Function::apply` | 903 | 5.897 | 6530.7 |
+| `CVFEMNavierStokes::apply` | 903 | 5.837 | 6463.6 |
+| `sscvfem::apply` | 903 | 5.657 | 6264.1 |
+| `sscvfem::nodal_q_grad` | 903 | 1.264 | 1399.3 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.077 | 25618.0 |
+| `Function::gradient` | 10 | 0.070 | 6975.0 |
+| `CVFEMNavierStokes::gradient` | 10 | 0.069 | 6892.1 |
+
+
+### ss_L8p_N2
+
+75,140 dof, 72 threads, nid006544. 0.296 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.176 | 194.8 | 385.8 | 59.3% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 917 | 0.073 | 79.9 | 940.3 | 24.7% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.040 | 43.8 | 1715.4 | 13.3% |
+| `to_semistructured` | other | 1 | 0.003 | 2599.0 | 28.9 | 0.9% |
+| `SFC::reorder` | other | 1 | 0.002 | 2242.1 | 33.5 | 0.8% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.001 | 444.4 | 169.1 | 0.4% |
+| `DirichletConditions::gradient` | constraints | 11 | 0.000 | 42.9 | 1753.5 | 0.2% |
+| `DirichletConditions::apply_value` | constraints | 11 | 0.000 | 41.1 | 1828.5 | 0.2% |
+| `sscvfem::build_scatter` | setup | 2 | 0.000 | 165.8 | 453.1 | 0.1% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 110.6 | 679.2 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 47.0 | 1599.8 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 46.0 | 1633.0 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 1990133.7 | 0.0% |
+| `create_dual_graph` | other | 1 | 0.000 | 6.2 | 12121.5 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 0.7 | 105053.4 | 0.0% |
+| `sscvfem::apply_transient` | transient | 11 | 0.000 | 0.0 | 3466753.9 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 0.177 | 59.8% |
+| nodal gradient | 0.073 | 24.7% |
+| constraints | 0.041 | 13.7% |
+| other | 0.005 | 1.6% |
+| setup | 0.000 | 0.1% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 0.674 | 224648.0 |
+| `Function::apply` | 903 | 0.300 | 331.7 |
+| `CVFEMNavierStokes::apply` | 903 | 0.259 | 287.2 |
+| `sscvfem::apply` | 903 | 0.248 | 275.0 |
+| `sscvfem::nodal_q_grad` | 903 | 0.072 | 79.7 |
+| `Function::copy_constrained_dofs` | 903 | 0.040 | 44.1 |
+| `Function::gradient` | 11 | 0.005 | 431.8 |
+| `CVFEMNavierStokes::gradient` | 11 | 0.004 | 387.8 |
+
+
+### ss_L8p_N3
+
+242,500 dof, 72 threads, nid006544. 0.490 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.312 | 345.5 | 701.9 | 63.7% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.076 | 83.3 | 2912.5 | 15.5% |
+| `to_semistructured` | other | 1 | 0.055 | 55229.9 | 4.4 | 11.3% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.040 | 43.8 | 5531.8 | 8.1% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.003 | 889.9 | 272.5 | 0.5% |
+| `SFC::reorder` | other | 1 | 0.002 | 2030.1 | 119.5 | 0.4% |
+| `sscvfem::build_scatter` | setup | 2 | 0.001 | 532.9 | 455.1 | 0.2% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 44.5 | 5451.6 | 0.1% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 41.6 | 5835.9 | 0.1% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 104.4 | 2322.2 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 103.0 | 2354.4 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 98.5 | 2462.8 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 5634717.0 | 0.0% |
+| `create_dual_graph` | other | 1 | 0.000 | 15.7 | 15410.9 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 1.9 | 127139.7 | 0.0% |
+| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 7119818.5 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 0.315 | 64.3% |
+| nodal gradient | 0.076 | 15.5% |
+| other | 0.057 | 11.7% |
+| constraints | 0.040 | 8.3% |
+| setup | 0.001 | 0.2% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 1.358 | 452640.0 |
+| `Function::apply` | 903 | 0.440 | 487.5 |
+| `CVFEMNavierStokes::apply` | 903 | 0.400 | 442.9 |
+| `sscvfem::apply` | 903 | 0.388 | 429.1 |
+| `sscvfem::nodal_q_grad` | 903 | 0.075 | 83.0 |
+| `Function::copy_constrained_dofs` | 903 | 0.040 | 44.1 |
+| `CVFEMNavierStokes::initialize` | 1 | 0.004 | 4443.9 |
+| `Function::gradient` | 7 | 0.004 | 617.0 |
+
+
+### ss_L8p_N4
+
+561,924 dof, 72 threads, nid006544. 0.702 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 0.565 | 625.8 | 897.9 | 80.5% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 914 | 0.082 | 89.3 | 6289.8 | 11.6% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.040 | 44.7 | 12565.2 | 5.8% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.005 | 1805.6 | 311.2 | 0.8% |
+| `to_semistructured` | other | 1 | 0.003 | 3222.2 | 174.4 | 0.5% |
+| `sscvfem::build_scatter` | setup | 2 | 0.003 | 1354.5 | 414.9 | 0.4% |
+| `SFC::reorder` | other | 1 | 0.002 | 2219.9 | 253.1 | 0.3% |
+| `DirichletConditions::gradient` | constraints | 8 | 0.000 | 44.1 | 12739.9 | 0.1% |
+| `DirichletConditions::apply_value` | constraints | 8 | 0.000 | 42.1 | 13362.9 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 185.3 | 3033.3 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 184.3 | 3049.0 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 122.8 | 4576.5 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.0 | 12302100.8 | 0.0% |
+| `create_dual_graph` | other | 1 | 0.000 | 32.7 | 17203.5 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 5.0 | 112232.2 | 0.0% |
+| `sscvfem::apply_transient` | transient | 8 | 0.000 | 0.1 | 9427523.5 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 0.571 | 81.3% |
+| nodal gradient | 0.082 | 11.6% |
+| constraints | 0.042 | 5.9% |
+| other | 0.005 | 0.8% |
+| setup | 0.003 | 0.4% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 2.681 | 893753.3 |
+| `Function::apply` | 903 | 0.702 | 777.0 |
+| `CVFEMNavierStokes::apply` | 903 | 0.660 | 731.3 |
+| `sscvfem::apply` | 903 | 0.646 | 715.2 |
+| `sscvfem::nodal_q_grad` | 903 | 0.080 | 88.7 |
+| `Function::copy_constrained_dofs` | 903 | 0.041 | 45.0 |
+| `CVFEMNavierStokes::initialize` | 1 | 0.010 | 10219.1 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.008 | 2792.2 |
+
+
+### ss_L8p_N6
+
+1,853,572 dof, 72 threads, nid006544. 2.106 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 1.749 | 1937.3 | 956.8 | 83.1% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 919 | 0.224 | 243.8 | 7602.9 | 10.6% |
+| `to_semistructured` | other | 1 | 0.053 | 53266.8 | 34.8 | 2.5% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.046 | 50.4 | 36751.5 | 2.2% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.019 | 6386.0 | 290.3 | 0.9% |
+| `sscvfem::build_scatter` | setup | 2 | 0.010 | 5101.3 | 363.4 | 0.5% |
+| `SFC::reorder` | other | 1 | 0.002 | 2216.8 | 836.1 | 0.1% |
+| `DirichletConditions::gradient` | constraints | 13 | 0.001 | 51.3 | 36108.5 | 0.0% |
+| `DirichletConditions::apply_value` | constraints | 13 | 0.001 | 42.0 | 44134.4 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.000 | 417.9 | 4434.9 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.000 | 417.0 | 4445.1 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 115.6 | 16029.8 | 0.0% |
+| `create_dual_graph` | other | 1 | 0.000 | 112.5 | 16471.2 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 24719439.8 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 10.5 | 176692.2 | 0.0% |
+| `sscvfem::apply_transient` | transient | 13 | 0.000 | 0.0 | 0.0 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 1.769 | 84.0% |
+| nodal gradient | 0.224 | 10.6% |
+| other | 0.056 | 2.6% |
+| constraints | 0.048 | 2.3% |
+| setup | 0.010 | 0.5% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 8.532 | 2843850.0 |
+| `Function::apply` | 903 | 2.090 | 2315.0 |
+| `CVFEMNavierStokes::apply` | 903 | 2.043 | 2262.3 |
+| `sscvfem::apply` | 903 | 1.971 | 2182.3 |
+| `sscvfem::nodal_q_grad` | 903 | 0.219 | 242.4 |
+| `Function::copy_constrained_dofs` | 903 | 0.046 | 51.3 |
+| `CVFEMNavierStokes::initialize` | 1 | 0.035 | 35189.9 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.032 | 10776.5 |
+
+
+### ss_L8p_N8
+
+4,343,300 dof, 72 threads, nid006544. 4.751 s in non-container scopes.
+
+| scope | kind | calls | seconds | us/call | MDOF/s | share |
+|---|---|---|---|---|---|---|
+| `sscvfem::apply_macro_local_hoisted` | element sweep | 903 | 4.088 | 4527.0 | 959.4 | 86.0% |
+| `sscvfem::nodal_grad_strided` | nodal gradient | 913 | 0.484 | 530.2 | 8191.1 | 10.2% |
+| `to_semistructured` | other | 1 | 0.055 | 54652.9 | 79.5 | 1.2% |
+| `DirichletConditions::copy_constrained_dofs` | constraints | 903 | 0.055 | 60.5 | 71768.1 | 1.2% |
+| `sscvfem::block_diag` | element sweep | 3 | 0.038 | 12642.5 | 343.5 | 0.8% |
+| `sscvfem::build_scatter` | setup | 2 | 0.027 | 13494.8 | 321.9 | 0.6% |
+| `SFC::reorder` | other | 1 | 0.002 | 2309.8 | 1880.4 | 0.0% |
+| `Function::constraints_mask` | constraints | 1 | 0.001 | 761.5 | 5703.5 | 0.0% |
+| `DirichletConditions::mask` | constraints | 1 | 0.001 | 759.4 | 5719.7 | 0.0% |
+| `DirichletConditions::gradient` | constraints | 7 | 0.000 | 69.8 | 62204.8 | 0.0% |
+| `DirichletConditions::apply_value` | constraints | 7 | 0.000 | 43.3 | 100330.3 | 0.0% |
+| `create_dual_graph` | other | 1 | 0.000 | 258.2 | 16821.0 | 0.0% |
+| `DirichletConditions::apply` | constraints | 1 | 0.000 | 130.7 | 33243.0 | 0.0% |
+| `sscvfem::apply_transient_action` | transient | 903 | 0.000 | 0.1 | 43750152.3 | 0.0% |
+| `create_n2e` | other | 2 | 0.000 | 26.8 | 161929.9 | 0.0% |
+| `sscvfem::apply_transient` | transient | 7 | 0.000 | 0.0 | 127519618.8 | 0.0% |
+
+| kind | seconds | share |
+|---|---|---|
+| element sweep | 4.126 | 86.8% |
+| nodal gradient | 0.484 | 10.2% |
+| other | 0.057 | 1.2% |
+| constraints | 0.057 | 1.2% |
+| setup | 0.027 | 0.6% |
+| transient | 0.000 | 0.0% |
+
+Containers, listed apart because the rows above are inside them and adding
+both would count the same seconds twice:
+
+| scope | calls | seconds | us/call |
+|---|---|---|---|
+| `BiCGStab::apply` | 3 | 18.650 | 6216600.0 |
+| `Function::apply` | 903 | 4.811 | 5327.8 |
+| `CVFEMNavierStokes::apply` | 903 | 4.753 | 5263.1 |
+| `sscvfem::apply` | 903 | 4.565 | 5055.4 |
+| `sscvfem::nodal_q_grad` | 903 | 0.474 | 524.4 |
+| `CVFEMNavierStokes::initialize` | 1 | 0.088 | 88442.8 |
+| `CVFEMNavierStokes::hessian_block_diag` | 3 | 0.073 | 24279.2 |
+| `Function::copy_constrained_dofs` | 903 | 0.056 | 61.7 |
 
 
 ## Throughput against problem size
@@ -1012,11 +1252,11 @@ sizes are here to show where that begins rather than to be quoted.
 
 | run | dof | calls | seconds | MDOF/s |
 |---|---|---|---|---|
-| flat_N16 | 75,140 | 903 | 0.027 | 2540.0 |
-| flat_N24 | 242,500 | 903 | 0.034 | 6361.5 |
-| flat_N32 | 561,924 | 326 | 0.018 | 10208.4 |
-| flat_N48 | 1,853,572 | 903 | 0.163 | 10291.7 |
-| flat_N64 | 4,343,300 | 903 | 0.337 | 11646.1 |
+| flat_N16 | 75,140 | 903 | 0.027 | 2478.1 |
+| flat_N24 | 242,500 | 903 | 0.036 | 6123.5 |
+| flat_N32 | 561,924 | 326 | 0.018 | 9911.0 |
+| flat_N48 | 1,853,572 | 903 | 0.168 | 9969.0 |
+| flat_N64 | 4,343,300 | 903 | 0.350 | 11192.8 |
 | ss_L2_N8 | 75,140 | -- | -- | -- |
 | ss_L2_N12 | 242,500 | -- | -- | -- |
 | ss_L2_N16 | 561,924 | -- | -- | -- |
@@ -1027,16 +1267,21 @@ sizes are here to show where that begins rather than to be quoted.
 | ss_L4_N8 | 561,924 | -- | -- | -- |
 | ss_L4_N12 | 1,853,572 | -- | -- | -- |
 | ss_L4_N16 | 4,343,300 | -- | -- | -- |
+| ss_L8p_N2 | 75,140 | -- | -- | -- |
+| ss_L8p_N3 | 242,500 | -- | -- | -- |
+| ss_L8p_N4 | 561,924 | -- | -- | -- |
+| ss_L8p_N6 | 1,853,572 | -- | -- | -- |
+| ss_L8p_N8 | 4,343,300 | -- | -- | -- |
 
 ### `cvfem_hex8_ns_steady::apply_boundary_scs_residual`
 
 | run | dof | calls | seconds | MDOF/s |
 |---|---|---|---|---|
-| flat_N16 | 75,140 | 7 | 0.002 | 343.3 |
-| flat_N24 | 242,500 | 7 | 0.003 | 531.6 |
-| flat_N32 | 561,924 | 3 | 0.005 | 309.2 |
-| flat_N48 | 1,853,572 | 11 | 0.014 | 1487.5 |
-| flat_N64 | 4,343,300 | 7 | 0.024 | 1264.9 |
+| flat_N16 | 75,140 | 7 | 0.002 | 265.5 |
+| flat_N24 | 242,500 | 7 | 0.003 | 523.8 |
+| flat_N32 | 561,924 | 3 | 0.006 | 300.8 |
+| flat_N48 | 1,853,572 | 11 | 0.014 | 1435.4 |
+| flat_N64 | 4,343,300 | 7 | 0.025 | 1240.2 |
 | ss_L2_N8 | 75,140 | -- | -- | -- |
 | ss_L2_N12 | 242,500 | -- | -- | -- |
 | ss_L2_N16 | 561,924 | -- | -- | -- |
@@ -1047,16 +1292,21 @@ sizes are here to show where that begins rather than to be quoted.
 | ss_L4_N8 | 561,924 | -- | -- | -- |
 | ss_L4_N12 | 1,853,572 | -- | -- | -- |
 | ss_L4_N16 | 4,343,300 | -- | -- | -- |
+| ss_L8p_N2 | 75,140 | -- | -- | -- |
+| ss_L8p_N3 | 242,500 | -- | -- | -- |
+| ss_L8p_N4 | 561,924 | -- | -- | -- |
+| ss_L8p_N6 | 1,853,572 | -- | -- | -- |
+| ss_L8p_N8 | 4,343,300 | -- | -- | -- |
 
 ### `cvfem_hex8_ns_steady::apply_jacobian_action_packed`
 
 | run | dof | calls | seconds | MDOF/s |
 |---|---|---|---|---|
-| flat_N16 | 75,140 | 903 | 0.417 | 162.5 |
-| flat_N24 | 242,500 | 903 | 0.413 | 530.5 |
-| flat_N32 | 561,924 | 326 | 0.148 | 1240.3 |
-| flat_N48 | 1,853,572 | 903 | 1.502 | 1114.1 |
-| flat_N64 | 4,343,300 | 903 | 3.836 | 1022.5 |
+| flat_N16 | 75,140 | 903 | 0.417 | 162.9 |
+| flat_N24 | 242,500 | 903 | 0.422 | 519.4 |
+| flat_N32 | 561,924 | 326 | 0.152 | 1205.5 |
+| flat_N48 | 1,853,572 | 903 | 1.521 | 1100.2 |
+| flat_N64 | 4,343,300 | 903 | 3.851 | 1018.5 |
 | ss_L2_N8 | 75,140 | -- | -- | -- |
 | ss_L2_N12 | 242,500 | -- | -- | -- |
 | ss_L2_N16 | 561,924 | -- | -- | -- |
@@ -1067,16 +1317,21 @@ sizes are here to show where that begins rather than to be quoted.
 | ss_L4_N8 | 561,924 | -- | -- | -- |
 | ss_L4_N12 | 1,853,572 | -- | -- | -- |
 | ss_L4_N16 | 4,343,300 | -- | -- | -- |
+| ss_L8p_N2 | 75,140 | -- | -- | -- |
+| ss_L8p_N3 | 242,500 | -- | -- | -- |
+| ss_L8p_N4 | 561,924 | -- | -- | -- |
+| ss_L8p_N6 | 1,853,572 | -- | -- | -- |
+| ss_L8p_N8 | 4,343,300 | -- | -- | -- |
 
 ### `cvfem_hex8_ns_steady::apply_residual_packed`
 
 | run | dof | calls | seconds | MDOF/s |
 |---|---|---|---|---|
-| flat_N16 | 75,140 | 7 | 0.004 | 147.3 |
-| flat_N24 | 242,500 | 7 | 0.003 | 510.9 |
-| flat_N32 | 561,924 | 3 | 0.002 | 757.6 |
-| flat_N48 | 1,853,572 | 11 | 0.013 | 1547.6 |
-| flat_N64 | 4,343,300 | 7 | 0.021 | 1470.4 |
+| flat_N16 | 75,140 | 7 | 0.003 | 182.1 |
+| flat_N24 | 242,500 | 7 | 0.003 | 518.3 |
+| flat_N32 | 561,924 | 3 | 0.002 | 1084.6 |
+| flat_N48 | 1,853,572 | 11 | 0.013 | 1566.9 |
+| flat_N64 | 4,343,300 | 7 | 0.020 | 1500.3 |
 | ss_L2_N8 | 75,140 | -- | -- | -- |
 | ss_L2_N12 | 242,500 | -- | -- | -- |
 | ss_L2_N16 | 561,924 | -- | -- | -- |
@@ -1087,16 +1342,21 @@ sizes are here to show where that begins rather than to be quoted.
 | ss_L4_N8 | 561,924 | -- | -- | -- |
 | ss_L4_N12 | 1,853,572 | -- | -- | -- |
 | ss_L4_N16 | 4,343,300 | -- | -- | -- |
+| ss_L8p_N2 | 75,140 | -- | -- | -- |
+| ss_L8p_N3 | 242,500 | -- | -- | -- |
+| ss_L8p_N4 | 561,924 | -- | -- | -- |
+| ss_L8p_N6 | 1,853,572 | -- | -- | -- |
+| ss_L8p_N8 | 4,343,300 | -- | -- | -- |
 
 ### `cvfem_hex8_ns_steady::assemble_block_diag`
 
 | run | dof | calls | seconds | MDOF/s |
 |---|---|---|---|---|
-| flat_N16 | 75,140 | 3 | 0.016 | 14.4 |
-| flat_N24 | 242,500 | 3 | 0.017 | 41.8 |
-| flat_N32 | 561,924 | 2 | 0.010 | 109.8 |
-| flat_N48 | 1,853,572 | 3 | 0.032 | 176.2 |
-| flat_N64 | 4,343,300 | 3 | 0.069 | 188.7 |
+| flat_N16 | 75,140 | 3 | 0.016 | 14.3 |
+| flat_N24 | 242,500 | 3 | 0.017 | 44.1 |
+| flat_N32 | 561,924 | 2 | 0.009 | 123.3 |
+| flat_N48 | 1,853,572 | 3 | 0.030 | 185.5 |
+| flat_N64 | 4,343,300 | 3 | 0.067 | 193.6 |
 | ss_L2_N8 | 75,140 | -- | -- | -- |
 | ss_L2_N12 | 242,500 | -- | -- | -- |
 | ss_L2_N16 | 561,924 | -- | -- | -- |
@@ -1107,16 +1367,21 @@ sizes are here to show where that begins rather than to be quoted.
 | ss_L4_N8 | 561,924 | -- | -- | -- |
 | ss_L4_N12 | 1,853,572 | -- | -- | -- |
 | ss_L4_N16 | 4,343,300 | -- | -- | -- |
+| ss_L8p_N2 | 75,140 | -- | -- | -- |
+| ss_L8p_N3 | 242,500 | -- | -- | -- |
+| ss_L8p_N4 | 561,924 | -- | -- | -- |
+| ss_L8p_N6 | 1,853,572 | -- | -- | -- |
+| ss_L8p_N8 | 4,343,300 | -- | -- | -- |
 
 ### `cvfem_hex8_ns_steady::nodal_grad_strided`
 
 | run | dof | calls | seconds | MDOF/s |
 |---|---|---|---|---|
-| flat_N16 | 75,140 | 913 | 0.109 | 628.3 |
-| flat_N24 | 242,500 | 913 | 0.081 | 2736.5 |
-| flat_N32 | 561,924 | 331 | 0.062 | 2992.8 |
-| flat_N48 | 1,853,572 | 917 | 0.293 | 5804.4 |
-| flat_N64 | 4,343,300 | 913 | 0.734 | 5399.1 |
+| flat_N16 | 75,140 | 913 | 0.057 | 1193.8 |
+| flat_N24 | 242,500 | 913 | 0.057 | 3855.9 |
+| flat_N32 | 561,924 | 331 | 0.081 | 2284.4 |
+| flat_N48 | 1,853,572 | 917 | 0.330 | 5150.3 |
+| flat_N64 | 4,343,300 | 913 | 0.754 | 5262.6 |
 | ss_L2_N8 | 75,140 | -- | -- | -- |
 | ss_L2_N12 | 242,500 | -- | -- | -- |
 | ss_L2_N16 | 561,924 | -- | -- | -- |
@@ -1127,6 +1392,11 @@ sizes are here to show where that begins rather than to be quoted.
 | ss_L4_N8 | 561,924 | -- | -- | -- |
 | ss_L4_N12 | 1,853,572 | -- | -- | -- |
 | ss_L4_N16 | 4,343,300 | -- | -- | -- |
+| ss_L8p_N2 | 75,140 | -- | -- | -- |
+| ss_L8p_N3 | 242,500 | -- | -- | -- |
+| ss_L8p_N4 | 561,924 | -- | -- | -- |
+| ss_L8p_N6 | 1,853,572 | -- | -- | -- |
+| ss_L8p_N8 | 4,343,300 | -- | -- | -- |
 
 ### `sscvfem::apply_macro_local_hoisted`
 
@@ -1137,16 +1407,21 @@ sizes are here to show where that begins rather than to be quoted.
 | flat_N32 | 561,924 | -- | -- | -- |
 | flat_N48 | 1,853,572 | -- | -- | -- |
 | flat_N64 | 4,343,300 | -- | -- | -- |
-| ss_L2_N8 | 75,140 | 903 | 0.101 | 674.4 |
-| ss_L2_N12 | 242,500 | 903 | 0.256 | 855.5 |
-| ss_L2_N16 | 561,924 | 903 | 0.570 | 890.2 |
-| ss_L2_N24 | 1,853,572 | 903 | 1.929 | 867.9 |
-| ss_L2_N32 | 4,343,300 | 903 | 4.942 | 793.6 |
-| ss_L4_N4 | 75,140 | 1505 | 0.154 | 733.7 |
-| ss_L4_N6 | 242,500 | 903 | 0.235 | 931.9 |
-| ss_L4_N8 | 561,924 | 903 | 0.522 | 972.9 |
-| ss_L4_N12 | 1,853,572 | 903 | 1.779 | 940.9 |
-| ss_L4_N16 | 4,343,300 | 903 | 4.259 | 920.9 |
+| ss_L2_N8 | 75,140 | 903 | 0.102 | 665.9 |
+| ss_L2_N12 | 242,500 | 903 | 0.263 | 834.0 |
+| ss_L2_N16 | 561,924 | 903 | 0.585 | 867.5 |
+| ss_L2_N24 | 1,853,572 | 903 | 2.015 | 830.7 |
+| ss_L2_N32 | 4,343,300 | 903 | 5.077 | 772.5 |
+| ss_L4_N4 | 75,140 | 1505 | 0.162 | 699.1 |
+| ss_L4_N6 | 242,500 | 903 | 0.238 | 920.6 |
+| ss_L4_N8 | 561,924 | 903 | 0.534 | 950.1 |
+| ss_L4_N12 | 1,853,572 | 310 | 0.630 | 911.5 |
+| ss_L4_N16 | 4,343,300 | 903 | 4.389 | 893.7 |
+| ss_L8p_N2 | 75,140 | 903 | 0.176 | 385.8 |
+| ss_L8p_N3 | 242,500 | 903 | 0.312 | 701.9 |
+| ss_L8p_N4 | 561,924 | 903 | 0.565 | 897.9 |
+| ss_L8p_N6 | 1,853,572 | 903 | 1.749 | 956.8 |
+| ss_L8p_N8 | 4,343,300 | 903 | 4.088 | 959.4 |
 
 ### `sscvfem::block_diag`
 
@@ -1157,16 +1432,21 @@ sizes are here to show where that begins rather than to be quoted.
 | flat_N32 | 561,924 | -- | -- | -- |
 | flat_N48 | 1,853,572 | -- | -- | -- |
 | flat_N64 | 4,343,300 | -- | -- | -- |
-| ss_L2_N8 | 75,140 | 3 | 0.001 | 243.3 |
-| ss_L2_N12 | 242,500 | 3 | 0.002 | 319.5 |
-| ss_L2_N16 | 561,924 | 3 | 0.006 | 303.8 |
-| ss_L2_N24 | 1,853,572 | 3 | 0.020 | 282.5 |
-| ss_L2_N32 | 4,343,300 | 3 | 0.046 | 281.2 |
-| ss_L4_N4 | 75,140 | 5 | 0.001 | 321.3 |
-| ss_L4_N6 | 242,500 | 3 | 0.002 | 338.6 |
-| ss_L4_N8 | 561,924 | 3 | 0.005 | 331.2 |
-| ss_L4_N12 | 1,853,572 | 3 | 0.018 | 307.8 |
-| ss_L4_N16 | 4,343,300 | 3 | 0.042 | 310.7 |
+| ss_L2_N8 | 75,140 | 3 | 0.001 | 281.1 |
+| ss_L2_N12 | 242,500 | 3 | 0.002 | 330.3 |
+| ss_L2_N16 | 561,924 | 3 | 0.006 | 304.1 |
+| ss_L2_N24 | 1,853,572 | 3 | 0.019 | 286.1 |
+| ss_L2_N32 | 4,343,300 | 3 | 0.048 | 273.9 |
+| ss_L4_N4 | 75,140 | 5 | 0.001 | 319.9 |
+| ss_L4_N6 | 242,500 | 3 | 0.002 | 361.7 |
+| ss_L4_N8 | 561,924 | 3 | 0.005 | 323.4 |
+| ss_L4_N12 | 1,853,572 | 2 | 0.012 | 304.2 |
+| ss_L4_N16 | 4,343,300 | 3 | 0.041 | 320.7 |
+| ss_L8p_N2 | 75,140 | 3 | 0.001 | 169.1 |
+| ss_L8p_N3 | 242,500 | 3 | 0.003 | 272.5 |
+| ss_L8p_N4 | 561,924 | 3 | 0.005 | 311.2 |
+| ss_L8p_N6 | 1,853,572 | 3 | 0.019 | 290.3 |
+| ss_L8p_N8 | 4,343,300 | 3 | 0.038 | 343.5 |
 
 ### `sscvfem::nodal_grad_strided`
 
@@ -1177,22 +1457,27 @@ sizes are here to show where that begins rather than to be quoted.
 | flat_N32 | 561,924 | -- | -- | -- |
 | flat_N48 | 1,853,572 | -- | -- | -- |
 | flat_N64 | 4,343,300 | -- | -- | -- |
-| ss_L2_N8 | 75,140 | 913 | 0.065 | 1054.5 |
-| ss_L2_N12 | 242,500 | 913 | 0.117 | 1893.3 |
-| ss_L2_N16 | 561,924 | 913 | 0.216 | 2375.8 |
-| ss_L2_N24 | 1,853,572 | 916 | 0.773 | 2195.1 |
-| ss_L2_N32 | 4,343,300 | 919 | 2.198 | 1815.9 |
-| ss_L4_N4 | 75,140 | 1525 | 0.101 | 1132.3 |
-| ss_L4_N6 | 242,500 | 913 | 0.105 | 2102.1 |
-| ss_L4_N8 | 561,924 | 913 | 0.195 | 2631.2 |
-| ss_L4_N12 | 1,853,572 | 913 | 0.630 | 2688.1 |
-| ss_L4_N16 | 4,343,300 | 916 | 1.630 | 2441.4 |
+| ss_L2_N8 | 75,140 | 913 | 0.057 | 1197.0 |
+| ss_L2_N12 | 242,500 | 913 | 0.095 | 2341.2 |
+| ss_L2_N16 | 561,924 | 913 | 0.173 | 2969.9 |
+| ss_L2_N24 | 1,853,572 | 914 | 0.582 | 2912.9 |
+| ss_L2_N32 | 4,343,300 | 919 | 1.757 | 2272.2 |
+| ss_L4_N4 | 75,140 | 1525 | 0.093 | 1228.2 |
+| ss_L4_N6 | 242,500 | 913 | 0.090 | 2466.9 |
+| ss_L4_N8 | 561,924 | 913 | 0.157 | 3264.6 |
+| ss_L4_N12 | 1,853,572 | 315 | 0.170 | 3431.8 |
+| ss_L4_N16 | 4,343,300 | 916 | 1.287 | 3090.4 |
+| ss_L8p_N2 | 75,140 | 917 | 0.073 | 940.3 |
+| ss_L8p_N3 | 242,500 | 913 | 0.076 | 2912.5 |
+| ss_L8p_N4 | 561,924 | 914 | 0.082 | 6289.8 |
+| ss_L8p_N6 | 1,853,572 | 919 | 0.224 | 7602.9 |
+| ss_L8p_N8 | 4,343,300 | 913 | 0.484 | 8191.1 |
 
 
 ## Provenance
 
 | field | value |
 |---|---|
-| generated | 2026-09-11 10:33:36 |
-| configurations | 15 |
-| machines | nid006558 |
+| generated | 2026-09-12 09:12:59 |
+| configurations | 20 |
+| machines | nid006544 |
