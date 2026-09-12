@@ -518,6 +518,30 @@ namespace cvfem_ss {
     // hop the coarse space is unstructured HEX8, and the coarse ids must be read from the
     // *fine* semi-structured mesh's macro-corner slots rather than from the coarse mesh's
     // element array. Reading them the other way gave a transfer with relative error 1.14.
+    // The coarse connectivity a level needs, as plain arrays.
+    //
+    // Split out of galerkin_gid_from_spaces so the Galerkin path can be exercised without
+    // building two sfem::FunctionSpaces. Everything else in this file is already pure data --
+    // galerkin_init, galerkin_assemble, galerkin_build_node_reduce, galerkin_apply and
+    // galerkin_hop all take a GalerkinLevel and arrays -- and this was the one function that
+    // was not, which is what kept the element-wise assembly out of the test suite and left it
+    // checked only behind SFEM_GMG_CHECK=1 in the driver.
+    //
+    // rows[a][e] is the global coarse id of local coarse node a in macro-element e, which is
+    // exactly what a semi-structured mesh's own element table holds when the coarse space IS
+    // the fine one -- the q = 1 case, where the prolongation is the identity and the assembled
+    // operator must therefore reproduce the operator itself.
+    inline void galerkin_gid_from_rows(const std::vector<const smesh::idx_t *> &rows, const ptrdiff_t n_coarse,
+                                       GalerkinLevel &g) {
+        if ((int)rows.size() != g.nc)
+            SFEM_ERROR("galerkin_gid_from_rows: %d row pointers for %d coarse nodes per element\n",
+                       (int)rows.size(), g.nc);
+        g.n_coarse = n_coarse;
+        g.gid.assign((size_t)g.nmacro * (size_t)g.nc, 0);
+        for (ptrdiff_t e = 0; e < g.nmacro; ++e)
+            for (int a = 0; a < g.nc; ++a) g.gid[(size_t)e * g.nc + a] = rows[(size_t)a][e];
+    }
+
     inline void galerkin_gid_from_spaces(const std::shared_ptr<sfem::FunctionSpace> &from_space,  // coarse
                                          const std::shared_ptr<sfem::FunctionSpace> &to_space,    // fine, level 0
                                          GalerkinLevel                              &g) {
@@ -552,9 +576,7 @@ namespace cvfem_ss {
                                                                             k * to_level)];
         }
 
-        g.gid.assign((size_t)g.nmacro * (size_t)g.nc, 0);
-        for (ptrdiff_t e = 0; e < g.nmacro; ++e)
-            for (int a = 0; a < g.nc; ++a) g.gid[(size_t)e * g.nc + a] = rows[(size_t)a][e];
+        galerkin_gid_from_rows(rows, g.n_coarse, g);
     }
 
     // ------------------------------------------------------------------
