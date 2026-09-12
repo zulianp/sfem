@@ -1090,6 +1090,50 @@ operator once per linearization; matrix-free and inexact need no rebuild, becaus
 read the current state through `Function::update` and `inexact_update`. With that, all
 three take the same 747 applies and BSR reproduces the matrix-free answer exactly.
 
+### Is the BSR implementation any good?
+
+Two different answers for its two halves, and the measurement separates them cleanly.
+96-cube HEX8, 2738019 dof, Grace at 72 threads. The matrix is 24.6 M 3x3 blocks, so one
+apply moves 1.92 GB of values, indices and vectors.
+
+| | apply | GB/s | % of 500 GB/s | CG | assembly | solve | memory |
+|---|---|---|---|---|---|---|---|
+| BSR, f64 values | 4.758 ms | 403 | **81%** | 3.96 s | 2.75 s | 10.12 s | 1.77 GB |
+| BSR, f32 values | 2.661 ms | 387 | **77%** | 2.29 s | 2.75 s | 9.27 s | 0.88 GB |
+| inexact + packed | 2.757 ms | -- | -- | 2.37 s | **0.23 s** | **4.19 s** | 159 MB |
+
+**The apply is state of the art and has no headroom left in the kernel.** At 81% of
+this machine's peak memory bandwidth an SpMV is doing as well as an SpMV can; the only
+way to make it faster is to move fewer bytes, and that works exactly as predicted --
+halving the value width with `SFEM_ENABLE_MIXED_PRECISION=4` gives 1.79x and lands BSR
+*level with the packed stored tangent*, 2.66 ms against 2.76. Same iteration count, and
+the answer agrees to twelve digits. Nobody should be looking for a better BSR kernel
+here.
+
+**The assembly is not state of the art, by about sixty times.** It writes the same 1.77
+GB in 287 ms: **6.7 GB/s, 1.3% of peak**. The reason is visible in the generated
+scatter: per element it locates 8 rows, searches each for 8 columns, and then performs
+`8 x 8 x 3 x 3 = 576` `#pragma omp atomic update`. Over 884736 elements that is **509
+million contended read-modify-writes**, and they, not the bandwidth, are the cost.
+
+That is also the whole of why BSR loses here. With f32 values its linear solve is 2.29 s
+against partial assembly's 2.37 -- a dead heat -- and it still finishes in 9.27 s
+against 4.19, because it spends 2.75 s rebuilding the matrix that partial assembly
+rebuilds in 0.23.
+
+**What would fix it** is the technique this repository already uses for the matrix-free
+scatter, and already has plans machinery for: `plans/matrix_formats.py` carries
+`PackedAssemblyPass.ONE_PASS`/`TWO_PASS`, and the packed layout accumulates into
+thread-private storage with no atomic at all, reaching global memory only at the pack
+boundary. Applied to assembly it would replace most of those 509 million atomics with
+plain adds. Nothing here measures how much of the 2.75 s that recovers; the upper bound
+is large, since the kernel is running at one per cent of the bandwidth it would need.
+
+A second, cheaper lever is symmetry: the elastic Hessian is symmetric and
+`hessian_bcrs_sym` exists, but `neohookean_ogden` declares `matrix_formats=("bsr",
+"block_diag_sym")` and publishes no `bcrs_sym` kernel, so `SFEM_LINEAR_OP_TYPE=BSR_SYM`
+has nothing to dispatch to on this material.
+
 ### What the first version of these driver numbers got wrong
 
 The first three versions of this table were measured on a mis-constrained problem, and
