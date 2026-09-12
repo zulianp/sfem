@@ -948,16 +948,30 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
             // Once per macro-element, from its first micro-element.
+            // Micro-cell 0's corners, hoisted: the geometry AND the coordinates the
+            // Rhie-Chow term differences.
+            //
+            // The lattice inside a macro element is uniform, so every micro-cell is congruent
+            // to cell 0 and one adjugate serves all of them -- that is what the action does.
+            // This used to hoist the adjugate but then hand the Rhie-Chow struct each cell's
+            // OWN coordinates, and the two agree only to the precision the node positions are
+            // stored in. smesh::geom_t is float32, so the block diagonal disagreed with the
+            // action it is supposed to be the diagonal of by 4.23e-08 -- eight orders above
+            // round-off, and invisible until the q-independent consistency gate looked.
+            //
+            // Only DIFFERENCES of these are taken (d = x_j - x_i), so cell 0's coordinates are
+            // exact for the purpose, not an approximation. The boundary closure below still
+            // gets each cell's real position, because it tests where the cell actually is.
             scalar_t madj[9], mdet;
+            scalar_t c0x[8], c0y[8], c0z[8];
             {
-                scalar_t ex[8], ey[8], ez[8];
                 for (int a = 0; a < 8; ++a) {
                     const int l = off[a];
-                    ex[a]       = lx[(size_t)l];
-                    ey[a]       = ly[(size_t)l];
-                    ez[a]       = lz[(size_t)l];
+                    c0x[a]      = lx[(size_t)l];
+                    c0y[a]      = ly[(size_t)l];
+                    c0z[a]      = lz[(size_t)l];
                 }
-                sscvfem_micro_geom(ex, ey, ez, madj, &mdet);
+                sscvfem_micro_geom(c0x, c0y, c0z, madj, &mdet);
             }
 
             for (int zi = 0; zi < L; ++zi) {
@@ -2292,16 +2306,30 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
             }
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
+            // Micro-cell 0's corners, hoisted: the geometry AND the coordinates the
+            // Rhie-Chow term differences.
+            //
+            // The lattice inside a macro element is uniform, so every micro-cell is congruent
+            // to cell 0 and one adjugate serves all of them -- that is what the action does.
+            // This used to hoist the adjugate but then hand the Rhie-Chow struct each cell's
+            // OWN coordinates, and the two agree only to the precision the node positions are
+            // stored in. smesh::geom_t is float32, so the block diagonal disagreed with the
+            // action it is supposed to be the diagonal of by 4.23e-08 -- eight orders above
+            // round-off, and invisible until the q-independent consistency gate looked.
+            //
+            // Only DIFFERENCES of these are taken (d = x_j - x_i), so cell 0's coordinates are
+            // exact for the purpose, not an approximation. The boundary closure below still
+            // gets each cell's real position, because it tests where the cell actually is.
             scalar_t madj[9], mdet;
+            scalar_t c0x[8], c0y[8], c0z[8];
             {
-                scalar_t ex[8], ey[8], ez[8];
                 for (int a = 0; a < 8; ++a) {
                     const int l = off[a];
-                    ex[a]       = lx[(size_t)l];
-                    ey[a]       = ly[(size_t)l];
-                    ez[a]       = lz[(size_t)l];
+                    c0x[a]      = lx[(size_t)l];
+                    c0y[a]      = ly[(size_t)l];
+                    c0z[a]      = lz[(size_t)l];
                 }
-                sscvfem_micro_geom(ex, ey, ez, madj, &mdet);
+                sscvfem_micro_geom(c0x, c0y, c0z, madj, &mdet);
             }
 
             for (int zi = 0; zi < L; ++zi) {
@@ -2330,8 +2358,8 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
                         for (int a = 0; a < 8; ++a) sl[a * 8 + a] = (smesh::count_t)(base + off[a]);
 
                         const Hex8RcConfig rcfg = sscvfem_rc_config(d);
-                        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
-                                              nullptr, ux, uy, uz,  rcfg.tau};
+                        const Hex8RhieChow rc{c0x,     c0y, c0z, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                              nullptr, ux,  uy,  uz,  rcfg.tau};
                         cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, madj, mdet, ux, uy, uz, sl,
                                                                        lout.data(), rc, p);
                         boundary_scs_add_jacobian<false>(rho, mu, 0, madj, mdet, d.Lx, d.Ly, d.Lz, x, y, z,
