@@ -991,48 +991,52 @@ and lost a third of its apply to conflict misses -- 6.13 ms against 4.57 on TET4
 against 1.38x over matrix-free. The Op now pads, which is why the numbers above are
 what they are.
 
-**The packed layout works here, and is worth nothing measurable.**
-`SFEM_PACKED_MESH=1` builds it and the Op's packed branch fires: identical CG counts
-and a *bit-identical* answer against the standard layout, 5.274539951542e-01, which is
-what says it is doing the same arithmetic on the same problem. What it is not is
-faster. HEX8, 352947 dof, eight threads, packed and unpacked runs **interleaved** so
-that drift cannot masquerade as a result:
+### On Grace, where the driver was built for the purpose
 
-| pair | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
-|---|---|---|---|---|---|---|---|---|
-| packed gain | -2.6% | +12.8% | -9.9% | -1.5% | +7.3% | -9.7% | +0.3% | -3.5% |
+The laptop could not answer this: its run-to-run drift was 40% against an effect of a
+few per cent. SFEM builds on Grace in about three minutes (`cmake` + `make
+hyperelasticity_bdf2`, OpenMP on, which the pre-existing Grace build did not have), so
+the driver was measured there on the same mesh and the same boundary conditions.
+mesh48, 352947 dof, three interleaved passes, medians; pass-to-pass spread under 2%.
 
-Median -2.0%; medians 1.490 ms against 1.486. The spread between repetitions is six
-times any difference between the two.
+| threads | | solve | ms/apply |
+|---|---|---|---|
+| 8 | matrix-free | 2.665 s | 13.09 |
+| 8 | inexact | 1.360 s | 4.43 |
+| 8 | inexact + packed | **1.041 s** | **2.65** |
+| 72 | matrix-free | 0.813 s | 1.545 |
+| 72 | inexact | 0.562 s | 0.575 |
+| 72 | inexact + packed | 0.567 s | **0.332** |
 
-An earlier version of this section reported 9%, from best-of-three runs taken twenty
-minutes apart. Between those two sets the whole machine moved by 40% -- the same
-unpacked configuration measured 2.66, 2.29 and 1.38 ms -- so the comparison was
-reading the laptop's mood. Best-of-N within a run does not defend against drift
-between runs; interleaving does, and it is what any A/B here needs.
+All three produce the same answer, and the two inexact rows produce it bit-identically.
 
-Why nothing, when the same kernel gains 70% in the spike on Grace: at 352947 dof the
-vectors this apply touches are a few tens of megabytes against this laptop's 48 MB
-system-level cache, so the gather locality packing recovers is already there. The
-roofline said the same thing from the other side -- HEX8's stored apply is nowhere
-near the bandwidth ceiling, so it is not waiting on the traffic packing removes. The
-mesh ordering makes no difference either: `cartesian3` (mean node-id jump 1.2 between
-consecutive elements) and the default `morton3` (1097.7) measure the same to within
-this noise.
+**At eight threads the solve is 2.56x faster and the apply 4.9x.** At seventy-two the
+apply is still 4.7x but the solve is only 1.43x, and packing adds nothing to it: 142
+applies at 0.332 ms is 47 ms of a 567 ms solve, so the apply has stopped being where
+the time goes. What is left is the assembly, the gradient, the line search and the
+constraints -- none of which this work touched. Making the apply five times cheaper on
+a full socket buys 1.4x, and the next thing to profile is everything else.
 
-**So the packed layout's 70% is a Grace result and stays one.** Whether it reaches a
-solve has not been measured on a machine where it could; this laptop cannot answer it,
-and reporting a laptop number either way would be reporting noise.
+**The pack size has to be tuned, and the default is wrong for a many-core machine.**
+`PackedMesh` derives it from the *index type's* ceiling -- `n_packs = ceil(n_elements *
+nodes_per_element / 65536)` -- which says how many nodes a pack may address and nothing
+about how many threads there are. The 48-cube comes out as **14 packs**, and the
+generated kernels share the pack loop with `#pragma omp for`, so 58 of 72 threads get
+nothing:
 
-**Getting the packed path to run at all needed the permutation kept.**
-`PackedMesh::create(..., modify_mesh=true)` renumbers the mesh in place and then drops
-the map it used, so a nodeset read from a file -- which speaks the on-disk numbering --
-named different nodes and the solve converged to a different problem: displacement
-norm 3.894e-01 against 2.988e-01, with nothing in the output to say so.
-`FunctionSpace::initialize_packed_mesh` now builds the layout twice, once without
-modifying to capture the map and once to apply it, and `DirichletConditions` maps an
-explicit node list through it. A sideset needs no mapping, because packing does not
-move elements.
+| pack size | packs | 8 threads | 72 threads |
+|---|---|---|---|
+| 64 | 1728 | 2.666 | 0.340 |
+| 128 | 864 | 2.643 | 0.337 |
+| 256 | 432 | 2.627 | **0.328** |
+| 512 | 216 | **2.614** | 0.329 |
+| 1024 | 108 | 2.705 | 0.442 |
+| default | 14 | 2.980 | 1.573 |
+| *unpacked* | -- | *4.377* | *0.575* |
+
+At the default the packed apply is **2.7x slower than not packing at all** on 72
+threads, and 1.75x faster once tuned. The answer never changes. Report the pack size
+and the pack count with any packed measurement; the crossover moves with the mesh.
 
 ### What the first version of these driver numbers got wrong
 
