@@ -96,33 +96,100 @@ Both we and they rediscretize rather than Galerkin-coarsen, and for the same rea
 stabilization parameter is a function of element size, so `PᵀAP` inherits the fine-grid
 stabilization and is inconsistent. The difference is what happens to that parameter.
 
-| coarse operator | applied operator | Rhie–Chow `D_f = rc_scale·h²/(2μ)` |
+| coarse operator | selected by | Rhie–Chow `D_f = rc_scale·h²/(2μ)` |
 |---|---|---|
-| Lethe, matrix-free rediscretization | `A_H(I_H û)` | τ recomputed per level; consistent by construction |
-| ours, `derefine_op` | `A_H(R û)` | recomputed at coarse `h`, so `D_f` rises ~8× per level in 3D, then hand-corrected by `SFEM_GMG_RC_DECAY` |
-| ours, element-wise Galerkin (`SFEM_GMG_EGAL=1`, **the default**) | `Σ_e P_eᵀ A_e P_e` | frozen at the **fine** `h` |
+| Lethe, matrix-free rediscretization | — | τ recomputed per level; consistent by construction |
+| ours, `derefine_op` rediscretization | `SFEM_GMG_GALERKIN=0`, **the default** | recomputed at coarse `h`, so `D_f` quadruples per level (it carries `h²`), then hand-corrected by `SFEM_GMG_RC_DECAY`, which defaults to 1 — i.e. uncorrected |
+| ours, element-wise Galerkin | `SFEM_GMG_GALERKIN=2` with `SFEM_GMG_EGAL=1` | frozen at the **fine** `h`; exact only under the frozen-pgrad Jacobian |
 
-Two consequences.
+(An earlier draft of this table said element-wise Galerkin was the default. It is not:
+`SFEM_GMG_EGAL` defaults to 1 but is gated on `galerkin_mode == 2`, and `SFEM_GMG_GALERKIN`
+defaults to 0. The default hierarchy is rediscretized. The same draft said `D_f` rises 8× per
+level; it is 4×, since the coefficient carries `h²` and not `h³`.)
 
-First, our default coarse operator is the element-wise Galerkin one, which freezes the fine
-grid's stabilization — the very inconsistency `derefine_op`'s own comment gives as the reason
-not to use `PᵀAP`. Worse, element-wise Galerkin is exact only when the operator is a sum of
-element contributions, and Rhie–Chow couples through a **nodal** pressure gradient, which is
-not element-local unless it is frozen from the state. The driver already contains a gate that
-tests exactly this and prints `LOCAL (element-wise Galerkin is exact)` or `NON-LOCAL`.
+## What is required for a consistent coarse space
 
-Second, `SFEM_GMG_RC_DECAY` is a hand-tuned scalar standing in for a per-level spectral
-property — its comment says 0.25 "keeps `D_f` fixed at the fine level's value". That is the
-same quantity item 1 proposes to *measure*. The paper does not tune a decay factor; it
-estimates each level operator's spectrum and sets ω from it, for the stated reason that the
-stabilization depends on element size and changes per level. Our decay knob and their power
-iteration are two answers to one question, and only one of them is calibrated against the
-operator it is correcting.
+A coarse operator is only ever applied to a *correction*, so the property that matters is
+`A_H ≈ R A_h P` on the coarse space — not that `A_H` be a good discretization of the coarse
+mesh. Those two requirements diverge exactly at the stabilization, and the code currently
+pursues the second. Five things are required; the measurements below are from the cavity on
+semi-structured macro-elements, 4 threads, and each is reproducible with `SFEM_GMG_CHECK=1`.
 
-Action, replacing the earlier one: settle which coarse operator the hierarchy actually uses
-(`SFEM_GMG_EGAL`, `galerkin_mode`), check the element-locality gate on a Rhie–Chow-active
-case, and treat `SFEM_GMG_RC_DECAY` as a symptom — if per-level ω from item 1 works, the decay
-factor should become unnecessary rather than merely better-chosen.
+**1. The stabilization must be evaluated at the fine level's `h`.** On a smooth
+coarse-representable mode the fine operator applies the fine `D_f` and the rediscretized
+coarse operator applies 4× that, so the coarse solve returns a pressure correction 4× too
+small. The commutation defect `|A_H R v − R A_h v| / |R A_h v|` per component, on a 4×4×4
+macro mesh at L=4, 19,652 dof:
+
+| `SFEM_GMG_RC_DECAY` | hop | ux | uy | uz | p |
+|---|---|---|---|---|---|
+| 1 (default) | 0 | 0.370 | 0.494 | 0.420 | **7.525** |
+| 1 (default) | 1 | 0.495 | 0.389 | 0.410 | **8.413** |
+| 0.25 | 0 | 0.370 | 0.494 | 0.420 | **1.409** |
+| 0.25 | 1 | 0.495 | 0.389 | 0.410 | **0.599** |
+
+The velocity figures are the rediscretization baseline: unchanged by the decay factor, by the
+hierarchy (identical on a 2×1×1 mesh at L=8, 5,508 dof) and by `rho` from 1 to 0.01, so not
+convective in origin. The pressure block sits an order of magnitude above that baseline at the
+default and falls into it at 0.25. `SFEM_GMG_RC_DECAY=0.25` is a requirement, not a tuning
+knob, and the default is the inconsistent setting.
+
+**2. If the coarse operator is built element-wise, the fine operator must be element-local.**
+`Σ_e P_eᵀ A_e P_e` equals `PᵀAP` only for an operator that is a sum of element contributions.
+The exact Rhie–Chow Jacobian reconstructs the *direction's* nodal pressure gradient, which
+reaches outside the element. On 2×1×1 at L=8, 5,508 dof:
+
+| gate | `SFEM_RC_EXACT_JAC=1` (default) | `=0` (frozen pgrad) |
+|---|---|---|
+| element-locality, max abs response outside elem 0 | 1.2207e-02 — **NON-LOCAL** | 0.0000e+00 — LOCAL |
+| `egal identity (q=1)`, must reproduce `A` itself | **5.954e-02 FAILED** | 1.469e-16 OK |
+| `egal galerkin (0→1)` vs `PᵀAP` | **8.278e-01 FAILED** | 2.130e-16 OK |
+| `egal level 1` vs probed composite | **9.583e-01 MISMATCH** | 1.874e-16 OK |
+| `egal galerkin (0→2)`, `(0→3)` | 2.4e-16 OK | 2.4e-16 OK |
+
+Levels 2 and 3 pass under both because they coarsen level 1's element matrices — self-consistent
+and built on an 83%-wrong level. This failure mode was predicted in writing when the
+construction landed ("changing Rhie-Chow to differentiate the pressure gradient would silently
+invalidate the construction", `docs/README_alps.md`); `SFEM_RC_EXACT_JAC` subsequently came to
+default to 1, and nothing runs the gate unless `SFEM_GMG_CHECK=1` is set. So
+`SFEM_GMG_GALERKIN=2` requires `SFEM_RC_EXACT_JAC=0`, and the two defaults are mutually
+inconsistent.
+
+**3. `R = Pᵀ` on the residual, with the linearization point restricted separately.** Already
+true: `g.Rmat[i] = g.Pmat[i]->transpose()`, while the state goes down through
+`restrictions[]` divided by `state_weights[]`. Not a gap, and the two must stay distinct.
+
+**4. The null space must be the same object on every level**, `P·N(A_H) ⊆ N(A_h)`. With a
+pressure pin it is not: each level pins its own node, nothing makes it the same physical
+point, and a coarse correction then arrives carrying an arbitrary constant offset — precisely
+the near-null mode the smoother is worst at damping. The zero-mean gauge satisfies the
+condition because `P` maps constants to constants; a pin needs `SFEM_GMG_PFILTER=1`, which
+defaults to 0.
+
+**5. The coarse space must contain what the smoother leaves behind.** Trilinear interpolation
+on the macro-element lattice reproduces constants in each velocity component, the constant
+pressure and smooth shear, so the space itself is not the problem here — the operator built
+on it is.
+
+### The consequence that inverts the current design
+
+We already have a construction that is correction-consistent by definition and verified to
+`2.1e-16`: `A_H = PᵀA_hP`, assembled element-wise, under the frozen Jacobian. It was rejected
+because it "would inherit the fine-grid stabilisation and be inconsistent" — but inheriting
+the fine-grid stabilization *is* requirement 1. That comment applies discretization-consistency
+to an operator that only ever sees corrections. `SFEM_GMG_RC_DECAY=0.25` exists to
+hand-simulate, with a single scalar, the property the Galerkin operator has exactly.
+
+What none of this fixes: the ~0.4 velocity commutation defect is intrinsic to rediscretization
+and does not shrink with problem size. A coarse correction is approximate by construction,
+which is why item 1's per-level ω is not independent of this — the smoother has to be right
+for the cycle to tolerate an approximate coarse solve.
+
+Action, replacing the earlier one: set `SFEM_GMG_RC_DECAY=0.25` under rediscretization; if
+element-wise Galerkin is used, pair it with `SFEM_RC_EXACT_JAC=0` and make that pairing a
+build-time or startup assertion rather than a gate behind `SFEM_GMG_CHECK`; keep the zero-mean
+gauge on every level. Then re-measure, because item 1's ω is calibrated against whichever
+coarse operator these choices settle on.
 
 ## 4. Smaller things worth taking
 
@@ -152,10 +219,11 @@ none of their constants are ours.
 
 1. **Per-level ω from power iteration.** Smallest change, addresses a known-divergent smoother,
    and item 3 is hard to evaluate while the smoother is mistuned.
-2. **Settle the coarse operator.** Which of element-wise Galerkin and rediscretization the
-   hierarchy uses, whether the element-locality assumption holds with Rhie–Chow active, and
-   whether `SFEM_GMG_RC_DECAY` survives a calibrated ω. Not a state-transfer problem: the
-   linearization point already reaches every level.
+2. **Settle the coarse operator.** Measured, in item 3: the default hierarchy is
+   rediscretized with `SFEM_GMG_RC_DECAY=1`, which leaves the coarse pressure block an order
+   of magnitude off commuting with restriction, and element-wise Galerkin is wrong under the
+   default exact Rhie–Chow Jacobian. Fix the two defaults before anything else is measured.
+   Not a state-transfer problem: the linearization point already reaches every level.
 3. **Re-measure the step case.** The yardstick is 2–5 linear iterations per Newton step; if it
    is still in the thousands after 1 and 2, the fault is elsewhere and this document is wrong
    about where.
