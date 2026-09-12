@@ -1345,6 +1345,53 @@ One thing this did **not** fix: the residual path still builds its element matri
 probing, 12 unit basis vectors through `jacobian_action` per TET4 element. The energy
 path no longer does. That is the same construction removed above, in a second emitter.
 
+#### The two-unit material's inexact apply on HEX8
+
+TET4 established correctness and TET10 the accuracy under curvature; HEX8 is the element
+the driver benchmarks above run on, and it had never been measured. `run_mixed.sh HEX8`,
+Grace GH200 at 72 threads, `-O3 -march=native`, best of 9:
+
+| elements | ndof | exact | st. f64 | st. f32 | st. f16 | assembly | f64 rel | f16 rel |
+|---|---|---|---|---|---|---|---|---|
+| 512 | 2187 | 30.50 | 37.65 | 36.56 | 55.47 | 21.80 | 6.3e-04 | 6.9e-04 |
+| 4096 | 14739 | 72.90 | 145.63 | 132.64 | 126.18 | 43.57 | 1.5e-04 | 4.0e-04 |
+| 13824 | 46875 | 89.43 | 230.34 | 209.05 | 196.42 | 42.83 | 6.6e-05 | 3.7e-04 |
+| 32768 | 107811 | 96.04 | 291.69 | 251.55 | 241.38 | 39.40 | 3.7e-05 | 6.0e-04 |
+| 64000 | **206763** | 95.30 | **321.48** | 276.19 | 279.91 | 40.62 | 2.3e-05 | 5.8e-04 |
+
+MDOF/s for the apply, except `assembly`, which is the once-per-tangent kernel.
+**3.37x over the exact apply at 206763 dof**, breaking even after **3.3 applies per
+tangent**.
+
+**Narrowing the store does not pay on this material, and that inverts the single-unit
+result.** f32 is 276 against f64's 321 and f16 is 280; on every single-unit material in
+this document, halving the store bought bandwidth. The reason is the store itself: the
+Kelvin-Voigt tangent is unsymmetric and cannot fold 81 numbers into 45, so the pair costs
+**1008 bytes per element in f64** -- 45 elastic plus 81 viscous -- against 360 for a
+single symmetric unit. At that weight the apply has enough arithmetic per byte that it is
+no longer bandwidth-bound at this size, and the conversion on every load is a cost with
+nothing to buy. f16 also gives up accuracy for it, 5.8e-04 against 2.3e-05, so there is
+no configuration of this material in which the narrow stores are the right choice.
+
+The accuracy column is the projection error rather than a store error, and it converges
+under refinement -- 6.3e-04 to 2.3e-05 across the table -- which is what an inexact
+quadrature on a non-affine element should do. f64 and f32 agree to every digit shown,
+which says the same thing from the other side: at this severity the store's precision is
+not what limits the answer.
+
+One caveat on the largest row: the stored throughput is **still climbing** at 206763 dof
+(291.7 to 321.5 from the previous size) while the exact apply has flattened (96.0 to
+95.3). This material has not saturated the machine at the sizes the harness sweeps, so
+the 3.37x is a lower bound on the ratio rather than a converged figure.
+
+**Two practical notes for anyone re-running this.** The generation is 1380 s for HEX8
+alone, which is why the material ships with `inexact_apply` off. And the *compile* is
+worse: `bench_mixed.cpp` includes both units' inline headers, 502 KB and 780 KB, giving
+one translation unit with roughly 10200 scalar assignments whose longest straight-line
+run is about 4100 statements. gcc 13.3 at `-O3 -march=native` takes **38 minutes and
+1.2 GB** on that, which overruns a 28-minute debug job. Compile it on the login node, or
+split the two units into separate translation units -- they share nothing but the mesh.
+
 ### What the first version of these driver numbers got wrong
 
 The first three versions of this table were measured on a mis-constrained problem, and
