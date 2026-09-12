@@ -31,13 +31,31 @@
 //       An earlier commit claimed this test's [1] was satisfied unconditionally. It was not;
 //       this test is what established that, which is the reason it exists.
 //
-//   [2] BSR SpMV == action,  [3] diag(BSR) == block diagonal.
-//       FROZEN FORM ONLY, and deliberately so. The exact term couples pressures beyond
-//       nearest neighbours and would widen the BSR pattern, which is why the assembled
-//       matrix does not carry it -- see cvfem_hex8_jac_rhie_chow_p. With the exact term on
-//       the two are MEANT to differ, so asserting equality there would be asserting that a
-//       documented design decision had been undone. They are still measured and printed, and
-//       bounded loosely, so a blow-up is caught even where equality is not required.
+//   [2] BSR SpMV == action,  [3] diag(BSR) == action diagonal.
+//       Hold in the frozen form and NOT in the exact one, and that is a defect rather than a
+//       design. An earlier version of this comment called it "meant to differ", repeating a
+//       rationalisation instead of examining it. The assembled matrix is not merely the
+//       preconditioner's input: SFEM_MATRIX_FREE=0 hands it to the Krylov solver as THE
+//       operator, so a single environment variable decides which Jacobian the solve uses. The
+//       exact Rhie-Chow term cannot be held in the BSR pattern -- it couples pressures past
+//       nearest neighbours -- so with it on there are genuinely two operators in the code and
+//       which one you get depends on the path. That is the thing to fix, by widening the
+//       pattern or by confining the exact term to paths that never assemble; until then this
+//       measures the gap and bounds it rather than blessing it.
+//
+//   [4] block diagonal == diag(BSR). UNCONDITIONAL, and the one that has teeth in both forms.
+//       Both are built by element loops over the same kernel, so they are the same object
+//       computed twice and must agree whatever either of them approximates. This is not
+//       hypothetical either: a partial exact-diagonal term added to the block diagonal alone
+//       took them from 3.6e-16 apart to 6.0e-02, and the Galerkin levels build their smoother
+//       from the assembled matrix's diagonal while the fine level builds it from the block
+//       diagonal -- they would have been smoothing different operators. That term is reverted.
+//
+//   [S1] semi-structured block diagonal == the semi-structured action's diagonal.
+//       The same question on the other discretisation, asked separately because it is a
+//       different set of kernels over a macro-element lattice and the multigrid hierarchy is
+//       built on it. It shows the identical pattern -- round-off frozen, 1.4e-01 steady in the
+//       exact form -- which is what establishes that this is one systematic gap and not two.
 //
 // The diagonal of the action is obtained by probing it with unit vectors, which is legitimate
 // here and nowhere else: this is a test, the mesh is deliberately tiny, and the point is to
@@ -52,8 +70,11 @@
 // registers this binary twice, once per setting, the way cvfem_flat_vs_ss_packed is.
 
 #include "cvfem_hex8_ns_core.hpp"
+#include "cvfem_sshex8_ns.hpp"
 
 #include "sfem_context.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_semistructured.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -214,6 +235,11 @@ namespace {
 
         const scalar_t r_spmv = worst_rel(spmv, act);
         const scalar_t r_diag = worst_rel(bsr_diag, probed);
+        // [4] the two ASSEMBLED objects against each other. Both are built by element loops
+        // over the same kernel, so this holds whatever either of them approximates -- unless
+        // one of them has gained a term the other has not.
+        check_rel(worst_rel(bd, bsr_diag), scalar_t(1), scalar_t(1e-11),
+                  "[4] block diagonal == diag(BSR), unconditionally");
         if (exact) {
             // Meant to differ: the assembled matrix deliberately omits the wide term. Bounded
             // rather than ignored, so a blow-up is still caught.
@@ -224,6 +250,80 @@ namespace {
         } else {
             check_rel(r_spmv * scalar_t(1), scalar_t(1), scalar_t(1e-11), "[2] BSR SpMV == action");
             check_rel(r_diag * scalar_t(1), scalar_t(1), scalar_t(1e-11), "[3] diag(BSR) == action diagonal");
+        }
+    }
+
+    // ---- the semi-structured path ----
+    //
+    // The same question on the other discretisation, and it has to be asked separately: the
+    // semi-structured operator is a different set of kernels over a macro-element lattice, and
+    // it carries its own block diagonal. A flat-only test says nothing about it, and the
+    // semi-structured path is what the multigrid hierarchy is built on.
+    void probe_ss_action_diag(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                              std::vector<scalar_t> &blocks) {
+        const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+        blocks.assign((size_t)d.nnodes * 16, scalar_t(0));
+        std::vector<scalar_t> dir((size_t)ndof), jv((size_t)ndof);
+        for (ptrdiff_t col = 0; col < ndof; ++col) {
+            std::fill(dir.begin(), dir.end(), scalar_t(0));
+            dir[(size_t)col] = scalar_t(1);
+            std::fill(jv.begin(), jv.end(), scalar_t(0));
+            sscvfem_apply(d, rho, mu, dir.data(), jv.data());
+            const ptrdiff_t node = col / N_FIELDS;
+            const int       c    = (int)(col % N_FIELDS);
+            for (int r = 0; r < N_FIELDS; ++r)
+                blocks[(size_t)node * 16 + (size_t)r * 4 + (size_t)c] = jv[(size_t)node * N_FIELDS + r];
+        }
+    }
+
+    void run_ss_variant(sfem::Context &ctx, const char *name, const scalar_t dt, const int bdf_order,
+                        const bool with_prev2, const bool exact) {
+        std::printf("\n-- semi-structured, %s --\n", name);
+        const int level  = 2;  // a power of two; the operator refuses the others
+        auto      coarse = smesh::Mesh::create_hex8_cube(ctx.communicator(), 1, 1, 1, 0, 0, 0, 2, 1, 1);
+        auto      mesh   = smesh::to_semistructured(level, coarse, true, false);
+        if (!mesh) {
+            check(false, "to_semistructured built a mesh");
+            return;
+        }
+        SSMeshData d;
+        sscvfem_init(d, mesh, level);
+        d.rhie_chow_scale = 1;
+        d.dt              = dt;
+        d.bdf_order       = bdf_order;
+        if (dt > 0) {
+            d.u_prev.assign((size_t)d.nnodes * 3, scalar_t(0.25));
+            if (with_prev2) d.u_prev2.assign((size_t)d.nnodes * 3, scalar_t(0.1));
+        }
+        const auto *const px = d.points[0];
+        const auto *const py = d.points[1];
+        const auto *const pz = d.points[2];
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            const scalar_t X = px[i], Y = py[i], Z = pz[i];
+            d.ux[(size_t)i] = std::sin(scalar_t(1.7) * X) * std::cos(scalar_t(2.3) * Y) + scalar_t(0.3) * Z;
+            d.uy[(size_t)i] = std::cos(scalar_t(1.1) * Y) * (scalar_t(1) + scalar_t(0.2) * X) - scalar_t(0.15) * Z;
+            d.uz[(size_t)i] = std::sin(scalar_t(0.9) * Z) * (scalar_t(0.5) + scalar_t(0.1) * Y);
+            d.p[(size_t)i]  = scalar_t(0.7) * X - scalar_t(0.4) * Y + scalar_t(0.25) * Z * Z;
+        }
+        const scalar_t rho = 1, mu = 0.01;
+        sscvfem_nodal_p_grad(d);
+
+        std::vector<scalar_t> bd;
+        sscvfem_block_diag(d, rho, mu, bd);
+
+        std::vector<scalar_t> probed;
+        probe_ss_action_diag(d, rho, mu, probed);
+
+        scalar_t scale = 0;
+        for (const scalar_t v : probed) scale = std::max(scale, std::fabs(v));
+        check(scale > scalar_t(1e-8), "the probed semi-structured diagonal is not trivially zero");
+
+        const scalar_t r = worst_rel(bd, probed);
+        if (exact) {
+            report(r, "[S1] SS block diagonal vs SS action diagonal (exact form)");
+            check(r < scalar_t(0.25), "[S1] the semi-structured gap stays bounded");
+        } else {
+            check_rel(r, scalar_t(1), scalar_t(1e-10), "[S1] SS block diagonal == SS action diagonal");
         }
     }
 
@@ -239,6 +339,10 @@ int main(int argc, char **argv) {
     run_variant(*ctx, "steady", scalar_t(0), 1, false, exact);
     run_variant(*ctx, "transient BDF1", scalar_t(0.05), 1, false, exact);
     run_variant(*ctx, "transient BDF2", scalar_t(0.05), 2, true, exact);
+
+    run_ss_variant(*ctx, "steady", scalar_t(0), 1, false, exact);
+    run_ss_variant(*ctx, "transient BDF1", scalar_t(0.05), 1, false, exact);
+    run_ss_variant(*ctx, "transient BDF2", scalar_t(0.05), 2, true, exact);
 
     std::printf("\n%s\n", g_failures ? "operator consistency: FAILED" : "all operator forms agree");
     return g_failures ? EXIT_FAILURE : EXIT_SUCCESS;

@@ -779,49 +779,25 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
-                        nullptr, ux, uy, uz,  rcfg.tau};
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
 
-        // A PARTIAL correction towards the diagonal of the operator that is APPLIED.
+        // Both the block diagonal and the assembled matrix are built here from the FROZEN
+        // Rhie-Chow Jacobian, and they must stay that way together.
         //
-        // Read the claim carefully, because an earlier version of this comment overstated it
-        // and tests/cvfem_operator_consistency_test is what caught that. This does not make
-        // the block diagonal equal to the action's diagonal. It cannot, from an element loop:
-        // qg_i sums over EVERY element containing node i before being scaled by 1/W_i, so
-        // d(qg_i)/d(q_i) is a property of i's whole element neighbourhood while a sub-control
-        // surface belongs to one element. What is added below is this element's share of it.
+        // An attempt to make this one exact -- adding the element's share of d(qg)/d(q) -- was
+        // reverted. It could not do what it claimed, because qg_i sums over every element
+        // containing node i before being scaled by 1/W_i, so d(qg_i)/d(q_i) belongs to i's
+        // whole element neighbourhood while a sub-control surface belongs to one element; it
+        // narrowed the gap to the action from round-off-away-in-the-frozen-form to 8.2e-02
+        // rather than closing it. Worse, it desynchronised two objects that are the same thing
+        // computed two ways: the block diagonal and diag(BSR) went from agreeing at 3.6e-16 to
+        // differing by 6.0e-02, and the Galerkin levels build their smoother from the
+        // assembled matrix's diagonal while the fine level builds it from this one, so they
+        // would have been smoothing different operators.
         //
-        // Measured, exact form against a direct probe of the action: 8.2e-02 relative steady
-        // and 1.2e-02 on BDF2 with this term, against the frozen form's round-off. So the gap
-        // is narrowed and not closed, and the test reports it rather than asserting it away.
-        // Closing it needs a per-node pass for d(qg_i)/d(q_i) and a per-edge one for
-        // d(qg_j)/d(q_i), both structured like the reconstruction.
-        //
-        // It is kept because it is measured to help where the mismatch bites: on the
-        // pressure-port case the default preconditioner fails to converge without it and
-        // reaches Re=100 in 6 Newton steps with it. A preconditioner is allowed to be an
-        // approximation -- what it is not allowed to be is an approximation whose error nobody
-        // has measured.
-        //
-        // With SFEM_RC_EXACT_JAC=1 -- the default -- the apply differentiates through the
-        // reconstructed nodal pressure gradient and this assembly did not, so the
-        // preconditioner was built from a different operator than the one it preconditions.
-        // Measured at 5,508 dof that is a 3.5e-02 relative error in the block diagonal against
-        // a direct probe of the operator, and 5.7e-02 in the assembled fine operator, against
-        // round-off for both with the frozen form. It is not a rounding difference and it is
-        // load-bearing: on the pressure-port case the default fails to converge at all while
-        // the same run with SFEM_RC_EXACT_JAC=0 -- where the two agree by construction --
-        // reaches its target.
-        //
-        // Affine only. The isoparametric path rebuilds its Jacobian per sub-control surface,
-        // so there is no single element gradient to differentiate and dN would have to be
-        // carried per surface; that path keeps the frozen diagonal and is consistent with
-        // itself because nothing else on it is exact either.
-        scalar_t gw[CVFEM_HEX8_N_NODES], dNe[CVFEM_HEX8_N_NODES * 3];
-        const bool exact_diag = cvfem_hex8_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) &&
-                                !d.pgx.empty() && (ptrdiff_t)d.grad_w_inv.size() == d.nnodes &&
-                                geom != GeomKind::Isoparam;
-
+        // tests/cvfem_operator_consistency_test asserts that agreement now, in every variant
+        // and under both settings.
         if (geom == GeomKind::Isoparam) {
             cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(rho, mu, x, y, z, ux, uy, uz, sl, loc, rc, p);
             boundary_scs_add_jacobian<false>(
@@ -831,20 +807,6 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         } else {
             scalar_t adj[9], det;
             cvfem_hex8_load_adj(d, e, adj, &det);
-            if (exact_diag) {
-                // d(qg_a)/d(q_b) = grad_w_inv[a] * sgn(det) * (A^T dn_ref_b). The determinant
-                // cancels against the |det| the reconstruction weights by, exactly as the
-                // reconstruction sweep itself does it -- only the sign survives.
-                const scalar_t sgn = det > scalar_t(0) ? scalar_t(1) : scalar_t(-1);
-                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    gw[a] = d.grad_w_inv[(size_t)d.elems[a][e]];
-                    cvfem_hex8_pushforward(adj, sgn, (scalar_t)CVFEM_HEX8_DN_REF[a][0],
-                                           (scalar_t)CVFEM_HEX8_DN_REF[a][1], (scalar_t)CVFEM_HEX8_DN_REF[a][2],
-                                           dNe[a * 3 + 0], dNe[a * 3 + 1], dNe[a * 3 + 2]);
-                }
-                rc.gw = gw;
-                rc.dN = dNe;
-            }
             cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj, det, ux, uy, uz, sl, loc, rc, p);
             boundary_scs_add_jacobian<false>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
                                          cvfem_hex8_face_mask_of(d, e),
