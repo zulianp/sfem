@@ -196,6 +196,15 @@ if(EXISTS "${SPIKE_GEN_DIR}/${SPIKE_MATERIAL}_elastic_${SPIKE_ELEMENT_LOWER}_ine
         EXACT_ELASTIC_APPLY=${_elastic}_${SPIKE_ELEMENT_LOWER}_apply_a_msoa
         EXACT_VISCOUS_ACTION=${_viscous}_${SPIKE_ELEMENT_LOWER}_jacobian_action_a_msoa
         PACKED_STORED_APPLY)
+    # The assembled Jacobian, when the material publishes one.  A material with
+    # no `matrix_formats` has no BSR entry point, and the column is simply absent
+    # rather than the benchmark failing to link.
+    if(EXISTS "${SPIKE_GEN_DIR}/${_elastic}_${SPIKE_ELEMENT_LOWER}_matrix_format_operator.cpp")
+        target_compile_definitions(bench_mixed PRIVATE
+            ELASTIC_HESSIAN_BSR=${_elastic}_${SPIKE_ELEMENT_LOWER}_hessian_bsr_i_msoa
+            VISCOUS_HESSIAN_BSR=${_viscous}_${SPIKE_ELEMENT_LOWER}_hessian_bsr_i_msoa)
+        message(STATUS "bench_mixed: BSR column enabled")
+    endif()
     message(STATUS "bench_mixed: ${_elastic} + ${_viscous} on ${SPIKE_ELEMENT}")
 endif()
 
@@ -224,6 +233,11 @@ if(EXISTS "${SPIKE_GEN_DIR}/${SPIKE_MATERIAL}_${SPIKE_ELEMENT_LOWER}_inexact_app
     target_link_libraries(bench_split PRIVATE spike_common)
     target_compile_definitions(bench_split PRIVATE
         ${_single_macros} MESH_ORDER=\"${SPIKE_MESH_ORDER}\")
+    if(EXISTS "${SPIKE_GEN_DIR}/${_stem}_matrix_format_operator.cpp")
+        target_compile_definitions(bench_split PRIVATE
+            MATERIAL_HESSIAN_BSR=${_stem}_hessian_bsr_i_msoa)
+        message(STATUS "bench_split: BSR column enabled")
+    endif()
 
     add_executable(warp_sweep warp_sweep.cpp $<TARGET_OBJECTS:spike_kernels>)
     target_link_libraries(warp_sweep PRIVATE spike_common)

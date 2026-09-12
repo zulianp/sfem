@@ -29,6 +29,29 @@
 #include VISCOUS_INEXACT_HEADER
 #include "element_mesh.inc"
 #include "packed_mesh.inc"
+#ifdef ELASTIC_HESSIAN_BSR
+#include "bsr_matrix.inc"
+// The assembled Jacobian, through the same C entry points the Op calls.  Both
+// units accumulate into one matrix, which is what makes it the operator rather
+// than half of it.
+// The two units do not publish the same ABI, and the difference is invisible to
+// the linker.  The energy unit's entry point is runtime-typed, the convention
+// the rest of the generated surface follows: a leading `scalar_bytes` and `void
+// *` buffers.  The residual unit's is typed per precision -- `double` buffers
+// and a separate `..._float` symbol -- with no leading width.  Declaring the
+// energy shape for both links cleanly, because C linkage does not mangle
+// parameters, and then passes every argument one register across; it segfaults
+// inside the kernel reading `points`, which is how this was found.
+extern "C" int ELASTIC_HESSIAN_BSR(const int, const ptrdiff_t, const ptrdiff_t,
+    idx_t **const, const geom_t *const *const, const double, const double,
+    const ptrdiff_t, const void *const, const void *const, const void *const,
+    const count_t *const, const idx_t *const, void *const);
+extern "C" int VISCOUS_HESSIAN_BSR(const ptrdiff_t, const ptrdiff_t,
+    idx_t **const, const geom_t *const *const, const double, const double, const double,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const count_t *const, const idx_t *const, double *const);
+#endif
 
 #define TC_ELASTIC 45
 #define TC_VISCOUS 81
@@ -120,11 +143,17 @@ int main(int argc, char **argv) {
 #ifdef PACKED_STORED_APPLY
     std::printf(" | %8s %8s %9s", "pk.f64", "pk.f32", "pk diff");
 #endif
+#ifdef ELASTIC_HESSIAN_BSR
+    std::printf(" | %8s %8s %9s %7s", "bsr", "bsr asm", "bsr diff", "MB");
+#endif
     std::printf("\n");
     std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s", "", "", "",
                 "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
 #ifdef PACKED_STORED_APPLY
     std::printf(" | %8s %8s %9s", "MDOF/s", "MDOF/s", "rel");
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+    std::printf(" | %8s %8s %9s %7s", "MDOF/s", "MDOF/s", "rel", "values");
 #endif
     std::printf("\n");
 
@@ -268,6 +297,48 @@ int main(int argc, char **argv) {
             return num / den;
         };
 #endif
+#ifdef ELASTIC_HESSIAN_BSR
+        // The assembled Jacobian.  Its graph is the node-to-node graph, its
+        // vectors are component-interleaved, and its values are whatever the two
+        // units accumulate -- so the comparison against the matrix-free action
+        // goes through an interleave and back.
+        const BsrGraph graph = build_bsr_graph(m);
+        std::vector<geom_t> gx(N), gy(N), gz(N);
+        for (ptrdiff_t v = 0; v < N; ++v) {
+            gx[v] = (geom_t)m.px[v]; gy[v] = (geom_t)m.py[v]; gz[v] = (geom_t)m.pz[v];
+        }
+        const geom_t *const points[3] = {gx.data(), gy.data(), gz.data()};
+        std::vector<double> bsr_values((size_t)graph.nnz() * 9, 0.0);
+        std::vector<double> bsr_x((size_t)N * 3), bsr_y((size_t)N * 3, 0.0);
+        for (ptrdiff_t v = 0; v < N; ++v) {
+            bsr_x[(size_t)v * 3 + 0] = hx[v];
+            bsr_x[(size_t)v * 3 + 1] = hy[v];
+            bsr_x[(size_t)v * 3 + 2] = hz[v];
+        }
+        auto run_bsr_assemble = [&] {
+            std::fill(bsr_values.begin(), bsr_values.end(), 0.0);
+            ELASTIC_HESSIAN_BSR(SFEM_CODEGEN_F64, EC, N, m.evp.data(), points,
+                lmbda, mu, 1, ux.data(), uy.data(), uz.data(),
+                graph.rowptr.data(), graph.colidx.data(), bsr_values.data());
+            VISCOUS_HESSIAN_BSR(EC, N, m.evp.data(), points,
+                eta_b, eta_s, alpha, 1, ux.data(), uy.data(), uz.data(),
+                1, zx.data(), zy.data(), zz.data(),
+                graph.rowptr.data(), graph.colidx.data(), bsr_values.data());
+        };
+        auto run_bsr_apply = [&] {
+            bsr_apply<3>(graph, bsr_values.data(), bsr_x.data(), bsr_y.data());
+        };
+        auto rel_bsr = [&] {
+            double num = 0, den = 0;
+            for (ptrdiff_t v = 0; v < N; ++v) {
+                num += std::fabs(ax[v] - bsr_y[(size_t)v * 3 + 0])
+                     + std::fabs(ay[v] - bsr_y[(size_t)v * 3 + 1])
+                     + std::fabs(az[v] - bsr_y[(size_t)v * 3 + 2]);
+                den += std::fabs(ax[v]) + std::fabs(ay[v]) + std::fabs(az[v]);
+            }
+            return num / den;
+        };
+#endif
         auto run_compressed = [&] {
             ELASTIC_COMPRESS<double, half_t, float>(EC, m.evp.data(), CS, E16.data(), ES.data(),
                 1, hx.data(),hy.data(),hz.data(), 1, bx.data(),by.data(),bz.data());
@@ -287,6 +358,10 @@ int main(int argc, char **argv) {
         z3(pkx,pky,pkz); run_packed_stored(E64.data(), V64.data());
         const double dpk = rel_packed();
 #endif
+#ifdef ELASTIC_HESSIAN_BSR
+        run_bsr_assemble(); run_bsr_apply();
+        const double dbsr = rel_bsr();
+#endif
 
         const double e   = best_mdof(repeats, ndof, run_exact);
         const double s64 = best_mdof(repeats, ndof, [&]{ run_stored(E64.data(), V64.data()); });
@@ -297,12 +372,20 @@ int main(int argc, char **argv) {
         const double p64 = best_mdof(repeats, ndof, [&]{ run_packed_stored(E64.data(), V64.data()); });
         const double p32 = best_mdof(repeats, ndof, [&]{ run_packed_stored(E32.data(), V32.data()); });
 #endif
+#ifdef ELASTIC_HESSIAN_BSR
+        const double bsr_mdof = best_mdof(repeats, ndof, run_bsr_apply);
+        const double bsr_asm  = best_mdof(repeats, ndof, run_bsr_assemble);
+        const double bsr_mb   = (double)bsr_values.size() * sizeof(double) / (1024.0 * 1024.0);
+#endif
         // All three error columns per row: f64 is the projection error alone,
         // and what f32 and f16 add over it is the store's own contribution.
         std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e",
                     (long)EC, (long)N, (long)ndof, e, s64, s32, s16, a, d64, d32, d16);
 #ifdef PACKED_STORED_APPLY
         std::printf(" | %8.2f %8.2f %9.1e", p64, p32, dpk);
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+        std::printf(" | %8.2f %8.2f %9.1e %7.1f", bsr_mdof, bsr_asm, dbsr, bsr_mb);
 #endif
         std::printf("\n");
         if (n == 40 || (only && n == only)) {
@@ -312,6 +395,10 @@ int main(int argc, char **argv) {
             std::printf("  packed pack size %d, %ld packs, %d threads\n",
                         pack_size, (long)pk.layout.n_packs, threads);
             std::printf("  packed vs standard stored f64: %.2fx\n", p64 / s64);
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+            std::printf("  BSR: %.1f MB of values, assembly costs %.1f applies of its own\n",
+                        bsr_mb, (1.0 / bsr_asm) / (1.0 / bsr_mdof));
 #endif
             std::printf("  break-even applies per tangent: f64 %.1f  f32 %.1f  f16 %.1f\n",
                         be(s64), be(s32), be(s16));
