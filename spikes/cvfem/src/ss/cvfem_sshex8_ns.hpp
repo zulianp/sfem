@@ -59,6 +59,13 @@ struct SSMeshData {
 
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> pgx, pgy, pgz;
+    // The reconstruction's denominator: 1 / sum of |det| over the micro-elements touching a
+    // node. Pure geometry, so it is built once and kept, and the sweep that uses it neither
+    // allocates nor accumulates it. Keyed on the mesh it was built for; see
+    // sscvfem_build_grad_weight for why the key is what it is.
+    std::vector<scalar_t> grad_w_inv;
+    ptrdiff_t             grad_w_nmacro{-1};
+    int                   grad_w_level{-1};
     std::vector<scalar_t> qgx, qgy, qgz;
     // Body force per node and the control volume it is weighted by; empty unless a case sets
     // one, in which case the residual is unchanged. See apply_body_force in the flat core.
@@ -209,32 +216,52 @@ static SFEM_INLINE void sscvfem_scatter_element(const SSScatter &s, const int nx
 // nodal pressure gradient accumulates pgx, pgy, pgz and a volume weight, and it fed the
 // apply, so leaving it atomic left the whole operator non-reproducible even after the
 // Jacobian action's own scatter was fixed.
-static SFEM_INLINE void sscvfem_scatter_element_soa(const SSScatter &s, const int nxe, const ptrdiff_t e,
-                                                    const smesh::idx_t *const SFEM_RESTRICT lg,
-                                                    const scalar_t *const SFEM_RESTRICT     lacc,
-                                                    scalar_t *const                        dst[N_FIELDS]) {
+//
+// Templated on the width because not every user wants four. The nodal gradient wants three --
+// it stopped carrying a volume weight once that became cached geometry -- and a third of the
+// staging, of the scatter and of the shared reduction is a third of each pass's memory
+// traffic. The stage is allocated at the widest width any user needs, so a narrower pass
+// simply addresses less of it; write and read must agree, which is why the width is a
+// template parameter and not an argument that could differ between the two calls.
+template <int W>
+static SFEM_INLINE void sscvfem_scatter_element_soa_w(const SSScatter &s, const int nxe, const ptrdiff_t e,
+                                                      const smesh::idx_t *const SFEM_RESTRICT lg,
+                                                      const scalar_t *const SFEM_RESTRICT     lacc,
+                                                      scalar_t *const                        dst[W]) {
     scalar_t *const stage = const_cast<scalar_t *>(s.stage.data());
     for (int a = 0; a < nxe; ++a) {
         const int sl = s.slot[(size_t)e * nxe + a];
         if (sl < 0) {
             const smesh::idx_t g = lg[a];
-            for (int c = 0; c < N_FIELDS; ++c) dst[c][g] += lacc[(size_t)a * N_FIELDS + c];
+            for (int c = 0; c < W; ++c) dst[c][g] += lacc[(size_t)a * W + c];
         } else {
-            for (int c = 0; c < N_FIELDS; ++c) stage[(size_t)sl * N_FIELDS + c] = lacc[(size_t)a * N_FIELDS + c];
+            for (int c = 0; c < W; ++c) stage[(size_t)sl * W + c] = lacc[(size_t)a * W + c];
         }
     }
 }
 
-inline void sscvfem_reduce_shared_soa(const SSScatter &s, scalar_t *const dst[N_FIELDS]) {
+template <int W>
+inline void sscvfem_reduce_shared_soa_w(const SSScatter &s, scalar_t *const dst[W]) {
     const ptrdiff_t nrows = (ptrdiff_t)s.shared_node.size();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t r = 0; r < nrows; ++r) {
-        scalar_t acc[N_FIELDS] = {0};
+        scalar_t acc[W] = {0};
         for (ptrdiff_t k = s.red_ptr[(size_t)r]; k < s.red_ptr[(size_t)r + 1]; ++k)
-            for (int c = 0; c < N_FIELDS; ++c) acc[c] += s.stage[(size_t)s.red_idx[(size_t)k] * N_FIELDS + c];
+            for (int c = 0; c < W; ++c) acc[c] += s.stage[(size_t)s.red_idx[(size_t)k] * W + c];
         const smesh::idx_t g = s.shared_node[(size_t)r];
-        for (int c = 0; c < N_FIELDS; ++c) dst[c][g] += acc[c];
+        for (int c = 0; c < W; ++c) dst[c][g] += acc[c];
     }
+}
+
+static SFEM_INLINE void sscvfem_scatter_element_soa(const SSScatter &s, const int nxe, const ptrdiff_t e,
+                                                    const smesh::idx_t *const SFEM_RESTRICT lg,
+                                                    const scalar_t *const SFEM_RESTRICT     lacc,
+                                                    scalar_t *const                        dst[N_FIELDS]) {
+    sscvfem_scatter_element_soa_w<N_FIELDS>(s, nxe, e, lg, lacc, dst);
+}
+
+inline void sscvfem_reduce_shared_soa(const SSScatter &s, scalar_t *const dst[N_FIELDS]) {
+    sscvfem_reduce_shared_soa_w<N_FIELDS>(s, dst);
 }
 
 // Second pass: each shared node gathers its own contributions, in slot order.
@@ -355,71 +382,147 @@ static SFEM_INLINE Hex8BoundaryDataT<scalar_t> sscvfem_bd(const SSMeshData &d, c
 }
 
 
+// The reconstruction's denominator, built once.
+//
+// It is the sum of |det| over the micro-elements touching each node -- pure geometry, the
+// same for every call on a given mesh. The sweep below used to accumulate it on every call
+// alongside the gradient, which cost a fresh nnodes-sized allocation and zero-fill each time,
+// a fourth field in the per-element scatter, a fourth field through the shared reduction, and
+// a separate normalisation pass over every node afterwards. None of that is about the field
+// being differentiated. The flat path was given this treatment and its reconstruction went
+// from 4.87x slower to the fastest pass in the matvec; this is the same fix on the twin that
+// did not get it.
+//
+// Serial and deterministic, like its flat counterpart: it runs once per mesh, so the cost is
+// irrelevant beside the solve, and a thread-ordered accumulation would make the operator's
+// round-off depend on the thread count for no gain.
+//
+// The key is (nmacro, level). Coordinates are not in it, which is a deliberate limit rather
+// than an oversight: nothing in this spike moves a node after the operator is initialized,
+// and a checksum over a million coordinates on every call would cost more than the pass it
+// guards. A driver that ever does move points must clear grad_w_inv.
+inline void sscvfem_build_grad_weight(SSMeshData &d) {
+    if ((ptrdiff_t)d.grad_w_inv.size() == d.nnodes && d.grad_w_nmacro == d.nmacro &&
+        d.grad_w_level == d.level)
+        return;
+    d.grad_w_inv.assign((size_t)d.nnodes, scalar_t(0));
+    scalar_t *const SFEM_RESTRICT w = d.grad_w_inv.data();
+    const int                     L = d.level;
+    int                           off[8];
+    sscvfem_corner_offsets(L, off);
+    for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        // Hoisted exactly as the sweep hoists it, and that is a correctness requirement
+        // rather than a saving here: the denominator has to count the micro-elements the
+        // numerator counted, so both must make the same degeneracy decision on the same
+        // determinant.
+        scalar_t ex[8], ey[8], ez[8], adj[9], det;
+        for (int a = 0; a < 8; ++a) {
+            const smesh::idx_t g = d.elems[off[a]][e];
+            ex[a]                = (scalar_t)d.points[0][g];
+            ey[a]                = (scalar_t)d.points[1][g];
+            ez[a]                = (scalar_t)d.points[2][g];
+        }
+        sscvfem_micro_geom(ex, ey, ez, adj, &det);
+        const scalar_t vol = std::fabs(det);
+        if (vol < scalar_t(1e-30)) continue;
+        for (int zi = 0; zi < L; ++zi)
+            for (int yi = 0; yi < L; ++yi)
+                for (int xi = 0; xi < L; ++xi) {
+                    const int base = sscvfem_lidx(L, xi, yi, zi);
+                    for (int a = 0; a < 8; ++a) w[d.elems[base + off[a]][e]] += vol;
+                }
+    }
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+        w[i] = w[i] > scalar_t(0) ? scalar_t(1) / w[i] : scalar_t(0);
+    d.grad_w_nmacro = d.nmacro;
+    d.grad_w_level  = d.level;
+}
+
 inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
                                        const int stride, std::vector<scalar_t> &ogx,
                                        std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz) {
     SFEM_TRACE_SCOPE("sscvfem::nodal_grad_strided");
+    // Geometry, cached. Everything below is then about the field alone.
+    sscvfem_build_grad_weight(d);
+    const scalar_t *const SFEM_RESTRICT winv = d.grad_w_inv.data();
+
     ogx.assign((size_t)d.nnodes, 0);
     ogy.assign((size_t)d.nnodes, 0);
     ogz.assign((size_t)d.nnodes, 0);
-    std::vector<scalar_t> w((size_t)d.nnodes, 0);
 
     const int L = d.level;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
     const SSScatter *const sc = d.scatter ? d.scatter.get() : nullptr;
+    // Three fields where there were four. The weight used to ride along through the
+    // per-element accumulator, the scatter and the shared reduction, which is a third of the
+    // traffic of each spent re-deriving a quantity that does not change.
+    static constexpr int NG = 3;
 
 #pragma omp parallel
     {
-        std::vector<scalar_t> lx((size_t)d.nxe), ly((size_t)d.nxe), lz((size_t)d.nxe), lp((size_t)d.nxe);
+        std::vector<scalar_t>     lp((size_t)d.nxe);
         std::vector<smesh::idx_t> lg((size_t)d.nxe);
-        std::vector<scalar_t>     lacc((size_t)d.nxe * N_FIELDS);
+        std::vector<scalar_t>     lacc((size_t)d.nxe * NG);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
             if (sc) std::fill(lacc.begin(), lacc.end(), scalar_t(0));
+            // Only the field. The coordinates used to be gathered for every node of the
+            // macro-element -- three arrays of (L+1)^3 -- to feed a geometry computation that
+            // is the same for all of them.
             for (int a = 0; a < d.nxe; ++a) {
                 const smesh::idx_t g = d.elems[a][e];
                 lg[(size_t)a]        = g;
-                lx[(size_t)a]        = (scalar_t)d.points[0][g];
-                ly[(size_t)a]        = (scalar_t)d.points[1][g];
-                lz[(size_t)a]        = (scalar_t)d.points[2][g];
                 lp[(size_t)a]        = src[(ptrdiff_t)g * stride];
             }
+
+            // The geometry, once per macro-element rather than once per micro-element.
+            //
+            // A macro-element is subdivided uniformly, so its micro-elements are translates of
+            // one another and share a Jacobian exactly. sscvfem_macro_geom has always relied
+            // on this -- it is what the `hoisted` in apply_macro_local_hoisted means, and it
+            // computes the geometry of the first micro-element and reuses it for all L^3.
+            // This sweep did not, and paid L^3 geometry evaluations per macro-element where
+            // one is needed: eight times too many at level 2 and sixty-four at level 4.
+            scalar_t adj[9], det;
+            {
+                scalar_t ex[8], ey[8], ez[8];
+                for (int a = 0; a < 8; ++a) {
+                    const smesh::idx_t g = d.elems[off[a]][e];
+                    ex[a]                = (scalar_t)d.points[0][g];
+                    ey[a]                = (scalar_t)d.points[1][g];
+                    ez[a]                = (scalar_t)d.points[2][g];
+                }
+                sscvfem_micro_geom(ex, ey, ez, adj, &det);
+            }
+            if (std::fabs(det) < scalar_t(1e-30)) continue;
+            // |det| * grad, where grad itself carries a 1/det. The determinant cancels and
+            // only its SIGN survives, so the division the gradient used to do and the
+            // multiplication that undid it both disappear.
+            const scalar_t sgn = det > 0 ? scalar_t(1) : scalar_t(-1);
 
             for (int zi = 0; zi < L; ++zi) {
                 for (int yi = 0; yi < L; ++yi) {
                     for (int xi = 0; xi < L; ++xi) {
                         const int base = sscvfem_lidx(L, xi, yi, zi);
-                        scalar_t  ex[8], ey[8], ez[8], ep[8];
-                        for (int a = 0; a < 8; ++a) {
-                            const int l = base + off[a];
-                            ex[a]       = lx[(size_t)l];
-                            ey[a]       = ly[(size_t)l];
-                            ez[a]       = lz[(size_t)l];
-                            ep[a]       = lp[(size_t)l];
-                        }
-                        scalar_t adj[9], det;
-                        sscvfem_micro_geom(ex, ey, ez, adj, &det);
-                        const scalar_t vol = std::fabs(det);
-                        if (vol < scalar_t(1e-30)) continue;
+                        scalar_t  ep[8];
+                        for (int a = 0; a < 8; ++a) ep[a] = lp[(size_t)(base + off[a])];
                         scalar_t gx, gy, gz;
-                        cvfem_hex8_grad_scalar(adj, det, ep, gx, gy, gz);
+                        cvfem_hex8_grad_scalar(adj, sgn, ep, gx, gy, gz);
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
                             if (sc) {
-                                scalar_t *const acc = lacc.data() + (size_t)l * N_FIELDS;
-                                acc[0] += vol * gx;
-                                acc[1] += vol * gy;
-                                acc[2] += vol * gz;
-                                acc[3] += vol;
+                                scalar_t *const acc = lacc.data() + (size_t)l * NG;
+                                acc[0] += gx;
+                                acc[1] += gy;
+                                acc[2] += gz;
                             } else {
                                 const smesh::idx_t id = lg[(size_t)l];
-                                atomic_add(ogx.data(), id, vol * gx);
-                                atomic_add(ogy.data(), id, vol * gy);
-                                atomic_add(ogz.data(), id, vol * gz);
-                                atomic_add(w.data(), id, vol);
+                                atomic_add(ogx.data(), id, gx);
+                                atomic_add(ogy.data(), id, gy);
+                                atomic_add(ogz.data(), id, gz);
                             }
                         }
                     }
@@ -427,24 +530,27 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
             }
 
             if (sc) {
-                scalar_t *dst[N_FIELDS] = {ogx.data(), ogy.data(), ogz.data(), w.data()};
-                sscvfem_scatter_element_soa(*sc, d.nxe, e, lg.data(), lacc.data(), dst);
+                scalar_t *dst[NG] = {ogx.data(), ogy.data(), ogz.data()};
+                sscvfem_scatter_element_soa_w<NG>(*sc, d.nxe, e, lg.data(), lacc.data(), dst);
             }
         }
     }
 
     if (sc) {
-        scalar_t *dst[N_FIELDS] = {ogx.data(), ogy.data(), ogz.data(), w.data()};
-        sscvfem_reduce_shared_soa(*sc, dst);
+        scalar_t *dst[NG] = {ogx.data(), ogy.data(), ogz.data()};
+        sscvfem_reduce_shared_soa_w<NG>(*sc, dst);
     }
 
+    // The denominator, folded into one pass over the nodes instead of accumulated in the
+    // sweep and divided out in another. The flat twin folds it into the pack drain and has no
+    // pass at all; that needs the packed staging this path does not have, so one pass is the
+    // floor here.
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        if (w[(size_t)i] <= scalar_t(0)) continue;
-        const scalar_t inv = scalar_t(1) / w[(size_t)i];
-        ogx[(size_t)i] *= inv;
-        ogy[(size_t)i] *= inv;
-        ogz[(size_t)i] *= inv;
+        const scalar_t s = winv[(size_t)i];
+        ogx[(size_t)i] *= s;
+        ogy[(size_t)i] *= s;
+        ogz[(size_t)i] *= s;
     }
 }
 
