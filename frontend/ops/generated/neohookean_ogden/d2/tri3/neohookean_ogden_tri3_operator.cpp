@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <type_traits>
 #include "../neohookean_ogden_d2_simplex_local.hpp"
+#include "../neohookean_ogden_d2_simplex_hessian.hpp"
 #include "../../../reference/quad_tri_q1.hpp"
 #include "../../../reference/tri3_q1.hpp"
 #include "../../../geometry_kernels.hpp"
@@ -744,8 +745,6 @@ static int neohookean_ogden_tri3_hessian_i_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t bh_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     static constexpr int ne = VS;
     s_t bu_data[NS * NC][VS];
@@ -755,18 +754,6 @@ static int neohookean_ogden_tri3_hessian_i_msoa_assemble_impl(
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    const s_t *bu_streams[NS * NC];
-    for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
-    }
-    const s_t *bh_streams[NS * NC];
-    for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-    }
-    s_t *bout_streams[NS * NC];
-    for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
-    }
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];
@@ -813,27 +800,7 @@ static int neohookean_ogden_tri3_hessian_i_msoa_assemble_impl(
       }
     }
 
-    for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {
-      element_matrix[entry] = s_t(0);
-    }
-
-    for (int trial_component = 0; trial_component < NC; ++trial_component) {
-      for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
-        for (int stream = 0; stream < NS * NC; ++stream) {
-          bh_data[stream][0] = s_t(0);
-          bout_data[stream][0] = s_t(0);
-        }
-        bh_data[trial_shape * NC + trial_component][0] = s_t(1);
-        neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(1, 1, badj0, badj1, badj2, badj3, bdet0, isoparametric_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
-        const int col = trial_component * NS + trial_shape;
-        for (int test_component = 0; test_component < NC; ++test_component) {
-          for (int test_shape = 0; test_shape < NS; ++test_shape) {
-            const int row = test_component * NS + test_shape;
-            element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];
-          }
-        }
-      }
-    }
+    neohookean_ogden_d2_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, lmbda, mu, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
       neohookean_ogden_tri3_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

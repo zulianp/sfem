@@ -825,9 +825,55 @@ int test_generated_linear_elasticity_packed_one_pass_matches_two_pass() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_generated_neohookean_bsr_matches_hessian_action() {
+    // The hyperelastic element matrix has no other numerical gate.  It used to be
+    // recovered one column at a time by applying the operator to unit basis
+    // vectors, which was correct by construction and told nothing about the
+    // tangent; now it is computed directly from the state, so the assembled
+    // matrix has to be checked against the matrix-free action it is meant to
+    // reproduce -- at a non-zero state, where the two would agree trivially if
+    // the deformation gradient were dropped.
+    auto mesh     = sfem::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, 3, 3, 3, 0, 0, 0, 1, 1, 1);
+    auto space    = sfem::FunctionSpace::create(mesh, BLOCK_SIZE);
+    auto function = sfem::Function::create(space);
+    auto op       = sfem::create_op(space, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
+
+    SFEM_TEST_ASSERT(op != nullptr);
+    auto *const generated_op = dynamic_cast<sfem::GeneratedNeoHookeanOgden *>(op.get());
+    SFEM_TEST_ASSERT(generated_op != nullptr);
+    generated_op->set_value_in_block("default", "mu", 1.0);
+    generated_op->set_value_in_block("default", "lmbda", 1.0);
+    SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+    function->add_operator(op);
+
+    const ptrdiff_t     ndofs = space->n_dofs();
+    std::vector<real_t> state(ndofs, 0);
+    std::vector<real_t> direction(ndofs, 0);
+    fill_state_and_direction(space, state, direction);
+
+    std::vector<real_t> expected_action(ndofs, 0);
+    SFEM_TEST_ASSERT(generated_hessian_action(*function, state, direction.data(), expected_action.data()) == SFEM_SUCCESS);
+
+    auto x = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    std::copy(state.begin(), state.end(), x->data());
+
+    auto bsr = sfem::hessian_bsr(function, x, sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(bsr != nullptr);
+
+    std::vector<real_t> bsr_action(ndofs, 0);
+    SFEM_TEST_ASSERT(bsr->apply(direction.data(), bsr_action.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(assert_close_action("generated NeoHookean BSR hessian",
+                                         expected_action,
+                                         bsr_action,
+                                         1e-12,
+                                         1e-10) == SFEM_SUCCESS);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_generated_neohookean_hessian_action_matrix_formats);
+    SFEM_RUN_TEST(test_generated_neohookean_bsr_matches_hessian_action);
     SFEM_RUN_TEST(test_generated_linear_elasticity_packed_gradient_value_steps);
     SFEM_RUN_TEST(test_generated_linear_elasticity_packed_one_pass_matches_two_pass);
     SFEM_RUN_TEST(test_generated_laplace_crs_bsr_matches_existing_laplacian);

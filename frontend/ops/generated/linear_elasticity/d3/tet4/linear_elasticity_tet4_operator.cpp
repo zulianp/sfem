@@ -2284,8 +2284,6 @@ static int linear_elasticity_tet4_hessian_i_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t bh_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     static constexpr int ne = VS;
     s_t badj0[NQ * VS];
@@ -2299,14 +2297,6 @@ static int linear_elasticity_tet4_hessian_i_msoa_assemble_impl(
     s_t badj8[NQ * VS];
     s_t bdet0[NQ * VS];
     s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-    const s_t *bh_streams[NS * NC];
-    for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-    }
-    s_t *bout_streams[NS * NC];
-    for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
-    }
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];
