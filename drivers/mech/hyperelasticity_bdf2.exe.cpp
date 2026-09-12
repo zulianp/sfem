@@ -490,6 +490,15 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     // requested type, because the type falls back when nothing here supports it.
     const bool        use_inexact_operator =
             env.linear_op_type == sfem::op_type::INEXACT && f->inexact_supported();
+    // An assembled operator holds the values it was built from, so it carries the
+    // Jacobian of whatever state it saw at construction.  The matrix-free and
+    // inexact operators read the current state -- one through `Function::update`,
+    // the other through `inexact_update` -- and need no rebuilding; an assembled
+    // one does, once per linearization, or the Newton method quietly becomes a
+    // modified Newton on the initial Jacobian.  Measured on a 96-cube that cost
+    // 11206 linear iterations against 747.
+    const bool        rebuild_linear_op =
+            env.linear_op_type != sfem::op_type::MATRIX_FREE && !use_inexact_operator;
     auto              linear_op      = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
     auto              cg             = sfem::create_cg<real_t>(linear_op, sfem::EXECUTION_SPACE_HOST);
     cg->verbose                      = env.verbose;
@@ -617,6 +626,15 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             // breaks even at two or three applies per assembly and CG does tens.
             if (use_inexact_operator && f->inexact_update(u->data()) != SFEM_SUCCESS) {
                 return SFEM_FAILURE;
+            }
+            if (rebuild_linear_op) {
+                linear_op = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
+                if (!linear_op) {
+                    SFEM_ERROR("failed to rebuild the linear operator at step %d, Newton iteration %d\n",
+                               step,
+                               it);
+                    return SFEM_FAILURE;
+                }
             }
             cg->set_op(linear_op);
             cg->apply(rhs->data(), incr->data());

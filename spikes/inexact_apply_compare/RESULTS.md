@@ -1059,34 +1059,36 @@ and the pack count with any packed measurement; the crossover moves with the mes
 ### A larger example, where the linear solve is the run
 
 The 48-cube above is small enough that setup and I/O dominate at 72 threads. A 96-cube
-of HEX8 -- **2738019 dof**, 884736 elements -- over three time steps puts CG at 83% of
+of HEX8 -- **2738019 dof**, 884736 elements -- over three time steps puts CG at 87% of
 the matrix-free solve, which is where a solver comparison belongs. Grace, 72 threads,
-pack size 256.
+pack size 256. Every row takes the same 747 applies and agrees on the answer.
 
-| | CG | solve | ms/apply | applies | assembly | store |
-|---|---|---|---|---|---|---|
-| matrix-free | 9.290 s | 11.24 s | 12.07 | 747 | -- | -- |
-| inexact | 3.527 s | 5.14 s | 4.25 | 747 | 0.22 s | 159 MB |
-| inexact + packed | **2.362 s** | **4.19 s** | **2.73** | 747 | 0.22 s | 159 MB |
-| BSR | 58.014 s | 62.38 s | 4.74 | 11326 | 0.28 s | 1.77 GB |
+| | solve | CG | ms/apply | assembly | store |
+|---|---|---|---|---|---|
+| matrix-free | 10.94 s | 9.53 s | 12.40 | -- | -- |
+| BSR | 10.10 s | 3.84 s | 4.75 | 2.87 s (x10) | 1.77 GB |
+| inexact + packed | **4.19 s** | **2.37 s** | **2.76** | **0.23 s** (x9) | **159 MB** |
 
-All the matrix-free rows take the same 747 applies and agree on the answer to ten
-figures. **The linear solve is 3.9x faster than matrix-free and the whole solve 2.7x**,
-at this size, with the store an eleventh of the assembled matrix.
+**Partial assembly wins on all three axes against the assembled matrix**: the apply is
+1.7x cheaper, the assembly 11x cheaper -- 26 ms against 287 ms each -- and the store is
+an eleventh of the memory. Against matrix-free the linear solve is 4.0x and the whole
+solve 2.6x.
 
-**The BSR row is not a fair comparison, and the reason is a driver defect.**
-`sfem::hessian_bsr(f, u, es)` assembles the matrix once, at construction, and the
-driver builds its linear operator *before* the Newton loop -- the trace shows
-`Function::hessian_bsr` called once against twelve Newton iterations. So the BSR path
-is a modified Newton carrying the Jacobian of the initial state, which is why it needs
-11206 linear iterations where the others need 747, and why its answer differs in the
-fifth digit. Its 62 seconds measure that, not the format.
+The shape is worth reading. BSR's *apply* is respectable, within a factor of two of the
+stored tangent; what sinks it is that rebuilding 1.77 GB of matrix once per Newton
+iteration costs almost as much as all of its CG. The stored tangent is 45 numbers per
+element against a matrix row's worth, so its assembly is cheap enough to disappear:
+0.23 s against a 2.37 s linear solve.
 
-What can honestly be compared is the cost of one application: BSR 4.74 ms against the
-packed stored tangent's 2.73, for eleven times the memory. Partial assembly is the
-better stored operator on both axes. But a BSR comparison in this driver needs the
-matrix rebuilt per Newton step before its wall time means anything, and that is a
-change to `create_linear_operator`'s contract rather than to this spike.
+**BSR had to be fixed before it could be compared.** `sfem::hessian_bsr(f, u, es)`
+assembles once, at construction, and the driver built its linear operator before the
+Newton loop -- so `Function::hessian_bsr` was called *once* against twelve Newton
+iterations and BSR was running a modified Newton on the Jacobian of the initial state.
+It still converged, to a slightly different answer, in **11206 linear iterations against
+747**, and nothing in the output said why. The driver now rebuilds an assembled
+operator once per linearization; matrix-free and inexact need no rebuild, because they
+read the current state through `Function::update` and `inexact_update`. With that, all
+three take the same 747 applies and BSR reproduces the matrix-free answer exactly.
 
 ### What the first version of these driver numbers got wrong
 
