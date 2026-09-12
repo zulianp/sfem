@@ -1459,6 +1459,15 @@ single kernel with no harness at all and confirms the corrected figures.
 
 ## Reproducing
 
+The supported way is CMake; see `README.md` under **Building**:
+
+    cmake -S spikes/inexact_apply_compare -B build-spike \
+          -DSPIKE_MATERIAL=<material> -DSPIKE_ELEMENT=<element>
+    cmake --build build-spike -j
+    PACK_SIZE=512 OMP_NUM_THREADS=72 ./build-spike/bench_split 5
+
+The shell scripts below produced the numbers recorded above and still work.
+
     spikes/inexact_apply_compare/run_split.sh <material> <element> [repeats]
     spikes/inexact_apply_compare/run_mixed.sh <element> [repeats]
     spikes/inexact_apply_compare/run_store_precision.sh <element> [amplitudes...]
