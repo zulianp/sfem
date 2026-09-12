@@ -1345,52 +1345,67 @@ One thing this did **not** fix: the residual path still builds its element matri
 probing, 12 unit basis vectors through `jacobian_action` per TET4 element. The energy
 path no longer does. That is the same construction removed above, in a second emitter.
 
-#### The two-unit material's inexact apply on HEX8
+#### The two-unit material's inexact apply on HEX8, standard and packed
 
 TET4 established correctness and TET10 the accuracy under curvature; HEX8 is the element
-the driver benchmarks above run on, and it had never been measured. `run_mixed.sh HEX8`,
-Grace GH200 at 72 threads, `-O3 -march=native`, best of 9:
+the driver benchmarks above run on, and it had never been measured. Grace GH200 at 72
+threads, `-O3 -march=native`, best of 7, pack size 128. MDOF/s for the apply, except
+`assembly`, which is the once-per-tangent kernel:
 
-| elements | ndof | exact | st. f64 | st. f32 | st. f16 | assembly | f64 rel | f16 rel |
-|---|---|---|---|---|---|---|---|---|
-| 512 | 2187 | 30.50 | 37.65 | 36.56 | 55.47 | 21.80 | 6.3e-04 | 6.9e-04 |
-| 4096 | 14739 | 72.90 | 145.63 | 132.64 | 126.18 | 43.57 | 1.5e-04 | 4.0e-04 |
-| 13824 | 46875 | 89.43 | 230.34 | 209.05 | 196.42 | 42.83 | 6.6e-05 | 3.7e-04 |
-| 32768 | 107811 | 96.04 | 291.69 | 251.55 | 241.38 | 39.40 | 3.7e-05 | 6.0e-04 |
-| 64000 | **206763** | 95.30 | **321.48** | 276.19 | 279.91 | 40.62 | 2.3e-05 | 5.8e-04 |
+| elements | ndof | exact | st. f64 | st. f32 | st. f16 | **pk. f64** | pk. f32 | assembly | f64 rel | pk rel |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 512 | 2187 | 30.29 | 36.20 | 35.72 | 54.88 | 28.25 | 24.07 | 13.43 | 6.3e-04 | 6.3e-04 |
+| 4096 | 14739 | 74.11 | 146.54 | 135.74 | 130.20 | 181.40 | 155.06 | 26.62 | 1.5e-04 | 1.5e-04 |
+| 13824 | 46875 | 88.11 | 231.64 | 209.48 | 199.81 | 399.65 | 324.11 | 29.78 | 6.6e-05 | 6.6e-05 |
+| 32768 | 107811 | 96.09 | 287.08 | 249.37 | 231.89 | 565.06 | 443.47 | 30.66 | 3.7e-05 | 3.7e-05 |
+| 64000 | **206763** | 94.78 | 320.08 | 278.30 | 281.05 | **672.02** | 520.24 | 31.61 | 2.3e-05 | 2.3e-05 |
 
-MDOF/s for the apply, except `assembly`, which is the once-per-tangent kernel.
-**3.37x over the exact apply at 206763 dof**, breaking even after **3.3 applies per
-tangent**.
+**Packing is worth 2.10x on top of the stored apply, and 7.09x over the exact one.** The
+packed answer is identical to the standard one at every row -- `pk rel` matches `f64 rel`
+to every digit shown, so what is left is the projection error and nothing the layout did.
 
-**Narrowing the store does not pay on this material, and that inverts the single-unit
-result.** f32 is 276 against f64's 321 and f16 is 280; on every single-unit material in
-this document, halving the store bought bandwidth. The reason is the store itself: the
-Kelvin-Voigt tangent is unsymmetric and cannot fold 81 numbers into 45, so the pair costs
-**1008 bytes per element in f64** -- 45 elastic plus 81 viscous -- against 360 for a
-single symmetric unit. At that weight the apply has enough arithmetic per byte that it is
-no longer bandwidth-bound at this size, and the conversion on every load is a cost with
-nothing to buy. f16 also gives up accuracy for it, 5.8e-04 against 2.3e-05, so there is
+The pack size matters more here than anywhere else in this document, because it decides
+how many packs there are to share out and the packed loop is `#pragma omp for` over them:
+
+| pack size | packs at 64000 elements | pk. f64 at 206763 dof | packed vs standard |
+|---|---|---|---|
+| 128 | 500 | **672.02** | **2.10x** |
+| 256 | 250 | 607.18 | 1.89x |
+| 512 | 125 | 604.48 | 1.87x |
+| 1024 | 63 | 600.91 | 1.89x |
+
+At the largest size the spread is modest because even 63 packs is close to 72 threads.
+Two rows up it is brutal: at 4096 elements a pack size of 128 gives 181.40 MDOF/s and
+1024 gives 36.23, because 1024 leaves **four** packs for 72 threads. Smaller is safer,
+and the number to watch is the pack count against the thread count, not the pack size.
+
+**Narrowing the store does not pay on this material, in either layout.** Standard f32 is
+278 against f64's 320; packed f32 is 520 against packed f64's 672. That inverts every
+single-unit result in this document, where halving the store bought bandwidth. The cause
+is the store's weight: the Kelvin-Voigt tangent is unsymmetric and cannot fold 81 numbers
+into 45, so the pair costs **1008 bytes per element in f64** -- 45 elastic plus 81
+viscous -- against 360 for a single symmetric unit. At that arithmetic-per-byte the apply
+is not bandwidth-bound at these sizes, and the conversion on every load is a cost with
+nothing to buy. f16 gives up accuracy for it as well, 5.8e-04 against 2.3e-05, so there is
 no configuration of this material in which the narrow stores are the right choice.
 
-The accuracy column is the projection error rather than a store error, and it converges
-under refinement -- 6.3e-04 to 2.3e-05 across the table -- which is what an inexact
-quadrature on a non-affine element should do. f64 and f32 agree to every digit shown,
-which says the same thing from the other side: at this severity the store's precision is
-not what limits the answer.
+The accuracy columns are the projection error rather than a store error, and they converge
+under refinement -- 6.3e-04 to 2.3e-05 -- which is what an inexact quadrature on a
+non-affine element should do. f64 and f32 agree to every digit shown, which says the same
+thing from the other side.
 
-One caveat on the largest row: the stored throughput is **still climbing** at 206763 dof
-(291.7 to 321.5 from the previous size) while the exact apply has flattened (96.0 to
-95.3). This material has not saturated the machine at the sizes the harness sweeps, so
-the 3.37x is a lower bound on the ratio rather than a converged figure.
+Break-even rises to **4.3 applies per tangent** from the standard layout's 3.3, which is
+the right direction and not a regression: the apply got twice as cheap while the assembly
+did not, so it takes more of them to repay the same setup. A Newton step here does about
+98.
 
-**Two practical notes for anyone re-running this.** The generation is 1380 s for HEX8
-alone, which is why the material ships with `inexact_apply` off. And the *compile* is
-worse: `bench_mixed.cpp` includes both units' inline headers, 502 KB and 780 KB, giving
-one translation unit with roughly 10200 scalar assignments whose longest straight-line
-run is about 4100 statements. gcc 13.3 at `-O3 -march=native` takes **38 minutes and
-1.2 GB** on that, which overruns a 28-minute debug job. Compile it on the login node, or
-split the two units into separate translation units -- they share nothing but the mesh.
+**Two practical notes for anyone re-running this.** Generation is 1380 s for HEX8 alone,
+which is why the material ships with `inexact_apply` off. And the compile is worse:
+`bench_mixed.cpp` includes both units' inline headers, 502 KB and 780 KB, giving one
+translation unit with roughly 10200 scalar assignments whose longest straight-line run is
+about 4100 statements. gcc 13.3 at `-O3 -march=native` takes **38 minutes and 1.2 GB** on
+that, which overruns a 28-minute debug job -- compile it on the login node. Splitting the
+two units into separate translation units would halve it; they share nothing but the mesh.
 
 ### What the first version of these driver numbers got wrong
 
