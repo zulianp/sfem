@@ -991,9 +991,21 @@ and lost a third of its apply to conflict misses -- 6.13 ms against 4.57 on TET4
 against 1.38x over matrix-free. The Op now pads, which is why the numbers above are
 what they are.
 
-**What this run does not include.** It is on the standard mesh layout. The packed
-layout, worth 70 to 150% on the apply above, needs a `FunctionSpace` built on a packed
-mesh, which this driver does not create.
+**The packed layout is reachable but not yet usable here.** `SFEM_PACKED_MESH=1`
+builds it, and the Op has the branch; what blocks it is the boundary conditions.
+`PackedMesh::create` renumbers the mesh **in place**, and a Dirichlet nodeset stated
+as explicit node ids is written in the numbering it replaces -- so the constraints
+land on different nodes and the solve converges, perfectly well, to a different
+problem. On the 32-cube the displacement norm moves from 2.988e-01 to 3.894e-01 and
+nothing in the output says why; it was caught by comparing against the unpacked answer,
+which is the only thing that would have caught it.
+
+The driver now refuses that combination rather than warning about it. A sideset
+survives the renumbering, because it names elements and local faces and derives its
+nodeset afterwards; an explicit node list does not. Lifting the restriction means
+rebuilding `DirichletConditions` through the packed renumbering, which is a frontend
+change. Until then the 70 to 150% the packed apply is worth in the kernel benchmarks
+is not available to this driver.
 
 ### What the first version of these driver numbers got wrong
 
