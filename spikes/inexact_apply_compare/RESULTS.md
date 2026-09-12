@@ -1110,29 +1110,72 @@ halving the value width with `SFEM_ENABLE_MIXED_PRECISION=4` gives 1.79x and lan
 the answer agrees to twelve digits. Nobody should be looking for a better BSR kernel
 here.
 
-**The assembly is not state of the art, by about sixty times.** It writes the same 1.77
-GB in 287 ms: **6.7 GB/s, 1.3% of peak**. The reason is visible in the generated
-scatter: per element it locates 8 rows, searches each for 8 columns, and then performs
-`8 x 8 x 3 x 3 = 576` `#pragma omp atomic update`. Over 884736 elements that is **509
-million contended read-modify-writes**, and they, not the bandwidth, are the cost.
+**The assembly is not state of the art, and the reason is not what it looks like.** It
+writes the same 1.77 GB in 287 ms -- 6.7 GB/s, 1.3% of peak -- and the generated scatter
+does `8 x 8 x 3 x 3 = 576` `#pragma omp atomic update` per element, 509 million over the
+mesh, which is an inviting thing to blame. It is not the cost. Read the kernel and the
+arithmetic says so plainly:
+
+    for trial_component in 0..3:
+      for trial_shape in 0..8:            # 24 unit basis vectors
+        zero bh, bout; bh[this one] = 1
+        tensor_product_apply_block(1 element, ...)   # a full apply
+        copy out one column of the 24x24
+
+**The element matrix is built by applying the operator to 24 unit vectors.** 287 ms
+divided by 24 is 11.97 ms; one matrix-free apply over this mesh is 12.40 ms. The
+assembly *is* twenty-four applies, to within 3%, and everything else -- the column
+searches, the half-billion atomics -- fits in what is left.
 
 That is also the whole of why BSR loses here. With f32 values its linear solve is 2.29 s
 against partial assembly's 2.37 -- a dead heat -- and it still finishes in 9.27 s
 against 4.19, because it spends 2.75 s rebuilding the matrix that partial assembly
 rebuilds in 0.23.
 
-**What would fix it** is the technique this repository already uses for the matrix-free
-scatter, and already has plans machinery for: `plans/matrix_formats.py` carries
-`PackedAssemblyPass.ONE_PASS`/`TWO_PASS`, and the packed layout accumulates into
-thread-private storage with no atomic at all, reaching global memory only at the pack
-boundary. Applied to assembly it would replace most of those 509 million atomics with
-plain adds. Nothing here measures how much of the 2.75 s that recovers; the upper bound
-is large, since the kernel is running at one per cent of the bandwidth it would need.
+#### Why it does that, and what would fix it
 
-A second, cheaper lever is symmetry: the elastic Hessian is symmetric and
+The generator **already emits a direct element-matrix kernel** --
+`<material>_d<dim>_<family>_direct_hessian_<family>_element_matrix` -- and laplace and
+linear elasticity call it. Neohookean does not, and the gate is one line,
+`energy_codegen.py:_sfem_soa_direct_hessian_matrix_assembly_available`:
+
+    return not _form_uses_current(form, default=True)
+
+A direct element matrix is emitted only for a form that does **not** read the current
+state. A linear material's Hessian is state-independent and gets one; a hyperelastic
+material's depends on `u`, so it falls back to the generic 24-apply construction. That
+is a scope boundary, not a mathematical one: the element matrix of a hyperelastic
+operator at a given state is perfectly computable directly.
+
+**Three routes, in increasing order of how much the tree already knows.**
+
+*Lift the gate.* Emit a direct element-matrix kernel for state-dependent forms as well.
+The 24 applies each recompute the geometry, the deformation gradient and the material
+tangent at every quadrature point; a direct kernel computes them once and forms all 576
+entries from them. The saving is whatever fraction of an apply is tangent evaluation
+rather than contraction, which for a hyperelastic material is most of it.
+
+*Assemble from the stored tangent -- and this repository has already done it by hand.*
+`operators/sshex8/sshex8_neohookean_ogden.cpp:823` builds its element matrix with
+`hex8_neohookean_hessian_from_S_ikmn(&partial_assembly[e * S_IKMN_SIZE], W, element_matrix)`:
+`Sbar` once per element, then a contraction with the reference tensor. That is exactly
+the object the inexact path already computes, at **26 ms for this whole mesh** against
+the 287 ms the 24 applies cost, and the contraction that turns it into a column is what
+`plans/inexact_apply.py`'s `action_stages` already expresses symbolically. Assembling
+all 24 columns from one `Sbar` is the same contraction with 24 right-hand sides and
+shares every load of `Sbar` between them.
+
+*Then, and only then, the atomics.* `plans/matrix_formats.py` carries
+`PackedAssemblyPass.ONE_PASS`/`TWO_PASS` and the packed layout accumulates into
+thread-private storage with no atomic. It is the right technique and it is worth having
+-- but on this evidence it is optimising the small term, and doing it first would have
+produced a disappointing number and a wrong conclusion about why.
+
+A cheaper lever exists independently: the elastic Hessian is symmetric and
 `hessian_bcrs_sym` exists, but `neohookean_ogden` declares `matrix_formats=("bsr",
 "block_diag_sym")` and publishes no `bcrs_sym` kernel, so `SFEM_LINEAR_OP_TYPE=BSR_SYM`
-has nothing to dispatch to on this material.
+has nothing to dispatch to on this material. Adding it to the material's format list is
+a one-line experiment.
 
 ### What the first version of these driver numbers got wrong
 
