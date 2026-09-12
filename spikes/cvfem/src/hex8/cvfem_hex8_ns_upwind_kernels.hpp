@@ -181,6 +181,20 @@ struct Hex8RhieChowT {
     const T *uy{};
     const T *uz{};
     Hex8RcTau tau{};
+    // The exact Rhie-Chow term's contribution to the BLOCK DIAGONAL, which the assembled
+    // Jacobian otherwise omits along with the rest of the wide coupling.
+    //
+    // gw[a] is the reconstruction weight 1/W_a at local node a and dN[3b+k] is
+    // d(grad q)_k / d q_b for this element, so their product is d(qg_a)/d(q_b) -- the
+    // element's share of it. Both null means the frozen form, which is what every path that
+    // assembles a full matrix wants: including these there would widen the pressure coupling
+    // past nearest neighbours and the sparsity pattern cannot hold it.
+    //
+    // The block diagonal is the exception, because the widened entries are off-diagonal and
+    // are dropped by the slot mask anyway -- all except the two that are not, which is
+    // precisely what this computes.
+    const T *gw{};
+    const T *dN{};
 };
 
 // Every existing host call site names `Hex8RhieChow`, so keep that spelling bound
@@ -1152,6 +1166,34 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_rhie_chow_p(const scalar
     cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + j], 2, 3, uup_z * dmdot_j);
     cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + i], 2, 3, -uup_z * dmdot_i);
     cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 2, 3, -uup_z * dmdot_j);
+
+    // The exact term's diagonal share. See Hex8RhieChowT::gw.
+    //
+    // The residual's correction is mdotc = -coeff [ (q_j - q_i) - avg(qg_i, qg_j) . d ], and
+    // the four writes above are its derivative with the reconstructed gradient held FROZEN,
+    // which is where the assembled Jacobian stops. Differentiating the gradient too adds
+    //
+    //     d mdotc / d q_b  +=  coeff * (gw_i + gw_j)/2 * (dN_b . d)
+    //
+    // for EVERY node b of the element, not just i and j -- that is the widening. Of those,
+    // only b = i and b = j reach the block diagonal, and only through the rows that own them:
+    // row i receives +mdotc and row j receives -mdotc, so the two diagonal entries are
+    // +extra_i and -extra_j. Everything else is off-diagonal and the slot mask discards it.
+    if (rc.gw && rc.dN) {
+        const scalar_t half_w = scalar_t(0.5) * (rc.gw[i] + rc.gw[j]);
+        const scalar_t ei =
+                coeff * half_w * (rc.dN[i * 3 + 0] * dx + rc.dN[i * 3 + 1] * dy + rc.dN[i * 3 + 2] * dz);
+        const scalar_t ej =
+                coeff * half_w * (rc.dN[j * 3 + 0] * dx + rc.dN[j * 3 + 1] * dy + rc.dN[j * 3 + 2] * dz);
+        cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + i], 3, 3, ei);
+        cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 3, 3, -ej);
+        cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + i], 0, 3, uup_x * ei);
+        cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 0, 3, -uup_x * ej);
+        cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + i], 1, 3, uup_y * ei);
+        cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 1, 3, -uup_y * ej);
+        cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + i], 2, 3, uup_z * ei);
+        cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 2, 3, -uup_z * ej);
+    }
 }
 
 template <bool Atomic, typename Slot, typename scalar_t>
