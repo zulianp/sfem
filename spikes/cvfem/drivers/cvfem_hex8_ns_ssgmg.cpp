@@ -4651,16 +4651,14 @@ int main(int argc, char **argv) {
             // ~1e-15 and, for a solution that barely changes with the continuation parameter,
             // every later stage starts solved. Abandoning here discards converged stages --
             // the same floor the line search already respects applies.
-            // rel is measured against THIS stage's starting residual, so a stage that begins
-            // nearly solved can have no reachable rtol at all: the Re=100 cavity starts a stage
-            // at 9.84e-03, reaches 4.24e-09 in three steps, and its best possible rel is then
-            // 4.3e-07 -- outside a 1e-7 floor by a factor of four, with nothing left to
-            // converge. A step that moved the residual by less than 20% while not increasing it
-            // has reached the floor whatever the relative number says, and that is what the
-            // threshold was standing in for. A growing residual is excluded, so a genuinely
-            // diverging solve still fails fast.
-            const bool at_floor = newton_rate > real_t(0.8) && newton_rate <= real_t(1);
-            if (rel < nl_ls_floor || at_floor) {
+            // A stalling test was tried here -- accept when the Newton step moved the residual
+            // by less than 20% -- and it does not work, because it cannot tell the two cases
+            // apart. Measured on the 470,596-dof sweep: the Re=100 cavity stage is at the floor
+            // with rel 4.31e-07 and rate 0.612, and the N=64 manufactured-solution stage is
+            // genuinely unconverged with rel 3.81e-03 and rate 0.548. The rates are the same;
+            // only rel separates them, so rel is what the test uses. The rate is kept only for
+            // the message, where it tells a reader which of the two they are looking at.
+            if (rel < nl_ls_floor) {
                 std::printf("  linear solve gave up on a rel=%.3e right-hand side (rate %.3f)"
                             " -- residual floor, accepting as converged\n", (double)rel,
                             (double)newton_rate);
@@ -4721,8 +4719,7 @@ int main(int argc, char **argv) {
                 // No step reduces ||R||. That is a genuine failure only if the residual is
                 // still large; at the round-off floor it just means there is nothing left to
                 // reduce, and treating it as failure discards a converged stage.
-                const bool at_floor = newton_rate > real_t(0.8) && newton_rate <= real_t(1);
-                if (rel < nl_ls_floor || at_floor) {
+                if (rel < nl_ls_floor) {
                     std::printf("  line search found no decrease at rel=%.3e (rate %.3f)"
                                 " -- residual floor, accepting as converged\n", (double)rel,
                                 (double)newton_rate);
