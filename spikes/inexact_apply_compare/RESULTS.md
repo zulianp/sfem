@@ -1010,12 +1010,30 @@ mesh48, 352947 dof, three interleaved passes, medians; pass-to-pass spread under
 
 All three produce the same answer, and the two inexact rows produce it bit-identically.
 
-**At eight threads the solve is 2.56x faster and the apply 4.9x.** At seventy-two the
-apply is still 4.7x but the solve is only 1.43x, and packing adds nothing to it: 142
-applies at 0.332 ms is 47 ms of a 567 ms solve, so the apply has stopped being where
-the time goes. What is left is the assembly, the gradient, the line search and the
-constraints -- none of which this work touched. Making the apply five times cheaper on
-a full socket buys 1.4x, and the next thing to profile is everything else.
+**Measure the linear solve, not the "solve".** Profiling the 72-thread run showed
+`Output::write_time_step` at 23% of it, `Mesh::read` 16%, `Mesh::write` 14% and
+operator `initialize` 14% -- more than half the wall time is file I/O and setup for a
+one-step run, and all of CG is 12%. A number that dilutes a 5x kernel into 1.2x is
+measuring the file system. Timing `ConjugateGradient::apply` instead, which is the
+part partial assembly changes:
+
+| threads | | CG | ms/apply | assembly | solve |
+|---|---|---|---|---|---|
+| 8 | matrix-free | 1.995 s | 13.33 | -- | 2.41 s |
+| 8 | inexact | 0.688 s | 4.51 | 0.080 s | 1.18 s |
+| 8 | inexact + packed | **0.421 s** | **2.70** | 0.080 s | 1.05 s |
+| 72 | matrix-free | 0.257 s | 1.565 | -- | 0.603 s |
+| 72 | inexact | 0.111 s | 0.580 | 0.012 s | 0.492 s |
+| 72 | inexact + packed | **0.075 s** | **0.340** | 0.012 s | 0.508 s |
+
+**The linear solve is 4.7x faster at eight threads and 3.4x at seventy-two**, packed;
+2.9x and 2.3x without packing. The assembly is 19% of the linear solve at eight
+threads and 16% at seventy-two -- real, and not the story.
+
+The solve-level figures are in the table for honesty, not as the result: at 72 threads
+CG is 43% of the matrix-free solve and 15% of the packed one, so what the remaining
+speed-up is bounded by is I/O. On a run that wrote less and stepped more, the CG
+column is what would show.
 
 **The pack size has to be tuned, and the default is wrong for a many-core machine.**
 `PackedMesh` derives it from the *index type's* ceiling -- `n_packs = ceil(n_elements *
