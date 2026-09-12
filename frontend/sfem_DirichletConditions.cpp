@@ -431,6 +431,28 @@ namespace sfem {
                         p >> nodeset->data()[count++];
                     }
                 }
+
+                // An explicit node list speaks the numbering the mesh had on
+                // disk.  If the space has since been packed, that numbering is
+                // gone: the ids name different nodes, and a solve on them
+                // converges to a different problem without saying so.  A sideset
+                // needs none of this -- it names elements and local faces, and
+                // packing does not move elements -- which is why only this
+                // branch maps.
+                if (const auto map = space->packed_node_map()) {
+                    auto       *const ids   = nodeset->data();
+                    const auto *const to_new = map->data();
+                    const ptrdiff_t   nnodes = map->size();
+                    for (ptrdiff_t i = 0; i < nodeset->size(); ++i) {
+                        if (ids[i] < 0 || ids[i] >= nnodes) {
+                            SFEM_ERROR("node %ld in a Dirichlet nodeset is out of range for a "
+                                       "mesh of %ld nodes\n",
+                                       (long)ids[i],
+                                       (long)nnodes);
+                        }
+                        ids[i] = to_new[ids[i]];
+                    }
+                }
             }
 
             std::vector<int>    component;

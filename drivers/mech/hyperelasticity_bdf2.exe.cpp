@@ -407,25 +407,11 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     // below is checked against the unpacked one rather than trusted: a
     // constraint that moved still converges, to a different problem.
     if (smesh::Env::read("SFEM_PACKED_MESH", false)) {
-        // Refused rather than warned about, because the failure is silent: a
-        // constraint whose node ids were stated in the on-disk numbering lands
-        // on different nodes after the renumbering, and the solve then converges
-        // perfectly well to a different problem.  Measured on a 32-cube, the
-        // displacement norm moves from 2.988e-01 to 3.894e-01 and nothing in the
-        // output says why.
-        //
-        // A sideset survives, because it names elements and local faces and the
-        // nodeset is derived after.  An explicit node list does not.  Lifting
-        // this needs `DirichletConditions` to be rebuilt through the packed
-        // renumbering, which is a frontend change and not a driver one.
-        if (dirichlet_path.to_string() != "NONE") {
-            SFEM_ERROR(
-                    "SFEM_PACKED_MESH renumbers the mesh in place, and the Dirichlet "
-                    "conditions in %s are stated in the numbering it replaces. Use a "
-                    "sideset, or run without packing.\n",
-                    dirichlet_path.to_string().c_str());
-            return SFEM_FAILURE;
-        }
+        // `PackedMesh::create` renumbers the mesh in place, so this has to happen
+        // before anything reads node ids off it.  A Dirichlet nodeset given as
+        // explicit ids speaks the on-disk numbering and is mapped through
+        // `FunctionSpace::packed_node_map` when it is read; a sideset needs no
+        // mapping, because packing does not move elements.
         if (fs->initialize_packed_mesh() != SFEM_SUCCESS) {
             SFEM_ERROR("failed to build the packed mesh\n");
             return SFEM_FAILURE;
