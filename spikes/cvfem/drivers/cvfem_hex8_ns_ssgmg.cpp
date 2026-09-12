@@ -96,6 +96,23 @@ static real_t smoother_omega() {
     return smesh::Env::read<real_t>("SFEM_VANKA_OMEGA", real_t(1));
 }
 
+// Which Newton iteration the SFEM_GMG_CHECK gates fire on. Default 0, which is where they
+// have always fired and where they should stay for anything that depends only on geometry.
+//
+// It is a knob because the Rhie-Chow time scale now carries the advecting velocity, and at
+// Newton iteration 0 the interior velocity is ZERO -- only the Dirichlet values are set. So
+// the advective branch of the time scale is absent by construction at iteration 0, and a gate
+// measured there reports the diffusive limit whatever the flow is: on the L=8 Poiseuille
+// configuration the block-split norms move by exactly the factor two between the old
+// coefficient and the new one, which is the ratio of h^2/(2 nu) to h^2/(4 nu) and nothing to
+// do with the Peclet number the change is about.
+//
+// Setting this to a later iteration measures the same gate against a developed velocity
+// field, which is the regime the operator is actually solved in.
+static int gmg_check_at() {
+    return smesh::Env::read<int>("SFEM_GMG_CHECK_AT", 0);
+}
+
 
 namespace {
 
@@ -4326,7 +4343,7 @@ int main(int argc, char **argv) {
                 // that would diverge if iterated. Inside a V-cycle it IS iterated, so a
                 // divergent smoother makes the cycle diverge regardless of what the coarse
                 // levels do -- and no coarse-grid fix can repair that.
-                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 3 && newton_it == 0) {
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 3 && newton_it == gmg_check_at()) {
                     const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
                     // Same source as the cycle's, or this check measures something else.
                     const real_t om = (kind == "vanka")
@@ -4400,7 +4417,7 @@ int main(int argc, char **argv) {
                 // exactly what lam_min was telling us globally. This is that measurement
                 // resolved in space rather than as one number. It is the local decay, not
                 // Brandt's normalisation, so it is reported as a rate and not called sigma.
-                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 7 && newton_it == 0) {
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 7 && newton_it == gmg_check_at()) {
                     const int nsweep = smesh::Env::read<int>("SFEM_SIGMA_SWEEPS", 20);
                     const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
                     const real_t om = (kind == "vanka")
@@ -4472,7 +4489,7 @@ int main(int argc, char **argv) {
                                 slow_x, slow_y, slow_r);
                 }
 
-                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 6 && newton_it == 0) {
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 6 && newton_it == gmg_check_at()) {
                     const std::string base =
                             smesh::Env::read_string("SFEM_DUMP_OP", std::string("/tmp/op"));
                     // Build the same preconditioner the solve would use, so the spectrum
@@ -4509,7 +4526,7 @@ int main(int argc, char **argv) {
                     dump_dense((base + "_M.txt").c_str(), ndof, dM);
                 }
 
-                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 2 && newton_it == 0) {
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 2 && newton_it == gmg_check_at()) {
                     std::vector<real_t> probe((size_t)ndof, 0);
                     gmg->mg->verbose = true;
                     // Multigrid::debug prints, per level per cycle, the coarse residual after
