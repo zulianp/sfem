@@ -77,9 +77,17 @@ The pack size is a cache variable *and* an environment variable: `PACK_SIZE=256
 ./build-spike/bench_mixed 5` re-partitions without rebuilding, which is the only
 practical way to sweep it when the translation unit takes forty minutes to compile.
 
-The `run_*.sh` scripts predate this and still work; they hand-write the same compiler
-invocation, and the copies had drifted apart -- one knew about the packed layout and
-another did not, one found `mpi.h` and another did not. Prefer CMake.
+Where the material publishes a `matrix_formats` entry the harnesses also assemble a BSR
+matrix and time its apply beside the matrix-free and partially-assembled ones, so the
+three ways of applying the same Jacobian appear in one table with their setup costs and
+their memory. The graph is the mesh's node-to-node graph, built in `bsr_matrix.inc`
+rather than borrowed from the library, because the comparison is between kernels and not
+between two surrounding frameworks.
+
+The `run_*.sh` scripts predate this and still work, but they are behind: they hand-write
+the same compiler invocation, the copies had drifted apart -- one knew about the packed
+layout and another did not, one found `mpi.h` and another did not -- and none of them
+carries the BSR column. Prefer CMake.
 
 ## The split kernels
 

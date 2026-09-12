@@ -67,6 +67,18 @@ extern "C" int EXACT_APPLY(
 
 #include "element_mesh.inc"
 #include "packed_mesh.inc"
+#ifdef MATERIAL_HESSIAN_BSR
+#include "bsr_matrix.inc"
+// The assembled Jacobian, through the same C entry point the Op calls.  An
+// energy unit publishes the runtime-typed ABI: a leading scalar width and
+// `void *` buffers.
+extern "C" int MATERIAL_HESSIAN_BSR(const int, const ptrdiff_t, const ptrdiff_t,
+    idx_t **const, const geom_t *const *const, const double, const double,
+#ifdef EXACT_TAKES_STATE
+    const ptrdiff_t, const void *const, const void *const, const void *const,
+#endif
+    const count_t *const, const idx_t *const, void *const);
+#endif
 #ifdef MATERIAL_PACKED_REFERENCE
 #include MATERIAL_PACKED_REFERENCE
 #endif
@@ -146,6 +158,9 @@ int main(int argc, char **argv) {
 #ifdef PACKED_REFERENCE_APPLY
     std::printf(" | %8s", "pk.ref");
 #endif
+#ifdef MATERIAL_HESSIAN_BSR
+    std::printf(" | %8s %8s %9s %7s", "bsr", "bsr asm", "bsr diff", "MB");
+#endif
     std::printf("\n");
     std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s", "", "", "",
                 "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
@@ -157,6 +172,9 @@ int main(int argc, char **argv) {
 #endif
 #ifdef PACKED_REFERENCE_APPLY
     std::printf(" | %8s", "MDOF/s");
+#endif
+#ifdef MATERIAL_HESSIAN_BSR
+    std::printf(" | %8s %8s %9s %7s", "MDOF/s", "MDOF/s", "rel", "values");
 #endif
     std::printf("\n");
 
@@ -336,6 +354,46 @@ int main(int argc, char **argv) {
             return num / den;
         };
 
+#ifdef MATERIAL_HESSIAN_BSR
+        // The assembled Jacobian, beside the matrix-free and partially assembled
+        // ones.  Its vectors are component-interleaved where the kernels' are
+        // component-separate, so the comparison goes through an interleave.
+        const BsrGraph graph = build_bsr_graph(m);
+        std::vector<geom_t> gx(m.nnodes), gy(m.nnodes), gz(m.nnodes);
+        for (ptrdiff_t v = 0; v < m.nnodes; ++v) {
+            gx[v] = (geom_t)m.px[v]; gy[v] = (geom_t)m.py[v]; gz[v] = (geom_t)m.pz[v];
+        }
+        const geom_t *const bsr_points[3] = {gx.data(), gy.data(), gz.data()};
+        std::vector<double> bsr_values((size_t)graph.nnz() * 9, 0.0);
+        std::vector<double> bsr_x((size_t)m.nnodes * 3), bsr_y((size_t)m.nnodes * 3, 0.0);
+        for (ptrdiff_t v = 0; v < m.nnodes; ++v) {
+            bsr_x[(size_t)v * 3 + 0] = hx[v];
+            bsr_x[(size_t)v * 3 + 1] = hy[v];
+            bsr_x[(size_t)v * 3 + 2] = hz[v];
+        }
+        auto run_bsr_assemble = [&] {
+            std::fill(bsr_values.begin(), bsr_values.end(), 0.0);
+            MATERIAL_HESSIAN_BSR(SFEM_CODEGEN_F64, m.nelements, m.nnodes,
+                m.evp.data(), bsr_points, lmbda, mu,
+#ifdef EXACT_TAKES_STATE
+                1, ux.data(), uy.data(), uz.data(),
+#endif
+                graph.rowptr.data(), graph.colidx.data(), bsr_values.data());
+        };
+        auto run_bsr_apply = [&] {
+            bsr_apply<3>(graph, bsr_values.data(), bsr_x.data(), bsr_y.data());
+        };
+        auto rel_bsr = [&] {
+            double num = 0, den = 0;
+            for (ptrdiff_t v = 0; v < m.nnodes; ++v) {
+                num += std::fabs(ax[v] - bsr_y[(size_t)v * 3 + 0])
+                     + std::fabs(ay[v] - bsr_y[(size_t)v * 3 + 1])
+                     + std::fabs(az[v] - bsr_y[(size_t)v * 3 + 2]);
+                den += std::fabs(ax[v]) + std::fabs(ay[v]) + std::fabs(az[v]);
+            }
+            return num / den;
+        };
+#endif
         run_exact();
         run_stored(S64.data());
         const double d_64 = rel(cx,cy,cz);
@@ -353,6 +411,13 @@ int main(int argc, char **argv) {
         const double d_pks = rel_packed();
 #endif
 
+#ifdef MATERIAL_HESSIAN_BSR
+        run_bsr_assemble(); run_bsr_apply();
+        const double d_bsr = rel_bsr();
+        const double bsr_mdof = best_mdof(repeats, ndof, run_bsr_apply);
+        const double bsr_asm  = best_mdof(repeats, ndof, run_bsr_assemble);
+        const double bsr_mb   = (double)bsr_values.size() * sizeof(double) / (1024.0 * 1024.0);
+#endif
         const double e  = best_mdof(repeats, ndof, run_exact);
         const double s64 = best_mdof(repeats, ndof, [&]{ run_stored(S64.data()); });
         const double s32 = best_mdof(repeats, ndof, [&]{ run_stored(S32.data()); });
@@ -379,6 +444,9 @@ int main(int argc, char **argv) {
 #endif
 #ifdef PACKED_REFERENCE_APPLY
         std::printf(" | %8.2f", sref);
+#endif
+#ifdef MATERIAL_HESSIAN_BSR
+        std::printf(" | %8.2f %8.2f %9.1e %7.1f", bsr_mdof, bsr_asm, d_bsr, bsr_mb);
 #endif
         std::printf("\n");
         if (n == sizes_probe[sizeof(sizes_probe)/sizeof(int) - 1]) {
