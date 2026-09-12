@@ -75,6 +75,10 @@ material = gen.CodeGenerator(
     systems,
     elements=gen.sfem_default_element_types(),
     op_name="GeneratedMooneyRivlinKelvinVoigtNewmark",
+    # Both units assemble: the elastic energy through the direct element-matrix
+    # kernel and the viscous residual through its own.  A vector-valued problem
+    # uses BSR and nothing else.
+    matrix_formats=("bsr",),
     parameter_defaults=(
         ("lmbda", 1.0),
         ("mu", 1.0),

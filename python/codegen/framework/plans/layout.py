@@ -207,22 +207,35 @@ def _mixed_triplet_stream_indices(layout, group_names):
     return tuple(indices)
 
 
-def _compatible_matrix_stream_indices(field_indices, n_shape):
+def _compatible_matrix_stream_indices(field_indices, n_shape, n_fields):
+    """Kernel stream indices for an element matrix, grouped by field.
+
+    The position in this list is the element matrix's row (or column); the value
+    is the stream the kernel reads.  Those are two different orders and the
+    distinction is the whole point: the matrix is laid out component-major so the
+    scatter's component and shape tables stay the plain ones, while a kernel
+    stream is `shape * n_fields + field`, the node-major order every gather in
+    this file writes and every block kernel reads.  They used to be the same
+    expression, which assembled a matrix permuted against the kernel that filled
+    it -- and the element matrix was fed a permuted state as well, so it was not
+    even a clean permutation of the right answer.
+    """
     streams = []
     for field_index in field_indices:
-        streams.extend(field_index * n_shape + shape for shape in range(n_shape))
+        streams.extend(shape * n_fields + field_index for shape in range(n_shape))
     return tuple(streams)
 
 
 def _compatible_stream_component_offsets(n_fields, n_shape):
-    offsets = []
-    for field_index in range(n_fields):
-        offsets.extend(field_index for _ in range(n_shape))
-    return tuple(offsets)
+    """Which field each kernel stream carries, indexed by the stream.
+
+    A stream is `shape * n_fields + field`, so the field is the remainder.  This
+    is indexed by the stream itself and not by a position in an element matrix,
+    which is why it is not simply the order the streams are listed in.
+    """
+    return tuple(stream % n_fields for stream in range(n_fields * n_shape))
 
 
 def _compatible_stream_shape_offsets(n_fields, n_shape):
-    offsets = []
-    for _ in range(n_fields):
-        offsets.extend(range(n_shape))
-    return tuple(offsets)
+    """Which shape function each kernel stream carries, indexed by the stream."""
+    return tuple(stream // n_fields for stream in range(n_fields * n_shape))

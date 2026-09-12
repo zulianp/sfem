@@ -6417,8 +6417,8 @@ def _scalar_crs_matrix_assembly_source(
         system,
         rule.element_type,
     )
-    row_streams = _compatible_matrix_stream_indices(row_fields, n_shape)
-    column_streams = _compatible_matrix_stream_indices(column_fields, n_shape)
+    row_streams = _compatible_matrix_stream_indices(row_fields, n_shape, n_fields)
+    column_streams = _compatible_matrix_stream_indices(column_fields, n_shape, n_fields)
     shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(tuple(range(n_shape)), 1, shape_order)
     if n_fields != 1:
@@ -6570,7 +6570,7 @@ def _scalar_crs_matrix_assembly_source(
         else:
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "      b%s[%d * NS + shape][0] = %s[node * %s];"
+                    "      b%s[shape * NC + %d][0] = %s[node * %s];"
                     % (role.name, field_index, role.field_pointer(field.name), role.stride)
                 )
     lines.extend(
@@ -6971,7 +6971,7 @@ def _scalar_crs_matrix_assembly_source(
             else:
                 for field_index in range(len(system.fields)):
                     lines.append(
-                        "          b%s[%d * NS + shape][0] = pk_%s[%d * max_nodes_per_pack + packed_node];"
+                        "          b%s[shape * NC + %d][0] = pk_%s[%d * max_nodes_per_pack + packed_node];"
                         % (role.name, field_index, role.name, field_index)
                     )
         lines.extend(["        }", ""])

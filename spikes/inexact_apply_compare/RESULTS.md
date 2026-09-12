@@ -1177,6 +1177,174 @@ A cheaper lever exists independently: the elastic Hessian is symmetric and
 has nothing to dispatch to on this material. Adding it to the material's format list is
 a one-line experiment.
 
+#### The gate was lifted, the probing is gone, and it did not get faster
+
+The first route was taken: `_sfem_soa_direct_hessian_matrix_assembly_available` now
+returns `True`, the direct element-matrix kernel takes the state streams and rebuilds
+`gu` the way the apply does, and both probing fallbacks are deleted along with the
+`bh_data`/`bout_data` scratch that existed only to feed them. The assembled matrix is
+now genuinely computed rather than recovered.
+
+**The prediction above -- that the saving is whatever fraction of an apply is tangent
+evaluation, "which for a hyperelastic material is most of it" -- was wrong.** Same
+machine, same problem, same configuration: 287.0 ms before, 274.4 to 285.7 ms after.
+Unchanged within run-to-run spread.
+
+The arithmetic says why, and it was available before the measurement. Per quadrature
+point of a HEX8 vector element, evaluating the material tangent once per trial degree
+of freedom is 24 x 123 = 2952 operations; the double contraction over test and trial
+degrees of freedom that follows it is 24 x 24 x 3 x 6 = 10368. The tangent is a quarter
+of the kernel, not most of it. Hoisting it out of the trial loop -- and all 114 of its
+CSE temporaries are loop-invariant, so gcc could in principle have done it and does not
+-- is worth about 11%, and it costs the linear materials their folded constants by
+turning an 81-entry tangent into a runtime-indexed array. That was built, measured
+against this model, and reverted.
+
+So forming a 24x24 element matrix really does cost about twenty-four applies' worth of
+arithmetic. The 24-applies coincidence was not evidence of waste; it was the shape of
+the problem. What is left is that **the assembly runs at `VS = 1`**, entirely scalar,
+against an apply path the rest of this document spends pages vectorising, and that the
+test/trial contraction has the same tensor-product structure the apply exploits through
+sum factorisation and the assembly does not.
+
+What the change did buy is correctness that can be checked. Probing was correct by
+construction and so said nothing about the tangent, and the hyperelastic assembly had no
+numerical gate at all; `sfem_MatrixFromatsTest` now requires the assembled BSR to
+reproduce the matrix-free action at a non-zero state, which fails at 3.2e-07 against a
+1e-12 tolerance if the matrix is assembled at the wrong state.
+
+#### The assembly, given the benchmark treatment
+
+Grace GH200, 72 cores, `OMP_PROC_BIND=true`, `OMP_PLACES=cores`, HEX8 neo-Hookean,
+3 BDF2 steps, `SFEM_LSOLVE_RTOL=1e-3`, f64 values. `Function::hessian_bsr`, per call:
+
+| dof | elements | 1 th | 4 th | 8 th | 18 th | 36 th | 72 th | 1 -> 72 |
+|---|---|---|---|---|---|---|---|---|
+| 107811 | 32768 | 716.4 ms | 178.2 | 89.2 | 40.3 | 20.6 | **10.7 ms** | 67.0x |
+| 352947 | 110592 | 2431.4 ms | 604.9 | 304.6 | 135.2 | 68.6 | **35.1 ms** | 69.2x |
+| 2738019 | 884736 | 19531.6 ms | -- | 2455.7 | 1080.1 | 543.7 | **274.4 ms** | 71.2x |
+
+Throughput is flat at **3.1 to 3.2 Melements/s at 72 threads on all three sizes**, and
+0.4 / 0.8 / 1.6 / 3.1 at 8 / 18 / 36 / 72. That is linear scaling and no size
+dependence: the assembly is compute-bound and already saturated at 32768 elements, at
+22.1 microseconds of core time per element.
+
+The apply does the opposite. On 2738019 dof it goes 87.4 -> 12.6 -> 6.71 -> 4.82 ->
+4.86 ms and **stops scaling at 36 threads**, which is the bandwidth ceiling this
+document already measured at 81% of peak. The two halves of BSR are limited by
+different resources, and only the assembly has cores left to give.
+
+| dof | operator | solve | setup per call | apply | setup in applies | CG it |
+|---|---|---|---|---|---|---|
+| 107811 | matrix-free | 0.347 s | -- | 0.563 ms | -- | 224 |
+| | BSR | 0.386 s | 10.79 ms | 0.041 ms | 266 | 224 |
+| | inexact | **0.286 s** | 2.90 ms | 0.312 ms | 9.3 | 224 |
+| 352947 | matrix-free | 0.927 s | -- | 1.690 ms | -- | 336 |
+| | BSR | 1.019 s | 35.19 ms | 0.293 ms | 120 | 336 |
+| | inexact | **0.627 s** | 3.38 ms | 0.662 ms | 5.1 | 336 |
+| 2738019 | matrix-free | 10.534 s | -- | 12.071 ms | -- | 729 |
+| | BSR | 10.164 s | 285.7 ms | 4.787 ms | 59.7 | 729 |
+| | inexact | **5.114 s** | 24.3 ms | 4.400 ms | 5.5 | 729 |
+
+Iteration counts are identical across all three operators at all three sizes, and
+matrix-free and BSR agree bit for bit on the final displacement norm
+(`3.032044587279e+00` at 2738019 dof). That is the correctness result: the assembled
+matrix reproduces the matrix-free action exactly, at scale, on three meshes.
+
+**BSR does not pay at a realistic inner tolerance.** One assembly costs 59.7 BSR applies
+on the saturating problem and CG does 74.7 applies per Newton step at rtol 1e-3. The
+margin is thin and it inverts on the smaller meshes -- 120 and 266 applies, where BSR is
+*slower* than matrix-free. The inexact operator's setup costs 5.5 applies and builds at
+36.4 Melements/s against the assembly's 3.1, an 11.7x difference, which is the whole of
+why it wins 2.0x over both.
+
+One loose end: about 2.8 s of the 10.16 s BSR solve is neither assembly nor applies. The
+applies (3.58 s) plus the assembly (2.86 s) plus gradients, line search and output
+account for roughly 7.3 s, against roughly 0.9 s unaccounted in the matrix-free run. The
+driver rebuilds the linear operator every Newton step, which reallocates the 1.77 GB
+value buffer ten times; that is the plausible cause and it is not confirmed.
+
+#### The same treatment for Mooney-Rivlin Kelvin-Voigt Newmark, and what it found
+
+This material had **no assembled matrix at all**: `matrix_formats` was empty, so
+`GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_bsr` was a stub returning
+`SFEM_FAILURE` and `SFEM_LINEAR_OP_TYPE=BSR` had nothing to dispatch to. Enabling it
+turned up two defects that had been invisible because nothing had ever asked.
+
+**The coupled Op had no assembly dispatch.** This material is an energy (Mooney-Rivlin)
+plus a residual (Kelvin-Voigt) and `_coupled_cases` built `gradient`, `apply`,
+`objective` and `objective_steps` but no `hessian_bsr`, so both halves could produce
+element matrices that nothing called. The dispatch now sequences the two units exactly
+the way `apply` sequences them -- both accumulate into the same `values` -- and it is
+emitted only when *both* units publish an assembly kernel, because a matrix holding
+only the elastic tangent is a different problem from the one the apply solves and it
+would converge quietly to it.
+
+**The residual path's matrix assembly used the wrong stream order.** Its gather wrote
+`b<role>[field * NS + shape]` and its scatter's `ROW_COMPONENT`/`ROW_SHAPE` tables were
+indexed component-major, while every block kernel in the same file reads
+`direction[shape * NC + field]` -- `direction[0]`, `[3]`, `[6]`, `[9]` for the first
+component's gradient on a TET4. So the element matrix was permuted against the kernel
+that filled it *and* the kernel was handed a permuted state, which is not even a clean
+permutation of the right answer. The assembled viscous operator was off by 1.5e-1
+against a reference of 1.4e-2 -- larger than the answer. `plans/layout.py` now derives
+all three tables from the stream index the kernels actually use.
+
+The gate that catches it: `sfem_MRKVHomogeneousDeformationValidation` checks the
+assembled BSR against the matrix-free action at a non-zero state, **once per unit and
+once for both** -- elastic only, viscous only, both. Isolating the units is what turned
+"the matrix is wrong" into "the residual half is wrong" in one run. All three now agree
+to 3e-16, 3e-17 and 3e-16 respectively.
+
+Grace GH200, 72 cores, HEX8, 3 Newmark steps, BiCGStab at rtol 1e-3,
+`eta_s = 0.1`, `eta_b = 0`. `Function::hessian_bsr`, per call:
+
+| dof | elements | 1 th | 4 th | 8 th | 18 th | 36 th | 72 th | 1 -> 72 |
+|---|---|---|---|---|---|---|---|---|
+| 107811 | 32768 | 1668.2 ms | 417.4 | 209.0 | 94.6 | 47.8 | **26.0 ms** | 64.2x |
+| 352947 | 110592 | 5707.7 ms | 1422.7 | 713.0 | 318.7 | 160.8 | **82.3 ms** | 69.3x |
+| 2738019 | 884736 | 45843.9 ms | -- | 5766.2 | 2580.3 | 1288.0 | **668.2 ms** | 68.6x |
+
+Same shape as neo-Hookean -- flat throughput across sizes, near-linear scaling to 72
+threads -- at **1.3 Melements/s**, 2.4x slower per element, which is what assembling
+two units instead of one costs. 51.8 microseconds of core time per element against 22.1.
+
+| dof | operator | solve | setup per call | apply | setup in applies | BiCGStab it |
+|---|---|---|---|---|---|---|
+| 107811 | matrix-free | 0.775 s | -- | 1.224 ms | -- | 212 |
+| | BSR | **0.646 s** | 25.0 ms | 0.042 ms | 603 | 212 |
+| 352947 | matrix-free | 2.598 s | -- | 3.621 ms | -- | 302 |
+| | BSR | **1.689 s** | 82.1 ms | 0.320 ms | 257 | 300 |
+| 2738019 | matrix-free | 32.704 s | -- | 28.022 ms | -- | 539 |
+| | BSR | **16.408 s** | 664.9 ms | 4.820 ms | 138 | 539 |
+
+**And here BSR wins, where for neo-Hookean it did not.** 2.0x at 2738019 dof, against a
+dead heat on the same machine and mesh for neo-Hookean. Nothing about the assembly
+changed to cause that -- it got *slower*, 668 ms against 274 -- the matrix-free apply
+did. This material's apply evaluates two units and one of them is a viscous Jacobian
+action, so it costs 28.02 ms where neo-Hookean's costs 12.07, while the SpMV is the same
+4.82 ms in both because an SpMV only knows about the sparsity pattern. The assembly
+costs 138 applies and BiCGStab does about 98 per Newton step, so on the neo-Hookean
+accounting BSR should lose; it wins anyway because each apply it replaces is 5.8x the
+one it substitutes.
+
+That is the general rule this pair of measurements gives: **assembly pays in proportion
+to how expensive the matrix-free apply is relative to an SpMV, not in proportion to how
+cheap the assembly is.** The break-even in applies is the wrong number to watch on its
+own.
+
+Two cautions on the table. The displacement norms agree between the two operators to
+nine or ten digits rather than exactly, and the BiCGStab iteration counts wander by a
+few per cent across the thread sweep (489, 546, 535, 474, 491 on the largest mesh),
+because BiCGStab is far more sensitive to rounding than CG; the *setup* column is the
+clean measurement and the solve column carries that noise. And the BSR apply saturates
+at 36 threads here too -- 4.703 ms at 36 against 4.826 at 72 -- so the same split holds:
+the assembly is compute-bound and scales, the apply is bandwidth-bound and does not.
+
+One thing this did **not** fix: the residual path still builds its element matrix by
+probing, 12 unit basis vectors through `jacobian_action` per TET4 element. The energy
+path no longer does. That is the same construction removed above, in a second emitter.
+
 ### What the first version of these driver numbers got wrong
 
 The first three versions of this table were measured on a mis-constrained problem, and
