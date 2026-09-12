@@ -1399,13 +1399,36 @@ the right direction and not a regression: the apply got twice as cheap while the
 did not, so it takes more of them to repay the same setup. A Newton step here does about
 98.
 
-**Two practical notes for anyone re-running this.** Generation is 1380 s for HEX8 alone,
-which is why the material ships with `inexact_apply` off. And the compile is worse:
-`bench_mixed.cpp` includes both units' inline headers, 502 KB and 780 KB, giving one
-translation unit with roughly 10200 scalar assignments whose longest straight-line run is
-about 4100 statements. gcc 13.3 at `-O3 -march=native` takes **38 minutes and 1.2 GB** on
-that, which overruns a 28-minute debug job -- compile it on the login node. Splitting the
-two units into separate translation units would halve it; they share nothing but the mesh.
+**What it costs to reproduce, and why.** Generation is 1380 s for HEX8 alone, which is
+why the material ships with `inexact_apply` off. The compile is worse: gcc 13.3 at
+`-O3 -march=native` takes **38 minutes and over a gigabyte** on `bench_mixed.cpp`, which
+overruns a 28-minute debug job. Compile it on the login node.
+
+That number is a gcc pathology and not what this code costs to compile. **AppleClang 17
+builds the same translation unit in 15.1 s and 381 MB**, so the 150x is the compiler, not
+the source. Measured on the worst single kernel -- the viscous tangent, whose
+`#pragma omp simd` body is 3855 straight-line statements -- gcc takes 239 s and 3.2 GB,
+and `-ftime-report` says where:
+
+| pass | time | share | memory |
+|---|---|---|---|
+| instruction scheduling | 51.5 s | 22% | 16 MB |
+| combiner | 43.9 s | 19% | 35 MB |
+| load CSE after reload | 35.0 s | 15% | -- |
+| dead store elim2 | 10.1 s | 4% | **1473 MB** |
+| tree SLP vectorization | 0.17 s | 0% | 5 MB |
+
+It is the RTL back end, and the obvious suspect is not guilty: the SLP vectoriser costs
+0.17 s and `-fno-tree-slp-vectorize` changes the total by less than one per cent, 237 s
+against 239. Nor does lowering the optimisation level rescue it -- `-O2` is 205 s -- and
+dropping `-march=native` for a generic `-O3` only reaches 145 s. The memory is the real
+hazard: 3.2 GB for one kernel, `dead store elim2` alone holding 1.47 GB, which is what
+would make a parallel build of several such kernels exhaust a node.
+
+Every one of those passes is superlinear in basic-block size, so the fix that would help
+every compiler is on the generator's side: the tangent emits its whole CSE chain into a
+single scope. The cheap fix here is to split the two units into separate translation
+units, which share nothing but the mesh, so they compile concurrently.
 
 ### What the first version of these driver numbers got wrong
 
