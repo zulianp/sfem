@@ -545,14 +545,43 @@ def section_conservation(runs, checks):
     return "\n".join(body) + "\n"
 
 
+# Convergence is gated HERE, once, and nowhere else.
+#
+# Every physics check abstains on a run that did not converge, and each is right to: the
+# residual sum of an unconverged iterate says where the solver stopped, not whether the scheme
+# conserves mass, and the pressure shift of an unconverged iterate is not the pressure shift.
+# But an unconverged run is never scored, so it can never be `bad`, and with convergence
+# asserted nowhere the report could lose most of a sweep and still pass every check: the
+# pressure-port sweep once read "3 of 8 values verified, 5 did not converge" over a PASS, and
+# the five had converged in the previous generation of the same report.
+#
+# One gate restores the teeth without removing the abstentions, which are the honest semantics
+# for a physics claim.
+#
+# It is a check rather than part of section_solver because the summary table is rendered from
+# `checks` before the tail sections are built, so a check appended from the tail never reaches
+# the summary -- which is how the first attempt at this silently changed nothing.
+def check_convergence(runs, checks):
+    rows = [r for r in runs if "converged" in r]
+    if not rows:
+        return
+    lost = [r.get("label", r["log"]) for r in rows if not r["converged"]]
+    checks.append(("Every run converged",
+                   "%d of %d converged%s" % (
+                       len(rows) - len(lost), len(rows),
+                       "" if not lost else " -- did not: " + ", ".join(sorted(lost))),
+                   not lost))
+
+
 def section_solver(runs):
     rows = [r for r in runs if "converged" in r]
     if not rows:
         return ""
     body = ["## Solver behaviour", "",
-            "Reported for context, not asserted here: a verification result from a run that",
-            "did not converge is not a verification result. Timings carry the dof count they",
-            "were measured on, and the machine is named in Provenance.", ""]
+            "Convergence is asserted by the check above; the physics checks abstain on a run",
+            "that did not converge, because a verification result from such a run is not a",
+            "verification result. Timings carry the dof count they were measured on, and the",
+            "machine is named in Provenance.", ""]
     return "\n".join(body) + "\n" + table(
         ["case", "ndof", "converged", "Newton", "linear its", "t_solve (s)", "Re reached", "gauge"],
         [[r.get("label", r["log"]), r.get("ndof", "--"), "yes" if r["converged"] else "no",
@@ -591,6 +620,7 @@ def build_report(manifest, rundir):
              section_boundary(runs, checks),
              section_pump(runs, checks),
              section_conservation(runs, checks)]
+    check_convergence(runs, checks)
 
     head = ["# CVFEM verification report", "",
             manifest.get("subtitle",
