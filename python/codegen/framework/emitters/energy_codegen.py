@@ -559,11 +559,13 @@ def generate_sfem_soa_cpp_files(
     hessian_name = source_builder.header_name("%s_hessian" % local_prefix)
     header_guard_suffix = source_builder.header_guard_suffix()
     operator_name = "%s_operator.%s" % (prefix, source_builder.operator_extension)
-    emits_hessian_header = _sfem_soa_emits_hessian_header(
+    # The header holds one thing, the direct element matrix, and only a matrix
+    # assembly calls it.  A material with no matrix format publishes no header.
+    emits_hessian_header = bool(
+        _matrix_formats_from_plan(matrix_format_plan)
+    ) and _sfem_soa_emits_hessian_header(
         forms,
-        quadrature_rule,
         array_inputs,
-        basis_family,
     )
     files = [
         GeneratedKernelFile(
@@ -881,17 +883,13 @@ def _sfem_soa_local_header(
 
 def _sfem_soa_emits_hessian_header(
     forms,
-    quadrature_rule,
     array_inputs,
-    basis_family,
 ):
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     return any(
         _sfem_soa_direct_hessian_matrix_assembly_available(
             form,
-            quadrature_rule,
             reference_inputs,
-            basis_family,
         )
         for form in forms
     )
@@ -969,9 +967,7 @@ def _sfem_soa_hessian_header(
     for form in forms:
         if not _sfem_soa_direct_hessian_matrix_assembly_available(
             form,
-            quadrature_rule,
             reference_inputs,
-            basis_family,
         ):
             continue
         name = _sfem_soa_direct_hessian_function_name(
@@ -1036,6 +1032,12 @@ def _sfem_soa_direct_hessian_element_matrix_function(
         )
         params.append("const s_t *const RSTR q_weight")
     params.extend(_form_material_parameter_declarations(form))
+    # The current state, where the tangent depends on it.  Same shape the apply
+    # takes it in, so the caller hands over the streams it already gathered.
+    if _form_uses_current(form, default=True):
+        # The component count is settled by the form, and the signature is
+        # written before the body declares `NC`, so it goes in as a number.
+        params.append("const s_t bu_data[NS * %d][VS]" % n_field_components)
     params.append("s_t *const RSTR element_matrix")
 
     lines = [
@@ -1593,20 +1595,22 @@ _BLOCK_FUNCTION_BY_CONTRACTION = {
 
 def _sfem_soa_direct_hessian_matrix_assembly_available(
     form,
-    quadrature_rule,
     reference_inputs,
-    basis_family,
 ):
     if form.name != "apply" or form.weak_form is None:
         return False
     if len(reference_inputs) != 1 or reference_inputs[0].name != "grad_ref":
         return False
-    use_tensor_product_reference = _use_tensor_product_reference(
-        quadrature_rule,
-        reference_inputs,
-        basis_family,
-    )
-    return not _form_uses_current(form, default=True)
+    # A state-dependent form used to be excluded here, which sent every
+    # hyperelastic material down a fallback that recovered the element matrix one
+    # column at a time by applying the operator to unit basis vectors: 24 applies
+    # per HEX8 element, each recomputing the geometry, the deformation gradient
+    # and the material tangent at every quadrature point and keeping one column
+    # of the result.  The tangent of a hyperelastic operator at a state is a
+    # perfectly ordinary expression -- it just needs the current deformation
+    # gradient, which the kernel now takes the state to compute -- so the
+    # fallback is gone and this is the only way an element matrix is formed.
+    return True
 
 
 def _constant_p1_specialized_local(local_prefix, quadrature_rule):
@@ -6448,6 +6452,78 @@ def _sfem_soa_mesh_objective_steps_function(
     return lines
 
 
+def _sfem_soa_direct_hessian_current_gradient_lines(
+    weak_form,
+    dim,
+    n_field_components,
+    reference_inputs,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+    reference_prefix,
+    indent,
+):
+    """Rebuild the current deformation gradient from the state streams.
+
+    A state-dependent material's tangent is an ordinary expression once `gu` is
+    known, so the element matrix is computed the same way the apply computes it:
+    contract the state with the reference gradients, push forward with the
+    adjugate, and hand the result to the same material expression.
+    """
+    lines = []
+    for idx in range(n_field_components * dim):
+        lines.append("%ss_t gu_ref%d = s_t(0);" % (indent, idx))
+    lines.append("%sfor (int shape = 0; shape < NS; ++shape) {" % indent)
+    if use_tensor_product_reference:
+        lines.extend(
+            _tensor_product_shape_coordinate_lines(
+                dim,
+                "shape",
+                "state",
+                "%s  " % indent,
+            )
+        )
+    for ref_component in range(dim):
+        lines.append(
+            "%s  const s_t state_grad_ref%d = %s;"
+            % (
+                indent,
+                ref_component,
+                _sfem_soa_reference_gradient_expr_for_shape(
+                    dim,
+                    ref_component,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    reference_inputs,
+                    "shape",
+                    coord_prefix="state",
+                    reference_prefix=reference_prefix,
+                ),
+            )
+        )
+    for row in range(n_field_components):
+        lines.append(
+            "%s  const s_t state_u%d = bu_data[%s][lane];"
+            % (indent, row, c_sum(c_product("shape", "NC"), row))
+        )
+        for col in range(dim):
+            lines.append(
+                "%s  gu_ref%d += state_u%d * state_grad_ref%d;"
+                % (indent, row * dim + col, row, col)
+            )
+    lines.append("%s}" % indent)
+    for row in range(weak_form.n_field_components):
+        for col in range(dim):
+            terms = [
+                "gu_ref%d * adj_lane%d" % (row * dim + k, k * dim + col)
+                for k in range(dim)
+            ]
+            lines.append(
+                "%sconst s_t gu%d = (%s) * idet;"
+                % (indent, row * dim + col, " + ".join(terms))
+            )
+    return lines
+
+
 def _sfem_soa_direct_hessian_matrix_assembly_lines(
     form,
     dim,
@@ -6460,13 +6536,16 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     emit_tensor_product_static_constants=True,
 ):
     n_field_components = form_n_field_components(form, dim)
-    if _form_uses_current(form, default=True):
-        raise ValueError("direct hessian matrix assembly currently requires no current field")
+    uses_current = _form_uses_current(form, default=True)
     weak_form = form.weak_form
     material = _weak_form_material_expression(
         weak_form,
         form.name,
-        _weak_form_deformation_gradient_substitutions(weak_form, "gu"),
+        _weak_form_deformation_gradient_substitutions(
+            weak_form,
+            "gu",
+            scalar_temporaries=True,
+        ),
         tuple(
             sp.symbols("trial_grad[%d]" % i)
             for i in range(weak_form.n_field_components * dim)
@@ -6510,6 +6589,23 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
             % indent,
             "%s  const s_t idet = s_t(1) / det_lane0;"
             % indent,
+        ]
+    )
+    if uses_current:
+        lines.extend(
+            _sfem_soa_direct_hessian_current_gradient_lines(
+                weak_form,
+                dim,
+                n_field_components,
+                reference_inputs,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                reference_prefix,
+                "%s  " % indent,
+            )
+        )
+    lines.extend(
+        [
             "%s  for (int trial_component = 0; trial_component < NC; ++trial_component) {"
             % indent,
             "%s    for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {"
@@ -6644,6 +6740,7 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
     function_name,
     dim,
     material_parameter_names,
+    uses_current,
     use_tensor_product_reference,
     use_reference_gradient_vectors,
     reference_inputs,
@@ -6673,6 +6770,8 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
         )
         args.append(scalar_weight_name)
     args.extend(material_parameter_names)
+    if uses_current:
+        args.append("bu_data")
     args.append("element_matrix")
     return (
         "%s%s<s_t, NQ, NS, VS>(%s);"
@@ -6681,10 +6780,8 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
 
 
 def _sfem_soa_hessian_packed_crs_passes(
-    block_name,
     coordinate_streams_name,
     dim,
-    direct_hessian_assembly,
     direct_hessian_function_name,
     function_base,
     identity_stream_shape_order,
@@ -6916,8 +7013,6 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "",
                 "      for (ptrdiff_t element = e_start; element < e_end; ++element) {",
                 "        s_t element_matrix[NDOFS * NDOFS];",
-                "        s_t bh_data[NS * NC][VS];",
-                "        s_t bout_data[NS * NC][VS];",
                 "        s_t bcoordinate_data[NS * ND][VS];",
                 kernel_constant("ne", "VS", indent="        "),
             ]
@@ -6931,35 +7026,8 @@ def _sfem_soa_hessian_packed_crs_passes(
             "        s_t *badj_streams[ND * ND] = {%s};"
             % ", ".join("badj%d" % i for i in range(dim * dim))
         )
-        if uses_current:
-            lines.extend(
-                _ordered_stream_pointer_array_lines(
-                    "const s_t *",
-                    "bu_streams",
-                    "bu_data",
-                    dim,
-                    stream_shape_order,
-                    "        ",
-                )
-            )
         lines.extend(
             [
-                *_ordered_stream_pointer_array_lines(
-                    "const s_t *",
-                    "bh_streams",
-                    "bh_data",
-                    dim,
-                    stream_shape_order,
-                    "        ",
-                ),
-                *_ordered_stream_pointer_array_lines(
-                    "s_t *",
-                    "bout_streams",
-                    "bout_data",
-                    dim,
-                    stream_shape_order,
-                    "        ",
-                ),
                 "",
                 "        for (int shape = 0; shape < NS; ++shape) {",
                 "          const uint16_t packed_node = elements[shape][element];",
@@ -7018,76 +7086,24 @@ def _sfem_soa_hessian_packed_crs_passes(
             )
             lines.extend("  %s" % line if line else line for line in geometry_lines)
             lines.append("      }")
-        packed_call_args = [
-            "1",
-            "1",
-            *("badj%d" % i for i in range(dim * dim)),
-            "bdet0",
-        ]
-        if omit_reference_basis_inputs:
-            pass
-        elif use_tensor_product_reference:
-            packed_call_args.extend((tensor_shape_name, tensor_grad_name))
-        elif use_reference_gradient_vectors:
-            packed_call_args.extend(
-                "%s%s" % (reference_prefix, _sfem_reference_gradient_vector_name(component))
-                for component in range(dim)
-            )
-        else:
-            packed_call_args.extend(
-                "%s%s" % (reference_prefix, array_input.name)
-                for array_input in reference_inputs
-            )
-        packed_call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
-        packed_call_args.extend(material_parameter_names)
-        if uses_current:
-            packed_call_args.append("bu_streams")
-        packed_call_args.extend(("bh_streams", "bout_streams"))
         lines.append("")
-        if direct_hessian_assembly:
-            lines.extend(
-                _sfem_soa_direct_hessian_element_matrix_call_lines(
-                    direct_hessian_function_name,
-                    dim,
-                    material_parameter_names,
-                    use_tensor_product_reference,
-                    use_reference_gradient_vectors,
-                    reference_inputs,
-                    tensor_shape_name,
-                    tensor_grad_name,
-                    tensor_weight_name,
-                    scalar_weight_name,
-                    reference_prefix,
-                    "      ",
-                )
+        lines.extend(
+            _sfem_soa_direct_hessian_element_matrix_call_lines(
+                direct_hessian_function_name,
+                dim,
+                material_parameter_names,
+                uses_current,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                reference_inputs,
+                tensor_shape_name,
+                tensor_grad_name,
+                tensor_weight_name,
+                scalar_weight_name,
+                reference_prefix,
+                "      ",
             )
-        else:
-            lines.extend(
-                [
-                    "      for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
-                    "        element_matrix[entry] = s_t(0);",
-                    "      }",
-                    "",
-                    "      for (int trial_component = 0; trial_component < NC; ++trial_component) {",
-                    "        for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {",
-                    "          for (int stream = 0; stream < NS * NC; ++stream) {",
-                    "            bh_data[stream][0] = s_t(0);",
-                    "            bout_data[stream][0] = s_t(0);",
-                    "          }",
-                    "          bh_data[trial_shape * NC + trial_component][0] = s_t(1);",
-                    "          %s<s_t, NQ, NS, VS>(%s);"
-                    % (block_name, ", ".join(packed_call_args)),
-                    "          const int col = trial_component * NS + trial_shape;",
-                    "          for (int test_component = 0; test_component < NC; ++test_component) {",
-                    "            for (int test_shape = 0; test_shape < NS; ++test_shape) {",
-                    "              const int row = test_component * NS + test_shape;",
-                    "              element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];",
-                    "            }",
-                    "          }",
-                    "        }",
-                    "      }",
-                ]
-            )
+        )
         lines.extend(
             [
                 "",
@@ -7099,73 +7115,6 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "  return SFEM_SUCCESS;",
                 "}",
                 "",
-            ]
-        )
-
-
-def _sfem_soa_hessian_direct_assembly(
-    block_name,
-    call_args,
-    dim,
-    direct_hessian_assembly,
-    direct_hessian_function_name,
-    lines,
-    material_parameter_names,
-    reference_inputs,
-    reference_prefix,
-    scalar_weight_name,
-    tensor_grad_name,
-    tensor_shape_name,
-    tensor_weight_name,
-    use_reference_gradient_vectors,
-    use_tensor_product_reference,
-):
-    """Assembly straight into an existing matrix graph, without a packed pass.
-
-    Lifted out of `_sfem_soa_hessian_matrix_assembly_function` unchanged.
-    """
-    if direct_hessian_assembly:
-        lines.extend(
-            _sfem_soa_direct_hessian_element_matrix_call_lines(
-                direct_hessian_function_name,
-                dim,
-                material_parameter_names,
-                use_tensor_product_reference,
-                use_reference_gradient_vectors,
-                reference_inputs,
-                tensor_shape_name,
-                tensor_grad_name,
-                tensor_weight_name,
-                scalar_weight_name,
-                reference_prefix,
-                "    ",
-            )
-        )
-    else:
-        lines.extend(
-            [
-                "    for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
-                "      element_matrix[entry] = s_t(0);",
-                "    }",
-                "",
-                "    for (int trial_component = 0; trial_component < NC; ++trial_component) {",
-                "      for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {",
-                "        for (int stream = 0; stream < NS * NC; ++stream) {",
-                "          bh_data[stream][0] = s_t(0);",
-                "          bout_data[stream][0] = s_t(0);",
-                "        }",
-                "        bh_data[trial_shape * NC + trial_component][0] = s_t(1);",
-                "        %s<s_t, NQ, NS, VS>(%s);"
-                % (block_name, ", ".join(call_args)),
-                "        const int col = trial_component * NS + trial_shape;",
-                "        for (int test_component = 0; test_component < NC; ++test_component) {",
-                "          for (int test_shape = 0; test_shape < NS; ++test_shape) {",
-                "            const int row = test_component * NS + test_shape;",
-                "            element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];",
-                "          }",
-                "        }",
-                "      }",
-                "    }",
             ]
         )
 
@@ -7189,7 +7138,17 @@ def _sfem_soa_hessian_matrix_assembly_function(
     formats = _matrix_formats_from_plan(matrix_format_plan)
     if not formats:
         return []
-    if form.name != "apply" or form.weak_form is None:
+    element_inputs = _sfem_soa_element_inputs(array_inputs)
+    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
+    # The assembly is the direct element matrix and nothing else -- there is no
+    # fallback that recovers the matrix by applying the operator to unit basis
+    # vectors -- so a form that cannot reach the direct kernel publishes no
+    # matrix at all.  This is the predicate the header consults, so the header
+    # and the assembly cannot disagree about which kernels exist.
+    if not _sfem_soa_direct_hessian_matrix_assembly_available(
+        form,
+        reference_inputs,
+    ):
         return []
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
@@ -7197,8 +7156,6 @@ def _sfem_soa_hessian_matrix_assembly_function(
     material_parameter_names = _form_material_parameter_names(form)
     uses_current = _form_uses_current(form, default=True)
 
-    element_inputs = _sfem_soa_element_inputs(array_inputs)
-    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     use_tensor_product_reference = _use_tensor_product_reference(
         quadrature_rule,
         reference_inputs,
@@ -7221,19 +7178,6 @@ def _sfem_soa_hessian_matrix_assembly_function(
     )
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
     coordinate_streams_name = "bcoordinate_data"
-    block_name = "%s_apply_block" % local_prefix
-    specialized_prefix = _constant_p1_specialized_local_prefix(
-        local_prefix,
-        quadrature_rule,
-    )
-    if specialized_prefix is not None and not use_tensor_product_reference:
-        block_name = "%s_apply_block" % specialized_prefix
-    direct_hessian_assembly = _sfem_soa_direct_hessian_matrix_assembly_available(
-        form,
-        quadrature_rule,
-        reference_inputs,
-        basis_family,
-    )
     direct_hessian_function_name = _sfem_soa_direct_hessian_function_name(
         local_prefix,
         use_tensor_product_reference,
@@ -7362,8 +7306,6 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "  for (ptrdiff_t element = 0; element < nelements; ++element) {",
             "    idx_t ev[NS];",
             "    s_t element_matrix[NDOFS * NDOFS];",
-            "    s_t bh_data[NS * NC][VS];",
-            "    s_t bout_data[NS * NC][VS];",
             "    s_t bcoordinate_data[NS * ND][VS];",
             kernel_constant("ne", "VS", indent="    "),
         ]
@@ -7377,35 +7319,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "    s_t *badj_streams[ND * ND] = {%s};"
             % ", ".join("badj%d" % i for i in range(dim * dim))
         )
-    if uses_current:
-        lines.extend(
-            _ordered_stream_pointer_array_lines(
-                "const s_t *",
-                "bu_streams",
-                "bu_data",
-                dim,
-                stream_shape_order,
-                "    ",
-            )
-        )
     lines.extend(
         [
-            *_ordered_stream_pointer_array_lines(
-                "const s_t *",
-                "bh_streams",
-                "bh_data",
-                dim,
-                stream_shape_order,
-                "    ",
-            ),
-            *_ordered_stream_pointer_array_lines(
-                "s_t *",
-                "bout_streams",
-                "bout_data",
-                dim,
-                stream_shape_order,
-                "    ",
-            ),
             "",
             "    for (int shape = 0; shape < NS; ++shape) {",
             "      const idx_t node = elements[shape][element];",
@@ -7467,49 +7382,23 @@ def _sfem_soa_hessian_matrix_assembly_function(
         )
         lines.append("    }")
 
-    call_args = [
-        "1",
-        "1",
-        *("badj%d" % i for i in range(dim * dim)),
-        "bdet0",
-    ]
-    if omit_reference_basis_inputs:
-        pass
-    elif use_tensor_product_reference:
-        call_args.extend((tensor_shape_name, tensor_grad_name))
-    elif use_reference_gradient_vectors:
-        call_args.extend(
-            "%s%s" % (reference_prefix, _sfem_reference_gradient_vector_name(component))
-            for component in range(dim)
-        )
-    else:
-        call_args.extend(
-            "%s%s" % (reference_prefix, array_input.name)
-            for array_input in reference_inputs
-        )
-    call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
-    call_args.extend(material_parameter_names)
-    if uses_current:
-        call_args.append("bu_streams")
-    call_args.extend(("bh_streams", "bout_streams"))
-
     lines.append("")
-    _sfem_soa_hessian_direct_assembly(
-        block_name,
-        call_args,
-        dim,
-        direct_hessian_assembly,
-        direct_hessian_function_name,
-        lines,
-        material_parameter_names,
-        reference_inputs,
-        reference_prefix,
-        scalar_weight_name,
-        tensor_grad_name,
-        tensor_shape_name,
-        tensor_weight_name,
-        use_reference_gradient_vectors,
-        use_tensor_product_reference,
+    lines.extend(
+        _sfem_soa_direct_hessian_element_matrix_call_lines(
+            direct_hessian_function_name,
+            dim,
+            material_parameter_names,
+            uses_current,
+            use_tensor_product_reference,
+            use_reference_gradient_vectors,
+            reference_inputs,
+            tensor_shape_name,
+            tensor_grad_name,
+            tensor_weight_name,
+            scalar_weight_name,
+            reference_prefix,
+            "    ",
+        )
     )
     lines.append("")
     lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "    "))
@@ -7523,10 +7412,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
         ]
     )
     _sfem_soa_hessian_packed_crs_passes(
-        block_name,
         coordinate_streams_name,
         dim,
-        direct_hessian_assembly,
         direct_hessian_function_name,
         function_base,
         identity_stream_shape_order,

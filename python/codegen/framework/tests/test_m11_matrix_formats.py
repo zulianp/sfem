@@ -100,8 +100,16 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
 
         self.assertNotIn("TENSOR_SHAPE_INDEX", hessian_source)
         self.assertNotIn("STREAM_SHAPE_ORDER", hessian_source)
-        self.assertIn(
+        # The assembly forms the element matrix directly.  It used to call the
+        # apply once per trial degree of freedom and keep a column, which is
+        # twenty-four applies per element for a HEX8; the apply block belongs to
+        # the apply and must not appear in an assembly again.
+        self.assertNotIn(
             "neohookean_ogden_d3_tensor_product_apply_block<s_t, NQ, NS, VS>",
+            hessian_source,
+        )
+        self.assertIn(
+            "neohookean_ogden_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, VS>",
             hessian_source,
         )
         self.assertIn(
