@@ -991,21 +991,36 @@ and lost a third of its apply to conflict misses -- 6.13 ms against 4.57 on TET4
 against 1.38x over matrix-free. The Op now pads, which is why the numbers above are
 what they are.
 
-**The packed layout is reachable but not yet usable here.** `SFEM_PACKED_MESH=1`
-builds it, and the Op has the branch; what blocks it is the boundary conditions.
-`PackedMesh::create` renumbers the mesh **in place**, and a Dirichlet nodeset stated
-as explicit node ids is written in the numbering it replaces -- so the constraints
-land on different nodes and the solve converges, perfectly well, to a different
-problem. On the 32-cube the displacement norm moves from 2.988e-01 to 3.894e-01 and
-nothing in the output says why; it was caught by comparing against the unpacked answer,
-which is the only thing that would have caught it.
+**The packed layout now works here, and is worth 9%.** `SFEM_PACKED_MESH=1` builds it
+and the Op's packed branch fires. HEX8, 352947 dof, best of three:
 
-The driver now refuses that combination rather than warning about it. A sideset
-survives the renumbering, because it names elements and local faces and derives its
-nodeset afterwards; an explicit node list does not. Lifting the restriction means
-rebuilding `DirichletConditions` through the packed renumbering, which is a frontend
-change. Until then the 70 to 150% the packed apply is worth in the kernel benchmarks
-is not available to this driver.
+| | ms/apply | MDOF/s | displacement norm |
+|---|---|---|---|
+| matrix-free | 11.43 | 30.9 | 5.274539943032e-01 |
+| inexact, standard layout | 2.29 | 154.1 | 5.274539951542e-01 |
+| inexact, packed | **2.09** | **168.6** | 5.274539951542e-01 |
+
+Identical CG counts and a *bit-identical* answer between the two inexact runs, which is
+what says the packed layout is doing the same arithmetic on the same problem.
+
+9%, against the 70% the same kernel gains in the spike. Two reasons, and neither is a
+defect. The spike's number is the kernel alone; this one includes the Op's domain
+iteration and the BDF2 inertia term, which packing does not touch. And this mesh comes
+out of `cube` already SFC-ordered, so the gather locality packing recovers is largely
+there before it starts -- the ordering sweep above measured that same effect from the
+other side.
+
+**Getting there needed the permutation kept.** `PackedMesh::create(..., modify_mesh=true)`
+renumbers the mesh in place and then drops the map it used, so a nodeset read from a
+file -- which speaks the on-disk numbering -- named different nodes and the solve
+converged to a different problem: displacement norm 3.894e-01 against 2.988e-01, with
+nothing in the output to say so. `FunctionSpace::initialize_packed_mesh` now builds the
+layout twice, once without modifying to capture the map and once to apply it, and
+`DirichletConditions` maps an explicit node list through it. A sideset needs no mapping,
+because packing does not move elements.
+
+Pack size barely matters: 128 through 1024 and smesh's own default (8192 elements per
+pack here) span 2.10 to 2.28 ms, with the default fastest.
 
 ### What the first version of these driver numbers got wrong
 
