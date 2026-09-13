@@ -104,7 +104,20 @@ PLAN_INPUTS = (
 #: Three sites remain in this cluster and are not table lookups: each selects
 #: the whole remainder of a body emitter, so moving them means splitting three
 #: functions rather than mapping a value.
-BUDGET = 179
+#:
+#: 179 -> 176: those three, split.  Each was an early return in the middle of a
+#: weak-form body emitter -- the 0-form accumulated its density and stopped, the
+#: rest of the function was the 1- and 2-form's loperand and contraction -- so
+#: the choice was made where it could not be named.  Each emitter now has two
+#: tails with one signature and a table keyed on `form_accumulation`, which is
+#: the shape `_BLOCK_FUNCTION_BY_CONTRACTION` had already established beside it.
+#:
+#: The split is what showed how much the tails close over: the tensor-product
+#: one needs nothing beyond the step's own arguments, the constant-P1 one needs
+#: two more and the simplex one three.  That was invisible while they were
+#: inline, and it is the measure of how far each body emitter is from being a
+#: step that could be moved.
+BUDGET = 176
 
 
 def _tested_names(test):
