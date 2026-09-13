@@ -59,6 +59,12 @@ struct SSMeshData {
 
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> pgx, pgy, pgz;
+    // The nodal VELOCITY gradient, [i*9 + r*3 + c] = du_r/dx_c, for the deferred-correction
+    // convection scheme. Empty unless that is on. Same layout and same reconstruction as the
+    // flat path's, so the two produce the same correction on the same mesh.
+    std::vector<scalar_t> ugrad;
+    int                   conv_ho{0};
+    int                   conv_limiter{0};
     // The reconstruction's denominator: 1 / sum of |det| over the micro-elements touching a
     // node. Pure geometry, so it is built once and kept, and the sweep that uses it neither
     // allocates nor accumulates it. Keyed on the mesh it was built for; see
@@ -2076,9 +2082,36 @@ inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t r
 
 // zero_first=false accumulates, which is what sfem::Op::gradient needs: Function runs
 // every operator over one shared output buffer without clearing between them.
+// The nodal velocity gradient the deferred correction extrapolates with, semi-structured.
+// Three passes of sscvfem_nodal_grad_strided -- the same reconstruction the pressure uses and
+// the same one CVFEMNavierStokes::nodal_velocity_gradient publishes -- interleaved into the
+// [i*9 + r*3 + c] layout the correction kernel reads.
+inline void sscvfem_assemble_nodal_u_grad(SSMeshData &d) {
+    SFEM_TRACE_SCOPE("sscvfem::assemble_nodal_u_grad");
+    std::vector<scalar_t> gx, gy, gz;
+    d.ugrad.assign((size_t)d.nnodes * 9, scalar_t(0));
+    const scalar_t *const src[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+    for (int r = 0; r < 3; ++r) {
+        sscvfem_nodal_grad_strided(d, src[r], 1, gx, gy, gz);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 0] = gx[(size_t)i];
+            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 1] = gy[(size_t)i];
+            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 2] = gz[(size_t)i];
+        }
+    }
+}
+
 inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                            scalar_t *const SFEM_RESTRICT res, const bool zero_first = true) {
     SFEM_TRACE_SCOPE("sscvfem::residual");
+    // Deferred-correction convection. Off by default and then bit-for-bit the scheme every
+    // recorded number here was measured with; the gradient is built once per residual, which
+    // is once per Newton step, because the correction is lagged by construction.
+    d.conv_ho      = smesh::Env::read<int>("SFEM_CONV_HO", 0);
+    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 1);
+    if (d.conv_ho) sscvfem_assemble_nodal_u_grad(d);
+    else d.ugrad.clear();
+
     const ptrdiff_t ndof = d.nnodes * N_FIELDS;
     if (zero_first)
         for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
@@ -2096,6 +2129,9 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
         std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
         std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
         std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
+        // Nine per node when the correction is on, empty otherwise -- one allocation that
+        // costs nothing to a run that has not asked for it.
+        std::vector<scalar_t>     lug(d.conv_ho ? (size_t)nxe * 9 : 0);
         std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
 
 #pragma omp for schedule(static)
@@ -2113,6 +2149,8 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                 lpgx[(size_t)a]      = d.pgx[(size_t)g];
                 lpgy[(size_t)a]      = d.pgy[(size_t)g];
                 lpgz[(size_t)a]      = d.pgz[(size_t)g];
+                if (!lug.empty())
+                    for (int k = 0; k < 9; ++k) lug[(size_t)a * 9 + (size_t)k] = d.ugrad[(size_t)g * 9 + (size_t)k];
             }
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
@@ -2134,6 +2172,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                     for (int xi = 0; xi < L; ++xi) {
                         const int base = sscvfem_lidx(L, xi, yi, zi);
                         scalar_t  x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
+                        scalar_t g8[CVFEM_HEX8_N_NODES * 9];
                         scalar_t  r[CVFEM_HEX8_N_DOF];
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
@@ -2147,12 +2186,23 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                             pgx[a]      = lpgx[(size_t)l];
                             pgy[a]      = lpgy[(size_t)l];
                             pgz[a]      = lpgz[(size_t)l];
+                            if (!lug.empty())
+                                for (int k = 0; k < 9; ++k) g8[a * 9 + k] = lug[(size_t)l * 9 + (size_t)k];
                         }
                         const Hex8RcConfig rcfg = sscvfem_rc_config(d);
                         const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                               nullptr, ux, uy, uz,  rcfg.tau};
+                        // Deferred-correction convection, on the path the production solver
+                        // actually runs: FGMRES preconditioned by multigrid needs this lattice,
+                        // so a correction that existed only on the flat mesh could not be used
+                        // for anything at scale. Null when off, which is the arithmetic this
+                        // call did before.
+                        const bool ho = !lug.empty();
                         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r,
-                                                             rc, d.upwind_eps);
+                                                             rc, d.upwind_eps,
+                                                             ho ? g8 : nullptr,
+                                                             ho ? x : nullptr, ho ? y : nullptr,
+                                                             ho ? z : nullptr, d.conv_limiter);
                         boundary_scs_add_residual(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                   ux, uy, uz, p, r,
                                                   d.macro_face_mask.empty()
