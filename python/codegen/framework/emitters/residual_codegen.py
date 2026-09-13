@@ -6972,32 +6972,21 @@ def _scalar_crs_matrix_assembly_source(
                 "      }",
             ]
         )
-        if state_dependencies.current:
+        for role in live_field_roles(state_dependencies, roles=STATE_FIELD_ROLES):
             for field_index, field in enumerate(system.fields):
+                pointer = role.field_pointer(field.name)
                 lines.extend(
                     [
                         "      {",
-                        "        s_t *const RSTR pk_field = pk_current + %d * max_nodes_per_pack;" % field_index,
+                        "        s_t *const RSTR pk_field = pk_%s + %d * max_nodes_per_pack;"
+                        % (role.name, field_index),
                         "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                        "          pk_field[k] = %s[(owned_nodes_ptr[pack] + k) * current_stride];" % field.name,
+                        "          pk_field[k] = %s[(owned_nodes_ptr[pack] + k) * %s_stride];"
+                        % (pointer, role.name),
                         "        }",
                         "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                        "          pk_field[n_contiguous + k] = %s[ghosts[k] * current_stride];" % field.name,
-                        "        }",
-                        "      }",
-                    ]
-                )
-        if state_dependencies.previous:
-            for field_index, field in enumerate(system.fields):
-                lines.extend(
-                    [
-                        "      {",
-                        "        s_t *const RSTR pk_field = pk_previous + %d * max_nodes_per_pack;" % field_index,
-                        "        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                        "          pk_field[k] = %s_old[(owned_nodes_ptr[pack] + k) * previous_stride];" % field.name,
-                        "        }",
-                        "        for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                        "          pk_field[n_contiguous + k] = %s_old[ghosts[k] * previous_stride];" % field.name,
+                        "          pk_field[n_contiguous + k] = %s[ghosts[k] * %s_stride];"
+                        % (pointer, role.name),
                         "        }",
                         "      }",
                     ]
@@ -7150,13 +7139,6 @@ def _scalar_crs_matrix_assembly_source(
             % ", ".join("badjugate_data[%d]" % i for i in range(dim * dim))
         )
         packed_call_args = list(call_args)
-        if state_dependencies.current:
-            current_index = packed_call_args.index(state_stream_args["current"])
-            packed_call_args[current_index] = state_stream_args["current"]
-        if state_dependencies.previous:
-            previous_index = packed_call_args.index(state_stream_args["previous"])
-            packed_call_args[previous_index] = state_stream_args["previous"]
-        packed_call_args[packed_call_args.index(direction_arg)] = direction_arg
         packed_call_args[-1] = output_arg
         lines.extend([""])
         lines.extend(_local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, "      "))
