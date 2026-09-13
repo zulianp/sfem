@@ -86,7 +86,25 @@ PLAN_INPUTS = (
 #: and for a graph-lowered form of non-zero order with a single output the two
 #: disagree.  `mesh_output_streams` keeps that behaviour and says so rather than
 #: collapsing it, because collapsing it would change what is emitted.
-BUDGET = 183
+#:
+#: 183 -> 179: the other question `writes_per_shape` conflates.  A 0-form
+#: weights its energy density into one accumulator per element; a 1- or 2-form
+#: forms the loperand and contracts it onto the test functions.  Two body
+#: shapes, named as `plans.form_emission.FormAccumulation` beside the
+#: `FormContraction` that already said *how* the contraction is reached.
+#:
+#: Four sites map their spelling to it instead of branching: the block
+#: signature's output parameter, the per-point loperand buffer, the per-component
+#: loperand scalars, and -- the one that matters most -- which expressions the
+#: diagnostics cost model counts.  That last one has to be the expressions the
+#: body actually evaluates, and it was asking the question separately from the
+#: body emitters, so a record counting the wrong half would have been wrong in a
+#: way nothing compiles against.
+#:
+#: Three sites remain in this cluster and are not table lookups: each selects
+#: the whole remainder of a body emitter, so moving them means splitting three
+#: functions rather than mapping a value.
+BUDGET = 179
 
 
 def _tested_names(test):
