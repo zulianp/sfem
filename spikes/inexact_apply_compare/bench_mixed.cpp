@@ -198,10 +198,10 @@ int main(int argc, char **argv) {
 
         // Both units, assembled.  This is the once-per-tangent cost.
         auto assemble = [&] {
-            ELASTIC_TANGENT<double,geom_t,double,16>(EC, m.evp.data(),
+            ELASTIC_TANGENT<double,geom_t,double,16>(EC, m.kevp.data(),
                 A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
                 lmbda, mu, 1, ux.data(),uy.data(),uz.data(), CS, E64.data());
-            VISCOUS_TANGENT<double,geom_t,double,16>(EC, m.evp.data(),
+            VISCOUS_TANGENT<double,geom_t,double,16>(EC, m.kevp.data(),
                 A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
                 eta_b, eta_s, alpha, 1, ux.data(),uy.data(),uz.data(),
                 1, zx.data(),zy.data(),zz.data(), CS, V64.data());
@@ -236,10 +236,10 @@ int main(int argc, char **argv) {
         };
         auto run_stored = [&](auto *ep, auto *vp) {
             ELASTIC_STORED<double, typename std::remove_const<typename std::remove_pointer<decltype(ep)>::type>::type, 16>(
-                EC, m.evp.data(), CS, ep, 1, hx.data(),hy.data(),hz.data(),
+                EC, m.kevp.data(), CS, ep, 1, hx.data(),hy.data(),hz.data(),
                 1, bx.data(),by.data(),bz.data());
             VISCOUS_STORED<double, typename std::remove_const<typename std::remove_pointer<decltype(vp)>::type>::type, 16>(
-                EC, m.evp.data(), CS, vp, 1, hx.data(),hy.data(),hz.data(),
+                EC, m.kevp.data(), CS, vp, 1, hx.data(),hy.data(),hz.data(),
                 1, bx.data(),by.data(),bz.data());
         };
 #ifdef PACKED_STORED_APPLY
@@ -264,7 +264,7 @@ int main(int argc, char **argv) {
             ELASTIC_PACKED_STORED<double, typename std::remove_const<
                 typename std::remove_pointer<decltype(ep)>::type>::type, 16>(
                 pk.layout.n_packs, pk.layout.n_elements_per_pack, EC,
-                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.max_nodes_per_pack, pk.kernel_element_ptrs.data(),
                 pk.layout.owned_nodes_ptr.data(),
                 pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
                 pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
@@ -275,7 +275,7 @@ int main(int argc, char **argv) {
             VISCOUS_PACKED_STORED<double, typename std::remove_const<
                 typename std::remove_pointer<decltype(vp)>::type>::type, 16>(
                 pk.layout.n_packs, pk.layout.n_elements_per_pack, EC,
-                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.max_nodes_per_pack, pk.kernel_element_ptrs.data(),
                 pk.layout.owned_nodes_ptr.data(),
                 pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
                 pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
@@ -340,9 +340,9 @@ int main(int argc, char **argv) {
         };
 #endif
         auto run_compressed = [&] {
-            ELASTIC_COMPRESS<double, half_t, float>(EC, m.evp.data(), CS, E16.data(), ES.data(),
+            ELASTIC_COMPRESS<double, half_t, float>(EC, m.kevp.data(), CS, E16.data(), ES.data(),
                 1, hx.data(),hy.data(),hz.data(), 1, bx.data(),by.data(),bz.data());
-            VISCOUS_COMPRESS<double, half_t, float>(EC, m.evp.data(), CS, V16.data(), VS.data(),
+            VISCOUS_COMPRESS<double, half_t, float>(EC, m.kevp.data(), CS, V16.data(), VS.data(),
                 1, hx.data(),hy.data(),hz.data(), 1, bx.data(),by.data(),bz.data());
         };
         auto rel=[&]{ double num=0,den=0; for(ptrdiff_t i=0;i<N;++i){

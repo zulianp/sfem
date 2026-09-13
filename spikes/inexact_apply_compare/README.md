@@ -57,7 +57,22 @@ support.
 
 The cache variables are `SPIKE_MATERIAL`, `SPIKE_ELEMENT` (TET4, HEX8, TET10),
 `SPIKE_MESH_ORDER`, `SPIKE_PACK_SIZE`, `SPIKE_ARCH_FLAGS`, and the paths
-`SPIKE_SFEM`, `SPIKE_SFEM_BUILD` and `SPIKE_GEN_ROOT`. On Apple silicon pass
+`SPIKE_SFEM`, `SPIKE_SFEM_BUILD` and `SPIKE_GEN_ROOT`.
+
+`SPIKE_ELEMENT` stays the mesh's element even where that element publishes no
+micro-kernel of its own. HEX8 forwards to PROTEUS_HEX8, whose basis is
+lexicographic, so two names are in play: the `extern "C"` symbols these
+benchmarks call are HEX8's, and the `..._impl` templates they instantiate are
+PROTEUS_HEX8's. The build resolves the pairing from
+`plans/layout.cartesian_twin` and prints it —
+
+    -- HEX8 forwards its micro-kernel to PROTEUS_HEX8 (node order 0,1,3,2,4,5,7,6)
+
+— and passes the permutation as `KERNEL_SHAPE_ORDER`, which `element_mesh.inc`
+applies to the connectivity. Instantiating a template bypasses the generated
+forwarder that would otherwise have applied it, and getting it wrong is silent:
+it compiles, it runs, and the projected apply deviates from the exact one by
+3.6e-01 instead of 3.6e-05. `bench_split` now fails rather than printing that. On Apple silicon pass
 `-DSPIKE_ARCH_FLAGS=-mcpu=apple-m1` and `-DOpenMP_ROOT=$(brew --prefix libomp)`.
 
 Which harnesses appear depends on what the material publishes: a single-unit material

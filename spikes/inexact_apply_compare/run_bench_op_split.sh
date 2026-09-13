@@ -20,6 +20,16 @@ WORKTREE="$(cd "$HERE/../.." && pwd)"
 SFEM="${SFEM_MAIN_CHECKOUT:-$WORKTREE/../sfem}"
 BUILD="${SFEM_BUILD:-$SFEM/build64}"
 GEN="${SFEM_SPIKE_GEN:?set SFEM_SPIKE_GEN to the generated tree root}"
+. "$HERE/kernel_element.sh"
+# HEX8 and QUAD4 forward to their lexicographic twin, so the templated bodies
+# this benchmark instantiates are the twin's while the C ABI symbols it calls
+# stay this element's.  KLOWER names the first, LOWER the second.
+KERNEL_ELEMENT="$(kernel_element "$ELEMENT")"
+KLOWER="$(echo "$KERNEL_ELEMENT" | tr '[:upper:]' '[:lower:]')"
+# The permutation that goes with it.  These benchmarks call the `..._impl`
+# templates directly, so they bypass the generated forwarder and have to reorder
+# the connectivity themselves; `element_mesh.inc` does it from this.
+SHAPE_ORDER="$(kernel_shape_order "$ELEMENT")"
 WORK="${SFEM_SPIKE_WORK:-${TMPDIR:-/tmp}}/bench_op_split"
 BIN="$WORK/bench_op_split_${MATERIAL}_${LOWER}"
 mkdir -p "$WORK"
@@ -43,12 +53,13 @@ LINK_LINE=$(sed -n '1p' "$BUILD/CMakeFiles/bench_op.dir/link.txt" \
 ( cd "$BUILD" && ${MPICXX:-mpic++} -std=c++17 -O3 -mcpu=apple-m1 -mtune=apple-m1 \
     -Xclang -fopenmp -DNDEBUG \
     -DELEMENT_${ELEMENT} \
+    ${SHAPE_ORDER:+-DKERNEL_SHAPE_ORDER=$SHAPE_ORDER} \
     -DMATERIAL_LABEL="\"$MATERIAL\"" \
-    -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${LOWER}_inexact_apply_inline.hpp\"" \
-    -DTANGENT_KERNEL=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
-    -DSTORED_APPLY=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_stored_a_msoa_impl \
-    -DCOMPRESSED_APPLY=sfem::codegen::${MATERIAL}_${LOWER}_inexact_apply_compressed_a_msoa_impl \
-    -I "$GEN/d3/$LOWER" -I "$GEN" -I "$GEN/d3" \
+    -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${KLOWER}_inexact_apply_inline.hpp\"" \
+    -DTANGENT_KERNEL=sfem::codegen::${MATERIAL}_${KLOWER}_inexact_apply_tangent_a_msoa_impl \
+    -DSTORED_APPLY=sfem::codegen::${MATERIAL}_${KLOWER}_inexact_apply_stored_a_msoa_impl \
+    -DCOMPRESSED_APPLY=sfem::codegen::${MATERIAL}_${KLOWER}_inexact_apply_compressed_a_msoa_impl \
+    -I "$GEN/d3/$LOWER" -I "$GEN/d3/$KLOWER" -I "$GEN" -I "$GEN/d3" \
     $CXX_INCLUDES \
     -o "$BIN" "$HERE/bench_op_split.exe.cpp" $LINK_LINE )
 

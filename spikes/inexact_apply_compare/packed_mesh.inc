@@ -21,6 +21,10 @@
 struct PackedMeshView {
     PackedLayout layout;
     Mesh mesh;  //: the same mesh, renumbered so each pack owns a contiguous node range
+    //: `layout.element_ptrs` in the order the templated micro-kernel is written
+    //: against.  The two are the same unless this element forwards its kernel to
+    //: a lexicographic twin; see `finalise_element_pointers`.
+    std::vector<uint16_t *> kernel_element_ptrs;
 };
 
 // Geometry is per element and packs are contiguous element ranges, so the adjugate,
@@ -30,6 +34,19 @@ static PackedMeshView build_packed_mesh(const Mesh &source, ptrdiff_t elements_p
     PackedMeshView p;
     p.layout = build_packed_layout(source.ev, source.nelements, source.nnodes,
                                    elements_per_pack);
+    // The pack-local connectivity in the kernel's node order, for the same
+    // reason `finalise_element_pointers` builds `kevp`.  The *layout* stays the
+    // library's -- packing renumbers nodes, and doing that from permuted rows
+    // would give a different numbering from the one SFEM produces, which the
+    // packed `extern "C"` apply is entitled to.  Only the pointer view moves.
+    p.kernel_element_ptrs = p.layout.element_ptrs;
+#ifdef KERNEL_SHAPE_ORDER
+    {
+        static const int kernel_shape_order[] = {KERNEL_SHAPE_ORDER};
+        for (int node = 0; node < NXE; ++node)
+            p.kernel_element_ptrs[node] = p.layout.element_ptrs[kernel_shape_order[node]];
+    }
+#endif
 
     p.mesh.nelements = source.nelements;
     p.mesh.nnodes = source.nnodes;
