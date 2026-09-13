@@ -840,6 +840,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
                                                                const scalar_t *const SFEM_RESTRICT xe,
                                                                const scalar_t *const SFEM_RESTRICT ye,
                                                                const scalar_t *const SFEM_RESTRICT ze,
+                                                               const scalar_t *const SFEM_RESTRICT ux,
+                                                               const scalar_t *const SFEM_RESTRICT uy,
+                                                               const scalar_t *const SFEM_RESTRICT uz,
+                                                               const int limiter,
                                                                const int s, const int i, const int j,
                                                                const scalar_t mdot, const scalar_t ueps,
                                                                scalar_t &dfx, scalar_t &dfy, scalar_t &dfz) {
@@ -878,12 +882,45 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     const scalar_t *const Gi = g + i * 9;
     const scalar_t *const Gj = g + j * 9;
 
-    dfx = mpos * (Gi[0] * dix + Gi[1] * diy + Gi[2] * diz) +
-          mneg * (Gj[0] * djx + Gj[1] * djy + Gj[2] * djz);
-    dfy = mpos * (Gi[3] * dix + Gi[4] * diy + Gi[5] * diz) +
-          mneg * (Gj[3] * djx + Gj[4] * djy + Gj[5] * djz);
-    dfz = mpos * (Gi[6] * dix + Gi[7] * diy + Gi[8] * diz) +
-          mneg * (Gj[6] * djx + Gj[7] * djy + Gj[8] * djz);
+    // One component's pair of increments, limited together.
+    //
+    // limiter = 0: none. Correct for a smooth field and the right thing for measuring what
+    //              the reconstruction is worth, wrong anywhere a discontinuity can form.
+    // limiter = 1: bounded face. The reconstructed face value is clipped into
+    //              [min(u_i,u_j), max(u_i,u_j)], so the face can introduce no value outside
+    //              the range its own two nodes already span, and the correction vanishes
+    //              where it would. This is local -- no neighbour stencil, no extra pass --
+    //              and it needs no differentiability, because under deferred correction the
+    //              limiter never enters the Jacobian. Its known cost is that it also clips
+    //              at a SMOOTH extremum, where the true face value legitimately lies outside
+    //              the nodal range; that is the classic Barth-Jespersen weakness and it is
+    //              why the unlimited arm is kept and measured beside it.
+    auto lim = [&](const scalar_t *const u, const scalar_t inc_i, const scalar_t inc_j,
+                   scalar_t &oi, scalar_t &oj) {
+        oi = inc_i;
+        oj = inc_j;
+        if (limiter != 1) return;
+        const scalar_t a = u[i], b = u[j];
+        const scalar_t lo = a < b ? a : b;
+        const scalar_t hi = a < b ? b : a;
+        scalar_t       fi = a + inc_i;
+        scalar_t       fj = b + inc_j;
+        fi = fi < lo ? lo : (fi > hi ? hi : fi);
+        fj = fj < lo ? lo : (fj > hi ? hi : fj);
+        oi = fi - a;
+        oj = fj - b;
+    };
+
+    scalar_t ii, jj;
+    lim(ux, Gi[0] * dix + Gi[1] * diy + Gi[2] * diz,
+            Gj[0] * djx + Gj[1] * djy + Gj[2] * djz, ii, jj);
+    dfx = mpos * ii + mneg * jj;
+    lim(uy, Gi[3] * dix + Gi[4] * diy + Gi[5] * diz,
+            Gj[3] * djx + Gj[4] * djy + Gj[5] * djz, ii, jj);
+    dfy = mpos * ii + mneg * jj;
+    lim(uz, Gi[6] * dix + Gi[7] * diy + Gi[8] * diz,
+            Gj[6] * djx + Gj[7] * djy + Gj[8] * djz, ii, jj);
+    dfz = mpos * ii + mneg * jj;
 }
 
 template <typename scalar_t>
@@ -988,7 +1025,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               const scalar_t *const SFEM_RESTRICT ugrad8 = nullptr,
                                                               const scalar_t *const SFEM_RESTRICT xe = nullptr,
                                                               const scalar_t *const SFEM_RESTRICT ye = nullptr,
-                                                              const scalar_t *const SFEM_RESTRICT ze = nullptr) {
+                                                              const scalar_t *const SFEM_RESTRICT ze = nullptr,
+                                                              const int limiter = 0) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     scalar_t grad[9];
@@ -1056,7 +1094,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
         // Jacobian below is untouched by design; see cvfem_hex8_scs_defcor.
         if (ugrad8) {
             scalar_t dfx, dfy, dfz;
-            cvfem_hex8_scs_defcor(ugrad8, xe, ye, ze, s, i, j, mdot, ueps, dfx, dfy, dfz);
+            cvfem_hex8_scs_defcor(ugrad8, xe, ye, ze, ux, uy, uz, limiter, s, i, j, mdot, ueps,
+                                  dfx, dfy, dfz);
             fx += dfx;
             fy += dfy;
             fz += dfz;

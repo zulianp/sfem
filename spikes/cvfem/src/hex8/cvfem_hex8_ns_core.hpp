@@ -94,6 +94,7 @@ struct MeshData {
     // from the current Newton iterate is exactly what it wants.
     std::vector<scalar_t> ugrad;
     int                   conv_ho{0};
+    int                   conv_limiter{0};
 
     // The Rhie-Chow coefficient, hoisted out of the element loop -- twelve values per
     // element, one per sub-control surface, rebuilt by cvfem_hex8_build_rc_coeff only when
@@ -622,7 +623,8 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         if (ho) gather_element_ugrad(d, e, g8);
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
                                               d.upwind_eps, ho ? g8 : nullptr,
-                                              ho ? x : nullptr, ho ? y : nullptr, ho ? z : nullptr);
+                                              ho ? x : nullptr, ho ? y : nullptr, ho ? z : nullptr,
+                                              d.conv_limiter);
         boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
                                   d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
                                   d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
@@ -1104,7 +1106,12 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     // recovers the order that the Re = 100 manufactured ladder says the first-order flux
     // loses. Forcing the path here rather than silently producing a first-order answer under
     // the packed layout is the difference between a limitation and a bug.
-    d.conv_ho = smesh::Env::read<int>("SFEM_CONV_HO", 0);
+    d.conv_ho      = smesh::Env::read<int>("SFEM_CONV_HO", 0);
+    // 0 = unlimited, 1 = bounded face. Default 1 when the correction is on: an unlimited
+    // reconstruction is right only where the field is smooth, and defaulting to the setting
+    // that is correct on a manufactured solution and wrong on a step would be exactly the
+    // shape of default this work has spent the day removing.
+    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 1);
     if (d.conv_ho) {
         assemble_nodal_u_grad(d, geom);
         apply_residual_atomic_sumfact(d, rho, mu);
