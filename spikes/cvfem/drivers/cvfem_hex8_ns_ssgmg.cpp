@@ -3668,6 +3668,15 @@ int main(int argc, char **argv) {
                         const real_t uin =
                                 inlet ? cvfem_case::step_inflow_ux<real_t>(y, z, step_y, Ly, Lz, U)
                                       : real_t(0);
+                        // Same bookkeeping as the `step` branch, and it has to be here too or
+                        // the option is silently wrong on this case: SFEM_STEP_OUTFLOW is
+                        // validated once for both step cases, so `convective` would constrain
+                        // this outlet and then never refresh it -- an outlet frozen at zero
+                        // for the whole run, with nothing in the log to say so.
+                        if (want_convective_outflow && outflow) {
+                            conv_slot.push_back(uvw_nodes.size());
+                            conv_node.push_back(i);
+                        }
                         uvw_nodes.push_back((idx_t)i);
                         uvw_ux.push_back(uin);
                         uvw_uy.push_back(real_t(0));
@@ -4575,7 +4584,17 @@ int main(int argc, char **argv) {
         // it is the SAME quadrature the balance below uses, so any error in it cancels
         // instead of biasing the shift. The flow-diagnostics test pins that identity against
         // rho*U*Ly*Lz on both the flat and the semi-structured path.
-        static real_t conv_area = -1;
+        //
+        // TWO AREAS, and they are not always the same one. conv_area is the whole outlet and
+        // is what the mean outflow velocity U_c is defined against. conv_area_ctl is the part
+        // the shift can actually move -- the nodes this condition prescribes -- and is what
+        // the shift must be divided by. On `step` every outlet node is prescribed and the two
+        // are equal. On `step_turb` they are not: a node on both x = Lx and a spanwise plane
+        // is a slip node, so its u_x and u_y stay free, and dividing the flux deficit by the
+        // full area would under-correct by that ring's share. Measuring the controlled area
+        // as the flux of a field that is 1 on exactly those nodes gets it right on both cases
+        // without either of them being special.
+        static real_t conv_area = -1, conv_area_ctl = -1;
         if (conv_area < 0) {
             std::vector<real_t> probe((size_t)ndof, 0);
             for (ptrdiff_t i = 0; i < nnodes; ++i) probe[(size_t)i * N_FIELDS + 0] = 1;
@@ -4585,8 +4604,18 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
             }
             conv_area = qa / op->rho;
-            std::printf("convective outflow: %td nodes  outlet area %g\n",
-                        (ptrdiff_t)conv_slot.size(), (double)conv_area);
+
+            std::fill(probe.begin(), probe.end(), real_t(0));
+            for (size_t k = 0; k < conv_node.size(); ++k)
+                probe[(size_t)conv_node[k] * N_FIELDS + 0] = 1;
+            real_t qc = 0;
+            if (op->sideset_mass_flux(probe.data(), "outlet", qc) != SFEM_SUCCESS || qc <= 0) {
+                std::fprintf(stderr, "convective outflow: the prescribed nodes carry no area\n");
+                return EXIT_FAILURE;
+            }
+            conv_area_ctl = qc / op->rho;
+            std::printf("convective outflow: %td nodes  outlet area %g  controlled %g\n",
+                        (ptrdiff_t)conv_slot.size(), (double)conv_area, (double)conv_area_ctl);
         }
 
         real_t mdot_in = 0;
@@ -4622,8 +4651,9 @@ int main(int argc, char **argv) {
             std::fprintf(stderr, "convective outflow: could not measure the outlet flux\n");
             return EXIT_FAILURE;
         }
-        // Flux is linear in u and the shift is normal, so Q(u* + d n) = Q(u*) + d rho A.
-        const real_t shift = (q_target - q_cand) / (op->rho * conv_area);
+        // Flux is linear in u and the shift is normal, so Q(u* + d n) = Q(u*) + d rho A_ctl,
+        // over the nodes the shift is written to and no others.
+        const real_t shift = (q_target - q_cand) / (op->rho * conv_area_ctl);
 
         auto &conds = dirichlet->conditions();
         for (size_t k = 0; k < conv_slot.size(); ++k) {
