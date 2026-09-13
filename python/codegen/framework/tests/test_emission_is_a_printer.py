@@ -134,7 +134,19 @@ PLAN_INPUTS = (
 #:
 #: What remains of `writes_per_shape` in that emitter is a comprehension filter,
 #: one table lookup and three pass-throughs: no branch reads it any more.
-BUDGET = 172
+#:
+#: 172 -> 168, and the first of these to come out of `residual_codegen.py`.
+#: `plans/geometry_quantities` records in its own docstring that its subject was
+#: "asked again as `if dependencies.uses_adjugate:` at some twenty sites"; four
+#: were left and these are two of them, plus the two that built the affine
+#: geometry stream list.
+#:
+#: Those last two were the same nested ternary written twice -- the cached
+#: metric, or the adjugate when the form needs one, then the determinant -- and
+#: it is the sequence `mesh_geometry_streams` already published at the ABI.
+#: What separated them was only the frozen `g_` prefix, so the plan now states
+#: the sequence once and applies the prefix on top of it.
+BUDGET = 168
 
 
 def _tested_names(test):

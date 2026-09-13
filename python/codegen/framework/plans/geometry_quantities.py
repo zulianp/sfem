@@ -129,18 +129,33 @@ def mesh_geometry_streams(dependencies, dim, metric_components=None):
     is ARCHITECTURE.html OP 16's defect, and this is the shape that makes it
     unrepresentable rather than merely fixed.
     """
+    return tuple(
+        MeshGeometryStream(abi_geometry_name(local), role)
+        for local, role in local_geometry_streams(dependencies, dim, metric_components)
+    )
+
+
+def local_geometry_streams(dependencies, dim, metric_components=None):
+    """The same sequence, by the names a kernel uses for them internally.
+
+    ``mesh_geometry_streams`` above is this with the frozen ``g_`` prefix
+    applied.  Which streams there are and in what order is one decision; whether
+    a given site is naming the C ABI parameter or the kernel's own local is
+    another, and only the second is the caller's.
+
+    Two sites in ``emitters/residual_codegen.py`` spelled this sequence
+    themselves, as a nested ternary over the cached metric and the adjugate --
+    the same three cases in the same order, written twice more.
+    """
     if metric_components:
         return tuple(
-            MeshGeometryStream(abi_geometry_name("geom_metric%d" % index), "metric")
+            ("geom_metric%d" % index, "metric")
             for index in range(int(metric_components))
         )
     streams = []
     if getattr(dependencies, "uses_adjugate", False):
-        streams.extend(
-            MeshGeometryStream(abi_geometry_name("adj%d" % index), "adjugate")
-            for index in range(dim * dim)
-        )
-    streams.append(MeshGeometryStream(abi_geometry_name("det0"), "determinant"))
+        streams.extend(("adj%d" % index, "adjugate") for index in range(dim * dim))
+    streams.append(("det0", "determinant"))
     return tuple(streams)
 
 
