@@ -2055,11 +2055,27 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                                 (Blocks == SSBLOCK_ALL) ||
                                 (all_cols_mom && !pu && !pp) || (all_cols_con && !uu && !up);
 
+                        // The same boundary data the full action is given. Without it the
+                        // closure fell back to a bounding-box plane test: on a box that marks the
+                        // right faces but closes the do-nothing outlet, and on anything else it closes
+                        // interior faces that happen to lie on a bounding plane. Measured on the FDA
+                        // nozzle, apply_blocks(all) differed from apply by 65% in the continuity rows,
+                        // and Vanka could not solve a system the dense LU solved in two Newton steps.
                         if constexpr (no_masking) {
                             scalar_t rb[CVFEM_HEX8_N_DOF];
                             for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
                             boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
-                                                             ux, uy, uz, vx, vy, vz, q, rb);
+                                                             ux, uy, uz, vx, vy, vz, q, rb,
+                                                             d.macro_face_mask.empty()
+                                                                     ? -1
+                                                                     : sscvfem_micro_face_mask(
+                                                                               (int)d.macro_face_mask[(size_t)e],
+                                                                               L, xi, yi, zi),
+                                                             sscvfem_micro_face_mask(
+                                                                     d.macro_natural_mask.empty() ? 0
+                                                                         : (int)d.macro_natural_mask[(size_t)e],
+                                                                     L, xi, yi, zi),
+                                                             sscvfem_bd(d, e, L, xi, yi, zi));
                             for (int a = 0; a < 8; ++a) {
                                 if constexpr (uu || up)
                                     for (int cc = 0; cc < 3; ++cc) r[a * 4 + cc] += rb[a * 4 + cc];
@@ -2071,7 +2087,17 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                             if constexpr (uu || pu) {
                                 for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
                                 boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
-                                                                 ux, uy, uz, vx, vy, vz, zero8, rb);
+                                                                 ux, uy, uz, vx, vy, vz, zero8, rb,
+                                                             d.macro_face_mask.empty()
+                                                                     ? -1
+                                                                     : sscvfem_micro_face_mask(
+                                                                               (int)d.macro_face_mask[(size_t)e],
+                                                                               L, xi, yi, zi),
+                                                             sscvfem_micro_face_mask(
+                                                                     d.macro_natural_mask.empty() ? 0
+                                                                         : (int)d.macro_natural_mask[(size_t)e],
+                                                                     L, xi, yi, zi),
+                                                             sscvfem_bd(d, e, L, xi, yi, zi));
                                 for (int a = 0; a < 8; ++a) {
                                     if constexpr (uu)
                                         for (int cc = 0; cc < 3; ++cc) r[a * 4 + cc] += rb[a * 4 + cc];
@@ -2081,7 +2107,17 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                             if constexpr (up || pp) {
                                 for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
                                 boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
-                                                                 ux, uy, uz, zero8, zero8, zero8, q, rb);
+                                                                 ux, uy, uz, zero8, zero8, zero8, q, rb,
+                                                             d.macro_face_mask.empty()
+                                                                     ? -1
+                                                                     : sscvfem_micro_face_mask(
+                                                                               (int)d.macro_face_mask[(size_t)e],
+                                                                               L, xi, yi, zi),
+                                                             sscvfem_micro_face_mask(
+                                                                     d.macro_natural_mask.empty() ? 0
+                                                                         : (int)d.macro_natural_mask[(size_t)e],
+                                                                     L, xi, yi, zi),
+                                                             sscvfem_bd(d, e, L, xi, yi, zi));
                                 for (int a = 0; a < 8; ++a) {
                                     if constexpr (up)
                                         for (int cc = 0; cc < 3; ++cc) r[a * 4 + cc] += rb[a * 4 + cc];
