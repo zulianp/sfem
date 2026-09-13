@@ -265,8 +265,11 @@ namespace cvfem_ss {
                 }
 
                 SSMacroGeom mg;
+                // Outside the block: the Rhie-Chow term below takes its node distances from the
+                // same corners mg was built from. See sscvfem_residual for what the cell's own
+                // coordinates cost on a curved macro element.
+                scalar_t ex[8], ey[8], ez[8];
                 {
-                    scalar_t ex[8], ey[8], ez[8];
                     for (int a = 0; a < 8; ++a) {
                         const int l = off[a];
                         ex[a]       = lx[(size_t)l];
@@ -303,7 +306,7 @@ namespace cvfem_ss {
                             for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
 
                             const Hex8RcConfig rcfg = sscvfem_rc_config(d);
-                            const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                            const Hex8RhieChow rc{ex,      ey, ez, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                                   nullptr, ux, uy, uz,  rcfg.tau};
                             cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, mg.adj, mg.det, ux, uy, uz, sl,
                                                                            loc, rc, p);
