@@ -2826,6 +2826,41 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "nozzle: set SFEM_NOZZLE_RE (the throat Reynolds number), not SFEM_U\n");
         return EXIT_FAILURE;
     }
+    // The manufactured case's domain and density are NOT free parameters, and until now this
+    // was asserted in three comments and enforced nowhere.
+    //
+    // The pressure carries a gauge constant, 1408/33075 - 8/(5 Re), which makes it exactly
+    // zero-mean on [0,2]^2 and on no other box; and its nonlinear part carries an implicit
+    // rho = 1, so at any other density the returned p is simply not the exact pressure. Under
+    // either override the run still converges and still prints an error norm -- against a
+    // reference that is not the solution. scripts/verify_report.sh records what that looks
+    // like: "it produced u_linf of 26, 10, 8.8 and 14 down a ladder that should have been
+    // converging quadratically", and it avoids it only by not setting the variables, which is
+    // a convention rather than a guarantee.
+    //
+    // Re enters through mu alone -- exact_state derives Re = 1/mu, so the two cannot disagree
+    // -- which is what makes a ladder at a different Reynolds number legitimate while a
+    // ladder on a different box is not.
+    // The VALUE is checked, not the variable's presence: SFEM_RHO=1 and SFEM_LX=2 are the
+    // required settings and scripts pass them explicitly, so rejecting the name would refuse
+    // the correct configuration. Rejecting the wrong value is the useful test.
+    if (want_mms) {
+        struct { const char *name; real_t got, want; } req[] = {
+                {"SFEM_LX", Lx, 2}, {"SFEM_LY", Ly, 2}, {"SFEM_LZ", Lz, 2}, {"SFEM_RHO", rho, 1}};
+        for (const auto &r : req) {
+            if (std::fabs((double)(r.got - r.want)) > 1e-12) {
+                std::fprintf(stderr,
+                             "mms: %s = %g, but the manufactured case requires %g. Its pressure "
+                             "gauge constant 1408/33075 - 8/(5 Re) is zero-mean on [0,2]^3 and "
+                             "nowhere else, and its nonlinear term carries rho = 1; either way "
+                             "the reported error would be measured against something that is "
+                             "not the exact solution. Set the Reynolds number with SFEM_MU "
+                             "(Re = 1/mu), which is the one parameter that IS free.\n",
+                             r.name, (double)r.got, (double)r.want);
+                return EXIT_FAILURE;
+            }
+        }
+    }
     const real_t      U          = want_nozzle ? cvfem_case::nozzle_throat_velocity(nozzle, nozzle_re, rho, mu)
                                                : smesh::Env::read<real_t>("SFEM_U", 1);
     const real_t      L_re       = want_nozzle ? 2 * nozzle.r_throat : Ly;
