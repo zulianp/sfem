@@ -165,10 +165,25 @@ def _field_n_shape_by_name(field_name, cell_rule, field_element_types):
     )
 
 
-def _is_tensor_product_family(rule, basis_family=None):
-    if basis_family is None:
+def is_tensor_product_family(family):
+    """Whether this basis or geometry family is the tensor-product one.
+
+    Takes the family and nothing else.  It used to take a quadrature rule
+    first and never read it -- nineteen call sites passed a `rule` or a
+    `cell_rule` that the body ignored -- which made it look like a question
+    about the rule when it is a question about the family alone.  That it is
+    also asked of `geometry_family`, not only of `basis_family`, is the
+    clearest sign of it.
+
+    Public because `emitters/residual_codegen.py` already imported the private
+    spelling across the module boundary, and because two more sites in
+    `emitters/energy_codegen.py` and one in `emitters/energy.py` wrote
+    `str(basis_family) == "tensor_product"` out by hand rather than reach for
+    something whose name said not to.
+    """
+    if family is None:
         raise ValueError("basis family must be provided by the emission plan")
-    return str(basis_family) == "tensor_product"
+    return str(family) == "tensor_product"
 
 
 def _residual_parent_field_name(field_or_name):
@@ -202,7 +217,7 @@ def _mixed_field_shape_orders(
     field_element_types,
     basis_family,
 ):
-    if not _is_tensor_product_family(cell_rule, basis_family):
+    if not is_tensor_product_family(basis_family):
         return tuple(tuple(range(layout.n_shape(field_index))) for field_index in range(len(layout.fields)))
 
     field_element_types = {} if field_element_types is None else field_element_types
@@ -224,7 +239,7 @@ def _mixed_tensor_product_field_stream_order(
     field_element_types,
     basis_family,
 ):
-    if not _is_tensor_product_family(cell_rule, basis_family):
+    if not is_tensor_product_family(basis_family):
         return tuple(range(layout.total_streams))
 
     field_element_types = {} if field_element_types is None else field_element_types

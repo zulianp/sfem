@@ -339,7 +339,32 @@ PLAN_INPUTS = (
 #: improving anything, which is adjusting the scorer rather than the code.  Both
 #: the guards and the measure stay as they are; the note is here so the next
 #: reader knows the remainder is not all emission logic.
-BUDGET = 112
+#:
+#: 112 -> 110: whether a family is the tensor-product one.  The number is small
+#: because most of the sites were already calling a plan function; what was
+#: wrong was the function.
+#:
+#: `plans/layout._is_tensor_product_family(rule, basis_family)` never read its
+#: first parameter.  Nineteen call sites passed a `rule` or a `cell_rule` that
+#: the body ignored, which made it read as a question about the quadrature rule
+#: when it is a question about the family alone -- and six of those sites pass
+#: `geometry_family` rather than `basis_family`, which is the tell.
+#:
+#: It was private by name and imported across modules anyway, by
+#: `residual_codegen.py`.  `energy_codegen.py` and `energy.py` wrote
+#: `str(basis_family) == "tensor_product"` out at seven sites instead of
+#: reaching for something whose underscore said not to, and two of those seven
+#: re-derived the `basis_family is None` check that already lived inside the
+#: function.
+#:
+#: The unified predicate raises on None where three of the converted sites used
+#: to return False for it.  That widening was not assumed to be safe: a full
+#: regeneration of all eight materials raised nothing and moved no byte, and the
+#: suite -- which builds configurations the generators do not, including the
+#: CUDA and HIP source builders that define `emits_tensor_product_header`
+#: separately -- reported the baseline set unchanged.  A family is never absent
+#: on any path either reaches.
+BUDGET = 110
 
 
 def _tested_names(test):

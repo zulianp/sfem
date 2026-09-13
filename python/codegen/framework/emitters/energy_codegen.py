@@ -91,6 +91,7 @@ from codegen.framework.emitters.ast_printer import (
     render_kernel_ast_lines,
 )
 from codegen.framework.targets import current_target
+from codegen.framework.plans.layout import is_tensor_product_family
 from codegen.framework.plans.matrix_formats import (
     BSRAssemblyPlan,
     BlockDiagSymAssemblyPlan,
@@ -2660,11 +2661,8 @@ def _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes):
 
 
 def _use_tensor_product_reference(quadrature_rule, reference_inputs, basis_family=None):
-    if basis_family is None:
-        raise ValueError("basis family must be provided by the emission plan")
-    tensor_product = str(basis_family) == "tensor_product"
     return (
-        tensor_product
+        is_tensor_product_family(basis_family)
         and len(reference_inputs) == 1
         and reference_inputs[0].name == "grad_ref"
     )
@@ -4807,7 +4805,7 @@ def _sfem_soa_mesh_operator_function(
     )
     use_tensor_product_geometry = (
         geometry_mode == "isoparametric"
-        and str(geometry_family) == "tensor_product"
+        and is_tensor_product_family(geometry_family)
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
@@ -6119,7 +6117,7 @@ def _objective_steps_lines(
     )
     use_tensor_product_geometry = (
         geometry_mode == "isoparametric"
-        and str(geometry_family) == "tensor_product"
+        and is_tensor_product_family(geometry_family)
     )
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
@@ -7324,7 +7322,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         reference_inputs,
         basis_family,
     )
-    use_tensor_product_geometry = str(geometry_family) == "tensor_product"
+    use_tensor_product_geometry = is_tensor_product_family(geometry_family)
     use_reference_gradient_vectors = (
         not use_tensor_product_reference
         and len(reference_inputs) == 1
@@ -8985,7 +8983,7 @@ def _sfem_soa_diagnostics_lines(
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     geometry_streams = sum(array_input.size for array_input in element_inputs)
-    if str(basis_family) == "tensor_product":
+    if is_tensor_product_family(basis_family):
         reference_scalars = (
             len(quadrature_rule.tensor_product_shape_values_1d)
             + len(quadrature_rule.tensor_product_shape_gradients_1d)
@@ -9094,9 +9092,7 @@ def _sfem_soa_specialized_wrapper_arguments(
     basis_family=None,
 ):
     arguments = [_cpp_argument_name(param) for param in wrapper_params]
-    if basis_family is None:
-        raise ValueError("basis family must be provided by the emission plan")
-    if str(basis_family) == "tensor_product":
+    if is_tensor_product_family(basis_family):
         offset = 1 + _sfem_soa_element_stream_count_from_params(wrapper_params)
         arguments.insert(
             offset,
