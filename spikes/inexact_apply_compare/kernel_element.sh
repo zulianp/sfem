@@ -36,6 +36,14 @@
 kernel_element() {
     _ke_element="$1"
     _ke_field="${2:-name}"
+    # An explicit answer wins.  The machine that builds need not be the machine
+    # that generated -- an Alps compute node has the compiler and the kernels
+    # but no sympy, so it cannot import the plan layer.  A stale override is not
+    # silent: `bench_split` fails on the deviation it produces.
+    case "$_ke_field" in
+        name)  [ -n "${KERNEL_ELEMENT:-}" ] && { printf '%s' "$KERNEL_ELEMENT"; return 0; } ;;
+        order) [ -n "${SHAPE_ORDER+set}" ]  && { printf '%s' "${SHAPE_ORDER}"; return 0; } ;;
+    esac
     _ke_query="${TMPDIR:-/tmp}/sfem_kernel_element.$$.py"
     cat > "$_ke_query" <<'QUERY'
 import sys
