@@ -23,6 +23,7 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl
     static constexpr int NQ = 4;
     static constexpr s_t QGRAD[32] = {s_t(-0.78867513459481287), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(0.21132486540518711), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(-0.78867513459481287), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(0.21132486540518711), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(0.21132486540518711)};
     static constexpr s_t QWEIGHT[4] = {s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25)};
+    s_t btangent_acc[10][VS];
     const g_t *const RSTR bg_adj0 = g_adj0 + evb;
     const g_t *const RSTR bg_adj1 = g_adj1 + evb;
     const g_t *const RSTR bg_adj2 = g_adj2 + evb;
@@ -40,30 +41,25 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl
     tangent_t *const RSTR btangent9 = tangent + evb + 9 * tangent_component_stride;
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
+        btangent_acc[0][lane] = s_t(0);
+        btangent_acc[1][lane] = s_t(0);
+        btangent_acc[2][lane] = s_t(0);
+        btangent_acc[3][lane] = s_t(0);
+        btangent_acc[4][lane] = s_t(0);
+        btangent_acc[5][lane] = s_t(0);
+        btangent_acc[6][lane] = s_t(0);
+        btangent_acc[7][lane] = s_t(0);
+        btangent_acc[8][lane] = s_t(0);
+        btangent_acc[9][lane] = s_t(0);
+    }
+    for (int q = 0; q < NQ; ++q) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
       const s_t adjugate0 = s_t(bg_adj0[lane]);
       const s_t adjugate1 = s_t(bg_adj1[lane]);
       const s_t adjugate2 = s_t(bg_adj2[lane]);
       const s_t adjugate3 = s_t(bg_adj3[lane]);
       const s_t determinant = s_t(bg_det0[lane]);
-      s_t tangent0 = s_t(0);
-      s_t tangent1 = s_t(0);
-      s_t tangent2 = s_t(0);
-      s_t tangent3 = s_t(0);
-      s_t tangent4 = s_t(0);
-      s_t tangent5 = s_t(0);
-      s_t tangent6 = s_t(0);
-      s_t tangent7 = s_t(0);
-      s_t tangent8 = s_t(0);
-      s_t tangent9 = s_t(0);
-      for (int q = 0; q < NQ; ++q) {
-        const s_t gref_0_0 = QGRAD[q * 8 + 0];
-        const s_t gref_0_1 = QGRAD[q * 8 + 1];
-        const s_t gref_1_0 = QGRAD[q * 8 + 2];
-        const s_t gref_1_1 = QGRAD[q * 8 + 3];
-        const s_t gref_2_0 = QGRAD[q * 8 + 4];
-        const s_t gref_2_1 = QGRAD[q * 8 + 5];
-        const s_t gref_3_0 = QGRAD[q * 8 + 6];
-        const s_t gref_3_1 = QGRAD[q * 8 + 7];
         const s_t qw = QWEIGHT[q];
             const s_t integrand_t0 = pow_m1(determinant);
             const s_t integrand_t1 = pow_2(adjugate1);
@@ -86,27 +82,30 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl
             const s_t integrand7 = integrand_t0*(integrand_t1*integrand_t3 + integrand_t2*mu);
             const s_t integrand8 = integrand_t0*(adjugate1*adjugate3*integrand_t3 + integrand_t5*mu);
             const s_t integrand9 = integrand_t0*(integrand_t3*integrand_t7 + integrand_t8*mu);
-        tangent0 += qw * integrand0;
-        tangent1 += qw * integrand1;
-        tangent2 += qw * integrand2;
-        tangent3 += qw * integrand3;
-        tangent4 += qw * integrand4;
-        tangent5 += qw * integrand5;
-        tangent6 += qw * integrand6;
-        tangent7 += qw * integrand7;
-        tangent8 += qw * integrand8;
-        tangent9 += qw * integrand9;
+        btangent_acc[0][lane] += qw * integrand0;
+        btangent_acc[1][lane] += qw * integrand1;
+        btangent_acc[2][lane] += qw * integrand2;
+        btangent_acc[3][lane] += qw * integrand3;
+        btangent_acc[4][lane] += qw * integrand4;
+        btangent_acc[5][lane] += qw * integrand5;
+        btangent_acc[6][lane] += qw * integrand6;
+        btangent_acc[7][lane] += qw * integrand7;
+        btangent_acc[8][lane] += qw * integrand8;
+        btangent_acc[9][lane] += qw * integrand9;
       }
-      btangent0[lane] = tangent_t(tangent0);
-      btangent1[lane] = tangent_t(tangent1);
-      btangent2[lane] = tangent_t(tangent2);
-      btangent3[lane] = tangent_t(tangent3);
-      btangent4[lane] = tangent_t(tangent4);
-      btangent5[lane] = tangent_t(tangent5);
-      btangent6[lane] = tangent_t(tangent6);
-      btangent7[lane] = tangent_t(tangent7);
-      btangent8[lane] = tangent_t(tangent8);
-      btangent9[lane] = tangent_t(tangent9);
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+        btangent0[lane] = tangent_t(btangent_acc[0][lane]);
+        btangent1[lane] = tangent_t(btangent_acc[1][lane]);
+        btangent2[lane] = tangent_t(btangent_acc[2][lane]);
+        btangent3[lane] = tangent_t(btangent_acc[3][lane]);
+        btangent4[lane] = tangent_t(btangent_acc[4][lane]);
+        btangent5[lane] = tangent_t(btangent_acc[5][lane]);
+        btangent6[lane] = tangent_t(btangent_acc[6][lane]);
+        btangent7[lane] = tangent_t(btangent_acc[7][lane]);
+        btangent8[lane] = tangent_t(btangent_acc[8][lane]);
+        btangent9[lane] = tangent_t(btangent_acc[9][lane]);
     }
   }
 

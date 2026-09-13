@@ -440,20 +440,22 @@ def _quadrature_table_lines(name, values, indent="    "):
     ]
 
 
-def _quadrature_loop_compute(
-    integrand, integrand_symbols, gradient_symbols, reference, weights,
-    n_nodes, dim, rule, plan, strategy=None,
+def _quadrature_point_lines(
+    integrand, integrand_symbols, gradient_symbols, lane_prologue,
+    n_nodes, dim, strategy,
 ):
-    """The sum over several points: accumulators, then the loop.
+    """One quadrature point's contribution, for one lane.
 
-    Reads the shared reference struct the rule publishes -- the same tables
-    every other kernel on this element reads -- rather than a table of its own.
+    Straight-line: this is the body of a lane loop and carries no loop of its
+    own.  Only the gradients the integrand actually reads are loaded -- a
+    state-independent tangent, linear elasticity's, reads none of them, and
+    loading all of them anyway is what
+    `test_no_kernel_computes_a_value_nothing_reads` catches.
     """
-    lines = [
-        "      s_t tangent%d = s_t(0);" % slot
-        for slot in range(plan.tangent_components)
-    ]
-    lines.append("      for (int q = 0; q < NQ; ++q) {")
+    read = set()
+    for expression in integrand:
+        read |= expression.free_symbols
+    lines = list(lane_prologue)
     lines.extend(
         "        const s_t %s = %s;"
         % (
@@ -462,6 +464,7 @@ def _quadrature_loop_compute(
         )
         for node in range(n_nodes)
         for axis in range(dim)
+        if gradient_symbols[node][axis] in read
     )
     lines.append("        const s_t qw = %s;" % _WEIGHT_READ_BY_STRATEGY[strategy])
     lines.extend(
@@ -471,10 +474,9 @@ def _quadrature_loop_compute(
         )
     )
     lines.extend(
-        "        tangent%d += qw * integrand%d;" % (slot, slot)
-        for slot in range(plan.tangent_components)
+        "        btangent_acc[%d][lane] += qw * integrand%d;" % (slot, slot)
+        for slot in range(len(integrand_symbols))
     )
-    lines.append("      }")
     return lines
 
 
@@ -566,14 +568,11 @@ _REFERENCE_AXES = ("x", "y", "z")
 #: points with the element's full reference gradients, which is why it carries a
 #: folded gradient table instead of reading the shared 1D factors.  That is the
 #: remaining gap, and naming it in this table is what keeps it visible.
-_QUADRATURE_BY_STRATEGY = {
-    EvaluationStrategy.EXPANDED: _single_point_compute,
-    EvaluationStrategy.QUADRATURE: functools.partial(
-        _quadrature_loop_compute, strategy=EvaluationStrategy.QUADRATURE
-    ),
-    EvaluationStrategy.SUM_FACTORIZED: functools.partial(
-        _quadrature_loop_compute, strategy=EvaluationStrategy.SUM_FACTORIZED
-    ),
+#: Whether a strategy's tangent needs a quadrature loop around its lane loop.
+_NEEDS_QUADRATURE_LOOP = {
+    EvaluationStrategy.EXPANDED: False,
+    EvaluationStrategy.QUADRATURE: True,
+    EvaluationStrategy.SUM_FACTORIZED: True,
 }
 
 _QUADRATURE_TABLES_BY_STRATEGY = {
@@ -597,6 +596,83 @@ _GRADIENT_READ_BY_STRATEGY = {
 _WEIGHT_READ_BY_STRATEGY = {
     EvaluationStrategy.QUADRATURE: "qweight[q] * QMEASURE",
     EvaluationStrategy.SUM_FACTORIZED: "QWEIGHT[q]",
+}
+
+
+def _expanded_tangent_body(
+    integrand, integrand_symbols, gradient_symbols, reference, weights,
+    lane_prologue, n_nodes, dim, strategy, plan,
+):
+    """An EXPANDED element: one lane loop, nothing around it."""
+    compute = list(lane_prologue)
+    compute.extend(
+        _single_point_compute(
+            integrand, integrand_symbols, gradient_symbols, reference, weights,
+            n_nodes, dim, None, plan,
+        )
+    )
+    compute.extend(
+        "      %s = tangent_t(tangent%d);" % (_BLOCKED_TANGENT_LANE % slot, slot)
+        for slot in range(plan.tangent_components)
+    )
+    return compute, None
+
+
+def _quadrature_tangent_body(
+    integrand, integrand_symbols, gradient_symbols, reference, weights,
+    lane_prologue, n_nodes, dim, strategy, plan,
+):
+    """A quadrature loop *around* three lane loops: zero, accumulate, write out.
+
+    This is the framework's nesting -- lane loops innermost, holding only
+    straight-line work -- and it is why the accumulator is a lane-major array
+    rather than a scalar: it has to survive across the points while staying
+    per-lane.  Accumulating in `s_t` and converting once at the end keeps the
+    store's precision out of the sum.
+    """
+    target = current_target()
+    pragma = target.vectorize_pragma() if hasattr(target, "vectorize_pragma") else None
+    slots = plan.tangent_components
+    zero = _lane_loop_node(
+        ["        btangent_acc[%d][lane] = s_t(0);" % slot for slot in range(slots)],
+        pragma,
+    )
+    point = _lane_loop_node(
+        _quadrature_point_lines(
+            integrand, integrand_symbols, gradient_symbols, lane_prologue,
+            n_nodes, dim, strategy,
+        ),
+        pragma,
+    )
+    q = iterator("q", "int")
+    accumulate = LoopNode(
+        LoopKind.QUADRATURE,
+        q,
+        iteration_range(0, expr_ref("NQ", "quadrature_points")),
+        pre_increment(q),
+        body=(point,),
+    )
+    write_out = _lane_loop_node(
+        [
+            "        %s = tangent_t(btangent_acc[%d][lane]);"
+            % (_BLOCKED_TANGENT_LANE % slot, slot)
+            for slot in range(slots)
+        ],
+        pragma,
+    )
+    return [], [zero, accumulate, write_out]
+
+
+#: Which body shape the tangent takes, keyed on whether its strategy needs a
+#: quadrature loop.
+_ACCUMULATOR_BY_LOOP = {
+    False: lambda slots: [],
+    True: lambda slots: ["    s_t btangent_acc[%d][VS];" % slots],
+}
+
+_TANGENT_BODY_BY_LOOP = {
+    False: _expanded_tangent_body,
+    True: _quadrature_tangent_body,
 }
 
 
@@ -649,20 +725,14 @@ def _tangent_lines(
     # EXPANDED element coincide on the simplices, which is why testing the point
     # count looked right; it is the element's family that decides.
     strategy = evaluation_strategy(plan.element_type)
-    compute = _QUADRATURE_BY_STRATEGY[strategy](
-        integrand, integrand_symbols, gradient_symbols, reference, weights,
-        n_nodes, dim, rule, plan,
-    )
-    compute.extend(
-        "      %s = tangent_t(tangent%d);" % (_BLOCKED_TANGENT_LANE % slot, slot)
-        for slot in range(plan.tangent_components)
-    )
-    # The per-lane state and geometry are read once, before the quadrature loop:
-    # they do not depend on the point.
-    compute = [
+    lane_prologue = [
         "      const s_t %s = b%s[lane];" % (value, value)
         for value, _s, _n, _r in gathered
-    ] + _blocked_geometry_lines(dim) + compute
+    ] + _blocked_geometry_lines(dim)
+    compute, inner = _TANGENT_BODY_BY_LOOP[_NEEDS_QUADRATURE_LOOP[strategy]](
+        integrand, integrand_symbols, gradient_symbols, reference, weights,
+        lane_prologue, n_nodes, dim, strategy, plan,
+    )
 
     signature = ["    const ptrdiff_t nelements,"]
     signature.extend(_CONNECTIVITY_ARGUMENT_BY_USE[bool(gathered)])
@@ -679,10 +749,15 @@ def _tangent_lines(
     tables = _QUADRATURE_TABLES_BY_STRATEGY[strategy](
         reference, weights, n_nodes, dim, rule
     )
+    # The accumulator survives the quadrature loop and stays per-lane, so it is
+    # lane-major scratch.  Declared only where there is a loop to survive.
+    tables.extend(
+        _ACCUMULATOR_BY_LOOP[_NEEDS_QUADRATURE_LOOP[strategy]](plan.tangent_components)
+    )
     return _blocked_function_lines(
         "%s_inexact_apply_tangent_a_msoa" % prefix,
         ("typename s_t", "typename g_t", "typename tangent_t", "int VS"),
-        signature, tables + scratch, gathers, compute, [],
+        signature, tables + scratch, gathers, compute, [], inner=inner,
     )
 
 
@@ -1134,7 +1209,27 @@ def _packed_function_lines(name, template_params, signature, scratch, gathers, c
     return list(render_kernel_ast_lines(name, nodes)) + [""]
 
 
-def _blocked_function_lines(name, template_params, signature, scratch, gathers, compute, store):
+def _lane_loop_node(body_lines, pragma):
+    """A lane loop over the tile, with nothing nested inside it.
+
+    Lane loops in this framework are innermost and hold straight-line work: a
+    loop inside one is what `test_openmp_hot_loop_families_report_vectorized_local_loops`
+    exists to catch, and a quadrature loop nested in a lane loop is the shape it
+    caught here.
+    """
+    lane = iterator("lane", "int")
+    return LoopNode(
+        LoopKind.SIMD,
+        lane,
+        iteration_range(0, expr_ref("ne", "tile_extent")),
+        pre_increment(lane),
+        body=(RawLinesNode(tuple(body_lines), reason="kernel arithmetic"),),
+        vectorized=bool(pragma),
+    )
+
+
+def _blocked_function_lines(name, template_params, signature, scratch, gathers, compute, store,
+                            inner=None):
     """One kernel, blocked over `VS` elements, with the gathers staged.
 
     The values this kernel reads come through the mesh connectivity, so their
@@ -1156,7 +1251,6 @@ def _blocked_function_lines(name, template_params, signature, scratch, gathers, 
     printer = CLikeKernelASTPrinter(vectorize_pragma=pragma or "")
 
     element_block = iterator("evb", "ptrdiff_t")
-    lane = iterator("lane", "int")
     body = [
         RawLinesNode(
             (
@@ -1167,14 +1261,7 @@ def _blocked_function_lines(name, template_params, signature, scratch, gathers, 
         ),
         RawLinesNode(tuple(scratch), reason="staging buffers"),
         RawLinesNode(tuple(gathers), reason="indirect gathers"),
-        LoopNode(
-            LoopKind.SIMD,
-            lane,
-            iteration_range(0, expr_ref("ne", "tile_extent")),
-            pre_increment(lane),
-            body=(RawLinesNode(tuple(compute), reason="kernel arithmetic"),),
-            vectorized=bool(pragma),
-        ),
+        *(inner if inner is not None else [_lane_loop_node(compute, pragma)]),
         RawLinesNode(tuple(store), reason="scatter"),
     ]
     nodes = (

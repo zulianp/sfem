@@ -27,6 +27,7 @@ static SFEM_INLINE int neohookean_ogden_quad4_inexact_apply_tangent_a_msoa_impl(
     static constexpr int NQ = 4;
     static constexpr s_t QGRAD[32] = {s_t(-0.78867513459481287), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(0.21132486540518711), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(-0.78867513459481287), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(0.21132486540518711), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(0.21132486540518711)};
     static constexpr s_t QWEIGHT[4] = {s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25)};
+    s_t btangent_acc[10][VS];
     idx_t bev0[VS];
     idx_t bev1[VS];
     idx_t bev2[VS];
@@ -74,6 +75,20 @@ static SFEM_INLINE int neohookean_ogden_quad4_inexact_apply_tangent_a_msoa_impl(
     tangent_t *const RSTR btangent9 = tangent + evb + 9 * tangent_component_stride;
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
+        btangent_acc[0][lane] = s_t(0);
+        btangent_acc[1][lane] = s_t(0);
+        btangent_acc[2][lane] = s_t(0);
+        btangent_acc[3][lane] = s_t(0);
+        btangent_acc[4][lane] = s_t(0);
+        btangent_acc[5][lane] = s_t(0);
+        btangent_acc[6][lane] = s_t(0);
+        btangent_acc[7][lane] = s_t(0);
+        btangent_acc[8][lane] = s_t(0);
+        btangent_acc[9][lane] = s_t(0);
+    }
+    for (int q = 0; q < NQ; ++q) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
       const s_t ux_0 = bux_0[lane];
       const s_t ux_1 = bux_1[lane];
       const s_t ux_2 = bux_2[lane];
@@ -87,17 +102,6 @@ static SFEM_INLINE int neohookean_ogden_quad4_inexact_apply_tangent_a_msoa_impl(
       const s_t adjugate2 = s_t(bg_adj2[lane]);
       const s_t adjugate3 = s_t(bg_adj3[lane]);
       const s_t determinant = s_t(bg_det0[lane]);
-      s_t tangent0 = s_t(0);
-      s_t tangent1 = s_t(0);
-      s_t tangent2 = s_t(0);
-      s_t tangent3 = s_t(0);
-      s_t tangent4 = s_t(0);
-      s_t tangent5 = s_t(0);
-      s_t tangent6 = s_t(0);
-      s_t tangent7 = s_t(0);
-      s_t tangent8 = s_t(0);
-      s_t tangent9 = s_t(0);
-      for (int q = 0; q < NQ; ++q) {
         const s_t gref_0_0 = QGRAD[q * 8 + 0];
         const s_t gref_0_1 = QGRAD[q * 8 + 1];
         const s_t gref_1_0 = QGRAD[q * 8 + 2];
@@ -180,27 +184,30 @@ static SFEM_INLINE int neohookean_ogden_quad4_inexact_apply_tangent_a_msoa_impl(
             const s_t integrand7 = integrand_t0*(integrand_t1*integrand_t59 + integrand_t25*integrand_t57 + integrand_t29*integrand_t62);
             const s_t integrand8 = integrand_t0*(integrand_t34*integrand_t59 + integrand_t35*integrand_t57 + integrand_t36*integrand_t61 + integrand_t37*integrand_t61);
             const s_t integrand9 = integrand_t0*(integrand_t53*integrand_t59 + integrand_t54*integrand_t57 + integrand_t55*integrand_t62);
-        tangent0 += qw * integrand0;
-        tangent1 += qw * integrand1;
-        tangent2 += qw * integrand2;
-        tangent3 += qw * integrand3;
-        tangent4 += qw * integrand4;
-        tangent5 += qw * integrand5;
-        tangent6 += qw * integrand6;
-        tangent7 += qw * integrand7;
-        tangent8 += qw * integrand8;
-        tangent9 += qw * integrand9;
+        btangent_acc[0][lane] += qw * integrand0;
+        btangent_acc[1][lane] += qw * integrand1;
+        btangent_acc[2][lane] += qw * integrand2;
+        btangent_acc[3][lane] += qw * integrand3;
+        btangent_acc[4][lane] += qw * integrand4;
+        btangent_acc[5][lane] += qw * integrand5;
+        btangent_acc[6][lane] += qw * integrand6;
+        btangent_acc[7][lane] += qw * integrand7;
+        btangent_acc[8][lane] += qw * integrand8;
+        btangent_acc[9][lane] += qw * integrand9;
       }
-      btangent0[lane] = tangent_t(tangent0);
-      btangent1[lane] = tangent_t(tangent1);
-      btangent2[lane] = tangent_t(tangent2);
-      btangent3[lane] = tangent_t(tangent3);
-      btangent4[lane] = tangent_t(tangent4);
-      btangent5[lane] = tangent_t(tangent5);
-      btangent6[lane] = tangent_t(tangent6);
-      btangent7[lane] = tangent_t(tangent7);
-      btangent8[lane] = tangent_t(tangent8);
-      btangent9[lane] = tangent_t(tangent9);
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+        btangent0[lane] = tangent_t(btangent_acc[0][lane]);
+        btangent1[lane] = tangent_t(btangent_acc[1][lane]);
+        btangent2[lane] = tangent_t(btangent_acc[2][lane]);
+        btangent3[lane] = tangent_t(btangent_acc[3][lane]);
+        btangent4[lane] = tangent_t(btangent_acc[4][lane]);
+        btangent5[lane] = tangent_t(btangent_acc[5][lane]);
+        btangent6[lane] = tangent_t(btangent_acc[6][lane]);
+        btangent7[lane] = tangent_t(btangent_acc[7][lane]);
+        btangent8[lane] = tangent_t(btangent_acc[8][lane]);
+        btangent9[lane] = tangent_t(btangent_acc[9][lane]);
     }
   }
 
