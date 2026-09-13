@@ -49,6 +49,7 @@ namespace cvfem_diag {
         double eps_visc{0};    // averaged across the step, to match dEdt's centring
         double eps_num{0};     // the residual: what the upwind term removed
         double closure{0};     // |eps_num| relative to the largest term, the honesty check
+                               // (gauge-invariant: see close() on why p_in - p_out, not p_in)
     };
 
     // Contract a nodal velocity gradient into the volume quantities.
@@ -146,7 +147,20 @@ namespace cvfem_diag {
         // one end's dissipation biases the residual by half the change across the step.
         e.eps_visc = 0.5 * (a.eps_visc + b.eps_visc);
         e.eps_num  = e.p_in - e.p_out - e.eps_visc - e.dEdt;
-        const double scale = std::fmax(std::fmax(std::fabs(e.p_in), std::fabs(e.p_out)),
+        // THE LARGEST TERM OF THE BUDGET, and p_in and p_out are not terms of it -- their
+        // DIFFERENCE is. Taking the max over them separately is not merely imprecise, it
+        // makes the ratio depend on the pressure gauge: p_in carries integral p u.n over the
+        // inlet, so shifting the pressure level by a constant shifts it, while eps_visc and
+        // dEdt do not move at all. The difference is invariant whenever the prescribed fluxes
+        // balance, because the shift contributes c (mdot_in + mdot_out).
+        //
+        // Measured on the outflow A/B at 47,268 dof, where the two arms differ only in the
+        // outlet condition and therefore in the gauge: the denominator silently changed from
+        // p_in to eps_visc between them, and the convective arm read closure 0.1931 against
+        // the natural arm's 0.1405 -- a 37% gap reported for two states whose gauge-invariant
+        // num_frac is 0.1618 and 0.1585, two percent apart. The conclusion drawn from it, that
+        // the convective outflow closed the budget worse, was an artifact of this line.
+        const double scale = std::fmax(std::fabs(e.p_in - e.p_out),
                                        std::fmax(std::fabs(e.eps_visc), std::fabs(e.dEdt)));
         e.closure  = scale > 0 ? std::fabs(e.eps_num) / scale : 0.0;
         return e;
