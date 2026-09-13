@@ -1562,15 +1562,24 @@ socket (`nid006549`, 72 Neoverse-V2 cores, GCC 13.3 from `prgenv-gnu/24.11`,
 `OMP_PLACES=cores`, `OMP_PROC_BIND=true`, twenty repetitions, 206763 dof).
 HEX8, and this time with the packed layout in the same run.
 
-**This is not a controlled A/B for any one change.** The recorded numbers predate
-the whole of the codegen rework: the tangent's quadrature sum became a loop, its
-`grad u` stopped being inlined at every occurrence, the tensor-product tangent
-started contracting through `tensor_gradient` instead of a private 192-entry
-table, the C ABI collapsed to one runtime-typed entry point, and HEX8 stopped
-publishing a micro-kernel and began forwarding to PROTEUS_HEX8.
+**These numbers are not comparable with the recorded run above, and the ratio
+table this section first carried has been withdrawn.**
 
-What makes it readable anyway is that **the exact apply is a control**: none of
-that work touches it, so its column says what the two runs have in common.
+The recorded run predates not only the codegen rework but the benchmark harness
+itself.  At the commit that recorded it, `element_mesh.inc` had no `MESH_ORDER`
+at all: the mesh was built lexicographically and never reordered.  This run uses
+`morton3`, which is what SFEM runs and what the harness has defaulted to since.
+*Ordering the benchmark mesh* in this same file measures what that is worth to
+this kernel -- a factor of four when gather locality is destroyed -- so a
+difference of 23 to 28% between the two runs says nothing about the generator.
+
+The exact apply held to within 2% across the two, which is what made the
+comparison look safe; it is not a control across a change of mesh, only across a
+change of kernel.  Three passes of one binary agree to better than 1%, so the
+measurement itself is reproducible and the cross-run difference is real -- it is
+simply not attributable to anything in the generator.
+
+What this run does support, because it is all one run on one mesh:
 
 | threads | exact | st. f64 | st. f32 | st. f16 | assembly |
 |---|---|---|---|---|---|
@@ -1579,33 +1588,15 @@ that work touches it, so its column says what the two runs have in common.
 | 32 | 105.79 | 336.21 | 286.04 | 271.50 | 59.48 |
 | 72 | 215.79 | 568.55 | 500.92 | 494.40 | 132.16 |
 
-Against the recorded run, as ratios:
+**The f64 store beats the f32 one at every thread count**, by 13% at 72 threads
+and 21% at 1.  That is the opposite of what halving the store traffic would
+suggest, and it is the same sign in the recorded run, so it is a property of the
+machine rather than of any change here: reading a `float` store into `double`
+arithmetic costs 45 widening converts per element, and on Neoverse-V2 that
+exceeds what the 180 saved bytes per element buy.  f32 remains the right default
+for its memory footprint; it is not the faster one on this machine.
 
-| threads | exact | st. f64 | st. f32 | st. f16 | assembly |
-|---|---|---|---|---|---|
-| 1 | 1.02 | 1.28 | 1.08 | 1.05 | 1.12 |
-| 8 | 1.01 | 1.23 | 1.05 | 1.02 | 1.13 |
-| 32 | 1.02 | 1.24 | 1.07 | 1.06 | 1.13 |
-| 72 | 0.98 | 1.07 | 0.97 | 0.96 | 1.13 |
-
-The control holds to within 2% at every thread count, which is the noise floor
-here and is what makes the rest of the table worth reading.  The same comparison
-on a ten-core laptop moved the control by 13%, so it resolves nothing and is not
-reported.
-
-**Nothing regressed, and the tangent assembly is 12 to 13% faster at every
-thread count.**  That is the one number with a clear cause: the tangent now
-reaches its reference gradients through `tensor_gradient_contiguous` and the
-shared one-dimensional tables, rather than walking the element's full reference
-gradients out of a table of its own.  It is consistent across the sweep, which
-noise at this level is not.  Break-even falls with it, from 3.2 applies per
-tangent to **2.6**.
-
-The apply columns are less clean: f64 gains 23 to 28% below 32 threads and only
-7% at 72, while f32 and f16 are within a few percent everywhere.  At 72 threads
-this kernel is bandwidth-bound and the store width is what matters, so the
-low-thread f64 gain is the part that wants explaining and this measurement does
-not explain it.
+Break-even at 72 threads is 2.6 applies per tangent for f64, 2.9 for f32.
 
 **The packed layout is the result worth having**, and the recorded run had no
 packed column at all:
