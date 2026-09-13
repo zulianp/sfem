@@ -41,6 +41,8 @@ from codegen.framework.plans.form_transformations import (
     metric_value_scale,
 )
 from codegen.framework.plans.form_emission import (
+    FormAccumulation,
+    form_accumulation,
     mesh_output_shape,
     mesh_output_streams,
     output_assignment,
@@ -1301,12 +1303,9 @@ def _sfem_soa_weak_form_block_function(
             params.append(
                 "const s_t *const RSTR h_streams[NS * %d]" % n_field_components
             )
-        if not writes_per_shape(form):
-            params.append("s_t *const RSTR value")
-        else:
-            params.append(
-                "s_t *const RSTR out_streams[NS * %d]" % n_field_components
-            )
+        params.append(
+            _BLOCK_OUTPUT_PARAMETER[form_accumulation(form)](n_field_components)
+        )
     else:
         if shared.uses_current:
             params.extend(
@@ -1683,8 +1682,10 @@ def _append_sfem_soa_tensor_weak_form_lines(
         lines.append("  s_t gu_ref_q[%s];" % block_extent)
     if uses_direction:
         lines.append("  s_t grad_h_ref_q[%s];" % block_extent)
-    if writes_per_shape(form):
-        lines.append("  s_t loperand_q[%s];" % block_extent)
+    lines.extend(
+        "  s_t %s[%s];" % (name, block_extent)
+        for name in _POINT_BUFFERS[form_accumulation(form)]
+    )
 
     for row in range(n_field_components):
         output_offset = c_product(row, "NQ", dim, "VS")
@@ -2235,9 +2236,12 @@ def _append_sfem_soa_weak_form_lines(
                 lines.append("      s_t gu_ref%d_values[VS];" % idx)
             if uses_direction:
                 lines.append("      s_t grad_h_ref%d_values[VS];" % idx)
-    if writes_per_shape(form):
-        for component in range(n_field_components * dim):
-            lines.append("      s_t loperand%d_values[VS];" % component)
+    lines.extend(
+        "      s_t loperand%d_values[VS];" % component
+        for component in _LOPERAND_COMPONENTS[form_accumulation(form)](
+            n_field_components, dim
+        )
+    )
     zeroed = []
     for row in range(n_field_components):
         for col in range(dim):
@@ -8821,24 +8825,9 @@ def _sfem_soa_diagnostics_lines(
             "diag_grad",
             scalar_temporaries=True,
         )
-        if not writes_per_shape(form):
-            diagnostic_expressions = (
-                form.weak_form.energy_density.xreplace(
-                    diagnostic_deformation_substitutions
-                ),
-            )
-        else:
-            diagnostic_expressions = tuple(
-                _weak_form_material_expression(
-                    form.weak_form,
-                    form.name,
-                    diagnostic_deformation_substitutions,
-                    tuple(
-                        sp.symbols("diag_trial_grad%d" % i)
-                        for i in range(form.weak_form.n_field_components * form.weak_form.dim)
-                    ),
-                )
-            )
+        diagnostic_expressions = _DIAGNOSTIC_EXPRESSIONS[form_accumulation(form)](
+            form, diagnostic_deformation_substitutions
+        )
         diagnostic_graph = (
             build_expression_graph(
                 KernelExpressions()
@@ -9900,6 +9889,63 @@ def _cpp_scalar_literal(value, scalar_type="real_t"):
     if value == 0.0:
         return "%s(0)" % scalar_type
     return "%s(%.17g)" % (scalar_type, value)
+
+
+#: The output parameter a block kernel declares, per body shape.  A scalar body
+#: is handed one accumulator; a per-shape body is handed the stream array.
+_BLOCK_OUTPUT_PARAMETER = {
+    FormAccumulation.SCALAR: lambda n_field_components: "s_t *const RSTR value",
+    FormAccumulation.PER_SHAPE: (
+        lambda n_field_components: "s_t *const RSTR out_streams[NS * %d]"
+        % n_field_components
+    ),
+}
+
+#: The per-point buffers a body needs beyond its gradients.  A scalar body forms
+#: no loperand, so the sequence is empty and nothing is declared.
+_POINT_BUFFERS = {
+    FormAccumulation.SCALAR: (),
+    FormAccumulation.PER_SHAPE: ("loperand_q",),
+}
+
+#: The same, per component, for the bodies that keep the loperand in lane-major
+#: scalars rather than one block.
+_LOPERAND_COMPONENTS = {
+    FormAccumulation.SCALAR: lambda n_field_components, dim: (),
+    FormAccumulation.PER_SHAPE: (
+        lambda n_field_components, dim: range(n_field_components * dim)
+    ),
+}
+
+
+def _scalar_diagnostic_expressions(form, substitutions):
+    """A 0-form's cost is its energy density."""
+    return (form.weak_form.energy_density.xreplace(substitutions),)
+
+
+def _per_shape_diagnostic_expressions(form, substitutions):
+    """A 1- or 2-form's cost is the material expression it contracts."""
+    return tuple(
+        _weak_form_material_expression(
+            form.weak_form,
+            form.name,
+            substitutions,
+            tuple(
+                sp.symbols("diag_trial_grad%d" % i)
+                for i in range(form.weak_form.n_field_components * form.weak_form.dim)
+            ),
+        )
+    )
+
+
+#: What the diagnostics cost model counts, per body shape.  It has to be the
+#: expressions the body actually evaluates, which is the same fact the body
+#: emitters read -- a record that counted the wrong half would be wrong in a
+#: way nothing compiles against.
+_DIAGNOSTIC_EXPRESSIONS = {
+    FormAccumulation.SCALAR: _scalar_diagnostic_expressions,
+    FormAccumulation.PER_SHAPE: _per_shape_diagnostic_expressions,
+}
 
 
 def _zero_fill_lines(output, source_builder, work_item, indent="    "):

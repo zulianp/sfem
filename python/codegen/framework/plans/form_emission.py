@@ -163,6 +163,40 @@ def _names_one_output(form):
     return len(form.expression_graph.evaluation_plan.outputs) == 1
 
 
+class FormAccumulation(Enum):
+    """What a form's body turns its integrand into.
+
+    The companion to `FormContraction`, which says *how* the contraction is
+    reached.  This says what there is to contract at all:
+
+    A 0-form weights its energy density and adds it into one accumulator per
+    element.  A 1-form and a 2-form form the loperand -- the flux pulled back
+    through the geometry -- and contract it onto the test functions, which needs
+    a buffer per component and writes one contribution per shape function.
+
+    Two body shapes, and `writes_per_shape(form)` was the bare boolean eleven
+    sites in `emitters/energy_codegen.py` re-asked to choose between them: the
+    block signature, the per-point buffers, the accumulation itself, the
+    diagnostics cost model.  Naming the set is what lets each of those map its
+    shape rather than branch on the question.
+    """
+
+    #: One accumulator per element: the objective, or a residual-based merit.
+    SCALAR = "scalar"
+
+    #: One contribution per shape function per field component.
+    PER_SHAPE = "per_shape"
+
+
+def form_accumulation(form):
+    """Which of the two body shapes this form has."""
+    return (
+        FormAccumulation.PER_SHAPE
+        if writes_per_shape(form)
+        else FormAccumulation.SCALAR
+    )
+
+
 class FormContraction(Enum):
     """How a form's integrand is contracted against the test functions."""
 
