@@ -88,6 +88,12 @@ struct MeshData {
     std::vector<scalar_t> rx, ry, rz, rc;
     std::vector<scalar_t> pgx, pgy, pgz;
     std::vector<scalar_t> qgx, qgy, qgz;  // same reconstruction applied to the Jacobian direction
+    // The nodal VELOCITY gradient, [i*9 + r*3 + c] = du_r/dx_c, for the deferred-correction
+    // convection scheme. Built only when that is on, and rebuilt once per residual rather than
+    // once per Krylov application: the correction is lagged by construction, so a gradient
+    // from the current Newton iterate is exactly what it wants.
+    std::vector<scalar_t> ugrad;
+    int                   conv_ho{0};
 
     // The Rhie-Chow coefficient, hoisted out of the element loop -- twelve values per
     // element, one per sub-control surface, rebuilt by cvfem_hex8_build_rc_coeff only when
@@ -455,6 +461,38 @@ inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
     assemble_nodal_grad_strided(d, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
 }
 
+// The nodal velocity gradient the deferred correction extrapolates with. Three passes of the
+// same reconstruction the pressure already uses, interleaved into one array in the layout
+// CVFEMNavierStokes::nodal_velocity_gradient publishes, so the diagnostics and the scheme read
+// the same thing.
+//
+// This is not cheap -- the gradient pass is 40-52% of a matvec by the solver's own trace, and
+// this is three of them -- which is the other reason the correction is lagged per Newton step
+// rather than evaluated per Krylov application.
+inline void assemble_nodal_u_grad(MeshData &d, const GeomKind geom_kind) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_u_grad");
+    std::vector<scalar_t> gx, gy, gz;
+    d.ugrad.assign((size_t)d.nnodes * 9, scalar_t(0));
+    const scalar_t *const src[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+    for (int r = 0; r < 3; ++r) {
+        assemble_nodal_grad_strided(d, geom_kind, src[r], 1, gx, gy, gz);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 0] = gx[(size_t)i];
+            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 1] = gy[(size_t)i];
+            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 2] = gz[(size_t)i];
+        }
+    }
+}
+
+// Gather one element's eight nodal velocity gradients into the 72-scalar block the SCS
+// correction reads.
+inline void gather_element_ugrad(const MeshData &d, const ptrdiff_t e, scalar_t *const g8) {
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const smesh::idx_t id = d.elems[a][e];
+        for (int k = 0; k < 9; ++k) g8[a * 9 + k] = d.ugrad[(size_t)id * 9 + (size_t)k];
+    }
+}
+
 SFEM_INLINE void gather_element_pgrad(const MeshData               &d,
                                              const ptrdiff_t               e,
                                              scalar_t *const SFEM_RESTRICT gx,
@@ -577,7 +615,14 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
                               nullptr, ux, uy, uz,  rcfg.tau};
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
-        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc);
+        // Deferred correction, when it is on. Null pointers otherwise, which is the same
+        // arithmetic the kernel did before this existed.
+        scalar_t g8[CVFEM_HEX8_N_NODES * 9];
+        const bool ho = d.conv_ho != 0 && !d.ugrad.empty();
+        if (ho) gather_element_ugrad(d, e, g8);
+        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
+                                              d.upwind_eps, ho ? g8 : nullptr,
+                                              ho ? x : nullptr, ho ? y : nullptr, ho ? z : nullptr);
         boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
                                   d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
                                   d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
@@ -1049,6 +1094,24 @@ inline void apply_transient_action(MeshData &d, const scalar_t rho,
 inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual");
     assemble_nodal_p_grad(d, geom);
+    // SFEM_CONV_HO: deferred-correction convection. Off by default, and off is bit-for-bit the
+    // scheme that every recorded number in this repository was measured with.
+    //
+    // It currently runs only the sum-factored atomic path. That is a scope limit, not a design
+    // one: the correction needs the element's node coordinates and its eight nodal velocity
+    // gradients, and threading those through the packed SIMD face kernel is a larger change
+    // than the question this is being built to answer -- whether extrapolating the donor value
+    // recovers the order that the Re = 100 manufactured ladder says the first-order flux
+    // loses. Forcing the path here rather than silently producing a first-order answer under
+    // the packed layout is the difference between a limitation and a bug.
+    d.conv_ho = smesh::Env::read<int>("SFEM_CONV_HO", 0);
+    if (d.conv_ho) {
+        assemble_nodal_u_grad(d, geom);
+        apply_residual_atomic_sumfact(d, rho, mu);
+        apply_body_force(d);
+        apply_transient(d, rho);
+        return;
+    }
     if (geom == GeomKind::Isoparam) {
         apply_residual_atomic_isoparam(d, rho, mu);
         apply_body_force(d);
