@@ -76,7 +76,7 @@ from codegen.framework.plans.layout import (
     _field_element_type,
     _field_n_shape_by_name,
     _identity_order,
-    _is_tensor_product_family,
+    is_tensor_product_family,
     _linear_index_offset,
     _mixed_field_shape_orders,
     gather_shape_order,
@@ -1311,7 +1311,7 @@ def _mixed_local_reference_params(cell_rule, n_fields, dim, dependencies, basis_
         % (stream.name, "[%d]" % stream.extent if stream.extent else "")
         for stream in mixed_reference_streams(
             dependencies,
-            _is_tensor_product_family(cell_rule, basis_family),
+            is_tensor_product_family(basis_family),
             n_fields,
             dim,
         )
@@ -1330,7 +1330,7 @@ def _mixed_reference_pointer_lines(
     field_element_types = {} if field_element_types is None else field_element_types
     layout = MixedFieldLayout.create(system, cell_rule, field_element_types)
     lines = []
-    if _is_tensor_product_family(cell_rule, basis_family):
+    if is_tensor_product_family(basis_family):
         lines.append(
             "%sconst s_t *const field_shape_1d[NC] = {%s};"
             % (
@@ -1418,7 +1418,7 @@ def _mixed_reference_call_args(cell_rule, dependencies, basis_family=None):
         else stream.name
         for stream in mixed_reference_streams(
             dependencies,
-            _is_tensor_product_family(cell_rule, basis_family),
+            is_tensor_product_family(basis_family),
             n_fields=0,
             dim=0,
         )
@@ -2257,7 +2257,7 @@ def _mixed_local_function(
         kernel_constant("%s_NS" % group.name.upper(), group.shape_count)
         for group in layout.groups
     )
-    if _is_tensor_product_family(rule, basis_family):
+    if is_tensor_product_family(basis_family):
         lines.extend(
             _mixed_tensor_local_body(
                 system,
@@ -2843,7 +2843,7 @@ def _local_function(
     rule = specialization.quadrature_rule
     dim = system.dim
     n_fields = len(system.fields)
-    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product = is_tensor_product_family(basis_family)
     gradient_metric = (
         None
         if tensor_product or not allow_simplex_gradient_metric
@@ -4196,7 +4196,7 @@ def _operator_source(
     n_qp = rule.n_qp
     vector_size = specialization.vector_size
     element = rule.element_type.lower()
-    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product = is_tensor_product_family(basis_family)
     lines = [
         "#include <type_traits>",
         "#include <cstdint>",
@@ -4527,7 +4527,7 @@ def _mixed_operator_source(
 
 
 def _mixed_reference_data(cell_rule, system, field_element_types, basis_family=None):
-    if _is_tensor_product_family(cell_rule, basis_family):
+    if is_tensor_product_family(basis_family):
         data = (
             SfemReferenceData("q_weight_1d", cell_rule.tensor_product_weights_1d),
         )
@@ -4873,8 +4873,8 @@ def _mixed_isoparametric_function(
     )
     if not publishes_kernel(dependencies):
         return []
-    tensor_product = _is_tensor_product_family(cell_rule, basis_family)
-    tensor_product_geometry = _is_tensor_product_family(cell_rule, geometry_family)
+    tensor_product = is_tensor_product_family(basis_family)
+    tensor_product_geometry = is_tensor_product_family(geometry_family)
     if tensor_product:
         lines.extend(_mixed_tensor_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
     else:
@@ -5543,7 +5543,7 @@ def _mesh_operator_source(
     n_shape = rule.n_shape
     n_qp = rule.n_qp
     vector_size = affine_specialization.vector_size
-    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product = is_tensor_product_family(basis_family)
     specialized_prefix = _constant_p1_affine_specialized_local_prefix(
         local_prefix,
         rule,
@@ -6466,8 +6466,8 @@ def _scalar_crs_matrix_assembly_source(
     n_shape = rule.n_shape
     n_streams = n_fields * n_shape
     n_qp = rule.n_qp
-    tensor_product = _is_tensor_product_family(rule, basis_family)
-    tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
+    tensor_product = is_tensor_product_family(basis_family)
+    tensor_product_geometry = is_tensor_product_family(geometry_family)
     row_fields, column_fields = _compatible_matrix_field_indices_from_prefix(
         prefix,
         system,
@@ -7209,8 +7209,8 @@ def _isoparametric_mesh_operator_source(
     n_shape = rule.n_shape
     n_qp = rule.n_qp
     vector_size = specialization.vector_size
-    tensor_product = _is_tensor_product_family(rule, basis_family)
-    tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
+    tensor_product = is_tensor_product_family(basis_family)
+    tensor_product_geometry = is_tensor_product_family(geometry_family)
     gradient_metric = None
     shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
@@ -7471,8 +7471,8 @@ def _scalar_packed_jacobian_action_source(
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     n_qp = rule.n_qp
-    tensor_product = _is_tensor_product_family(rule, basis_family)
-    tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
+    tensor_product = is_tensor_product_family(basis_family)
+    tensor_product_geometry = is_tensor_product_family(geometry_family)
     shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
@@ -7890,7 +7890,7 @@ def _scalar_packed_affine_jacobian_action_source(
     n_shape = rule.n_shape
     n_qp = rule.n_qp
     vector_size = specialization.vector_size
-    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product = is_tensor_product_family(basis_family)
     specialized_prefix = _constant_p1_affine_specialized_local_prefix(
         local_prefix,
         rule,

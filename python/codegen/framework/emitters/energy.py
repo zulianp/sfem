@@ -13,6 +13,7 @@ from codegen.framework.ir.kernel_ast import (
 )
 from codegen.framework.emitters.ast_printer import render_kernel_ast_lines
 from codegen.framework.emitters.tensor_product_geometry import sfem_geometry_kernels_header_source
+from codegen.framework.plans.layout import is_tensor_product_family
 from codegen.framework.targets import CUDATarget, OpenMPTarget
 
 
@@ -308,7 +309,7 @@ class CUDAEnergySoASourceBuilder:
     def local_header_preamble_lines(self, math_name, tensor_product_name, basis_family):
         tensor_include = (
             ('#include "%s"' % tensor_product_name,)
-            if str(basis_family) == "tensor_product"
+            if is_tensor_product_family(basis_family)
             else ()
         )
         return (
@@ -332,7 +333,7 @@ class CUDAEnergySoASourceBuilder:
         return _cuda_geometry_header_source()
 
     def emits_tensor_product_header(self, basis_family):
-        return str(basis_family) == "tensor_product"
+        return is_tensor_product_family(basis_family)
 
     def tensor_product_header_source(self):
         from codegen.framework.emitters.tensor_product_kernels import sfem_tensor_product_kernels_header_source
