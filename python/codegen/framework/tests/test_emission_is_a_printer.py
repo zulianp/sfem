@@ -222,7 +222,24 @@ PLAN_INPUTS = (
 #: still has an element API, and the answer there is that the current state is
 #: present and the direction follows the form's own `has_direction`.  That
 #: default was the whole of the difference and was restated at every site.
-BUDGET = 138
+#:
+#: 138 -> 132, in two parts.
+#:
+#: Three predicates about a form -- does it read the state, does it read a
+#: direction, which material constants does it name -- lived in
+#: `emitters/energy_codegen.py`, each carrying its own "a form not lowered
+#: through a dependency set" fallback.  They are pure questions about a form and
+#: they are `plans/form_emission`'s now.  The fallback is the part that is not
+#: `getattr`: what such a form reads is the caller's declaration, and saying so
+#: three times in emission was saying it in the wrong layer.
+#:
+#: And `form == "jacobian_action"` at three sites, which is the question of
+#: which forms publish a packed-mesh kernel.  Only the Jacobian action does, and
+#: `plans/geometry_variants` now says why: packing removes the scatter from a
+#: matrix-free apply, and a residual scatters once per Newton step while an
+#: objective scatters nothing, so neither has the cost packing exists to remove.
+#: A sequence, for the reason `packed_mesh_layouts` beside it is one.
+BUDGET = 132
 
 
 def _tested_names(test):

@@ -43,6 +43,9 @@ from codegen.framework.plans.form_transformations import (
 from codegen.framework.plans.form_emission import (
     FormAccumulation,
     element_api_field_roles,
+    form_material_parameter_names,
+    form_reads_current,
+    form_reads_direction,
     publishes_objective_steps,
     form_accumulation,
     mesh_output_shape,
@@ -1250,8 +1253,8 @@ def _sfem_soa_block_function(
             if use_tensor_product_reference
             else tuple(range(n_nodes))
         ),
-        uses_current=_form_uses_current(form, default=True),
-        uses_direction=_form_uses_direction(form, default=form.has_direction),
+        uses_current=form_reads_current(form, default=True),
+        uses_direction=form_reads_direction(form, default=form.has_direction),
         source_builder=source_builder,
     )
     # Selected, not branched on.  Both take the same arguments now, so which
@@ -1728,8 +1731,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
-    uses_current = _form_uses_current(form, default=True)
-    uses_direction = _form_uses_direction(form, default=form.has_direction)
+    uses_current = form_reads_current(form, default=True)
+    uses_direction = form_reads_direction(form, default=form.has_direction)
     u_streams = "u_streams" if use_stream_arrays else "weak_u_streams"
     h_streams = "h_streams" if use_stream_arrays else "weak_h_streams"
     out_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
@@ -1906,7 +1909,7 @@ def _metric_plan_bindings(form, dim, source_builder, use_stream_arrays):
     """The plan's abstract `fff` and `u` bound to what this ABI calls them."""
     n_field_components = form_n_field_components(form, dim)
     work_item = _work_item_index(source_builder)
-    uses_direction = _form_uses_direction(form, default=form.has_direction)
+    uses_direction = form_reads_direction(form, default=form.has_direction)
     field = "h" if uses_direction else "u"
     stream_prefix = "" if use_stream_arrays else "weak_"
     bindings = {}
@@ -2089,8 +2092,8 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     n_field_components = form_n_field_components(form, dim)
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
-    uses_current = _form_uses_current(form, default=True)
-    uses_direction = _form_uses_direction(form, default=form.has_direction)
+    uses_current = form_reads_current(form, default=True)
+    uses_direction = form_reads_direction(form, default=form.has_direction)
 
     def field_value(field, row, shape):
         stream_prefix = "" if use_stream_arrays else "weak_"
@@ -2302,8 +2305,8 @@ def _append_sfem_soa_weak_form_lines(
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
-    uses_current = _form_uses_current(form, default=True)
-    uses_direction = _form_uses_direction(form, default=form.has_direction)
+    uses_current = form_reads_current(form, default=True)
+    uses_direction = form_reads_direction(form, default=form.has_direction)
     if weak_form.dim != dim:
         raise ValueError("weak form dim does not match SoA kernel dim")
     if form.name not in ("objective", "gradient", "apply"):
@@ -2627,35 +2630,10 @@ def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix,
             lines.append("    %s %s;" % (target, _sfem_ccode(expression)))
 
 
-def _form_dependencies(form):
-    return getattr(form, "dependencies", None)
-
-
-def _form_uses_current(form, default):
-    dependencies = _form_dependencies(form)
-    if dependencies is None:
-        return bool(default)
-    return bool(getattr(dependencies, "current", False))
-
-
-def _form_uses_direction(form, default):
-    dependencies = _form_dependencies(form)
-    if dependencies is None:
-        return bool(default)
-    return bool(getattr(dependencies, "direction", False))
-
-
-def _form_material_parameter_names(form):
-    dependencies = _form_dependencies(form)
-    if dependencies is None:
-        return ()
-    return tuple(str(parameter) for parameter in getattr(dependencies, "parameters", ()))
-
-
 def _form_material_parameter_declarations(form, scalar_type="s_t"):
     return tuple(
         "const %s %s" % (scalar_type, parameter)
-        for parameter in _form_material_parameter_names(form)
+        for parameter in form_material_parameter_names(form)
     )
 
 
@@ -4788,7 +4766,7 @@ def _sfem_soa_mesh_operator_function(
     effective_vector_size = source_builder.effective_vector_size(vector_size)
     if geometry_mode not in ("affine", "isoparametric"):
         raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
-    material_parameter_names = _form_material_parameter_names(form)
+    material_parameter_names = form_material_parameter_names(form)
 
     function_name = _sfem_soa_mesh_public_function_name(
         prefix,
@@ -4843,8 +4821,8 @@ def _sfem_soa_mesh_operator_function(
     )
     use_stream_arrays = use_shared_weak_local and form.weak_form is not None
     compact_coordinate_buffers = geometry_mode == "isoparametric"
-    uses_current = _form_uses_current(form, default=True)
-    uses_direction = _form_uses_direction(form, default=form.has_direction)
+    uses_current = form_reads_current(form, default=True)
+    uses_direction = form_reads_direction(form, default=form.has_direction)
     stream_shape_order = (
         _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
         if use_tensor_product_reference
@@ -6096,7 +6074,7 @@ def _objective_steps_lines(
     if geometry_mode not in ("affine", "isoparametric"):
         raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
     work_item = _work_item_index(source_builder)
-    material_parameter_names = _form_material_parameter_names(form)
+    material_parameter_names = form_material_parameter_names(form)
 
     function_name = _sfem_soa_mesh_public_function_name(
         prefix,
@@ -6721,7 +6699,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     emit_tensor_product_static_constants=True,
 ):
     n_field_components = form_n_field_components(form, dim)
-    uses_current = _form_uses_current(form, default=True)
+    uses_current = form_reads_current(form, default=True)
     weak_form = form.weak_form
     material = _weak_form_material_expression(
         weak_form,
@@ -7338,8 +7316,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     packed_crs_passes = _packed_crs_passes(matrix_format_plan)
-    material_parameter_names = _form_material_parameter_names(form)
-    uses_current = _form_uses_current(form, default=True)
+    material_parameter_names = form_material_parameter_names(form)
+    uses_current = form_reads_current(form, default=True)
 
     use_tensor_product_reference = _use_tensor_product_reference(
         quadrature_rule,
@@ -8972,8 +8950,8 @@ def _element_flops_plan(
         affine_rule.n_qp if affine_rule is not None else n_qp,
         n_field_components,
         writes_per_shape(form),
-        _form_uses_current(form, default=True),
-        _form_uses_direction(form, default=form.has_direction),
+        form_reads_current(form, default=True),
+        form_reads_direction(form, default=form.has_direction),
     )
     return element_flops_plan(
         getattr(form, "name", ""),
@@ -9006,8 +8984,8 @@ def _sfem_soa_diagnostics_lines(
     public_name = _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
     struct_name = _sfem_soa_diagnostics_struct_name()
     variable_name = "%s_diagnostics_data" % public_name
-    uses_current = _form_uses_current(form, default=True)
-    uses_direction = _form_uses_direction(form, default=form.has_direction)
+    uses_current = form_reads_current(form, default=True)
+    uses_direction = form_reads_direction(form, default=form.has_direction)
     if form.expression_graph is not None:
         cost = form.expression_graph.cost
     elif form.weak_form is not None:
@@ -9621,7 +9599,7 @@ def _sfem_soa_element_api_block_call(
             use_tensor_product_reference,
             use_reference_gradient_vectors,
         ),
-        *_form_material_parameter_names(form),
+        *form_material_parameter_names(form),
     ]
     args.extend(
         "b%s_streams" % stream_prefix

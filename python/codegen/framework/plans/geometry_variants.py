@@ -139,6 +139,27 @@ def packed_is_worth_emitting(dim):
     return int(dim) == 3
 
 
+#: The residual path's form names, and which of them publish a packed-mesh
+#: kernel.  Only the Jacobian action does, and the reason is what packing is
+#: for: it removes the scatter from a matrix-free apply, which is where the
+#: apply spends most of its traffic.  A residual scatters once per Newton step
+#: and an objective scatters nothing at all, so neither has the cost packing
+#: exists to remove.
+PACKED_KERNEL_FORMS = ("jacobian_action",)
+
+
+def packed_kernel_forms(form):
+    """That form's packed kernels, as a sequence: one entry or none.
+
+    A sequence rather than a predicate for the reason `packed_mesh_layouts`
+    above is one -- three sites in `emitters/residual_codegen.py` asked
+    `form == "jacobian_action"` and appended a source, which is a decision taken
+    where the form's name is a string to be compared rather than a plan to be
+    read.
+    """
+    return (str(form),) if str(form) in PACKED_KERNEL_FORMS else ()
+
+
 def geometry_variant_plan(weak_form, rule, *, specialized=True, assembles_matrix=False):
     """The variants this form publishes on the element `rule` describes.
 
