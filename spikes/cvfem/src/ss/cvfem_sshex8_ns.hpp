@@ -2131,7 +2131,13 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     // recorded number here was measured with; the gradient is built once per residual, which
     // is once per Newton step, because the correction is lagged by construction.
     d.conv_ho      = smesh::Env::read<int>("SFEM_CONV_HO", 0);
-    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 1);
+    // DEFAULT 0, BECAUSE 0 IS WHAT CONVERGES. Measured on the backward-facing step at
+    // Re = 40, the deferred correction reaches the target in 24 Newton steps unlimited
+    // and does not converge at all with either limiter -- the bounded-face clip stalls
+    // at Re 14.04 after 399 steps, Venkatakrishnan's smooth form at Re 21.92 after 411.
+    // The limiter is the cause, not the reconstruction. Both remain reachable, because
+    // a bounded scheme is still wanted and reproducing the failure is a legitimate need.
+    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 0);
     if (d.conv_ho) sscvfem_assemble_nodal_u_grad(d);
     else d.ugrad.clear();
 

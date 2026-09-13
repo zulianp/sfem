@@ -80,6 +80,13 @@ MUS=${MUS:-"0.05 0.02 0.01"}
 # stalls, run HOS=0 on 4:8 and keep both arms on the cheap meshes where the failure is
 # already characterised.
 HOS=${HOS:-"0 1"}
+# LIMITER 0, and named rather than inherited even though it is now the default. The first run
+# of this job set 1 and every HO cell read conv=0: conv_limiter.sbatch established that the
+# clip is what stalls, not the reconstruction -- unlimited reaches the target in 24 Newton
+# steps where the clip runs 399 and stops at Re 14.04. Until the limiter deactivates itself in
+# the near-constant regions it has no business acting in, the bounded arm cannot be part of a
+# budget measurement, because a budget read off an unconverged state is not a measurement.
+LIM=${LIM:-0}
 
 run_one() {
     local tag=$1; shift
@@ -136,7 +143,7 @@ for MU in $MUS; do
         NN=${NL%%:*}; LV=${NL##*:}
         for HO in $HOS; do
             run_one "re${RE}_n${NN}l${LV}_ho${HO}" SFEM_MU=$MU SFEM_N=$NN \
-                SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=$HO SFEM_CONV_LIMITER=1
+                SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=$HO SFEM_CONV_LIMITER=$LIM
         done
     done
     echo

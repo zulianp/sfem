@@ -1139,7 +1139,13 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     // reconstruction is right only where the field is smooth, and defaulting to the setting
     // that is correct on a manufactured solution and wrong on a step would be exactly the
     // shape of default this work has spent the day removing.
-    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 1);
+    // DEFAULT 0, BECAUSE 0 IS WHAT CONVERGES. Measured on the backward-facing step at
+    // Re = 40, the deferred correction reaches the target in 24 Newton steps unlimited
+    // and does not converge at all with either limiter -- the bounded-face clip stalls
+    // at Re 14.04 after 399 steps, Venkatakrishnan's smooth form at Re 21.92 after 411.
+    // The limiter is the cause, not the reconstruction. Both remain reachable, because
+    // a bounded scheme is still wanted and reproducing the failure is a legitimate need.
+    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 0);
     if (d.conv_ho) {
         assemble_nodal_u_grad(d, geom);
         apply_residual_atomic_sumfact(d, rho, mu);
