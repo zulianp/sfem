@@ -2864,13 +2864,13 @@ int main(int argc, char **argv) {
     const real_t      U          = want_nozzle ? cvfem_case::nozzle_throat_velocity(nozzle, nozzle_re, rho, mu)
                                                : smesh::Env::read<real_t>("SFEM_U", 1);
     const real_t      L_re       = want_nozzle ? 2 * nozzle.r_throat : Ly;
-    // Isoparametric by default on the nozzle, because its elements are not affine and the
-    // affine kernels would silently integrate a different geometry.
+    // Isoparametric by default on the nozzle, because its elements are not affine. SFEM_GEOM=
+    // affine is an explicit opt-in to approximating each element by its Jacobian at the centre
+    // -- per element on a flat mesh, per MACRO element on a semi-structured one -- whose error
+    // shrinks with the element (macro element) size. It is announced, never silent.
     const std::string geom_name  = smesh::Env::read_string("SFEM_GEOM", want_nozzle ? "isoparam" : "affine");
-    if (want_nozzle && geom_name != "isoparam") {
-        std::fprintf(stderr, "nozzle: SFEM_GEOM must be isoparam -- the mesh is not affine\n");
-        return EXIT_FAILURE;
-    }
+    if (want_nozzle && geom_name == "affine")
+        std::printf("nozzle: SFEM_GEOM=affine -- curved elements approximated by their centre Jacobian\n");
     const int         max_newton = smesh::Env::read<int>("SFEM_NL_MAX_IT", 40);
     // Transient stepping. SFEM_DT <= 0 -- the default -- is the steady solve every existing
     // case runs, and nothing below changes for it. With a timestep the whole continuation
@@ -2957,13 +2957,14 @@ int main(int argc, char **argv) {
     const real_t step_y = smesh::Env::read<real_t>("SFEM_STEP_Y", 1);
     std::shared_ptr<smesh::Mesh> mesh;
     if (want_nozzle) {
-        // Flat only. The semi-structured operator hoists one Jacobian per macro element, which
-        // is exact for an affine macro element and wrong for every element of this mesh; a
-        // curved semi-structured path is future work, and until it exists the run is refused
-        // rather than handed a wrong operator.
-        if (smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1) > 1) {
-            std::fprintf(stderr, "nozzle: SFEM_ELEMENT_REFINE_LEVEL > 1 is not supported -- the "
-                                 "semi-structured operator requires affine macro elements\n");
+        // The semi-structured operator hoists one Jacobian per macro element -- the macro
+        // element's own Jacobian at its centre, scaled to a micro cell -- which is exact for an
+        // affine macro element and an approximation for every element of this mesh, one that
+        // improves as the MACRO elements shrink and not with the level. So it is allowed only
+        // under SFEM_GEOM=affine, which says that approximation is what the run asked for.
+        if (smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1) > 1 && geom_name != "affine") {
+            std::fprintf(stderr, "nozzle: SFEM_ELEMENT_REFINE_LEVEL > 1 approximates each macro element "
+                                 "by its centre Jacobian; say so with SFEM_GEOM=affine\n");
             return EXIT_FAILURE;
         }
         // Resolution, in cells: across the core square, ring layers out to the bore, ring
@@ -3100,9 +3101,36 @@ int main(int argc, char **argv) {
     // existing run changes.
     // The nozzle's outlet is always the do-nothing outflow: there is no outlet profile to
     // prescribe, since the jet has not finished decaying where the domain is cut.
+    //
+    // ONE READ, ONE NAME. SFEM_STEP_OUTFLOW was read here and again where the Dirichlet set
+    // is built, spelled `!= "dirichlet"` in both places -- so every value other than that one
+    // word meant "natural", including a typo, and including any third option added later.
+    // Reading it once and rejecting what it does not understand is what makes a third option
+    // possible at all.
+    //
+    //   natural      leave x = Lx unconstrained; the boundary sub-control-surface term
+    //                evaluates the flux from the interior state.
+    //   dirichlet    impose the fully-developed profile. Not their boundary condition, so a
+    //                number produced under it must be labelled as such.
+    //   convective   du/dt + U_c du/dn = 0, the advective condition of Orlanski (1976) as
+    //                used for incompressible flow by Sani and Gresho. Transient only, and
+    //                implemented below as a Dirichlet value refreshed once per step.
+    const std::string step_outflow =
+            want_any_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") : std::string("natural");
+    if (want_any_step && step_outflow != "natural" && step_outflow != "dirichlet" &&
+        step_outflow != "convective") {
+        std::fprintf(stderr,
+                     "invalid SFEM_STEP_OUTFLOW '%s' (expected natural, dirichlet or convective)\n",
+                     step_outflow.c_str());
+        return EXIT_FAILURE;
+    }
+    // Both non-natural modes constrain the outlet velocity, so neither leaves the outflow
+    // open. The pressure gauge follows on its own: fixes_pressure_level() goes false and the
+    // zero-mean projection takes over, which is the treatment the closed cases already use.
+    const bool want_convective_outflow = want_any_step && step_outflow == "convective";
     const bool want_natural_outlet =
             want_nozzle ? true
-            : want_any_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet"
+            : want_any_step ? step_outflow == "natural"
                             : smesh::Env::read_string("SFEM_OUTLET", "dirichlet") == "natural";
     // A traction or pressure condition names one of these sidesets, so they have to exist
     // whether or not the outlet is natural. Read here rather than where the operator is
@@ -3140,6 +3168,12 @@ int main(int argc, char **argv) {
     // which is every run that does not ask for adaptation.
     real_t dt_now       = dt_step;
     real_t dt_prev_step = 0;
+    // The step this iteration is actually taking, and the clock that accumulates it. Both
+    // exist because dt_now moves: t = n*dt is only the time when every step was the same
+    // size, and a run that adapts and still reports n*dt labels its frames with instants it
+    // never visited.
+    real_t dt_taken     = dt_step;
+    real_t t_run        = 0;
     if (cfl_target > real_t(0) && !want_diag) {
         std::fprintf(stderr, "SFEM_CFL_TARGET needs SFEM_DIAG_CSV: the CFL number it steers on "
                              "is measured by the flow diagnostics, and adapting on a number "
@@ -3169,8 +3203,10 @@ int main(int argc, char **argv) {
                 std::fprintf(stderr, "nozzle: could not build the inlet sideset\n");
                 return EXIT_FAILURE;
             }
-            mesh->add_sideset("inlet", ins.front());
-            std::printf("sidesets: inlet %td faces\n", (ptrdiff_t)ins.front()->parent()->size());
+            // Held in step_inlet so the re-attachment after to_semistructured carries it too.
+            step_inlet = ins.front();
+            mesh->add_sideset("inlet", step_inlet);
+            std::printf("sidesets: inlet %td faces\n", (ptrdiff_t)step_inlet->parent()->size());
         }
         // Register them on the flat mesh as well, so a run at refine_level 1 -- which never
         // reaches the re-attachment below, because it does not rebuild the mesh -- still has
@@ -3450,6 +3486,15 @@ int main(int argc, char **argv) {
     real_t p_seed_port = 0;
     double mesh_coord_checksum = 0;
     std::shared_ptr<sfem::DirichletConditions> dirichlet;
+    // Which entries of uvw_nodes below are the convective outflow's, so the time loop can
+    // rewrite those values and only those. Recorded as an index into uvw_nodes rather than
+    // as a second node list, because the time loop writes into the Condition's values buffer
+    // and that buffer is in uvw_nodes order -- a parallel list would have to be matched back
+    // to it every step, which is the kind of second path that desynchronises. The two
+    // vectors are filled together and are the same length. Declared out here because the
+    // constraint set is built in a block and the time loop is several hundred lines below it.
+    std::vector<size_t>    conv_slot;
+    std::vector<ptrdiff_t> conv_node;
     // The nozzle's wall and inflow nodes, per node in the operator's numbering. Built with the
     // constraints below and kept, because the wall-pressure profile reads the same wall.
     std::vector<char> nozzle_inlet_node, nozzle_wall_node;
@@ -3486,8 +3531,7 @@ int main(int argc, char **argv) {
             mesh_coord_checksum = (double)(cx + cy + cz);
         }
 
-        const bool step_outflow_natural =
-                smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet";
+        const bool step_outflow_natural = step_outflow == "natural";
 
         // Which nodes lie on the domain skin. Topological, so the step faces are included.
         std::vector<char> skin_node((size_t)nnodes, 0);
@@ -3564,6 +3608,13 @@ int main(int argc, char **argv) {
 
         std::vector<idx_t>  uvw_nodes, uz_nodes;
         std::vector<real_t> uvw_ux, uvw_uy, uvw_uz, uz_vals;
+        // Which entries of uvw_nodes are the convective outflow's, so the time loop can
+        // rewrite those values and only those. Recorded as an index into uvw_nodes rather
+        // than as a second node list, because the time loop writes into the Condition's
+        // values buffer and that buffer is in uvw_nodes order -- a parallel list would have
+        // to be matched back to it every step, which is the kind of second path that
+        // desynchronises. The two vectors are filled together and are the same length.
+
         p_exact.assign((size_t)nnodes, real_t(0));
         ptrdiff_t          &pin  = pin_node;
         real_t              best = 1e300;
@@ -3661,6 +3712,17 @@ int main(int argc, char **argv) {
                 const bool outflow = cvfem_case::on_plane(x, Lx, Lx);
                 const bool free_outlet = step_outflow_natural && outflow;
                 if (skin_node[(size_t)i] && !free_outlet) {
+                    // The convective outlet's nodes are Dirichlet like every other
+                    // constrained node; what makes them different is only that the time loop
+                    // rewrites their values. Noting the slot here is what lets it, and doing
+                    // it inside the same branch that pushes the node is what keeps the two
+                    // in step. exact_state's zero is the starting value -- the flow has not
+                    // reached the outlet at t = 0 -- and the first step's mass-balance
+                    // correction gives it the right flux immediately.
+                    if (want_convective_outflow && outflow) {
+                        conv_slot.push_back(uvw_nodes.size());
+                        conv_node.push_back(i);
+                    }
                     uvw_nodes.push_back((idx_t)i);
                     uvw_ux.push_back(ux);
                     uvw_uy.push_back(uy);
@@ -4439,15 +4501,147 @@ int main(int argc, char **argv) {
     cvfem_diag::FlowState diag_prev{};
     bool                  diag_have_prev = false;
     std::vector<real_t>   diag_vol, diag_grad, diag_w;
+    // The convective outflow's scratch, hoisted out of the step loop for the same reason the
+    // diagnostics' is: these are ndof-sized and reallocating them every step is pure waste.
+    std::vector<real_t>   conv_grad, conv_trial;
     FILE                 *diag_fh = nullptr;
 
     for (int tstep = 0; tstep < (dt_step > real_t(0) ? nsteps : 1); ++tstep) {
     // Absolute, so a segmented run and a single one report the same instants and a frame
     // written in segment three is not labelled as though it were the third frame overall.
     const int    abs_step = tstep0 + tstep + 1;
-    const real_t t_abs    = t0 + (real_t)(tstep + 1) * dt_step;
+    // TELL THE OPERATOR. Without this the CFL controller below is inert: it moves dt_now,
+    // the diagnostics compute their CFL from dt_now, and the log reports a step size that
+    // converges on the target -- while every step the solver actually takes is still
+    // dt_step, because set_time_step was called once before the loop and never again. The
+    // reported CFL was then a function of the number the controller had just written rather
+    // than of anything the solve did, which is a measurement of the controller by itself.
+    //
+    // Called every step rather than only when the size changes, because BDF2's variable-step
+    // coefficients need dt AND the previous dt: calling only on a change leaves the operator
+    // holding a stale dt_prev on the step after one, which is exactly where the coefficients
+    // matter most.
+    dt_taken = dt_now;
+    if (dt_step > real_t(0)) op->set_time_step(dt_taken, bdf_order, dt_prev_step);
+    t_run += dt_taken;
+    // n*dt while the step is FIXED, accumulated only once it is not. Not a micro-optimisation
+    // and not cosmetic: summing dt six times and multiplying it by six differ in the last
+    // bit, the pump drives its diaphragm at sin(2 pi t / T), and that bit reaches the swept
+    // volume -- the restart test compares the printed port-versus-swept identity across a
+    // seam and read 1.110223e-16 against 0.000000e+00 the moment this became a sum. For a
+    // fixed step n*dt is also the more accurate answer, since it accumulates no error at all;
+    // the sum is only needed when there is no single dt to multiply by.
+    const real_t t_abs    = (cfl_target > real_t(0)) ? (t0 + t_run)
+                                                     : (t0 + (real_t)(tstep + 1) * dt_step);
     if (dt_step > real_t(0)) std::printf("=== step %d (segment %d/%d)  t = %g ===\n", abs_step, tstep + 1,
                                          nsteps, (double)t_abs);
+    // ------------------------------------------------ the convective outflow, du/dt + U_c du/dn = 0
+    //
+    // Orlanski's advective condition (JCP 21, 1976), as used for incompressible flow by Sani
+    // and Gresho. It exists because the do-nothing outflow reflects: a vortex reaching x = Lx
+    // has to leave, and a zero-traction plane sends part of it back upstream. That only
+    // matters once the flow is unsteady enough to advect structures out, which is why this is
+    // transient-only and why the natural outflow remains the default.
+    //
+    // IMPLEMENTED AS A DIRICHLET VALUE REFRESHED ONCE PER STEP, not as a third boundary mask.
+    // The condition is explicit in time by construction -- it reads u^n and writes u^{n+1} --
+    // so it needs no term in the residual and no entry in the Jacobian, and the machinery for
+    // a time-varying prescribed velocity already exists and is already used by the pump. A
+    // mask in Hex8BoundaryDataT would be a second path to the same boundary values, and it
+    // would have to carry a level of face history that the nodal state already holds.
+    //
+    // du/dn COMES FROM nodal_velocity_gradient, the same pass the diagnostics and the
+    // deferred correction use, rather than from a neighbour search along the normal. That is
+    // the whole reason it works on the semi-structured mesh without a second implementation:
+    // the operator already dispatches that call on both paths. The outlet is the plane
+    // x = Lx, so n = (1,0,0) and du/dn is column 0 of each node's gradient.
+    //
+    // U_c IS UNIFORM, NOT LOCAL. Orlanski used a locally computed phase speed and the
+    // literature since reports that the local choice leaves wavy profiles at the boundary;
+    // the uniform mean is the robust one. It is also parameter-free here, because the mean
+    // outflow velocity is exactly the number the mass balance below already needs:
+    // U_c = |mdot_in| / (rho * A_outlet).
+    //
+    // AND THE MASS BALANCE IS NOT OPTIONAL. With the outlet velocity prescribed, every
+    // boundary of the domain carries a velocity condition, so the discrete continuity
+    // equations are consistent only if the prescribed fluxes sum to zero. The advective
+    // update has no reason to satisfy that, and an inconsistent singular system does not fail
+    // loudly -- it converges to something. So the updated outflow is shifted by a uniform
+    // normal velocity that restores the balance exactly. The flux is linear in u, so the
+    // shift is a division rather than an iteration.
+    if (want_convective_outflow && dt_step > real_t(0) && dirichlet && !conv_slot.empty()) {
+        // The outlet area, once. Measured rather than computed from Ly*Lz: sideset_mass_flux
+        // of a uniform u = (1,0,0) is rho*A through a plane normal to x by construction, and
+        // it is the SAME quadrature the balance below uses, so any error in it cancels
+        // instead of biasing the shift. The flow-diagnostics test pins that identity against
+        // rho*U*Ly*Lz on both the flat and the semi-structured path.
+        static real_t conv_area = -1;
+        if (conv_area < 0) {
+            std::vector<real_t> probe((size_t)ndof, 0);
+            for (ptrdiff_t i = 0; i < nnodes; ++i) probe[(size_t)i * N_FIELDS + 0] = 1;
+            real_t qa = 0;
+            if (op->sideset_mass_flux(probe.data(), "outlet", qa) != SFEM_SUCCESS || qa <= 0) {
+                std::fprintf(stderr, "convective outflow: could not measure the outlet area\n");
+                return EXIT_FAILURE;
+            }
+            conv_area = qa / op->rho;
+            std::printf("convective outflow: %td nodes  outlet area %g\n",
+                        (ptrdiff_t)conv_slot.size(), (double)conv_area);
+        }
+
+        real_t mdot_in = 0;
+        if (op->sideset_mass_flux(x, "inlet", mdot_in) != SFEM_SUCCESS) {
+            std::fprintf(stderr, "convective outflow: no inlet sideset to balance against\n");
+            return EXIT_FAILURE;
+        }
+        // positive LEAVING, so the inlet reads negative and the outlet must carry +|mdot_in|.
+        const real_t q_target = -mdot_in;
+        const real_t u_mean   = q_target / (op->rho * conv_area);
+        const real_t uc       = smesh::Env::read<real_t>("SFEM_OUTFLOW_UC", u_mean);
+
+        conv_grad.assign((size_t)nnodes * 9, 0);
+        if (op->nodal_velocity_gradient(x, conv_grad.data()) != SFEM_SUCCESS) {
+            std::fprintf(stderr, "convective outflow: nodal_velocity_gradient failed\n");
+            return EXIT_FAILURE;
+        }
+
+        // u* = u^n - dt U_c du/dn, into a copy of the state so the flux of the CANDIDATE can
+        // be measured with the same routine that measures every other flux in this driver.
+        conv_trial.assign(x, x + ndof);
+        for (size_t k = 0; k < conv_node.size(); ++k) {
+            const ptrdiff_t i = conv_node[k];
+            for (int c = 0; c < 3; ++c) {
+                const real_t dudn = conv_grad[(size_t)i * 9 + (size_t)c * 3 + 0];  // n = +x
+                conv_trial[(size_t)i * N_FIELDS + (size_t)c] =
+                        x[(size_t)i * N_FIELDS + (size_t)c] - dt_now * uc * dudn;
+            }
+        }
+
+        real_t q_cand = 0;
+        if (op->sideset_mass_flux(conv_trial.data(), "outlet", q_cand) != SFEM_SUCCESS) {
+            std::fprintf(stderr, "convective outflow: could not measure the outlet flux\n");
+            return EXIT_FAILURE;
+        }
+        // Flux is linear in u and the shift is normal, so Q(u* + d n) = Q(u*) + d rho A.
+        const real_t shift = (q_target - q_cand) / (op->rho * conv_area);
+
+        auto &conds = dirichlet->conditions();
+        for (size_t k = 0; k < conv_slot.size(); ++k) {
+            const ptrdiff_t i = conv_node[k];
+            const size_t    slot = conv_slot[k];
+            for (int c = 0; c < 3; ++c)
+                conds[(size_t)c].values->data()[slot] =
+                        conv_trial[(size_t)i * N_FIELDS + (size_t)c] + (c == 0 ? shift : real_t(0));
+        }
+        // The constraint holds the new values; x does not, and the Newton loop only ever
+        // applies ZERO constraints to its correction. Without this the outlet keeps the
+        // previous step's velocity while the log reports the new one -- the same trap the
+        // pump's diaphragm fell into above.
+        f->apply_constraints(x);
+        std::printf("outflow: U_c %g  q_target %g  q_cand %g  shift %g\n",
+                    (double)uc, (double)q_target, (double)q_cand, (double)shift);
+    }
+
     if (want_pump && dt_step > real_t(0) && dirichlet) {
         const real_t t_now = t_abs;
         pump_scale         = std::sin(real_t(2) * real_t(M_PI) * t_now / pump_period);
@@ -5552,8 +5746,12 @@ int main(int argc, char **argv) {
                     if (nxt != dt_now) {
                         std::printf("cfl: measured %.3f, target %g -> dt %g to %g\n",
                                     st.cfl_max, (double)cfl_target, (double)dt_now, (double)nxt);
-                        dt_prev_step = dt_now;
-                        dt_now       = nxt;
+                        // dt_now is the size of the NEXT step. dt_prev_step is the size of
+                        // the one just taken and is set at the bottom of the loop, not here:
+                        // setting it alongside dt_now made it the previous size only on the
+                        // steps where the controller happened to act, and stale on every
+                        // step in between.
+                        dt_now = nxt;
                     }
                 }
                 diag_prev      = st;
@@ -5610,6 +5808,8 @@ int main(int argc, char **argv) {
                         restart_out.c_str());
         }
     }
+    // The step just completed becomes the previous step for the next one's BDF2 coefficients.
+    dt_prev_step = dt_taken;
     }  // time step
 
 
