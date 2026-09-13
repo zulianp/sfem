@@ -1009,7 +1009,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
                         }
 
                         const Hex8RcConfig rcfg = sscvfem_rc_config(d);
-                        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                        // The distances madj was built from: see sscvfem_residual.
+                        const Hex8RhieChow rc{c0x,     c0y, c0z, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                               nullptr, ux, uy, uz,  rcfg.tau};
                         cvfem_hex8_ns_upwind_jacobian_action(rho, mu, madj, mdet, ux, uy, uz, vx, vy, vz, q, r,
                                                              rc, p, d.upwind_eps);
@@ -2177,8 +2178,16 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
             SSMacroGeom mg;
+            // The corners mg is built from outlive the block below, because the Rhie-Chow
+            // term takes its node distances from them -- as the Jacobian action takes them
+            // from mg.dvec, which is built from the same corners. Each micro cell's own
+            // coordinates agree with those only on an affine macro element. On a curved one
+            // they did not, and the residual and its Jacobian action disagreed in every
+            // continuity row: measured on the FDA nozzle by SFEM_FD_CHECK, 6.0e-02 at macro
+            // core 2 / L 2, 3.2e-02 at L 4 and 1.2e-02 at macro core 4 / L 2, and exact with
+            // Rhie-Chow off.
+            scalar_t ex[8], ey[8], ez[8];
             {
-                scalar_t ex[8], ey[8], ez[8];
                 for (int a = 0; a < 8; ++a) {
                     const int l = off[a];
                     ex[a]       = lx[(size_t)l];
@@ -2212,7 +2221,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                                 for (int k = 0; k < 9; ++k) g8[a * 9 + k] = lug[(size_t)l * 9 + (size_t)k];
                         }
                         const Hex8RcConfig rcfg = sscvfem_rc_config(d);
-                        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                        const Hex8RhieChow rc{ex,      ey, ez, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                               nullptr, ux, uy, uz,  rcfg.tau};
                         // Deferred-correction convection, on the path the production solver
                         // actually runs: FGMRES preconditioned by multigrid needs this lattice,
