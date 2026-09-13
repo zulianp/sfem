@@ -42,6 +42,7 @@ from codegen.framework.plans.form_transformations import (
 )
 from codegen.framework.plans.form_emission import (
     FormAccumulation,
+    element_api_field_roles,
     publishes_objective_steps,
     form_accumulation,
     mesh_output_shape,
@@ -1049,10 +1050,13 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     params.extend(_form_material_parameter_declarations(form))
     # The current state, where the tangent depends on it.  Same shape the apply
     # takes it in, so the caller hands over the streams it already gathered.
-    if _form_uses_current(form, default=True):
-        # The component count is settled by the form, and the signature is
-        # written before the body declares `NC`, so it goes in as a number.
-        params.append("const s_t bu_data[NS * %d][VS]" % n_field_components)
+    # The component count is settled by the form, and the signature is written
+    # before the body declares `NC`, so it goes in as a number.
+    params.extend(
+        "const s_t b%s_data[NS * %d][VS]" % (stream_prefix, n_field_components)
+        for _role, stream_prefix in element_api_field_roles(form)
+        if stream_prefix == "u"
+    )
     params.append("s_t *const RSTR element_matrix")
 
     lines = [
@@ -9561,8 +9565,11 @@ def _sfem_soa_element_api_common_params(form, dim, include_coords):
         params.append("const s_t *const *const RSTR adj")
         params.append("const s_t *const RSTR det")
     params.extend(_form_material_parameter_declarations(form))
-    if _form_uses_current(form, default=True):
-        params.append("const s_t *const *const RSTR u_streams")
+    params.extend(
+        "const s_t *const *const RSTR %s_streams" % stream_prefix
+        for _role, stream_prefix in element_api_field_roles(form)
+        if stream_prefix == "u"
+    )
     return params
 
 
@@ -9616,10 +9623,10 @@ def _sfem_soa_element_api_block_call(
         ),
         *_form_material_parameter_names(form),
     ]
-    if _form_uses_current(form, default=True):
-        args.append("bu_streams")
-    if _form_uses_direction(form, default=form.has_direction):
-        args.append("bh_streams")
+    args.extend(
+        "b%s_streams" % stream_prefix
+        for _role, stream_prefix in element_api_field_roles(form)
+    )
     args.append(output_arg)
     return "%s<s_t, NQ, NS, VS>(%s);" % (
         block_name,
@@ -9631,10 +9638,15 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
     lines = [
         "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
     ]
-    if _form_uses_current(form, default=True):
-        lines.append("    const s_t *bu_streams[NDOFS];")
+    for _role, stream_prefix in element_api_field_roles(form):
+        if stream_prefix != "u":
+            continue
+        lines.append("    const s_t *b%s_streams[NDOFS];" % stream_prefix)
         lines.append("    for (int stream = 0; stream < NDOFS; ++stream) {")
-        lines.append("      bu_streams[stream] = u_streams[stream] + evb;")
+        lines.append(
+            "      b%s_streams[stream] = %s_streams[stream] + evb;"
+            % (stream_prefix, stream_prefix)
+        )
         lines.append("    }")
     if output_kind == "value":
         lines.append("    s_t *const bvalue = values + evb;")
@@ -9893,9 +9905,15 @@ def _sfem_soa_element_api_hessian_lines(
                 "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
             ]
         )
-        if _form_uses_current(form, default=True):
-            lines.append("    const s_t *bu_streams[NDOFS];")
-            lines.append("    for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;")
+        for _role, stream_prefix in element_api_field_roles(form):
+            if stream_prefix != "u":
+                continue
+            lines.append("    const s_t *b%s_streams[NDOFS];" % stream_prefix)
+            lines.append(
+                "    for (int stream = 0; stream < NDOFS; ++stream) "
+                "b%s_streams[stream] = %s_streams[stream] + evb;"
+                % (stream_prefix, stream_prefix)
+            )
         if include_coords:
             lines.extend(
                 _sfem_soa_element_api_coords_tile_lines(

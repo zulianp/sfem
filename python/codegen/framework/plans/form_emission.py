@@ -223,6 +223,43 @@ def form_contraction(form):
     )
 
 
+#: The field roles a form's element API carries, by the names those kernels use
+#: for them.  `plans/streams.MESH_FIELD_STREAMS` is the same axis at the mesh
+#: boundary, where the roles are spelled `current`/`previous`/`direction`; the
+#: element API spells the two it carries `u` and `h`.
+ELEMENT_API_FIELD_ROLES = (("current", "u"), ("direction", "h"))
+
+
+def element_api_field_roles(form):
+    """Which field streams this form's element API carries, in ABI order.
+
+    `plans/streams.live_field_roles` is this question for a mesh kernel, and its
+    docstring says why it is one sequence rather than a pair of tests:
+    "emission asks this as an unrolled loop ... the same pair written out
+    wherever a buffer is declared, a gather is emitted, a scratch slot is taken
+    or a stream argument is named".  Five sites in `emitters/energy_codegen.py`
+    asked the current half and four the direction half, in exactly that shape.
+
+    It is a separate function because the defaults differ.  A form that carries
+    no lowered dependencies at all still has an element API, and the answer
+    there is that the current state is present and the direction follows
+    `has_direction` -- which is the form's own declaration rather than anything
+    a dependency set knows.  That default is the whole of the difference, and
+    stating it here is what stops it being restated at nine sites.
+    """
+    dependencies = getattr(form, "dependencies", None)
+    defaults = {"current": True, "direction": bool(getattr(form, "has_direction", False))}
+    return tuple(
+        (role, prefix)
+        for role, prefix in ELEMENT_API_FIELD_ROLES
+        if (
+            defaults[role]
+            if dependencies is None
+            else bool(getattr(dependencies, role, False))
+        )
+    )
+
+
 def publishes_objective_steps(form):
     """Whether this form has a stepped objective kernel at all.
 
