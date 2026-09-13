@@ -17,12 +17,16 @@ from codegen.framework.tools import roofline
 HERE = os.path.dirname(os.path.abspath(__file__))
 GENERATED = os.path.abspath(os.path.join(HERE, "..", "..", "..", "..",
                                          "frontend", "ops", "generated"))
-HEX8 = os.path.join(GENERATED, "linear_elasticity", "d3", "hex8",
-                    "linear_elasticity_hex8_inexact_apply_inline.hpp")
+#: The lexicographic element, because that is the one that owns the
+#: micro-kernel: a HEX8 mesh reaches this body through a forwarding wrapper
+#: that permutes the connectivity and nothing else, so the traffic and the
+#: arithmetic being modelled here are the same either way.
+HEX8 = os.path.join(GENERATED, "linear_elasticity", "d3", "proteus_hex8",
+                    "linear_elasticity_proteus_hex8_inexact_apply_inline.hpp")
 
-STORED = "linear_elasticity_hex8_inexact_apply_stored_a_msoa"
-COMPRESSED = "linear_elasticity_hex8_inexact_apply_compressed_a_msoa"
-TANGENT = "linear_elasticity_hex8_inexact_apply_tangent_a_msoa"
+STORED = "linear_elasticity_proteus_hex8_inexact_apply_stored_a_msoa"
+COMPRESSED = "linear_elasticity_proteus_hex8_inexact_apply_compressed_a_msoa"
+TANGENT = "linear_elasticity_proteus_hex8_inexact_apply_tangent_a_msoa"
 
 
 def analyse(kernel, nodes_per_element=1.0, overrides=None):

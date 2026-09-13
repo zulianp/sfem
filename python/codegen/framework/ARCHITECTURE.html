@@ -519,12 +519,12 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Twenty-six, ordered by what unblocks what. Five are new since the last pass, and two of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Twenty-six, ordered by what unblocks what. Five are new since the last pass, and three of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
-  <div class="op decide">
+  <div class="op ready">
     <div class="rail"></div><div class="num">OP 25</div>
     <div class="body">
-      <div class="op-title">The inexact-apply family is half-wired into the stack <span class="chip c-part">the arithmetic conforms; the scaffolding around it does not</span></div>
+      <div class="op-title">The inexact-apply family is half-wired into the stack <span class="chip c-ok">closed &mdash; five passes, and three defects in shared machinery</span></div>
 
       <p><b>What this entry is.</b> OP 22 recorded that partial assembly exists, is on the C ABI and is measured. This one records what it is made of. The kernels answer correctly &mdash; 53 recorded digests and 28 packed/unpacked parity pairs &mdash; and until recently almost none of that answer came through the layers the rest of the tree lowers through. Three passes have closed part of it; what is left is enumerated here so it stops being rediscovered one defect at a time.</p>
 
@@ -548,7 +548,27 @@
 
       <p><b>And it does not delegate to its Cartesian twin.</b> The energy <code>hex8</code> operator publishes <code>proteus_hex8</code> symbols: the mesh-order element forwards to the lexicographic micro-kernel and the kernel reorders nothing. The inexact HEX8 kernel instead folds the mesh&rarr;Cartesian map into its own gather indices. <code>test_no_kernel_reorders_its_own_nodes</code> does not catch it, because the map is in the indices rather than in a reorder pass &mdash; which says the measure is narrower than the rule it was written to enforce.</p>
 
-      <div class="op-facts"><span><i>plan modules reached</i> 2 of 26</span><span><i>decisions in emission</i> 0 of 194</span><span><i>FLOP/AI functions</i> 0</span><span><i>_float entry points</i> 69 tree-wide, 62 exempt by filename</span><span><i>gcc on one kernel, before</i> 234.8 s · 4.45 GB</span><span><i>answer gate</i> 53 digests · 28 parity pairs</span></div>
+      <p><b>Closed, and what it cost.</b> Five passes, every one gated on the 53 recorded digests and 28 packed/unpacked parity pairs staying bit-identical &mdash; none of it changed an answer.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th></th><th>before</th><th>after</th></tr>
+        <tr><td>plan modules the emitter reaches</td><td class="n">2 of 26</td><td class="n">6 of 26</td></tr>
+        <tr><td><code>_float</code> entry points, tree-wide</td><td class="n">69</td><td class="n">26</td></tr>
+        <tr><td><code>_UNCONVERTED</code> exemptions</td><td class="n">3</td><td class="n">1</td></tr>
+        <tr><td>FLOP/AI records on these kernels</td><td class="n">0</td><td class="n">3 per element</td></tr>
+        <tr><td>decisions in emission, this file</td><td class="n">0 of 194</td><td class="n">0 of 194</td></tr>
+        <tr><td>dead assignments, tree-wide</td><td class="n">87</td><td class="n">66</td></tr>
+        <tr><td>named parameters nothing reads</td><td class="n">74</td><td class="n">56</td></tr>
+        <tr><td>standing pytest failures</td><td class="n">27</td><td class="n">26</td></tr>
+      </table>
+
+      <p><b>Two items turned out not to need work, and saying so is the point of having checked.</b> <code>abi_qualifier</code> already parsed the two-occupant slot &mdash; <code>stored_packed_two_pass</code> into store <code>stored</code> and traversal <code>packed_two_pass</code> &mdash; and all 801 published mesh-kernel names in the tree parse. And <code>plans/kernel_signature</code> hands a kernel <code>const s_t *const RSTR current[3]</code>, an array of pointers, where these take separate named streams: forcing one onto the other would change the C ABI rather than move a decision.</p>
+
+      <p><b>The work found three defects in machinery that was not this family's.</b> The runtime-typed ABI needed <em>no</em> dispatch change &mdash; <code>op_wrappers</code> reads <code>params[0] == _KERNEL_WIDTH_PARAMETER</code> and already handled both shapes, and the public signature came out byte-identical. The Cartesian delegation needed no emitter forwarder either, because <code>pipeline/driver.py</code>'s alias pass has always written them; attempting one produced four duplicate symbols, which is the shortest possible proof the path was already there. But that pass wrote <em>every</em> alias into <em>every</em> file it rewrote &mdash; invisible while an element has one source file, duplicate symbols the moment it has two &mdash; and its suffix table did not know a second file could exist. Both are fixed for every element, not just these.</p>
+
+      <p><b>And the ratchet that should have caught the original defect could not see it.</b> <code>kernel_permutations</code> scanned for a <code>&lt;type&gt; *name[N] = {elements[...]}</code> array; the inexact HEX8 kernel folded the same permutation into its gather indices, so the budget sat at zero while a kernel reordered its own nodes. It reads both now, and finds the pre-delegation kernel and nothing in the tree as it stands. <b>A measure narrower than the rule it enforces is not a ratchet</b>, and that is the finding worth keeping from this entry.</p>
+
+      <div class="op-facts"><span><i>plan modules reached</i> 2 &rarr; 6 of 26</span><span><i>_float entry points</i> 69 &rarr; 26</span><span><i>generated tree</i> 361 &rarr; 383 files, &minus;1836 lines</span><span><i>shared-machinery defects found</i> 3</span><span><i>answers moved</i> none</span><span><i>gcc on one kernel, before</i> 234.8 s &middot; 4.45 GB</span></div>
     </div>
   </div>
 

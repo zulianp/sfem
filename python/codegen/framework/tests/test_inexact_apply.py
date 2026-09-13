@@ -39,6 +39,12 @@ SHAPE = {
     "QUAD4": (64, 6, 0),
     "HEX8": (576, 10, 0),
     "TET10": (900, 9, 519),
+    # The lexicographic twins, which own the micro-kernel their mesh-ordered
+    # elements forward to.  `Wbar` is a Gram matrix of the element's gradients,
+    # so renumbering the nodes conjugates it by a permutation: same entries,
+    # same distinct values, same zeros, different places.
+    "PROTEUS_QUAD4": (64, 6, 0),
+    "PROTEUS_HEX8": (576, 10, 0),
 }
 
 
