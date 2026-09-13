@@ -711,6 +711,22 @@ namespace sfem {
         for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
             const int mm = (int)macro[(size_t)e];
             if (!mm) continue;
+            // The operator's hoisted geometry, not each cell's own: the flux is measured on the
+            // surfaces the residual integrates, which on a curved macro element differ.
+            scalar_t hadj[9], hdet;
+            {
+                int      ext[8];
+                scalar_t hx[8], hy[8], hz[8];
+                sscvfem_macro_corner_offsets(L, ext);
+                for (int a = 0; a < 8; ++a) {
+                    const smesh::idx_t gm = d.elems[ext[a]][e];
+                    hx[a]                 = (scalar_t)d.points[0][gm];
+                    hy[a]                 = (scalar_t)d.points[1][gm];
+                    hz[a]                 = (scalar_t)d.points[2][gm];
+                }
+                sscvfem_hoisted_cell(hx, hy, hz, L, hx, hy, hz);
+                sscvfem_micro_geom(hx, hy, hz, hadj, &hdet);
+            }
             for (int zi = 0; zi < L; ++zi) {
                 for (int yi = 0; yi < L; ++yi) {
                     for (int xi = 0; xi < L; ++xi) {
@@ -729,7 +745,12 @@ namespace sfem {
                             pe[a]  = d.p[(size_t)g];
                         }
                         scalar_t adj[9], det, re[CVFEM_HEX8_N_DOF];
-                        sscvfem_micro_geom(xe, ye, ze, adj, &det);
+                        if (sscvfem_macro_curved(d, e)) {
+                            sscvfem_micro_geom(xe, ye, ze, adj, &det);
+                        } else {
+                            std::copy(hadj, hadj + 9, adj);
+                            det = hdet;
+                        }
                         for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) re[k] = 0;
                         boundary_scs_add_residual((scalar_t)rho, (scalar_t)mu, 0, adj, det, d.Lx,
                                                   d.Ly, d.Lz, xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
