@@ -1618,3 +1618,51 @@ Every packed answer agrees with its standard counterpart to round-off (`pk diff`
 1.2e-16 for the exact apply) or exactly (3.6e-05 for the projected one, the same
 deviation the standard column reports), so the two layouts compute the same
 thing.
+
+
+## The delegation, measured properly
+
+*Withdraw the cross-run ratios* above says what the previous comparison was not.
+This is the one it should have been: two kernel trees, one harness, one mesh
+(morton3), one node (`nid006546`), built in the same job and run interleaved,
+three passes each, twenty repetitions per pass, 206763 dof.
+
+    old   HEX8 publishes its own inexact micro-kernel
+    new   HEX8 forwards to PROTEUS_HEX8 -- the same expression list in a
+          different node numbering, with the connectivity permuted once per
+          call instead of per element
+
+Everything else is held: same generator otherwise, same flags, same compiler,
+`OMP_PLACES=cores`, `OMP_PROC_BIND=true`.  Three passes of one binary agree to
+0.24% at 72 threads, so this resolves about half a percent.
+
+Means of three passes, MDOF/s:
+
+| threads | | exact | st. f64 | st. f32 | st. f16 | assembly | packed st. f32 |
+|---|---|---|---|---|---|---|---|
+| 1 | old | 3.590 | 13.780 | 11.307 | 10.287 | 1.893 | 17.443 |
+| 1 | new | 3.597 | 13.797 | 11.323 | 10.353 | 1.873 | 17.400 |
+| 8 | old | 27.967 | 99.847 | 84.157 | 76.527 | 14.987 | 132.253 |
+| 8 | new | 27.957 | 100.253 | 83.327 | 76.807 | 14.967 | 131.867 |
+| 72 | old | 212.657 | 563.503 | 498.163 | 479.900 | 130.630 | 761.973 |
+| 72 | new | 212.647 | 565.487 | 496.410 | 486.737 | 130.787 | 772.827 |
+
+**Neutral.**  At 72 threads the ratios are 1.000, 1.004, 0.996, 1.014, 1.001 and
+1.014; nothing anywhere in the table moves by more than 1.4%, and the packed
+column's own pass-to-pass spread at 72 threads is 2.3%, wider than the
+difference between the variants.
+
+The exact apply is the control and agrees to **0.005%** at 72 threads, which is
+what a control should look like when the two runs really are the same
+measurement.
+
+Two things this settles beyond the delegation:
+
+**The 12 to 13% "assembly gain" withdrawn above was the mesh.**  Assembly at one
+thread is 1.89 for the old kernel and 1.87 for the new, against 1.65 in the
+recorded run.  Both kernels here are faster than the record by the same amount,
+on the same ordered mesh, which is where that difference lives.
+
+**f64 beating f32 is not new either.**  It holds in both variants at every
+thread count, so it is the machine: 45 widening converts per element cost more
+on Neoverse-V2 than the 180 bytes per element they save.
