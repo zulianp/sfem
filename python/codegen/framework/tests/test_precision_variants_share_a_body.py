@@ -47,11 +47,7 @@ _WORK = ("for (", "#pragma")
 #: than from a parameter list, so neither was converted with the rest;
 #: `package/op_wrappers.py` keeps the merge that turns such a pair into one
 #: runtime-typed dispatch entry, and it is reached only by these.
-_UNCONVERTED = (
-    "boundary_operator.cpp",
-    "inexact_apply_inline.hpp",
-    "inexact_apply_operator.cpp",
-)
+_UNCONVERTED = ("boundary_operator.cpp",)
 
 
 def _definitions(text):

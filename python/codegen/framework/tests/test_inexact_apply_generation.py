@@ -156,14 +156,22 @@ class InexactApplyAbiTest(InexactApplyGenerationTest):
         files = self._generate("linear_elasticity", "TET4", opt_in=True)
         return files["d3/tet4/linear_elasticity_tet4_inexact_apply_operator.cpp"]
 
-    def test_each_kernel_crosses_the_abi_at_both_precisions(self):
+    def test_each_kernel_crosses_the_abi_once_typed_at_run_time(self):
+        """One symbol per kernel, selecting its scalar by width.
+
+        This asserted a `(name, name_float)` pair while the rest of the tree had
+        already collapsed to a single runtime-typed entry point, which is what
+        kept the inexact sources on `test_precision_variants_share_a_body`'s
+        exemption list.
+        """
         source = self._operator_source()
         for kernel in ("tangent", "stored", "compressed"):
-            for suffix in ("", "_float"):
-                name = ("linear_elasticity_tet4_inexact_apply_%s"
-                        "_a_msoa%s" % (kernel, suffix))
-                with self.subTest(kernel=kernel, precision=suffix or "double"):
-                    self.assertIn('extern "C" int %s(' % name, source)
+            name = ("linear_elasticity_tet4_inexact_apply_%s"
+                    "_a_msoa" % kernel)
+            with self.subTest(kernel=kernel):
+                self.assertIn('extern "C" int %s(\n    const int scalar_bytes,'
+                              % name, source)
+                self.assertNotIn('%s_float(' % name, source)
 
     def test_the_store_uses_sfem_types(self):
         """`metric_tensor_t` and `compressed_t` are what the library stores."""
