@@ -63,6 +63,28 @@ def writes_per_shape(form):
     return form_order(form) is not FormOrder.ZERO
 
 
+def output_assignment(form):
+    """How a form writes its result: accumulating, or replacing.
+
+    A kernel that accumulates reads its output before writing it, which is both
+    a `+=` in the body and a load per element in the traffic model, so the two
+    have to agree.  They did not have to *by construction*: five sites in
+    `emitters/energy_codegen.py` spelled this as the same ternary and a sixth
+    spelled the traffic consequence separately.
+
+    That is the shape `plans.layout.gather_shape_order` was lifted out of, and
+    for the same reason -- a decision duplicated across emission sites is a
+    decision that can disagree with itself, and four of those five gather
+    copies had.
+    """
+    return "+=" if output_is_accumulated(form) else "="
+
+
+def output_is_accumulated(form):
+    """Whether the kernel reads its output before writing it."""
+    return str(getattr(form, "output_mode", "")) == "accumulate"
+
+
 class FormContraction(Enum):
     """How a form's integrand is contracted against the test functions."""
 

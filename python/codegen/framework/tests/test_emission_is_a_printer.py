@@ -59,7 +59,15 @@ PLAN_INPUTS = (
 #: whether it was a Cartesian quad -- which is the argument for the rule this
 #: budget enforces: a decision duplicated across emission sites is a decision
 #: that can disagree with itself.
-BUDGET = 194
+#:
+#: 194 -> 189: the same shape again, and the largest duplicated decision left in
+#: `energy_codegen.py`.  Five sites spelled `"+=" if form.output_mode ==
+#: "accumulate" else "="` and a sixth spelled its traffic consequence -- a
+#: kernel that accumulates reads its output before writing it -- separately.
+#: `plans.form_emission.output_assignment` and `output_is_accumulated` state it
+#: once, so the body and the diagnostics record cannot disagree about whether
+#: the kernel reads its output.
+BUDGET = 189
 
 
 def _tested_names(test):

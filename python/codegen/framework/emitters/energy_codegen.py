@@ -41,6 +41,8 @@ from codegen.framework.plans.form_transformations import (
     metric_value_scale,
 )
 from codegen.framework.plans.form_emission import (
+    output_assignment,
+    output_is_accumulated,
     FormContraction,
     form_contraction,
     form_order,
@@ -2121,7 +2123,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         scalar_temporaries=True,
     )
     output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
-    op = "+=" if form.output_mode == "accumulate" else "="
+    op = output_assignment(form)
     for shape in range(dim + 1):
         for row in range(n_field_components):
             terms = []
@@ -2352,7 +2354,7 @@ def _append_sfem_soa_weak_form_lines(
             "loperand%d_values[%s] * %s" % (row * dim + col, work_item, reference_gradient(col))
             for col in range(dim)
         ]
-        op = "+=" if form.output_mode == "accumulate" else "="
+        op = output_assignment(form)
         output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
         lines.extend(_work_item_loop_lines(source_builder, "        "))
         lines.append(
@@ -2512,7 +2514,7 @@ def _append_weak_objective_accumulation(
         [weak_form.energy_density.xreplace(substitutions)],
         [
             "value[%s] %s"
-            % (work_item, "+=" if form.output_mode == "accumulate" else "=")
+            % (work_item, output_assignment(form))
         ],
         "weak_obj_tmp",
         scale="qw * %s" % geometry_value("det", 0),
@@ -2959,7 +2961,7 @@ def _sfem_soa_isoparametric_reference_gradient_expr(
 def _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item):
     output_count = len(form.expression_graph.evaluation_plan.outputs)
     if output_count == 1:
-        op = "+=" if form.output_mode == "accumulate" else "="
+        op = output_assignment(form)
         lines.append("    value[%s] %s element_vector[0];" % (work_item, op))
         return
 
@@ -2973,7 +2975,7 @@ def _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item):
         for d in range(dim):
             stream = "out%s%d" % (_component_name(d), node)
             idx = node * dim + d
-            op = "+=" if form.output_mode == "accumulate" else "="
+            op = output_assignment(form)
             lines.append("    %s[%s] %s element_vector[%d];" % (stream, work_item, op, idx))
 
 
@@ -8861,7 +8863,7 @@ def _sfem_soa_diagnostics_lines(
         reference_scalars = sum(array_input.size for array_input in reference_inputs)
         quadrature_weight_scalars = n_qp
     output_streams = len(_output_stream_names(form, n_field_components, n_nodes))
-    output_reads = output_streams if form.output_mode == "accumulate" else 0
+    output_reads = output_streams if output_is_accumulated(form) else 0
     output_writes = output_streams
     u_streams = dim * n_nodes if uses_current else 0
     h_streams = dim * n_nodes if uses_direction else 0
