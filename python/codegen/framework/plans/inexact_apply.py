@@ -69,6 +69,11 @@ import itertools
 
 import sympy as sp
 
+from codegen.framework.plans.geometry_quantities import (
+    mesh_geometry_argument_names,
+    mesh_geometry_parameters,
+    mesh_geometry_streams,
+)
 from codegen.framework.plans.geometry_variants import packed_is_worth_emitting
 from codegen.framework.fem.reference_basis import reference_basis
 
@@ -761,6 +766,43 @@ def projected_tangent(
         )
         integrand[slot] = pulled.subs(substitution)
     return tuple(integrand), gradient_symbols, previous_gradient_symbols
+
+
+@dataclass(frozen=True)
+class _PulledBackGeometry:
+    """What `mesh_geometry_streams` asks of a form, answered for this family.
+
+    `Sbar` is the material tangent pulled back through the geometry, so the
+    adjugate and the determinant are read by every inexact tangent whatever the
+    material -- it is a property of the projection rather than of the form.
+    That makes the answer constant here, where the general path has to derive it
+    from the lowering.
+    """
+
+    uses_adjugate: bool = True
+    value_coefficients: tuple = ()
+
+
+def geometry_streams(dim):
+    """The geometry buffers the tangent takes, in the order its ABI lists them.
+
+    Delegated rather than spelled: `plans/geometry_quantities` owns the names
+    and the order, and `ARCHITECTURE.html` OP 16 records what a second site
+    spelling them costs.
+    """
+    return mesh_geometry_streams(_PulledBackGeometry(), dim)
+
+
+def geometry_parameters(dim, scalar_type="const geom_t *const RSTR"):
+    """The same buffers, as a signature declares them."""
+    return mesh_geometry_parameters(
+        _PulledBackGeometry(), dim, scalar_type=scalar_type
+    )
+
+
+def geometry_argument_names(dim):
+    """The same buffers, as a call passes them."""
+    return mesh_geometry_argument_names(_PulledBackGeometry(), dim)
 
 
 def field_gradient_symbols(dim, role):
