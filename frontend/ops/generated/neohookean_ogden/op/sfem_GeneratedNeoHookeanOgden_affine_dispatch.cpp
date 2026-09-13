@@ -274,6 +274,20 @@ extern "C" int neohookean_ogden_tet4_gradient_a_msoa(
         void *const RSTR outy,
         void *const RSTR outz
 );
+extern "C" int neohookean_ogden_proteus_quad4_inexact_apply_compressed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    idx_t **const RSTR elements,
+    const ptrdiff_t tangent_component_stride,
+    const compressed_t *const RSTR tangent,
+    const scaling_t *const RSTR scaling,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy
+);
 extern "C" int neohookean_ogden_quad4_inexact_apply_compressed_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -303,6 +317,22 @@ extern "C" int neohookean_ogden_tri3_inexact_apply_compressed_a_msoa(
     void *const RSTR outy
 );
 extern "C" int neohookean_ogden_hex8_inexact_apply_compressed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    idx_t **const RSTR elements,
+    const ptrdiff_t tangent_component_stride,
+    const compressed_t *const RSTR tangent,
+    const scaling_t *const RSTR scaling,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
+extern "C" int neohookean_ogden_proteus_hex8_inexact_apply_compressed_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
@@ -350,6 +380,19 @@ extern "C" int neohookean_ogden_tet4_inexact_apply_compressed_a_msoa(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int neohookean_ogden_proteus_quad4_inexact_apply_stored_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    idx_t **const RSTR elements,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy
+);
 extern "C" int neohookean_ogden_quad4_inexact_apply_stored_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -377,6 +420,21 @@ extern "C" int neohookean_ogden_tri3_inexact_apply_stored_a_msoa(
     void *const RSTR outy
 );
 extern "C" int neohookean_ogden_hex8_inexact_apply_stored_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    idx_t **const RSTR elements,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
+extern "C" int neohookean_ogden_proteus_hex8_inexact_apply_stored_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
@@ -421,6 +479,23 @@ extern "C" int neohookean_ogden_tet4_inexact_apply_stored_a_msoa(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int neohookean_ogden_proteus_quad4_inexact_apply_tangent_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const real_t lmbda,
+    const real_t mu,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const ptrdiff_t tangent_component_stride,
+    metric_tensor_t *const RSTR tangent
+);
 extern "C" int neohookean_ogden_quad4_inexact_apply_tangent_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -456,6 +531,29 @@ extern "C" int neohookean_ogden_tri3_inexact_apply_tangent_a_msoa(
     metric_tensor_t *const RSTR tangent
 );
 extern "C" int neohookean_ogden_hex8_inexact_apply_tangent_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t lmbda,
+    const real_t mu,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t tangent_component_stride,
+    metric_tensor_t *const RSTR tangent
+);
+extern "C" int neohookean_ogden_proteus_hex8_inexact_apply_tangent_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     idx_t **const RSTR elements,
@@ -852,6 +950,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_inexact_apply_compress
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return neohookean_ogden_proteus_quad4_inexact_apply_compressed_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, scaling, h_stride, hx, hy, out_stride, outx, outy);
     case smesh::QUAD4:
       return neohookean_ogden_quad4_inexact_apply_compressed_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, scaling, h_stride, hx, hy, out_stride, outx, outy);
     case smesh::TRI3:
@@ -887,6 +987,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_inexact_apply_compress
   switch (element_type) {
     case smesh::HEX8:
       return neohookean_ogden_hex8_inexact_apply_compressed_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX8:
+      return neohookean_ogden_proteus_hex8_inexact_apply_compressed_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
       return neohookean_ogden_tet10_inexact_apply_compressed_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET4:
@@ -917,6 +1019,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_inexact_apply_stored_2
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return neohookean_ogden_proteus_quad4_inexact_apply_stored_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, h_stride, hx, hy, out_stride, outx, outy);
     case smesh::QUAD4:
       return neohookean_ogden_quad4_inexact_apply_stored_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, h_stride, hx, hy, out_stride, outx, outy);
     case smesh::TRI3:
@@ -951,6 +1055,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_inexact_apply_stored_3
   switch (element_type) {
     case smesh::HEX8:
       return neohookean_ogden_hex8_inexact_apply_stored_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX8:
+      return neohookean_ogden_proteus_hex8_inexact_apply_stored_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
       return neohookean_ogden_tet10_inexact_apply_stored_a_msoa((int)resolved_real_type, nelements, elements, tangent_component_stride, tangent, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET4:
@@ -985,6 +1091,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_inexact_apply_tangent_
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return neohookean_ogden_proteus_quad4_inexact_apply_tangent_a_msoa((int)resolved_real_type, nelements, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, tangent_component_stride, tangent);
     case smesh::QUAD4:
       return neohookean_ogden_quad4_inexact_apply_tangent_a_msoa((int)resolved_real_type, nelements, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, tangent_component_stride, tangent);
     case smesh::TRI3:
@@ -1027,6 +1135,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_inexact_apply_tangent_
   switch (element_type) {
     case smesh::HEX8:
       return neohookean_ogden_hex8_inexact_apply_tangent_a_msoa((int)resolved_real_type, nelements, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, tangent_component_stride, tangent);
+    case smesh::PROTEUS_HEX8:
+      return neohookean_ogden_proteus_hex8_inexact_apply_tangent_a_msoa((int)resolved_real_type, nelements, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, tangent_component_stride, tangent);
     case smesh::TET10:
       return neohookean_ogden_tet10_inexact_apply_tangent_a_msoa((int)resolved_real_type, nelements, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, tangent_component_stride, tangent);
     case smesh::TET4:

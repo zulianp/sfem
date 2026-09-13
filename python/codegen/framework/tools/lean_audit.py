@@ -211,6 +211,43 @@ def kernel_permutations(source):
         if name.startswith("proteus_"):
             continue
         permutations.append((name, extent))
+    permutations.extend(_staged_gather_permutations(source))
+    return permutations
+
+
+#: A staged gather: `b<name>[<slot>][lane] = <source>[bev<node>[lane] ...`.
+_STAGED_GATHER = re.compile(
+    r"\b(?P<buffer>[A-Za-z_][A-Za-z0-9_]*)\[(?P<slot>\d+)\]\[lane\]\s*=\s*"
+    r"[A-Za-z_][A-Za-z0-9_]*\[bev(?P<node>\d+)\[lane\]"
+)
+
+
+def _staged_gather_permutations(source):
+    """The same reordering, folded into a gather's indices instead of an array.
+
+    A wrapper that builds `idx_t *proteus_elements[8]` is visible to the scan
+    above; writing `bu_data[6][lane] = ux[bev3[lane] * u_stride]` is the same
+    permutation with the same effect and was not, which is how an inexact HEX8
+    kernel came to reorder its own nodes while the budget stayed at zero.  The
+    measure was narrower than the rule it was written to enforce.
+
+    Identity is not a permutation and is not counted, so a kernel already
+    written against its mesh's own order -- every simplex, and every `PROTEUS_*`
+    element -- contributes nothing.
+    """
+    by_buffer = {}
+    for match in _STAGED_GATHER.finditer(source):
+        nodes = by_buffer.setdefault(match.group("buffer"), [])
+        node = int(match.group("node"))
+        if node not in nodes:
+            nodes.append(node)
+    permutations = []
+    for buffer, nodes in sorted(by_buffer.items()):
+        if sorted(nodes) != list(range(len(nodes))):
+            continue
+        if nodes == list(range(len(nodes))):
+            continue
+        permutations.append((buffer, len(nodes)))
     return permutations
 
 

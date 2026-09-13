@@ -612,6 +612,33 @@ extern "C" int linear_elasticity_hex8_inexact_apply_stored_packed_two_pass_a_mso
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int linear_elasticity_proteus_hex8_inexact_apply_stored_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const ptrdiff_t tangent_component_stride,
+    const metric_tensor_t *const RSTR tangent,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
 extern "C" int linear_elasticity_tet10_inexact_apply_stored_packed_two_pass_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
@@ -1074,6 +1101,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_inexact_apply_stored_
   switch (element_type) {
     case smesh::HEX8:
       return linear_elasticity_hex8_inexact_apply_stored_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, tangent_component_stride, tangent, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX8:
+      return linear_elasticity_proteus_hex8_inexact_apply_stored_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, tangent_component_stride, tangent, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
       return linear_elasticity_tet10_inexact_apply_stored_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, max_nodes_per_pack, elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows, ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, tangent_component_stride, tangent, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET4:
