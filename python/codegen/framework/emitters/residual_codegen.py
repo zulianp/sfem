@@ -27,6 +27,8 @@ from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
     contracted_gradient_components,
     contracted_test_quantities,
+    staged_test_quantities,
+    live_test_coefficients,
     publishes_kernel,
     assembled_matrix_dependencies,
     jacobian_action_dependencies,
@@ -91,10 +93,6 @@ from codegen.framework.plans.residual_structure import (
     jacobian_block_plan,
     residual_local_phase_plans,
     residual_mesh_phase_plans,
-)
-from codegen.framework.plans.dependencies import (
-    contracted_gradient_components,
-    live_test_coefficients,
 )
 from codegen.framework.plans.geometry_variants import packed_kernel_forms
 from codegen.framework.plans.streams import field_stream_layout
@@ -2366,8 +2364,6 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     contiguous_suffix = _STREAM_HELPER_SUFFIX[field_stream_layout(stream_layout)]
     tensor_evaluate_name = "tensor_evaluate" + contiguous_suffix
     tensor_evaluate_value_name = "tensor_evaluate_value" + contiguous_suffix
-    tensor_integrate_name = "tensor_integrate" + contiguous_suffix
-    tensor_integrate_value_name = "tensor_integrate_value" + contiguous_suffix
 
     for field_index, field in enumerate(system.fields):
         reference_index = layout.reference_index(field_index)
@@ -2420,14 +2416,9 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 )
 
     for row, field in enumerate(system.fields):
-        lines.append(
-            "  s_t %s_value_coeff[NQ * VS];" % field.name
-        )
-        if dependencies.uses_test_gradients:
-            lines.append(
-                "  s_t %s_grad_coeff_ref[NQ * ND * VS];"
-                % field.name
-            )
+        for quantity in staged_test_quantities(dependencies):
+            suffix, extent = _STAGED_COEFFICIENT_BUFFER[quantity]
+            lines.append("  s_t %s_%s[%s];" % (field.name, suffix, extent))
 
     lines.extend(["  for (int q = 0; q < NQ; ++q) {"])
     if dim == 2:
@@ -2524,17 +2515,16 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         lines.append(
             "      %s_value_coeff_q[lane] = %s;" % (field.name, value)
         )
-        if dependencies.uses_test_gradients:
-            for k in range(dim):
-                terms = [
-                    "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
-                    for d in range(dim)
-                    if dependencies.gradient_coefficients[row][d]
-                ]
-                value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
-                lines.append(
-                    "      %s_grad_coeff_ref_q%d[lane] = %s;" % (field.name, k, value)
-                )
+        for k in contracted_gradient_components(dependencies, dim):
+            terms = [
+                "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
+                for d in range(dim)
+                if dependencies.gradient_coefficients[row][d]
+            ]
+            value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
+            lines.append(
+                "      %s_grad_coeff_ref_q%d[lane] = %s;" % (field.name, k, value)
+            )
     lines.extend(["    }", "  }"])
     for row, field in enumerate(system.fields):
         shape_name = layout.n_shape_constant(field)
@@ -2544,24 +2534,17 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             field_stream_layout(stream_layout)
         ](layout, row, field, offset, shape_name)
         lines.extend(declaration)
-        if dependencies.uses_test_gradients:
-            lines.extend(
-                [
-                    "  %s<s_t, NQ, %s, VS, ND, 1>("
-                    % (tensor_integrate_name, shape_name),
-                    "      ne, field_shape_1d[%d], field_grad_1d[%d], %s_value_coeff, %s_grad_coeff_ref, %s);"
-                    % (reference_index, reference_index, field.name, field.name, output_arg),
-                ]
-            )
-        else:
-            lines.extend(
-                [
-                    "  %s<s_t, NQ, %s, VS, ND, 1>("
-                    % (tensor_integrate_value_name, shape_name),
-                    "      ne, field_shape_1d[%d], %s_value_coeff, %s);"
-                    % (reference_index, field.name, output_arg),
-                ]
-            )
+        stem, argument_format = _TENSOR_INTEGRATE_CALL_BY_QUANTITIES[
+            staged_test_quantities(dependencies)
+        ]
+        lines.extend(
+            [
+                "  %s%s<s_t, NQ, %s, VS, ND, 1>("
+                % (stem, contiguous_suffix, shape_name),
+                argument_format
+                % {"i": reference_index, "f": field.name, "out": output_arg},
+            ]
+        )
     return lines
 
 
@@ -5409,6 +5392,33 @@ _OUTPUT_STREAM_ARGUMENT = {
 #: gradient buffer and called the entry point without it -- or the reverse --
 #: would not compile.  Keying both off one plan answer is what makes that
 #: unrepresentable rather than merely true.
+#: The extent of each staged coefficient buffer, in the kernel's own constants.
+#: Which of them exist is `plans.dependencies.staged_test_quantities`; how many
+#: elements each holds is emission's, because `NQ` and `ND` are this text's.
+_STAGED_COEFFICIENT_BUFFER = {
+    "value": ("value_coeff", "NQ * VS"),
+    "gradient": ("grad_coeff_ref", "NQ * ND * VS"),
+}
+
+
+#: Which contraction reads those buffers, and with what arguments.  The same
+#: question `_TENSOR_INTEGRATE_BY_QUANTITIES` below answers for the IR path,
+#: spelled for the field-prefixed buffers this body stages and for the shape
+#: tables it indexes by reference.  The helper's contiguous suffix is appended
+#: at the call, so the stem here names the contraction rather than the variant.
+_TENSOR_INTEGRATE_CALL_BY_QUANTITIES = {
+    ("value",): (
+        "tensor_integrate_value",
+        "      ne, field_shape_1d[%(i)d], %(f)s_value_coeff, %(out)s);",
+    ),
+    ("value", "gradient"): (
+        "tensor_integrate",
+        "      ne, field_shape_1d[%(i)d], field_grad_1d[%(i)d], "
+        "%(f)s_value_coeff, %(f)s_grad_coeff_ref, %(out)s);",
+    ),
+}
+
+
 _TENSOR_INTEGRATE_BY_QUANTITIES = {
     ("value",): (
         "tensor_integrate_value%s",
