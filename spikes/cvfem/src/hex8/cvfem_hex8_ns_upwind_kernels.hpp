@@ -276,6 +276,29 @@ static constexpr double CVFEM_HEX8_DN_REF[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_DN
 #endif
 
 // Edge-associated SCS centroids in [0,1]^3, toward the element center.
+// Reference coordinates of the eight nodes in [0,1]^3, in the element's own node order.
+// Redundant with the sign pattern of CVFEM_HEX8_DN_REF and written out anyway: a
+// reconstruction that reads them transposed is wrong in a way no residual norm reveals,
+// because the error is a smooth field rather than a blow-up.
+#define CVFEM_HEX8_REF_XI_INIT { \
+        {double(0), double(0), double(0)}, \
+        {double(1), double(0), double(0)}, \
+        {double(1), double(1), double(0)}, \
+        {double(0), double(1), double(0)}, \
+        {double(0), double(0), double(1)}, \
+        {double(1), double(0), double(1)}, \
+        {double(1), double(1), double(1)}, \
+        {double(0), double(1), double(1)}}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const double (&cvfem_hex8_ref_xi_tbl())[CVFEM_HEX8_N_NODES][3] {
+    static constexpr double t[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_REF_XI_INIT;
+    return t;
+}
+#define CVFEM_HEX8_REF_XI cvfem_hex8_ref_xi_tbl()
+#else
+static constexpr double CVFEM_HEX8_REF_XI[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_REF_XI_INIT;
+#endif
+
 #define CVFEM_HEX8_SCS_XI_INIT { \
         {double(0.5), double(0.25), double(0.25)}, \
         {double(0.5), double(0.75), double(0.25)}, \
@@ -787,6 +810,82 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_upwind_abs(const scalar_t m, cons
     }
 }
 
+// --------------------------------------------------- deferred-correction convection
+//
+// The convective flux is first-order donor cell: mpos*u[i] + mneg*u[j] carries the UPWIND
+// NODE'S value to a face that sits between the two nodes. Measured on the manufactured
+// solution, that costs an order: the ladder converges at 2.308 at Re = 1, where upwinding is
+// inactive, and at 0.727 at Re = 100, where it is not.
+//
+// The fix is the standard one, and this is the DEFERRED-CORRECTION form of it: extrapolate
+// the donor value to the face with the donor's own gradient,
+//
+//     u_face = u[donor] + grad u[donor] . (x_scs - x_donor)
+//
+// and add only the DIFFERENCE from the first-order value to the residual, leaving the
+// Jacobian first-order. That is what Nalu and FUN3D do, and here it has a second reason: the
+// assembled convective Jacobian writes only column d of an edge block -- 32 of 64 node pairs,
+// 3 of 9 momentum entries, hard-coded in CVFEM_HEX8_RECOMPUTED_PAIRS -- and a reconstructed
+// value reaches nodes outside the element, so differentiating it would void that sparsity and
+// regrow the stencil to two rings. Nothing here touches the Jacobian at all.
+//
+// The cost is Newton's rate: a lagged correction makes this defect correction rather than
+// Newton, so convergence is linear. That is the trade the method is.
+//
+// `g` is the element's eight nodal velocity gradients, [a*9 + r*3 + c] = du_r/dx_c, the same
+// layout CVFEMNavierStokes::nodal_velocity_gradient produces. Passing null disables the
+// correction with no arithmetic, which is what every caller that has not asked for it does.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *const SFEM_RESTRICT g,
+                                                               const scalar_t *const SFEM_RESTRICT xe,
+                                                               const scalar_t *const SFEM_RESTRICT ye,
+                                                               const scalar_t *const SFEM_RESTRICT ze,
+                                                               const int s, const int i, const int j,
+                                                               const scalar_t mdot, const scalar_t ueps,
+                                                               scalar_t &dfx, scalar_t &dfy, scalar_t &dfz) {
+    dfx = dfy = dfz = scalar_t(0);
+    if (!g) return;
+
+    // The sub-control surface's centroid in physical space, by trilinear interpolation at its
+    // parametric position. Computed rather than cached: it is eight fused multiply-adds and
+    // the alternative is a per-element array that has to be kept in step with the geometry.
+    const scalar_t xi = (scalar_t)CVFEM_HEX8_SCS_XI[s][0];
+    const scalar_t et = (scalar_t)CVFEM_HEX8_SCS_XI[s][1];
+    const scalar_t ze_ = (scalar_t)CVFEM_HEX8_SCS_XI[s][2];
+    scalar_t sx = 0, sy = 0, sz = 0;
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const scalar_t rx = (scalar_t)CVFEM_HEX8_REF_XI[a][0];
+        const scalar_t ry = (scalar_t)CVFEM_HEX8_REF_XI[a][1];
+        const scalar_t rz = (scalar_t)CVFEM_HEX8_REF_XI[a][2];
+        const scalar_t N  = (rx > scalar_t(0.5) ? xi : scalar_t(1) - xi) *
+                            (ry > scalar_t(0.5) ? et : scalar_t(1) - et) *
+                            (rz > scalar_t(0.5) ? ze_ : scalar_t(1) - ze_);
+        sx += N * xe[a];
+        sy += N * ye[a];
+        sz += N * ze[a];
+    }
+
+    // The same upwind split the flux used, recovered from the mass flux it returned -- which
+    // already carries the Rhie-Chow term, so the correction is weighted by the flux actually
+    // transported rather than by a second opinion about it.
+    scalar_t amdot, sgn;
+    cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+    const scalar_t mpos = scalar_t(0.5) * (mdot + amdot);
+    const scalar_t mneg = scalar_t(0.5) * (mdot - amdot);
+
+    const scalar_t dix = sx - xe[i], diy = sy - ye[i], diz = sz - ze[i];
+    const scalar_t djx = sx - xe[j], djy = sy - ye[j], djz = sz - ze[j];
+    const scalar_t *const Gi = g + i * 9;
+    const scalar_t *const Gj = g + j * 9;
+
+    dfx = mpos * (Gi[0] * dix + Gi[1] * diy + Gi[2] * diz) +
+          mneg * (Gj[0] * djx + Gj[1] * djy + Gj[2] * djz);
+    dfy = mpos * (Gi[3] * dix + Gi[4] * diy + Gi[5] * diz) +
+          mneg * (Gj[3] * djx + Gj[4] * djy + Gj[5] * djz);
+    dfz = mpos * (Gi[6] * dix + Gi[7] * diy + Gi[8] * diz) +
+          mneg * (Gj[6] * djx + Gj[7] * djy + Gj[8] * djz);
+}
+
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_convection(const scalar_t rho,
                                                   const scalar_t ux_i,
@@ -881,7 +980,15 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               const scalar_t *const SFEM_RESTRICT   p,
                                                               scalar_t *const SFEM_RESTRICT         r,
                                                               const Hex8RhieChowT<scalar_t>        &rc = {},
-                                                              const scalar_t ueps = scalar_t(0)) {
+                                                              const scalar_t ueps = scalar_t(0),
+                                                              // Deferred-correction inputs: the element's eight nodal velocity
+                                                              // gradients and its node coordinates. All null -- the default, and
+                                                              // what every caller that has not asked for the correction passes --
+                                                              // leaves this kernel bit-for-bit what it was.
+                                                              const scalar_t *const SFEM_RESTRICT ugrad8 = nullptr,
+                                                              const scalar_t *const SFEM_RESTRICT xe = nullptr,
+                                                              const scalar_t *const SFEM_RESTRICT ye = nullptr,
+                                                              const scalar_t *const SFEM_RESTRICT ze = nullptr) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     scalar_t grad[9];
@@ -945,6 +1052,15 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                   mdot,
                                   mdot_rc,
                                   ueps);
+        // The deferred correction, added to the first-order flux and to nothing else. The
+        // Jacobian below is untouched by design; see cvfem_hex8_scs_defcor.
+        if (ugrad8) {
+            scalar_t dfx, dfy, dfz;
+            cvfem_hex8_scs_defcor(ugrad8, xe, ye, ze, s, i, j, mdot, ueps, dfx, dfy, dfz);
+            fx += dfx;
+            fy += dfy;
+            fz += dfz;
+        }
         r[i * 4 + 0] += fx;
         r[i * 4 + 1] += fy;
         r[i * 4 + 2] += fz;
