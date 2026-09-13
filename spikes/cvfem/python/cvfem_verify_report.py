@@ -81,6 +81,15 @@ FIELDS = {
     "pump_balance":  (r"^pump: \|port - swept\|\s+\S+\s+\|port \+ diaphragm\|\s+(\S+)", float),
     "pump_area":     (r"^pump: chamber \S+\s+diaphragm area\s+(\S+)", float),
     "pump_faces":    (r"^pump: chamber .*port\s+(\d+) faces", int),
+    # The kinetic-energy budget. eps_num is what the measured terms leave over, so it is the
+    # scheme's numerical dissipation and, on a resolved laminar flow, is discretisation error
+    # and nothing else. re.search takes the FIRST match, which for a steady solve is the only
+    # diag line; a transient would need the last and this group is steady by construction.
+    "diag_E":        (r"^diag: E\s+(\S+)", float),
+    "diag_eps_visc": (r"^diag:.*\beps_visc\s+(\S+)", float),
+    "diag_eps_num":  (r"^diag:.*\beps_num\s+(\S+)", float),
+    "diag_closure":  (r"^diag:.*\bclosure\s+(\S+)", float),
+    "diag_div_l2":   (r"^diag:.*\bdiv_l2\s+(\S+)", float),
 }
 
 # Fields whose value is text rather than a number.
@@ -469,6 +478,96 @@ def section_boundary(runs, checks):
     return "\n".join(body) + "\n" if len(body) > 2 else ""
 
 
+def section_budget(runs, checks):
+    """The kinetic-energy budget on a flow where every term has a closed form.
+
+    This is the gate for every dissipation number the spike will ever report. The scheme's
+    convection is first-order upwind with no limiter, so the |mdot| term IS its subgrid model,
+    and eps_num -- defined as what dE/dt, the boundary power and the viscous dissipation leave
+    over -- is the only measurement of how large that model is. A residual definition inherits
+    every error in the terms it subtracts, so it has to be shown to vanish where it must
+    before it is believed where it matters.
+
+    Steady Poiseuille is where it must. dE/dt is zero, the flow is fully resolved, and the
+    exact solution is representable, so eps_num is pure discretisation error and has to
+    converge away at the scheme's order. A budget that cannot do that is not fit to report a
+    number at any Reynolds number.
+    """
+    rows = sorted((r for r in runs if r["group"] == "budget" and "diag_eps_num" in r
+                   and "ndof" in r and "stack" in r),
+                  key=lambda r: (r.get("stack", ""), r["ndof"]))
+    if not rows:
+        return ""
+
+    body = ["## The kinetic-energy budget", "",
+            "`dE/dt = P_in - P_out - eps_visc - eps_num`, with every term but the last",
+            "measured on the operator's own control volumes and sub-control surfaces, and",
+            "`eps_num` defined as the residual. On steady Poiseuille `dE/dt` is zero and the",
+            "flow is resolved, so `eps_num` is discretisation error: it must fall at the",
+            "scheme's order, and `closure` -- `|eps_num|` against the largest term it is",
+            "differenced from -- must fall with it.", ""]
+
+    # The ladder, per solver stack. The budget is a statement about the DISCRETISATION, so
+    # two stacks that solve the same discrete system must report the same numbers; a
+    # disagreement between them would mean one of them is not converging to the discrete
+    # solution rather than that the budget is wrong.
+    stacks = []
+    for r in rows:
+        if r["stack"] not in stacks:
+            stacks.append(r["stack"])
+
+    for stack in stacks:
+        arm = [r for r in rows if r["stack"] == stack]
+        body += ["", "### %s" % {"mg": "FGMRES + geometric multigrid",
+                                 "vanka": "FGMRES + Vanka, no multigrid"}.get(stack, stack), ""]
+        trows = []
+        for r in arm:
+            trows.append([str(r["ndof"]), fmt(r.get("diag_E")), fmt(r.get("diag_eps_visc")),
+                          fmt(r.get("diag_eps_num")), fmt(r.get("diag_closure")),
+                          fmt(r.get("diag_div_l2"))])
+        body.append(table(["ndof", "E", "eps_visc", "eps_num", "closure", "div_l2"], trows))
+
+        if len(arm) >= 2:
+            scales = [r["ndof"] ** (-1.0 / 3.0) for r in arm]
+            errs   = [abs(r["diag_eps_num"]) for r in arm]
+            f = fit_convergence_rate(scales, errs)
+            if f:
+                rate, _inter, r2, n = f
+                # 1.65 is the same allowance the MMS order checks use: second order with the
+                # same 0.35 of slack, and for the same reason -- a ladder short enough to run
+                # in a verification matrix has real fit noise in it.
+                ok = rate >= 1.65
+                body += ["", "Observed order of `eps_num`: **%.3f** (R^2 %.4f over %d levels, "
+                         "expect >= 1.65)." % (rate, r2, n), ""]
+                checks.append(("Budget closes and eps_num vanishes at second order (%s)" % stack,
+                               "rate %.3f, closure %.2e at the finest" % (rate, arm[-1].get("diag_closure", float("nan"))),
+                               ok))
+            else:
+                checks.append(("Budget closes and eps_num vanishes at second order (%s)" % stack,
+                               "not enough levels to fit", False))
+
+    # Solver independence, where two stacks ran the same size. The budget is a property of the
+    # discrete solution, so this must hold to the tolerance the two solves agree to.
+    by_size = {}
+    for r in rows:
+        by_size.setdefault(r["ndof"], {})[r["stack"]] = r
+    shared = [(n, d) for n, d in sorted(by_size.items()) if len(d) >= 2]
+    if shared:
+        n, d = shared[0]
+        ks = sorted(d)
+        a, b = d[ks[0]], d[ks[1]]
+        da = abs(a["diag_eps_num"] - b["diag_eps_num"])
+        scale = max(abs(a.get("diag_eps_visc", 1.0)), 1e-300)
+        ok = da / scale <= 1e-3
+        body += ["", "Solver independence at %d dof: `eps_num` %s (%s) against %s (%s), "
+                 "difference %s of eps_visc." % (n, fmt(a["diag_eps_num"]), ks[0],
+                                                 fmt(b["diag_eps_num"]), ks[1], fmt(da / scale)), ""]
+        checks.append(("Budget is the same on both solver stacks",
+                       "%s relative to eps_visc at %d dof" % (fmt(da / scale), n), ok))
+
+    return "\n".join(body) + "\n"
+
+
 def section_pump(runs, checks):
     """The diaphragm pump, judged on an identity rather than on a solution."""
     rows = [r for r in runs if r["group"] == "pump" and "pump_swept" in r]
@@ -555,7 +654,9 @@ def section_conservation(runs, checks):
         # The prescribed inlet profile, against a tolerance of its own: it is a trapezoidal
         # integral of a parabola, which the reference measured 3% low against the exact 1/9,
         # so holding it to round-off would fail a correct inlet.
-        inflow_ok = r.get("inflow_err") is None or r["inflow_err"] <= 0.05
+        # A run may carry its own tolerance through the manifest: the FDA nozzle's inlet is an
+        # inscribed polygon, whose O(h^2) area deficit at an affordable resolution is 19%.
+        inflow_ok = r.get("inflow_err") is None or r["inflow_err"] <= r.get("inflow_tol", 0.05)
         if r.get("converged") is False:
             unconverged += 1
             st = note("not converged")
@@ -657,6 +758,7 @@ def build_report(manifest, rundir):
     parts = [section_unit(manifest, checks),
              section_mms(runs, checks),
              section_boundary(runs, checks),
+             section_budget(runs, checks),
              section_pump(runs, checks),
              section_conservation(runs, checks)]
     check_convergence(runs, checks)
