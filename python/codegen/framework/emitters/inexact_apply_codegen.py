@@ -37,6 +37,11 @@ import sympy as sp
 
 from codegen.framework.emitters.cprinter import _sfem_ccode
 from codegen.framework.emitters.kernel_prologue import kernel_constant
+from codegen.framework.emitters.runtime_typed_abi import (
+    cast_arguments,
+    parameter_name,
+    runtime_typed_entry_point_lines,
+)
 from codegen.framework.emitters.quadrature_codegen import (
     REFERENCE_AXES,
     cpp_scalar_literal,
@@ -1111,19 +1116,12 @@ _CONNECTIVITY_ARGUMENT_BY_USE = {
 #: *names*, so a nameless parameter there produces a call with no argument for
 #: it.  The published signature varies with what the material reads, exactly as
 #: it already does for a previous state.
-_CONNECTIVITY_CALL_BY_USE = {True: ["elements"], False: []}
 _CONNECTIVITY_ABI_BY_USE = {
-    True: ["    idx_t **const RSTR elements,"],
+    True: ["idx_t **const RSTR elements"],
     False: [],
 }
 _ABI_STATE_BY_USE = {
-    True: lambda scalar, component: _abi_stream(scalar, "u", component),
-    False: lambda scalar, component: [],
-}
-_STATE_CALL_BY_USE = {
-    True: lambda component: ["      u_stride, %s," % ", ".join(
-        "u%s" % name for name in component
-    )],
+    True: lambda component: _abi_stream("u", component),
     False: lambda component: [],
 }
 
@@ -1598,57 +1596,76 @@ _ABI_VECTOR_SIZE = 16
 #: How the tangent is stored at the ABI boundary.  These are SFEM's own types
 #: for exactly this object: `metric_tensor_t` is what the hand-written partial
 #: assembly stores, and `compressed_t` with a `scaling_t` per element is what it
-#: compresses to.  Emitting the pair `<name>` and `<name>_float` is what makes
-#: the dispatch layer collapse them into one runtime-typed entry point.
-_ABI_SCALARS = (("", "double"), ("_float", "float"))
+#: compresses to.  None of them is the dispatched scalar -- the store's
+#: precision is its own template axis, which is why `carries_scalar` leaves
+#: them alone and why they cross the boundary spelled as themselves.
+_ABI_TANGENT_STORE = "metric_tensor_t"
 
 
-def _abi_stream(scalar, role, component, const="const "):
-    lines = ["    const ptrdiff_t %s_stride," % role]
-    lines.extend(
-        "    %s%s *const RSTR %s%s," % (const, scalar, role, name)
-        for name in component
-    )
-    return lines
+def _abi_stream(role, component, const="const "):
+    """One field at the boundary: its stride, then one buffer per component."""
+    return ["const ptrdiff_t %s_stride" % role] + [
+        "%ss_t *const RSTR %s%s" % (const, role, name) for name in component
+    ]
 
 
 def _abi_geometry(dim):
-    lines = [
-        "    const geom_t *const RSTR g_adj%d," % index
-        for index in range(dim * dim)
-    ]
-    lines.append("    const geom_t *const RSTR g_det0,")
-    return lines
+    """The affine geometry the tangent reads, one stream per adjugate entry."""
+    return [
+        "const geom_t *const RSTR g_adj%d" % index for index in range(dim * dim)
+    ] + ["const geom_t *const RSTR g_det0"]
 
 
-def _abi_tangent_arguments(dim, n_nodes, component):
-    return ["adjugate%d" % i for i in range(dim * dim)]
-
-
-def _packed_abi_prologue(scalar):
+def _packed_abi_prologue():
     """The packed ABI's leading parameters, in the order every packed kernel takes.
 
     Spelled here as well as in the templated kernel because the ABI is a C
     boundary: the dispatch layer builds its calls out of these names.
     """
     return [
-        "    const ptrdiff_t n_packs,",
-        "    const ptrdiff_t n_elements_per_pack,",
-        "    const ptrdiff_t nelements,",
-        "    const ptrdiff_t max_nodes_per_pack,",
-        "    uint16_t **const RSTR elements,",
-        "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
-        "    const ptrdiff_t n_ghost_entries,",
-        "    const ptrdiff_t n_ghost_reduce_rows,",
-        "    const ptrdiff_t *const RSTR ghost_ptr,",
-        "    const idx_t *const RSTR ghost_idx,",
-        "    const ptrdiff_t *const RSTR ghost_reduce_ptr,",
-        "    const ptrdiff_t *const RSTR ghost_reduce_idx,",
-        "    const idx_t *const RSTR ghost_reduce_dest,",
-        "    %s *const RSTR ghost_buf," % scalar,
-        "    const ptrdiff_t tangent_component_stride,",
-        "    const metric_tensor_t *const RSTR tangent,",
+        "const ptrdiff_t n_packs",
+        "const ptrdiff_t n_elements_per_pack",
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t max_nodes_per_pack",
+        "uint16_t **const RSTR elements",
+        "const ptrdiff_t *const RSTR owned_nodes_ptr",
+        "const ptrdiff_t n_ghost_entries",
+        "const ptrdiff_t n_ghost_reduce_rows",
+        "const ptrdiff_t *const RSTR ghost_ptr",
+        "const idx_t *const RSTR ghost_idx",
+        "const ptrdiff_t *const RSTR ghost_reduce_ptr",
+        "const ptrdiff_t *const RSTR ghost_reduce_idx",
+        "const idx_t *const RSTR ghost_reduce_dest",
+        "s_t *const RSTR ghost_buf",
+        "const ptrdiff_t tangent_component_stride",
+        "const %s *const RSTR tangent" % _ABI_TANGENT_STORE,
     ]
+
+
+def _abi_entry_point(name, params, template, template_arguments):
+    """One `extern "C"` entry point over the template, typed at run time.
+
+    Stands where `for suffix, scalar in _ABI_SCALARS:` stood.  A body written in
+    terms of `s_t` is the same text for every precision and is emitted once as a
+    template above; publishing a symbol per precision on top of it restated the
+    whole parameter list a second time and made the dispatch declare and switch
+    over both.  The entry point takes the scalar's width and selects the
+    instantiation itself, which is the shape the rest of SFEM's C ABI has.
+
+    Every kernel here passes its arguments in parameter order, but the cast is
+    applied by name through `cast_arguments` rather than by position, so a call
+    list that drifted from its signature would fail to compile instead of
+    quietly mis-casting a buffer.
+    """
+    arguments = [parameter_name(param) for param in params]
+    return runtime_typed_entry_point_lines(
+        name,
+        params,
+        lambda scalar_type, _positional: [
+            "return sfem::codegen::%s<%s>(" % (template, template_arguments(scalar_type)),
+            "    %s);" % ", ".join(cast_arguments(params, arguments, scalar_type)),
+        ],
+    )
 
 
 def _c_abi_lines(
@@ -1658,146 +1675,96 @@ def _c_abi_lines(
     """`extern "C"` wrappers, so the split is reachable from SFEM.
 
     The templated kernels above are what the generator produces; these are what
-    the library links against.  Each is emitted twice, once per scalar type,
-    because the dispatch layer collapses a `<name>`/`<name>_float` pair into a
-    single public entry point that takes the scalar type as a
-    `smesh::PrimitiveType` and the buffers as `void *` -- the shape the rest of
-    SFEM's C ABI already has.
+    the library links against.  One symbol each, carrying the scalar type as a
+    width and its buffers as `void *` -- the shape `emitters/runtime_typed_abi`
+    describes and the public dispatch above already had.
     """
-    geometry_call = ", ".join(
-        ["nelements"]
-        + _CONNECTIVITY_CALL_BY_USE[bool(reads_state or used_previous)]
-        + ["g_adj%d" % index for index in range(dim * dim)]
-        + ["g_det0"]
-    )
-    previous_signature = _PREVIOUS_ABI_BY_USE[bool(used_previous)]
-    previous_call = _PREVIOUS_CALL_BY_USE[bool(used_previous)]
-
+    gathers = bool(reads_state or used_previous)
     lines = []
-    for suffix, scalar in _ABI_SCALARS:
-        # --- the partial assembly ---------------------------------------
-        name = "%s_inexact_apply_tangent_a_msoa%s" % (prefix, suffix)
-        gathers = bool(reads_state or used_previous)
-        lines.append('extern "C" int %s(' % name)
-        lines.append("    const ptrdiff_t nelements,")
-        lines.extend(_CONNECTIVITY_ABI_BY_USE[gathers])
-        lines.extend(_abi_geometry(dim))
-        lines.extend("    const %s %s," % (scalar, p) for p in parameters)
-        lines.extend(_ABI_STATE_BY_USE[bool(reads_state)](scalar, component))
-        lines.extend(previous_signature(scalar, component))
-        lines.extend(
-            [
-                "    const ptrdiff_t tangent_component_stride,",
-                "    metric_tensor_t *const RSTR tangent",
-                ") {",
-                "  return sfem::codegen::%s_inexact_apply_tangent_a_msoa_impl<"
-                "%s, geom_t, metric_tensor_t, %d>("
-                % (prefix, scalar, _ABI_VECTOR_SIZE),
-                "      %s," % geometry_call,
-                "      %s," % ", ".join(parameters),
-                *_STATE_CALL_BY_USE[bool(reads_state)](component),
-                "      %stangent_component_stride, tangent);"
-                % previous_call(component),
-                "}",
-                "",
-            ]
-        )
 
-        # --- the apply, from a `metric_tensor_t` store --------------------
-        name = "%s_inexact_apply_stored_a_msoa%s" % (prefix, suffix)
-        lines.append('extern "C" int %s(' % name)
-        lines.extend(
-            [
-                "    const ptrdiff_t nelements,",
-                "    idx_t **const RSTR elements,",
-                "    const ptrdiff_t tangent_component_stride,",
-                "    const metric_tensor_t *const RSTR tangent,",
-            ]
+    # --- the partial assembly -------------------------------------------
+    params = ["const ptrdiff_t nelements"]
+    params.extend(_CONNECTIVITY_ABI_BY_USE[gathers])
+    params.extend(_abi_geometry(dim))
+    params.extend("const s_t %s" % name for name in parameters)
+    params.extend(_ABI_STATE_BY_USE[bool(reads_state)](component))
+    params.extend(_PREVIOUS_ABI_BY_USE[bool(used_previous)](component))
+    params.extend(
+        [
+            "const ptrdiff_t tangent_component_stride",
+            "%s *const RSTR tangent" % _ABI_TANGENT_STORE,
+        ]
+    )
+    lines.extend(
+        _abi_entry_point(
+            "%s_inexact_apply_tangent_a_msoa" % prefix,
+            params,
+            "%s_inexact_apply_tangent_a_msoa_impl" % prefix,
+            lambda scalar_type: "%s, geom_t, %s, %d"
+            % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
         )
-        lines.extend(_abi_stream(scalar, "h", component))
-        lines.extend(_abi_stream(scalar, "out", component, const=""))
-        lines[-1] = lines[-1].rstrip(",")
-        lines.extend(
-            [
-                ") {",
-                "  return sfem::codegen::%s_inexact_apply_stored_a_msoa_impl<"
-                "%s, metric_tensor_t, %d>(" % (prefix, scalar, _ABI_VECTOR_SIZE),
-                "      nelements, elements,",
-                "      tangent_component_stride, tangent,",
-                "      h_stride, %s," % ", ".join("h%s" % n for n in component),
-                "      out_stride, %s);" % ", ".join("out%s" % n for n in component),
-                "}",
-                "",
-            ]
-        )
+    )
 
-        # --- the apply, over a packed mesh --------------------------------
-        for layout in packed_layouts:
-            name = "%s_inexact_apply_stored%s_a_msoa%s" % (
-                prefix, _LAYOUT_SUFFIX[layout], suffix
+    # --- the apply, from a `metric_tensor_t` store ------------------------
+    params = [
+        "const ptrdiff_t nelements",
+        "idx_t **const RSTR elements",
+        "const ptrdiff_t tangent_component_stride",
+        "const %s *const RSTR tangent" % _ABI_TANGENT_STORE,
+    ]
+    params.extend(_abi_stream("h", component))
+    params.extend(_abi_stream("out", component, const=""))
+    lines.extend(
+        _abi_entry_point(
+            "%s_inexact_apply_stored_a_msoa" % prefix,
+            params,
+            "%s_inexact_apply_stored_a_msoa_impl" % prefix,
+            lambda scalar_type: "%s, %s, %d"
+            % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
+        )
+    )
+
+    # --- the apply, over a packed mesh ------------------------------------
+    for layout in packed_layouts:
+        params = list(_packed_abi_prologue())
+        params.extend(_abi_stream("h", component))
+        params.extend(_abi_stream("out", component, const=""))
+        suffix = _LAYOUT_SUFFIX[layout]
+        lines.extend(
+            _abi_entry_point(
+                "%s_inexact_apply_stored%s_a_msoa" % (prefix, suffix),
+                params,
+                "%s_inexact_apply_stored%s_a_msoa_impl" % (prefix, suffix),
+                lambda scalar_type: "%s, %s, %d"
+                % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
             )
-            lines.append('extern "C" int %s(' % name)
-            lines.extend(_packed_abi_prologue(scalar))
-            lines.extend(_abi_stream(scalar, "h", component))
-            lines.extend(_abi_stream(scalar, "out", component, const=""))
-            lines[-1] = lines[-1].rstrip(",")
-            lines.extend(
-                [
-                    ") {",
-                    "  return sfem::codegen::%s_inexact_apply_stored%s_a_msoa_impl<"
-                    "%s, metric_tensor_t, %d>("
-                    % (prefix, _LAYOUT_SUFFIX[layout], scalar, _ABI_VECTOR_SIZE),
-                    "      n_packs, n_elements_per_pack, nelements, max_nodes_per_pack,",
-                    "      elements, owned_nodes_ptr, n_ghost_entries, n_ghost_reduce_rows,",
-                    "      ghost_ptr, ghost_idx, ghost_reduce_ptr, ghost_reduce_idx,",
-                    "      ghost_reduce_dest, ghost_buf,",
-                    "      tangent_component_stride, tangent,",
-                    "      h_stride, %s," % ", ".join("h%s" % n for n in component),
-                    "      out_stride, %s);" % ", ".join("out%s" % n for n in component),
-                    "}",
-                    "",
-                ]
-            )
+        )
 
-        # --- the apply, from a compressed store ---------------------------
-        name = "%s_inexact_apply_compressed_a_msoa%s" % (prefix, suffix)
-        lines.append('extern "C" int %s(' % name)
-        lines.extend(
-            [
-                "    const ptrdiff_t nelements,",
-                "    idx_t **const RSTR elements,",
-                "    const ptrdiff_t tangent_component_stride,",
-                "    const compressed_t *const RSTR tangent,",
-                "    const scaling_t *const RSTR scaling,",
-            ]
+    # --- the apply, from a compressed store -------------------------------
+    params = [
+        "const ptrdiff_t nelements",
+        "idx_t **const RSTR elements",
+        "const ptrdiff_t tangent_component_stride",
+        "const compressed_t *const RSTR tangent",
+        "const scaling_t *const RSTR scaling",
+    ]
+    params.extend(_abi_stream("h", component))
+    params.extend(_abi_stream("out", component, const=""))
+    lines.extend(
+        _abi_entry_point(
+            "%s_inexact_apply_compressed_a_msoa" % prefix,
+            params,
+            "%s_inexact_apply_compressed_a_msoa_impl" % prefix,
+            lambda scalar_type: "%s, compressed_t, scaling_t" % scalar_type,
         )
-        lines.extend(_abi_stream(scalar, "h", component))
-        lines.extend(_abi_stream(scalar, "out", component, const=""))
-        lines[-1] = lines[-1].rstrip(",")
-        lines.extend(
-            [
-                ") {",
-                "  return sfem::codegen::%s_inexact_apply_compressed_a_msoa_impl<"
-                "%s, compressed_t, scaling_t>(" % (prefix, scalar),
-                "      nelements, elements,",
-                "      tangent_component_stride, tangent, scaling,",
-                "      h_stride, %s," % ", ".join("h%s" % n for n in component),
-                "      out_stride, %s);" % ", ".join("out%s" % n for n in component),
-                "}",
-                "",
-            ]
-        )
+    )
     return lines
 
 
 #: The previous state reaches the ABI only where the material reads one.
 _PREVIOUS_ABI_BY_USE = {
-    True: lambda scalar, component: _abi_stream(scalar, "z", component),
-    False: lambda scalar, component: [],
-}
-_PREVIOUS_CALL_BY_USE = {
-    True: lambda component: "z_stride, %s, " % ", ".join("z%s" % n for n in component),
-    False: lambda component: "",
+    True: lambda component: _abi_stream("z", component),
+    False: lambda component: [],
 }
 
 

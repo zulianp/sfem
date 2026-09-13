@@ -904,43 +904,33 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
 } // namespace sfem
 
 extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_bsr_i_msoa(
+    const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const double eta_b,
-    const double eta_s,
-    const double newmark_velocity_alpha,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t newmark_velocity_alpha,
     const ptrdiff_t current_stride,
-    const double *const RSTR u0,
-    const double *const RSTR u1,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
     const ptrdiff_t previous_stride,
-    const double *const RSTR u0_old,
-    const double *const RSTR u1_old,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    double *const RSTR values
+    void *const RSTR values
 ) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
-}
-
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_bsr_i_msoa_float(
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const float eta_b,
-    const float eta_s,
-    const float newmark_velocity_alpha,
-    const ptrdiff_t current_stride,
-    const float *const RSTR u0,
-    const float *const RSTR u1,
-    const ptrdiff_t previous_stride,
-    const float *const RSTR u0_old,
-    const float *const RSTR u1_old,
-    const count_t *const RSTR rowptr,
-    const idx_t *const RSTR colidx,
-    float *const RSTR values
-) {
-  return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+      return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, rowptr, colidx, (double *)values);
+    }
+    case (int)sizeof(float): {
+      return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, rowptr, colidx, (float *)values);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
 }

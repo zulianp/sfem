@@ -305,15 +305,10 @@ PRECISION_SUFFIXES = {
 }
 
 
-def precision_axis():
-    """``(scalar_type, name_suffix)`` for each emitted precision, in order.
-
-    Every matrix-free apply kernel is emitted once per entry.  The emitters
-    used to carry this as a literal tuple, repeated seventeen times in the
-    residual emitter alone, so adding or removing a precision meant editing
-    seventeen places and hoping none was missed.
-    """
-    return tuple(
-        (PRECISION_SCALAR_TYPES[precision], PRECISION_SUFFIXES[precision])
-        for precision in PRECISIONS
-    )
+#: ``precision_axis()`` stood here and returned ``(scalar_type, name_suffix)``
+#: for each precision, so an emitter could publish a symbol per precision.  Its
+#: last consumer was the residual matrix-assembly ABI; every entry point in the
+#: tree now carries the scalar's width instead, so nothing asks for a name
+#: suffix any more.  ``PRECISIONS`` stays: ``ApplyVariantPlan`` is still built
+#: per precision, and whether *that* doubling has outlived the symbol doubling
+#: is its own question.
