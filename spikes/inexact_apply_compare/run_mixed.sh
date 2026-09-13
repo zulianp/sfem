@@ -30,6 +30,16 @@ if [ -z "$PYTHON" ]; then
     done
 fi
 : "${PYTHON:?set SFEM_PYTHON: no venv found beside the checkout}"
+. "$HERE/kernel_element.sh"
+# HEX8 and QUAD4 forward to their lexicographic twin, so the templated bodies
+# this benchmark instantiates are the twin's while the C ABI symbols it calls
+# stay this element's.  KLOWER names the first, LOWER the second.
+KERNEL_ELEMENT="$(kernel_element "$ELEMENT")"
+KLOWER="$(echo "$KERNEL_ELEMENT" | tr '[:upper:]' '[:lower:]')"
+# The permutation that goes with it.  These benchmarks call the `..._impl`
+# templates directly, so they bypass the generated forwarder and have to reorder
+# the connectivity themselves; `element_mesh.inc` does it from this.
+SHAPE_ORDER="$(kernel_shape_order "$ELEMENT")"
 BUILD="${SFEM_BUILD:-$SFEM/build}"
 WORK="${SFEM_SPIKE_WORK:-${TMPDIR:-/tmp}}/inexact_apply_split"
 LOG="$WORK/mixed_${LOWER}.log"
@@ -41,7 +51,8 @@ mkdir -p "$WORK"
 echo "START $(date +%T)  mixed element=$ELEMENT repeats=$REPEATS" | tee "$LOG"
 
 GEN="$WORK/gen/$MATERIAL/d3/$LOWER"
-if [ ! -f "$GEN/${ELASTIC}_${LOWER}_inexact_apply_inline.hpp" ]; then
+KGEN="$WORK/gen/$MATERIAL/d3/$KLOWER"
+if [ ! -f "$KGEN/${ELASTIC}_${KLOWER}_inexact_apply_inline.hpp" ]; then
     echo "[1/3] generating kernels" | tee -a "$LOG"
     ( cd "$WORKTREE" && PYTHONPATH=python \
         "$PYTHON" - "$WORK/gen" "$MATERIAL" "$ELEMENT" <<'PY'
@@ -86,19 +97,20 @@ fi
 echo "[2/3] compiling with $CXX" | tee -a "$LOG"
 $CXX -std=c++17 -O3 -march=native -DNDEBUG \
     -DELEMENT_${ELEMENT} \
-    -DELASTIC_INEXACT_HEADER="\"${ELASTIC}_${LOWER}_inexact_apply_inline.hpp\"" \
-    -DVISCOUS_INEXACT_HEADER="\"${VISCOUS}_${LOWER}_inexact_apply_inline.hpp\"" \
+    ${SHAPE_ORDER:+-DKERNEL_SHAPE_ORDER=$SHAPE_ORDER} \
+    -DELASTIC_INEXACT_HEADER="\"${ELASTIC}_${KLOWER}_inexact_apply_inline.hpp\"" \
+    -DVISCOUS_INEXACT_HEADER="\"${VISCOUS}_${KLOWER}_inexact_apply_inline.hpp\"" \
     -DEXACT_ELASTIC_APPLY=${ELASTIC}_${LOWER}_apply_a_msoa \
     -DEXACT_VISCOUS_ACTION=${VISCOUS}_${LOWER}_jacobian_action_a_msoa \
-    -DELASTIC_TANGENT=sfem::codegen::${ELASTIC}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
-    -DELASTIC_STORED=sfem::codegen::${ELASTIC}_${LOWER}_inexact_apply_stored_a_msoa_impl \
-    -DELASTIC_COMPRESS=sfem::codegen::${ELASTIC}_${LOWER}_inexact_apply_compressed_a_msoa_impl \
-    -DVISCOUS_TANGENT=sfem::codegen::${VISCOUS}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
-    -DVISCOUS_STORED=sfem::codegen::${VISCOUS}_${LOWER}_inexact_apply_stored_a_msoa_impl \
-    -DVISCOUS_COMPRESS=sfem::codegen::${VISCOUS}_${LOWER}_inexact_apply_compressed_a_msoa_impl \
+    -DELASTIC_TANGENT=sfem::codegen::${ELASTIC}_${KLOWER}_inexact_apply_tangent_a_msoa_impl \
+    -DELASTIC_STORED=sfem::codegen::${ELASTIC}_${KLOWER}_inexact_apply_stored_a_msoa_impl \
+    -DELASTIC_COMPRESS=sfem::codegen::${ELASTIC}_${KLOWER}_inexact_apply_compressed_a_msoa_impl \
+    -DVISCOUS_TANGENT=sfem::codegen::${VISCOUS}_${KLOWER}_inexact_apply_tangent_a_msoa_impl \
+    -DVISCOUS_STORED=sfem::codegen::${VISCOUS}_${KLOWER}_inexact_apply_stored_a_msoa_impl \
+    -DVISCOUS_COMPRESS=sfem::codegen::${VISCOUS}_${KLOWER}_inexact_apply_compressed_a_msoa_impl \
     -DPACKED_STORED_APPLY \
-    -DELASTIC_PACKED_STORED=sfem::codegen::${ELASTIC}_${LOWER}_inexact_apply_stored_packed_two_pass_a_msoa_impl \
-    -DVISCOUS_PACKED_STORED=sfem::codegen::${VISCOUS}_${LOWER}_inexact_apply_stored_packed_two_pass_a_msoa_impl \
+    -DELASTIC_PACKED_STORED=sfem::codegen::${ELASTIC}_${KLOWER}_inexact_apply_stored_packed_two_pass_a_msoa_impl \
+    -DVISCOUS_PACKED_STORED=sfem::codegen::${VISCOUS}_${KLOWER}_inexact_apply_stored_packed_two_pass_a_msoa_impl \
     -o "$WORK/bench_mixed_${LOWER}" \
     "$HERE/bench_mixed.cpp" $UNIT_TU $EXTRA_TU \
     -I "$GEN" -I "$WORK/gen/$MATERIAL" -I "$WORK/gen/$MATERIAL/d3" \

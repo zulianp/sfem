@@ -77,9 +77,55 @@ endif()
 # ------------------------------------------------------------------- generation
 
 set(SPIKE_GEN_DIR "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}/d3/${SPIKE_ELEMENT_LOWER}")
+
+# --------------------------------------------------- which element owns a kernel
+#
+# A mesh-ordered tensor-product element publishes no kernel body of its own: it
+# forwards to its lexicographic twin, HEX8 to PROTEUS_HEX8.  So two names are in
+# play -- `SPIKE_ELEMENT` for the mesh and the `extern "C"` symbols, and
+# `SPIKE_KERNEL_ELEMENT` for the header holding the `..._impl` templates these
+# benchmarks instantiate directly.  `SPIKE_SHAPE_ORDER` is the permutation that
+# goes with it, which the harness applies because instantiating the template
+# bypasses the forwarder that would otherwise have applied it.
+#
+# Asked of `plans/layout.cartesian_twin` rather than tabulated here, for the same
+# reason `kernel_element.sh` asks: a copy of the pairing would be silent when it
+# drifted -- the benchmark would still build, against whichever kernel it found.
+execute_process(
+    COMMAND "${SPIKE_PYTHON}" -c
+"import sys
+sys.path.insert(0, r'${SPIKE_WORKTREE}/python')
+from codegen.framework.plans.layout import cartesian_twin
+twin = cartesian_twin('${SPIKE_ELEMENT}')
+print((twin.twin_name if twin is not None else '${SPIKE_ELEMENT}').upper())
+print('' if twin is None else ','.join(str(n) for n in twin.shape_order))"
+    OUTPUT_VARIABLE _spike_twin
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE _spike_twin_status)
+if(NOT _spike_twin_status EQUAL 0)
+    message(FATAL_ERROR
+        "could not ask plans/layout which element owns ${SPIKE_ELEMENT}'s kernel; "
+        "is SPIKE_PYTHON the venv the kernels are generated with?")
+endif()
+string(REPLACE "\n" ";" _spike_twin "${_spike_twin}")
+list(GET _spike_twin 0 SPIKE_KERNEL_ELEMENT)
+list(LENGTH _spike_twin _spike_twin_len)
+if(_spike_twin_len GREATER 1)
+    list(GET _spike_twin 1 SPIKE_SHAPE_ORDER)
+else()
+    set(SPIKE_SHAPE_ORDER "")
+endif()
+string(TOLOWER "${SPIKE_KERNEL_ELEMENT}" SPIKE_KERNEL_ELEMENT_LOWER)
+set(SPIKE_KERNEL_DIR "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}/d3/${SPIKE_KERNEL_ELEMENT_LOWER}")
+if(NOT SPIKE_KERNEL_ELEMENT STREQUAL SPIKE_ELEMENT)
+    message(STATUS
+        "${SPIKE_ELEMENT} forwards its micro-kernel to ${SPIKE_KERNEL_ELEMENT} "
+        "(node order ${SPIKE_SHAPE_ORDER})")
+endif()
+
 # A material with several units names its kernels after the unit, so the file
 # that proves generation ran is not always the material's own.
-file(GLOB _spike_inline_headers "${SPIKE_GEN_DIR}/*_inexact_apply_inline.hpp")
+file(GLOB _spike_inline_headers "${SPIKE_KERNEL_DIR}/*_inexact_apply_inline.hpp")
 if(NOT _spike_inline_headers)
     message(STATUS "Generating ${SPIKE_MATERIAL} ${SPIKE_ELEMENT} kernels (this is slow)")
     execute_process(
@@ -97,10 +143,10 @@ gen.generate(dataclasses.replace(material, inexact_apply=True),
     if(NOT _spike_gen_status EQUAL 0)
         message(FATAL_ERROR "kernel generation failed (${_spike_gen_status})")
     endif()
-    file(GLOB _spike_inline_headers "${SPIKE_GEN_DIR}/*_inexact_apply_inline.hpp")
+    file(GLOB _spike_inline_headers "${SPIKE_KERNEL_DIR}/*_inexact_apply_inline.hpp")
 endif()
 if(NOT _spike_inline_headers)
-    message(FATAL_ERROR "no inexact-apply headers in ${SPIKE_GEN_DIR}")
+    message(FATAL_ERROR "no inexact-apply headers in ${SPIKE_KERNEL_DIR}")
 endif()
 
 # The operator sources, minus the inexact ones: those are headers' worth of
@@ -148,6 +194,13 @@ target_compile_definitions(spike_common INTERFACE
     NDEBUG
     ELEMENT_${SPIKE_ELEMENT}
     PACK_SIZE=${SPIKE_PACK_SIZE})
+# Not a generator expression: the order is a comma-separated list and `$<BOOL:>`
+# takes exactly one parameter.
+if(SPIKE_SHAPE_ORDER)
+    target_compile_definitions(spike_common INTERFACE
+        KERNEL_SHAPE_ORDER=${SPIKE_SHAPE_ORDER})
+endif()
+target_include_directories(spike_common INTERFACE "${SPIKE_KERNEL_DIR}")
 target_compile_options(spike_common INTERFACE
     $<$<COMPILE_LANGUAGE:CXX>:${SPIKE_ARCH_FLAGS}>)
 target_link_libraries(spike_common INTERFACE MPI::MPI_CXX)
@@ -172,7 +225,8 @@ target_link_libraries(spike_kernels PRIVATE MPI::MPI_CXX)
 # by hand five times.
 
 function(spike_kernel_macros out_var unit prefix)
-    set(_stem "${unit}_${SPIKE_ELEMENT_LOWER}")
+    # The templated bodies belong to whichever element owns the micro-kernel.
+    set(_stem "${unit}_${SPIKE_KERNEL_ELEMENT_LOWER}")
     set(_macros
         ${prefix}_INEXACT_HEADER=\"${_stem}_inexact_apply_inline.hpp\"
         ${prefix}_TANGENT=sfem::codegen::${_stem}_inexact_apply_tangent_a_msoa_impl
@@ -184,7 +238,7 @@ endfunction()
 
 # The two-unit material: an energy unit whose exact entry point is `apply` and a
 # residual unit whose exact entry point is `jacobian_action`.
-if(EXISTS "${SPIKE_GEN_DIR}/${SPIKE_MATERIAL}_elastic_${SPIKE_ELEMENT_LOWER}_inexact_apply_inline.hpp")
+if(EXISTS "${SPIKE_KERNEL_DIR}/${SPIKE_MATERIAL}_elastic_${SPIKE_KERNEL_ELEMENT_LOWER}_inexact_apply_inline.hpp")
     set(_elastic "${SPIKE_MATERIAL}_elastic")
     set(_viscous "${SPIKE_MATERIAL}_viscous")
     spike_kernel_macros(_elastic_macros "${_elastic}" ELASTIC)
@@ -209,17 +263,21 @@ if(EXISTS "${SPIKE_GEN_DIR}/${SPIKE_MATERIAL}_elastic_${SPIKE_ELEMENT_LOWER}_ine
 endif()
 
 # The single-unit materials.
-if(EXISTS "${SPIKE_GEN_DIR}/${SPIKE_MATERIAL}_${SPIKE_ELEMENT_LOWER}_inexact_apply_inline.hpp")
+if(EXISTS "${SPIKE_KERNEL_DIR}/${SPIKE_MATERIAL}_${SPIKE_KERNEL_ELEMENT_LOWER}_inexact_apply_inline.hpp")
+    # `_stem` names the C ABI symbols, which stay this element's; `_kstem` names
+    # the templates, which are the owning element's.  They differ only when this
+    # element forwards.
     set(_stem "${SPIKE_MATERIAL}_${SPIKE_ELEMENT_LOWER}")
+    set(_kstem "${SPIKE_MATERIAL}_${SPIKE_KERNEL_ELEMENT_LOWER}")
     set(_single_macros
         MATERIAL_LABEL=\"${SPIKE_MATERIAL}\"
-        MATERIAL_INEXACT_HEADER=\"${_stem}_inexact_apply_inline.hpp\"
+        MATERIAL_INEXACT_HEADER=\"${_kstem}_inexact_apply_inline.hpp\"
         EXACT_APPLY=${_stem}_apply_a_msoa
-        TANGENT_KERNEL=${_stem}_inexact_apply_tangent_a_msoa_impl
-        STORED_APPLY=${_stem}_inexact_apply_stored_a_msoa_impl
-        COMPRESSED_APPLY=${_stem}_inexact_apply_compressed_a_msoa_impl
+        TANGENT_KERNEL=${_kstem}_inexact_apply_tangent_a_msoa_impl
+        STORED_APPLY=${_kstem}_inexact_apply_stored_a_msoa_impl
+        COMPRESSED_APPLY=${_kstem}_inexact_apply_compressed_a_msoa_impl
         PACKED_EXACT_APPLY=${_stem}_apply_packed_two_pass_a_msoa
-        PACKED_STORED_APPLY=${_stem}_inexact_apply_stored_packed_two_pass_a_msoa_impl)
+        PACKED_STORED_APPLY=${_kstem}_inexact_apply_stored_packed_two_pass_a_msoa_impl)
     # Whether the exact apply takes the current state is a property of the
     # material, not of the harness: a hyperelastic tangent needs it and a linear
     # one does not.  Omitting it does not fail to compile -- the harness simply
@@ -247,7 +305,7 @@ if(EXISTS "${SPIKE_GEN_DIR}/${SPIKE_MATERIAL}_${SPIKE_ELEMENT_LOWER}_inexact_app
     # compiled beside `sfem_API.hpp` rather than inside the generated namespace.
     set(SPIKE_SINGLE_UNIT_MACROS
         MATERIAL_LABEL=\"${SPIKE_MATERIAL}\"
-        MATERIAL_INEXACT_HEADER=\"${_stem}_inexact_apply_inline.hpp\"
+        MATERIAL_INEXACT_HEADER=\"${_kstem}_inexact_apply_inline.hpp\"
         TANGENT_KERNEL=sfem::codegen::${_stem}_inexact_apply_tangent_a_msoa_impl
         STORED_APPLY=sfem::codegen::${_stem}_inexact_apply_stored_a_msoa_impl
         COMPRESSED_APPLY=sfem::codegen::${_stem}_inexact_apply_compressed_a_msoa_impl)

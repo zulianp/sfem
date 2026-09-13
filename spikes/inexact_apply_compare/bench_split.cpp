@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
 
         auto assemble = [&] {
             sfem::codegen::TANGENT_KERNEL<double, geom_t, double, LANE_VS>(
-                m.nelements, m.evp.data(),
+                m.nelements, m.kevp.data(),
                 m.adj[0].data(),m.adj[1].data(),m.adj[2].data(),m.adj[3].data(),m.adj[4].data(),
                 m.adj[5].data(),m.adj[6].data(),m.adj[7].data(),m.adj[8].data(), m.det.data(),
                 lmbda, mu, 1, ux.data(), uy.data(), uz.data(),
@@ -264,13 +264,13 @@ int main(int argc, char **argv) {
             zero(cx,cy,cz);
             sfem::codegen::STORED_APPLY<double, typename std::remove_const<
                 typename std::remove_pointer<decltype(store)>::type>::type, LANE_VS>(
-                m.nelements, m.evp.data(), cstride, store,
+                m.nelements, m.kevp.data(), cstride, store,
                 1, hx.data(), hy.data(), hz.data(), 1, cx.data(), cy.data(), cz.data());
         };
         auto run_compressed = [&] {
             zero(cx,cy,cz);
             sfem::codegen::COMPRESSED_APPLY<double, half_t, float>(
-                m.nelements, m.evp.data(), cstride, S16.data(), scale.data(),
+                m.nelements, m.kevp.data(), cstride, S16.data(), scale.data(),
                 1, hx.data(), hy.data(), hz.data(), 1, cx.data(), cy.data(), cz.data());
         };
 #ifdef PACKED_REFERENCE_APPLY
@@ -279,7 +279,7 @@ int main(int argc, char **argv) {
             sfem::codegen::PACKED_REFERENCE_APPLY<double, typename std::remove_const<
                 typename std::remove_pointer<decltype(store)>::type>::type, LANE_VS>(
                 pk.layout.n_packs, pk.layout.n_elements_per_pack, m.nelements,
-                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.max_nodes_per_pack, pk.kernel_element_ptrs.data(),
                 pk.layout.owned_nodes_ptr.data(),
                 pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
                 pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
@@ -299,7 +299,7 @@ int main(int argc, char **argv) {
             sfem::codegen::PACKED_STORED_APPLY<double, typename std::remove_const<
                 typename std::remove_pointer<decltype(store)>::type>::type, LANE_VS>(
                 pk.layout.n_packs, pk.layout.n_elements_per_pack, m.nelements,
-                pk.layout.max_nodes_per_pack, pk.layout.element_ptrs.data(),
+                pk.layout.max_nodes_per_pack, pk.kernel_element_ptrs.data(),
                 pk.layout.owned_nodes_ptr.data(),
                 pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
                 pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
@@ -453,6 +453,26 @@ int main(int argc, char **argv) {
             // The gate: on an affine simplex the projection loses nothing, so
             // the f64 store must reproduce the exact apply to round-off.
             std::printf("\n  stored-f64 vs exact rel diff %.2e\n", d_64);
+            // A loose sanity bound, not an accuracy claim.  The projection is a
+            // genuine approximation on HEX8 and TET10 and is exact on an affine
+            // simplex, so the honest numbers here span 1e-15 to about 1e-3 --
+            // and the one failure this catches is nowhere near that range.
+            //
+            // Handing a lexicographic micro-kernel the mesh's own node order
+            // gives 3.6e-01: a plausible-looking number for an approximation,
+            // three orders of magnitude from the truth, and silent.  It happened
+            // when HEX8 stopped publishing a kernel of its own and started
+            // forwarding to PROTEUS_HEX8, and nothing in this harness objected.
+            // See `finalise_element_pointers` in `element_mesh.inc`.
+            if (d_64 > 1e-2) {
+                std::fprintf(stderr,
+                    "\nFAIL: the projected apply deviates from the exact one by "
+                    "%.2e, far beyond\n      what the projection itself can "
+                    "explain.  The usual cause is a node-order\n      mismatch: "
+                    "check KERNEL_SHAPE_ORDER against the element whose kernel\n"
+                    "      this was built against.\n", d_64);
+                return 1;
+            }
             // One tangent serves k applies.  The split wins when
             //   1/a + k/s  <  k/e   =>   k > (1/a) / (1/e - 1/s)
             auto breakeven = [&](double s) {

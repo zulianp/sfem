@@ -10,8 +10,19 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKTREE="$(cd "$HERE/../.." && pwd)"
 SFEM="${SFEM_MAIN_CHECKOUT:-$WORKTREE/../sfem}"
 BUILD="${SFEM_BUILD:-$SFEM/build}"
+. "$HERE/kernel_element.sh"
+# HEX8 and QUAD4 forward to their lexicographic twin, so the templated bodies
+# this benchmark instantiates are the twin's while the C ABI symbols it calls
+# stay this element's.  KLOWER names the first, LOWER the second.
+KERNEL_ELEMENT="$(kernel_element "$ELEMENT")"
+KLOWER="$(echo "$KERNEL_ELEMENT" | tr '[:upper:]' '[:lower:]')"
+# The permutation that goes with it.  These benchmarks call the `..._impl`
+# templates directly, so they bypass the generated forwarder and have to reorder
+# the connectivity themselves; `element_mesh.inc` does it from this.
+SHAPE_ORDER="$(kernel_shape_order "$ELEMENT")"
 WORK="${SFEM_SPIKE_WORK:-${TMPDIR:-/tmp}}/inexact_apply_split"
 GEN="$WORK/gen/$MATERIAL/d3/$LOWER"
+KGEN="$WORK/gen/$MATERIAL/d3/$KLOWER"
 LOG="$WORK/warp_${MATERIAL}_${LOWER}.log"
 mkdir -p "$WORK"
 TAKES_STATE="-DEXACT_TAKES_STATE"
@@ -23,11 +34,12 @@ if [ "$ELEMENT" = "HEX8" ]; then
 fi
 echo "START $(date +%T) warp sweep $MATERIAL $ELEMENT n=$N" | tee "$LOG"
 $CXX -std=c++17 -O2 -DNDEBUG $TAKES_STATE -DELEMENT_${ELEMENT} ${WARP_EXTRA_FLAGS:-} \
+    ${SHAPE_ORDER:+-DKERNEL_SHAPE_ORDER=$SHAPE_ORDER} \
     -DMATERIAL_LABEL="\"$MATERIAL\"" \
-    -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${LOWER}_inexact_apply_inline.hpp\"" \
+    -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${KLOWER}_inexact_apply_inline.hpp\"" \
     -DEXACT_APPLY=${MATERIAL}_${LOWER}_apply_a_msoa \
-    -DTANGENT_KERNEL=${MATERIAL}_${LOWER}_inexact_apply_tangent_a_msoa_impl \
-    -DSTORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_a_msoa_impl \
+    -DTANGENT_KERNEL=${MATERIAL}_${KLOWER}_inexact_apply_tangent_a_msoa_impl \
+    -DSTORED_APPLY=${MATERIAL}_${KLOWER}_inexact_apply_stored_a_msoa_impl \
     -o "$WORK/warp_${MATERIAL}_${LOWER}" "$HERE/warp_sweep.cpp" \
     "$GEN/${MATERIAL}_${LOWER}_operator.cpp" $EXTRA \
     -I "$HERE" -I "$GEN" -I "$WORK/gen/$MATERIAL" -I "$WORK/gen/$MATERIAL/d3" \

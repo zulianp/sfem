@@ -60,10 +60,46 @@ struct Mesh {
     ptrdiff_t nelements = 0, nnodes = 0;
     std::vector<std::vector<idx_t>> ev;
     std::vector<idx_t *> evp;
+    // The same pointers in the order the templated micro-kernel is written
+    // against, which is not always the mesh's own.  See
+    // `finalise_element_pointers`.
+    std::vector<idx_t *> kevp;
     std::vector<std::vector<geom_t>> adj;
     std::vector<geom_t> det;
     std::vector<double> px, py, pz;  // node positions, for seeding the fields
 };
+
+// The element pointers, in the two orders a benchmark needs.
+//
+// `evp` is the mesh's own, and is what the `extern "C"` symbols take.  `kevp`
+// is the order the templated `..._impl` bodies are written against, and for a
+// mesh-ordered tensor-product element the two differ: HEX8 publishes no kernel
+// of its own and forwards to PROTEUS_HEX8, whose basis is lexicographic.  The
+// generated forwarder does exactly this permutation on the way in; a benchmark
+// that instantiates the template directly bypasses that forwarder and has to
+// do it itself.
+//
+// Getting this wrong is silent.  It compiles, it runs, and it reports a
+// projected apply whose relative deviation from the exact one is 3.6e-01
+// instead of 2.3e-04 -- a plausible-looking number for an approximation, three
+// orders of magnitude from the truth, and not visibly wrong without the
+// recorded value to hand.
+//
+// `KERNEL_SHAPE_ORDER` comes from `plans/layout.cartesian_twin` by way of
+// `kernel_element.sh`.  Absent, the element owns its kernel and the two orders
+// are the same.
+static void finalise_element_pointers(Mesh &m) {
+    m.evp.clear();
+    for (auto &row : m.ev) m.evp.push_back(row.data());
+    m.kevp = m.evp;
+#ifdef KERNEL_SHAPE_ORDER
+    static const int kernel_shape_order[] = {KERNEL_SHAPE_ORDER};
+    static_assert(sizeof(kernel_shape_order) / sizeof(kernel_shape_order[0]) == NXE,
+                  "KERNEL_SHAPE_ORDER must name every node of the element");
+    for (int node = 0; node < NXE; ++node)
+        m.kevp[node] = m.evp[kernel_shape_order[node]];
+#endif
+}
 
 // SFEM's algorithm, from `smesh::SFC::reorder`: sort the elements by the curve
 // through their barycentres, then renumber the nodes in the order the reordered
@@ -134,8 +170,7 @@ static void reorder_mesh(Mesh &m, const char *ordering) {
     }
     m.px.swap(px); m.py.swap(py); m.pz.swap(pz);
 
-    m.evp.clear();
-    for (auto &row : m.ev) m.evp.push_back(row.data());
+    finalise_element_pointers(m);
 }
 
 #if defined(ELEMENT_HEX8)
@@ -161,7 +196,7 @@ static Mesh build_unordered(int n) {
         const ptrdiff_t v = nid(i,j,k);
         m.px[v] = i*h; m.py[v] = j*h; m.pz[v] = k*h;
     }
-    for (auto &r : m.ev) m.evp.push_back(r.data());
+    finalise_element_pointers(m);
     return m;
 }
 #else
@@ -235,7 +270,7 @@ static Mesh build_unordered(int n) {
 #else
     m.nnodes = nvert;
 #endif
-    for (auto &r : m.ev) m.evp.push_back(r.data());
+    finalise_element_pointers(m);
     return m;
 }
 #endif

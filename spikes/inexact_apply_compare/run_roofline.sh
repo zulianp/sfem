@@ -28,6 +28,12 @@ if [ -z "$PYTHON" ]; then
     done
 fi
 : "${PYTHON:?set SFEM_PYTHON: no venv found beside the checkout}"
+. "$HERE/kernel_element.sh"
+# HEX8 and QUAD4 forward to their lexicographic twin, so the templated bodies
+# this benchmark instantiates are the twin's while the C ABI symbols it calls
+# stay this element's.  KLOWER names the first, LOWER the second.
+KERNEL_ELEMENT="$(kernel_element "$ELEMENT")"
+KLOWER="$(echo "$KERNEL_ELEMENT" | tr '[:upper:]' '[:lower:]')"
 BUILD="${SFEM_BUILD:-$SFEM/build}"
 WORK="${SFEM_SPIKE_WORK:-${TMPDIR:-/tmp}}/inexact_apply_split"
 OUT="${SFEM_ROOFLINE_OUT:-$WORK}"
@@ -40,8 +46,8 @@ MEASURED="$HERE/measured_${MACHINE}.json"
 mkdir -p "$WORK" "$OUT"
 echo "START $(date +%T)  material=$MATERIAL element=$ELEMENT machine=$MACHINE" | tee "$LOG"
 
-GEN="$WORK/gen/$MATERIAL/d3/$LOWER"
-if [ ! -f "$GEN/${MATERIAL}_${LOWER}_inexact_apply_inline.hpp" ]; then
+GEN="$WORK/gen/$MATERIAL/d3/$KLOWER"
+if [ ! -f "$GEN/${MATERIAL}_${KLOWER}_inexact_apply_inline.hpp" ]; then
     echo "[1/2] generating kernels (slow for HEX8)" | tee -a "$LOG"
     ( cd "$WORKTREE" && PYTHONPATH=python:python/codegen/framework/materials \
         "$PYTHON" - "$WORK/gen" "$MATERIAL" "$ELEMENT" <<'PY'
@@ -82,7 +88,7 @@ done
 
 cd "$WORKTREE/python"
 PYTHONPATH=. "$PYTHON" -m codegen.framework.tools.roofline "$WORK/gen" \
-    --kernel "${MATERIAL}_${LOWER}_inexact_apply" \
+    --kernel "${MATERIAL}_${KLOWER}_inexact_apply" \
     --machine "$MACHINE" \
     ${THREADS:+--threads "$THREADS"} \
     --nodes-per-element "$NPE" \
