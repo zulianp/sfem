@@ -33,11 +33,30 @@ any difference there is a defect rather than an approximation.
 import sympy as sp
 
 from codegen.framework.emitters.cprinter import _sfem_ccode
+from codegen.framework.emitters.kernel_prologue import kernel_constant
+from codegen.framework.emitters.quadrature_codegen import cpp_scalar_initializer_list
+from codegen.framework.emitters.ast_printer import (
+    CLikeKernelASTPrinter,
+    render_kernel_ast_lines,
+)
+from codegen.framework.ir.kernel_ast import (
+    FunctionDefNode,
+    LoopKind,
+    LoopNode,
+    RawLinesNode,
+    add_assign_increment,
+    expr_ref,
+    iteration_range,
+    iterator,
+    pre_increment,
+)
 from codegen.framework.plans.inexact_apply import (
     action_stages,
     emittable_inexact_apply_plan,
     flux_form_for_collection,
     projected_tangent,
+    quadrature_accumulation,
+    reference_gradients_by_point,
 )
 from codegen.framework.targets import current_target
 
@@ -133,7 +152,7 @@ def _inexact_apply_kernel_source(
         for c in range(dim)
     ]
 
-    packed = projected_tangent(
+    integrand, gradient_symbols = projected_tangent(
         plan,
         flux_form,
         rule,
@@ -143,12 +162,14 @@ def _inexact_apply_kernel_source(
         is_deformation_gradient,
         previous_state,
     )
+    quadrature_weights = quadrature_accumulation(rule)
+    reference = reference_gradients_by_point(rule, n_nodes, dim)
     # Which state values the tangent actually reads.  A state-independent
     # material -- linear elasticity, whose tangent is constant -- reads none,
     # and then the kernel must not gather a state it will not use.  The plan
     # answers this; emission spells the answer.
-    used_state = plan.state_dependence(packed, state)
-    used_previous = plan.state_dependence(packed, previous_state)
+    used_state = plan.state_dependence(integrand, state)
+    used_previous = plan.state_dependence(integrand, previous_state)
 
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
@@ -172,7 +193,8 @@ def _inexact_apply_kernel_source(
     lines.extend(
         _tangent_lines(
             prefix, dim, n_nodes, component, parameters, used_state,
-            used_previous, packed, plan,
+            used_previous, integrand, gradient_symbols, quadrature_weights,
+            reference, plan,
         )
     )
     # One per layout the plan names, in the order it names them.  Iterated, not
@@ -354,21 +376,139 @@ def _gathered_names(role, component, n_nodes, wanted):
     ]
 
 
+def _quadrature_table_lines(name, values, indent="    "):
+    """One rule constant per point, as a folded table the loop indexes.
+
+    Literals rather than a runtime argument: these are properties of the element
+    and the rule, settled before the kernel exists.  Evaluated here rather than
+    printed symbolically, because a Gauss rule's gradients carry `sqrt(3)` and
+    `sqrt` is not constexpr -- printing the expression would not compile, and
+    printing it into a non-constexpr table would put a square root in the
+    kernel's prologue for a number the generator already knows.  The same
+    seventeen digits the generated reference tables use.
+    """
+    return [
+        "%sstatic constexpr s_t %s[%d] = {%s};"
+        % (
+            indent,
+            name,
+            len(values),
+            cpp_scalar_initializer_list(
+                [float(sp.sympify(value).evalf(20)) for value in values]
+            ),
+        )
+    ]
+
+
+def _quadrature_loop_compute(
+    integrand, integrand_symbols, gradient_symbols, reference, weights,
+    n_nodes, dim, plan,
+):
+    """The sum over several points: accumulators, then the loop."""
+    lines = [
+        "      s_t tangent%d = s_t(0);" % slot
+        for slot in range(plan.tangent_components)
+    ]
+    lines.append("      for (int q = 0; q < NQ; ++q) {")
+    lines.extend(
+        "        const s_t %s = QGRAD[q * %d + %d];"
+        % (gradient_symbols[node][axis], n_nodes * dim, node * dim + axis)
+        for node in range(n_nodes)
+        for axis in range(dim)
+    )
+    lines.append("        const s_t qw = QWEIGHT[q];")
+    lines.extend(
+        "    %s" % line
+        for line in _assignment_lines(
+            list(zip(integrand_symbols, integrand)), "integrand", indent="        "
+        )
+    )
+    lines.extend(
+        "        tangent%d += qw * integrand%d;" % (slot, slot)
+        for slot in range(plan.tangent_components)
+    )
+    lines.append("      }")
+    return lines
+
+
+def _single_point_compute(
+    integrand, integrand_symbols, gradient_symbols, reference, weights,
+    n_nodes, dim, plan,
+):
+    """The sum over one point: the term itself, with the gradients folded in."""
+    substitution = {
+        gradient_symbols[node][axis]: reference[0][node][axis]
+        for node in range(n_nodes)
+        for axis in range(dim)
+    }
+    weight = weights[0]
+    folded = [weight * expression.xreplace(substitution) for expression in integrand]
+    tangent_symbols = [
+        sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
+    ]
+    return [
+        "  %s" % line
+        for line in _assignment_lines(list(zip(tangent_symbols, folded)), "tangent")
+    ]
+
+
+def _quadrature_tables(reference, weights, n_nodes, dim):
+    values = [
+        reference[point][node][axis]
+        for point in range(len(weights))
+        for node in range(n_nodes)
+        for axis in range(dim)
+    ]
+    return (
+        [kernel_constant("NQ", len(weights), indent="    ")]
+        + _quadrature_table_lines("QGRAD", values)
+        + _quadrature_table_lines("QWEIGHT", weights)
+    )
+
+
+def _no_quadrature_tables(reference, weights, n_nodes, dim):
+    """A one-point rule indexes no table, so it declares none."""
+    return []
+
+
+#: Keyed on whether the rule has a single point, so emission looks the answer up
+#: rather than branching on the rule.
+_QUADRATURE_BY_POINT_COUNT = {
+    False: _quadrature_loop_compute,
+    True: _single_point_compute,
+}
+
+_QUADRATURE_TABLES_BY_POINT_COUNT = {
+    False: _quadrature_tables,
+    True: _no_quadrature_tables,
+}
+
+
 def _tangent_lines(
     prefix, dim, n_nodes, component, parameters, used_state, used_previous,
-    packed, plan,
+    integrand, gradient_symbols, weights, reference, plan,
 ):
-    """The partial assembly: `Sbar` computed once and stored.
+    """The partial assembly: `Sbar` accumulated over the quadrature points.
 
     Blocked over `VS` elements like the applies: the state reaches this kernel
     through the connectivity and so arrives indirect, and staging it lane-major
     first is what lets the arithmetic that follows vectorise.
+
+    The quadrature sum is a loop here, as it is in every other kernel in this
+    framework.  It used to be carried out symbolically in the plan, which
+    inlined the whole tangent once per point -- eight copies for a HEX8 rule --
+    and produced a single basic block of 3855 statements that cost gcc 234.8 s
+    and 4.45 GB on one kernel.  The arithmetic is the same; what changed is that
+    the repetition is a loop again.
 
     Takes the previous state only when the material reads one, so a
     rate-independent material keeps the shorter signature.
     """
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
+    ]
+    integrand_symbols = [
+        sp.Symbol("integrand%d" % slot) for slot in range(plan.tangent_components)
     ]
     gathered = _gathered_names("u", component, n_nodes, used_state)
     gathered.extend(_gathered_names("z", component, n_nodes, used_previous))
@@ -383,19 +523,25 @@ def _tangent_lines(
     gathers.extend(_blocked_geometry_bases(dim))
     gathers.extend(_blocked_tangent_bases(plan.tangent_components))
 
-    compute = [
-        "      const s_t %s = b%s[lane];" % (value, value)
-        for value, _s, _n, _r in gathered
-    ]
-    compute.extend(_blocked_geometry_lines(dim))
-    compute.extend(
-        "  %s" % line
-        for line in _assignment_lines(list(zip(tangent_symbols, packed)), "tangent")
+    # A one-point rule is a sum with one term.  Opening a loop for it, and
+    # reading the gradients out of a table the loop indexes, would be arithmetic
+    # the generator already knows the answer to -- and the affine simplices,
+    # where the projection is exact, are all one-point rules.  They get the
+    # point's gradients folded in as the literals they are.
+    compute = _QUADRATURE_BY_POINT_COUNT[len(weights) == 1](
+        integrand, integrand_symbols, gradient_symbols, reference, weights,
+        n_nodes, dim, plan,
     )
     compute.extend(
         "      %s = tangent_t(tangent%d);" % (_BLOCKED_TANGENT_LANE % slot, slot)
         for slot in range(plan.tangent_components)
     )
+    # The per-lane state and geometry are read once, before the quadrature loop:
+    # they do not depend on the point.
+    compute = [
+        "      const s_t %s = b%s[lane];" % (value, value)
+        for value, _s, _n, _r in gathered
+    ] + _blocked_geometry_lines(dim) + compute
 
     signature = ["    const ptrdiff_t nelements,"]
     signature.extend(_CONNECTIVITY_ARGUMENT_BY_USE[bool(gathered)])
@@ -409,10 +555,13 @@ def _tangent_lines(
             "    tangent_t *const RSTR tangent",
         ]
     )
+    tables = _QUADRATURE_TABLES_BY_POINT_COUNT[len(weights) == 1](
+        reference, weights, n_nodes, dim
+    )
     return _blocked_function_lines(
         "%s_inexact_apply_tangent_a_msoa" % prefix,
-        "template <typename s_t, typename g_t, typename tangent_t, int VS>",
-        signature, scratch, gathers, compute, [],
+        ("typename s_t", "typename g_t", "typename tangent_t", "int VS"),
+        signature, tables + scratch, gathers, compute, [],
     )
 
 
@@ -463,7 +612,7 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body, layout="standar
     signature.extend(_output_arguments(component))
     return _STORED_SKELETON_BY_LAYOUT[layout](
         "%s_inexact_apply_stored%s_a_msoa" % (prefix, _LAYOUT_SUFFIX[layout]),
-        "template <typename s_t, typename tangent_t, int VS>",
+        ("typename s_t", "typename tangent_t", "int VS"),
         signature, scratch, gathers, compute, store, component,
     )
 
@@ -507,7 +656,7 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     signature.extend(_output_arguments(component))
     return _function_lines(
         "%s_inexact_apply_compressed_a_msoa" % prefix,
-        "template <typename s_t, typename tangent_t, typename scale_t>",
+        ("typename s_t", "typename tangent_t", "typename scale_t"),
         signature,
         body,
     )
@@ -734,7 +883,7 @@ def _packed_signature(component, n_components):
     ]
 
 
-def _packed_function_lines(name, template, signature, scratch, gathers, compute,
+def _packed_function_lines(name, template_params, signature, scratch, gathers, compute,
                            store, component):
     """One kernel over a packed mesh, two-pass.
 
@@ -746,10 +895,7 @@ def _packed_function_lines(name, template, signature, scratch, gathers, compute,
     buffer that the disjoint second pass below reduces.
     """
     n_components = len(component)
-    lines = [template, "static SFEM_INLINE int %s_impl(" % name]
-    lines.extend(signature)
-    lines.append(") {")
-    lines.append("  static constexpr int NC = %d;" % n_components)
+    lines = ["  static constexpr int NC = %d;" % n_components]
     lines.append(
         "  const s_t *const h_components[NC] = {%s};"
         % ", ".join("h%s" % name for name in component)
@@ -848,14 +994,26 @@ def _packed_function_lines(name, template, signature, scratch, gathers, compute,
             "    }",
             "  }",
             "  return SFEM_SUCCESS;",
-            "}",
-            "",
         ]
     )
-    return lines
+    # The packed kernel's two passes are still text, but it is a
+    # `FunctionDefNode` like every other kernel here, so the signature, the
+    # qualifier and the template line come from the node and the printer rather
+    # than from string concatenation in this file.
+    nodes = (
+        FunctionDefNode(
+            name="%s_impl" % name,
+            params=tuple(line.strip().rstrip(",") for line in signature),
+            body=(RawLinesNode(tuple(lines), reason="packed two-pass body"),),
+            return_type="int",
+            qualifier="static SFEM_INLINE",
+            template_params=tuple(template_params),
+        ),
+    )
+    return list(render_kernel_ast_lines(name, nodes)) + [""]
 
 
-def _blocked_function_lines(name, template, signature, scratch, gathers, compute, store):
+def _blocked_function_lines(name, template_params, signature, scratch, gathers, compute, store):
     """One kernel, blocked over `VS` elements, with the gathers staged.
 
     The values this kernel reads come through the mesh connectivity, so their
@@ -863,25 +1021,62 @@ def _blocked_function_lines(name, template, signature, scratch, gathers, compute
     scratch in their own passes, which is how the exact apply in this framework
     gets vector code out of the arithmetic that follows: by the time the
     arithmetic loop runs, everything it touches is contiguous in the lane.
+
+    Built as a `FunctionDefNode` and rendered through the IR printer, like every
+    other kernel in the tree.  This path used to concatenate strings from the
+    emitter straight to a file, which is why no pass, ratchet or printer setting
+    ever applied to it and why it drifted into shapes nothing else could produce.
+    The arithmetic bodies are still `RawLinesNode`, which is the escape hatch the
+    IR documents for exactly this: the kernel is a tree now, and what is left as
+    text is marked and countable.
     """
-    lines = [template, "static SFEM_INLINE int %s_impl(" % name]
-    lines.extend(signature)
-    lines.append(") {")
-    lines.extend(_parallel_loop_lines())
-    lines.append("  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {")
-    lines.append(
-        "    const int ne = (int)((nelements - evb) < (ptrdiff_t)VS "
-        "? (nelements - evb) : (ptrdiff_t)VS);"
+    target = current_target()
+    pragma = target.vectorize_pragma() if hasattr(target, "vectorize_pragma") else None
+    printer = CLikeKernelASTPrinter(vectorize_pragma=pragma or "")
+
+    element_block = iterator("evb", "ptrdiff_t")
+    lane = iterator("lane", "int")
+    body = [
+        RawLinesNode(
+            (
+                "    const int ne = (int)((nelements - evb) < (ptrdiff_t)VS "
+                "? (nelements - evb) : (ptrdiff_t)VS);",
+            ),
+            reason="tile extent",
+        ),
+        RawLinesNode(tuple(scratch), reason="staging buffers"),
+        RawLinesNode(tuple(gathers), reason="indirect gathers"),
+        LoopNode(
+            LoopKind.SIMD,
+            lane,
+            iteration_range(0, expr_ref("ne", "tile_extent")),
+            pre_increment(lane),
+            body=(RawLinesNode(tuple(compute), reason="kernel arithmetic"),),
+            vectorized=bool(pragma),
+        ),
+        RawLinesNode(tuple(store), reason="scatter"),
+    ]
+    nodes = (
+        FunctionDefNode(
+            name="%s_impl" % name,
+            params=tuple(line.strip().rstrip(",") for line in signature),
+            body=(
+                RawLinesNode(tuple(_parallel_loop_lines()), reason="element loop pragma"),
+                LoopNode(
+                    LoopKind.KERNEL,
+                    element_block,
+                    iteration_range(0, expr_ref("nelements", "mesh_extent")),
+                    add_assign_increment(element_block, expr_ref("VS", "tile_width")),
+                    body=tuple(body),
+                ),
+                RawLinesNode(("", "  return SFEM_SUCCESS;"), reason="status"),
+            ),
+            return_type="int",
+            qualifier="static SFEM_INLINE",
+            template_params=tuple(template_params),
+        ),
     )
-    lines.extend(scratch)
-    lines.extend(gathers)
-    lines.extend(_simd_pragma("    "))
-    lines.append("    for (int lane = 0; lane < ne; ++lane) {")
-    lines.extend(compute)
-    lines.append("    }")
-    lines.extend(store)
-    lines.extend(["  }", "", "  return SFEM_SUCCESS;", "}", ""])
-    return lines
+    return list(render_kernel_ast_lines(name, nodes, printer=printer)) + [""]
 
 
 def _blocked_scatter(component, n_nodes, scale=""):
@@ -906,15 +1101,35 @@ def _blocked_scatter(component, n_nodes, scale=""):
     return lines
 
 
-def _function_lines(name, template, signature, body):
-    lines = [template, "static SFEM_INLINE int %s_impl(" % name]
-    lines.extend(signature)
-    lines.append(") {")
-    lines.extend(_parallel_loop_lines())
-    lines.append("  for (ptrdiff_t element = 0; element < nelements; ++element) {")
-    lines.extend(body)
-    lines.extend(["  }", "", "  return SFEM_SUCCESS;", "}", ""])
-    return lines
+def _function_lines(name, template_params, signature, body):
+    """A kernel that walks elements one at a time, on the IR spine.
+
+    The compressed apply reads a half-precision store and converts as it goes,
+    so it has no lane block to fill; it is still a `FunctionDefNode` with a real
+    loop node, like everything else.
+    """
+    element = iterator("element", "ptrdiff_t")
+    nodes = (
+        FunctionDefNode(
+            name="%s_impl" % name,
+            params=tuple(line.strip().rstrip(",") for line in signature),
+            body=(
+                RawLinesNode(tuple(_parallel_loop_lines()), reason="element loop pragma"),
+                LoopNode(
+                    LoopKind.KERNEL,
+                    element,
+                    iteration_range(0, expr_ref("nelements", "mesh_extent")),
+                    pre_increment(element),
+                    body=(RawLinesNode(tuple(body), reason="kernel arithmetic"),),
+                ),
+                RawLinesNode(("", "  return SFEM_SUCCESS;"), reason="status"),
+            ),
+            return_type="int",
+            qualifier="static SFEM_INLINE",
+            template_params=tuple(template_params),
+        ),
+    )
+    return list(render_kernel_ast_lines(name, nodes)) + [""]
 
 
 
