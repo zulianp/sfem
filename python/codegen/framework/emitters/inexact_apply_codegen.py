@@ -45,7 +45,7 @@ from codegen.framework.emitters.quadrature_codegen import (
     tensor_product_q_index_lines,
     tensor_product_quadrature_weight_expr,
 )
-from codegen.framework.fem.tensor_product import tensor_product_cartesian_shape_order
+from codegen.framework.plans.layout import gather_shape_order
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
     render_kernel_ast_lines,
@@ -648,7 +648,11 @@ def _sum_factorized_gradient_source(
     this kernel no longer carries a private table of them.
     """
     n_qp = len(weights)
-    shape_order = tensor_product_cartesian_shape_order(dim, n_nodes)
+    # `plans/layout` owns which order a kernel's field streams are gathered in,
+    # and its answer is identity for a PROTEUS element -- whose mesh already
+    # numbers its nodes lexicographically.  Spelling the permutation here
+    # instead would be right for HEX8 and wrong for its Cartesian twin.
+    shape_order = gather_shape_order(plan.element_type, dim, n_nodes, True)
     tables = [
         kernel_constant("NQ", n_qp, indent="    "),
         kernel_constant("NQ1", rule.tensor_product_n_qp_1d, indent="    "),
