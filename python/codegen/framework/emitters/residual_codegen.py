@@ -93,6 +93,7 @@ from codegen.framework.plans.residual_structure import (
     residual_mesh_phase_plans,
 )
 from codegen.framework.plans.geometry_quantities import (
+    local_geometry_streams,
     mesh_geometry_argument_names,
     mesh_geometry_parameters,
     local_geometry_quantities,
@@ -5420,6 +5421,34 @@ def _kernel_diagnostics_lines(
     return lines
 
 
+def _blocked_adjugate_array_lines(dependencies, dim, extent, indent):
+    """The block's adjugate as a pointer array, where the kernel reads one.
+
+    Which per-point geometry a lane body reads is
+    `plans.geometry_quantities.local_geometry_quantities`, and a form that maps
+    no reference gradient reads no adjugate -- so the sequence is empty and
+    nothing is declared, rather than a branch declining to declare it.
+
+    That module's own docstring records this being asked as
+    `if dependencies.uses_adjugate:` at some twenty sites; these were two of the
+    four left.
+    """
+    return [
+        "%sconst s_t *const b%s[%s] = {%s};"
+        % (
+            indent,
+            quantity.name,
+            extent,
+            ", ".join(
+                "b%s_data[%d]" % (quantity.name, component)
+                for component in range(quantity.components)
+            ),
+        )
+        for quantity in local_geometry_quantities(dependencies, dim)
+        if quantity.name == "adjugate"
+    ]
+
+
 def _mesh_operator_source(
     system,
     prefix,
@@ -5641,18 +5670,17 @@ def _mesh_operator_source(
     )
     gather.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
-    affine_geometry_streams = (
-        (
-            tuple(
-                "geom_metric%d" % i
-                for i in range(gradient_metric.metric_components)
-            )
-            if uses_cached_affine_metric
-            else tuple("adj%d" % i for i in range(dim * dim))
-            if dependencies.uses_adjugate
-            else ()
+    # Which geometry streams an affine kernel carries, and in what order, is
+    # `plans.geometry_quantities`: the cached metric, or the adjugate when the
+    # form needs one, followed by the determinant.  This site and one more
+    # spelled the same three cases as a nested ternary.
+    affine_geometry_streams = tuple(
+        name
+        for name, _role in local_geometry_streams(
+            dependencies,
+            dim,
+            gradient_metric.metric_components if uses_cached_affine_metric else None,
         )
-        + (() if uses_cached_affine_metric else ("det0",))
     )
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
@@ -7329,16 +7357,9 @@ def _isoparametric_mesh_operator_source(
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
-    if dependencies.uses_adjugate:
-        lines.append(
-            "    const s_t *const badjugate[%d] = {%s};"
-            % (
-                dim * dim,
-                ", ".join(
-                    "badjugate_data[%d]" % i for i in range(dim * dim)
-                ),
-            )
-        )
+    lines.extend(
+        _blocked_adjugate_array_lines(dependencies, dim, "%d" % (dim * dim), "    ")
+    )
     if gradient_metric is not None:
         lines.append(
             "    const s_t *const bgeom_metric[%d] = %s;"
@@ -7679,14 +7700,9 @@ def _scalar_packed_jacobian_action_source(
                 )
         lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
         lines.extend(["          }", "        }"])
-    if dependencies.uses_adjugate:
-        lines.append(
-            "        const s_t *const badjugate[ND * ND] = {%s};"
-            % ", ".join(
-                "badjugate_data[%d]" % component
-                for component in range(dim * dim)
-            )
-        )
+    lines.extend(
+        _blocked_adjugate_array_lines(dependencies, dim, "ND * ND", "        ")
+    )
     call_args = ["ne", "VS"]
     call_args.extend(
         _stream_call_arguments(
@@ -8456,18 +8472,17 @@ def _scalar_packed_affine_jacobian_action_source(
     block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
     block = "%s_jacobian_action_block" % block_prefix
     block_function = "%s_contiguous" % block
-    affine_geometry_streams = (
-        (
-            tuple(
-                "geom_metric%d" % i
-                for i in range(gradient_metric.metric_components)
-            )
-            if uses_cached_affine_metric
-            else tuple("adj%d" % i for i in range(dim * dim))
-            if dependencies.uses_adjugate
-            else ()
+    # Which geometry streams an affine kernel carries, and in what order, is
+    # `plans.geometry_quantities`: the cached metric, or the adjugate when the
+    # form needs one, followed by the determinant.  This site and one more
+    # spelled the same three cases as a nested ternary.
+    affine_geometry_streams = tuple(
+        name
+        for name, _role in local_geometry_streams(
+            dependencies,
+            dim,
+            gradient_metric.metric_components if uses_cached_affine_metric else None,
         )
-        + (() if uses_cached_affine_metric else ("det0",))
     )
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
