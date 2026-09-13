@@ -38,11 +38,14 @@ import sympy as sp
 from codegen.framework.emitters.cprinter import _sfem_ccode
 from codegen.framework.emitters.kernel_prologue import kernel_constant
 from codegen.framework.emitters.quadrature_codegen import (
-    cpp_scalar_initializer_list,
+    REFERENCE_AXES,
     cpp_scalar_literal,
     quadrature_reference_accessor,
     reference_include_lines,
+    tensor_product_q_index_lines,
+    tensor_product_quadrature_weight_expr,
 )
+from codegen.framework.fem.tensor_product import tensor_product_cartesian_shape_order
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
     render_kernel_ast_lines,
@@ -64,11 +67,17 @@ from codegen.framework.plans.evaluation_strategy import (
 )
 from codegen.framework.plans.inexact_apply import (
     action_stages,
+    basis_gradient_symbols,
     emittable_inexact_apply_plan,
     flux_form_for_collection,
+    physical_field_gradient_definitions,
     projected_tangent,
     quadrature_accumulation,
+    quadrature_measure,
+    reference_field_gradient_definitions,
+    reference_field_gradient_symbols,
     reference_gradients_by_point,
+    tensor_product_weight_measure,
 )
 from codegen.framework.targets import current_target
 
@@ -164,15 +173,13 @@ def _inexact_apply_kernel_source(
         for c in range(dim)
     ]
 
-    integrand, gradient_symbols = projected_tangent(
+    integrand, gradient_symbols, previous_gradient_symbols = projected_tangent(
         plan,
         flux_form,
         rule,
         adjugate,
         determinant,
-        state,
         is_deformation_gradient,
-        previous_state,
     )
     quadrature_weights = quadrature_accumulation(rule)
     reference = reference_gradients_by_point(rule, n_nodes, dim)
@@ -180,8 +187,8 @@ def _inexact_apply_kernel_source(
     # material -- linear elasticity, whose tangent is constant -- reads none,
     # and then the kernel must not gather a state it will not use.  The plan
     # answers this; emission spells the answer.
-    used_state = plan.state_dependence(integrand, state)
-    used_previous = plan.state_dependence(integrand, previous_state)
+    used_state = plan.state_dependence(integrand, gradient_symbols)
+    used_previous = plan.state_dependence(integrand, previous_gradient_symbols)
 
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
@@ -206,8 +213,9 @@ def _inexact_apply_kernel_source(
     lines.extend(
         _tangent_lines(
             prefix, dim, n_nodes, component, parameters, used_state,
-            used_previous, integrand, gradient_symbols, quadrature_weights,
-            reference, rule, plan,
+            used_previous, integrand, state, previous_state, gradient_symbols,
+            previous_gradient_symbols, adjugate, determinant,
+            quadrature_weights, reference, rule, plan,
         )
     )
     # One per layout the plan names, in the order it names them.  Iterated, not
@@ -398,9 +406,24 @@ class _ReferenceTable:
 
 def _shared_reference_includes(rule, dim):
     """The shared headers the quadrature loop forwards into."""
-    references = [_ReferenceTable("grad_ref_%s" % axis) for axis in _REFERENCE_AXES[:dim]]
+    references = [_ReferenceTable("grad_ref_%s" % axis) for axis in REFERENCE_AXES[:dim]]
     references.append(_ReferenceTable("q_weight"))
     return list(reference_include_lines(rule, references))
+
+
+def _tensor_product_reference_includes(rule, dim):
+    """The one-dimensional tables, and the contraction that reads them.
+
+    A tensor-product element's shared reference data is one-dimensional --
+    `ref_line_p1_q2<s_t>::shape_1d()` and `grad_1d()`, and the rule's
+    `q_weight_1d()` beside them -- because sum factorization never needs the
+    element's full reference gradients.  `tensor_product_kernels.hpp` carries
+    the contraction itself, and it is the same one the energy path calls.
+    """
+    references = [_ReferenceTable("shape_1d"), _ReferenceTable("q_weight_1d")]
+    return list(reference_include_lines(rule, references)) + [
+        '#include "tensor_product_kernels.hpp"'
+    ]
 
 
 def _no_reference_includes(rule, dim):
@@ -408,65 +431,409 @@ def _no_reference_includes(rule, dim):
     return []
 
 
-#: Only the strategy that reads the shared structs includes them.
+#: What each strategy forwards into.  An EXPANDED element folds its reference
+#: gradients into the arithmetic and reads nothing at run time.
 _REFERENCE_INCLUDES_BY_STRATEGY = {
     EvaluationStrategy.QUADRATURE: _shared_reference_includes,
     EvaluationStrategy.EXPANDED: _no_reference_includes,
-    EvaluationStrategy.SUM_FACTORIZED: _no_reference_includes,
+    EvaluationStrategy.SUM_FACTORIZED: _tensor_product_reference_includes,
 }
 
 
-def _quadrature_table_lines(name, values, indent="    "):
-    """One rule constant per point, as a folded table the loop indexes.
+@dataclasses.dataclass(frozen=True)
+class _GradientRole:
+    """A field whose gradient the projected tangent reads.
 
-    Literals rather than a runtime argument: these are properties of the element
-    and the rule, settled before the kernel exists.  Evaluated here rather than
-    printed symbolically, because a Gauss rule's gradients carry `sqrt(3)` and
-    `sqrt` is not constexpr -- printing the expression would not compile, and
-    printing it into a non-constexpr table would put a square root in the
-    kernel's prologue for a number the generator already knows.  The same
-    seventeen digits the generated reference tables use.
+    Two at most: the current state, and -- for a rate-dependent material such as
+    Kelvin-Voigt viscosity -- the previous one.  They differ in their name and in
+    nothing else, which is why every step below loops over them rather than
+    spelling the current state and then spelling it again.
     """
-    return [
-        "%sstatic constexpr s_t %s[%d] = {%s};"
-        % (
-            indent,
-            name,
-            len(values),
-            cpp_scalar_initializer_list(
-                [float(sp.sympify(value).evalf(20)) for value in values]
-            ),
+
+    name: str
+    nodal: tuple
+    reference: tuple
+    gradient: tuple
+
+
+def _gradient_roles(dim, state, previous_state, gradient_symbols,
+                    previous_gradient_symbols, used_state, used_previous):
+    """The fields this tangent actually reads, in signature order.
+
+    `plan.state_dependence` answered which; this pairs each with the symbols its
+    two gradient stages are named by.
+    """
+    roles = []
+    for name, nodal, gradient, used in (
+        ("u", state, gradient_symbols, used_state),
+        ("z", previous_state, previous_gradient_symbols, used_previous),
+    ):
+        if not used:
+            continue
+        roles.append(
+            _GradientRole(
+                name=name,
+                nodal=tuple(tuple(row) for row in nodal),
+                reference=reference_field_gradient_symbols(dim, "g%s" % name),
+                gradient=gradient,
+            )
         )
+    return tuple(roles)
+
+
+@dataclasses.dataclass(frozen=True)
+class _GradientSource:
+    """Where one point's physical field gradients come from.
+
+    The three evaluation strategies differ in this and in nothing else: the
+    material arithmetic below is the same expression in `gu_<c>_<a>` whatever
+    produced them.  Keeping the difference in one object is what lets the body
+    be written once.
+    """
+
+    tables: tuple = ()
+    scratch: tuple = ()
+    gathers: tuple = ()
+    q_prologue: tuple = ()
+    lane_lines: tuple = ()
+    #: The gradient stages, in order, each a list of (symbol, expression) pairs.
+    #: Separate blocks and not one list: the second stage reads what the first
+    #: defines, and a common-subexpression pass over both together would hoist a
+    #: temporary above the definition it depends on.
+    stages: tuple = ()
+    weight: object = None
+
+
+def _physical_definitions(roles, adjugate, determinant, dim):
+    """The second gradient stage, which every strategy shares."""
+    definitions = []
+    for role in roles:
+        definitions.extend(
+            physical_field_gradient_definitions(
+                role.reference, role.gradient, adjugate, determinant, dim
+            )
+        )
+    return tuple(definitions)
+
+
+def _explicit_reference_definitions(roles, basis_symbols, n_nodes, dim):
+    """The first gradient stage, for an element that evaluates its basis."""
+    definitions = []
+    for role in roles:
+        definitions.extend(
+            reference_field_gradient_definitions(
+                role.nodal, basis_symbols, role.reference, n_nodes, dim
+            )
+        )
+    return tuple(definitions)
+
+
+def _nodal_staging(roles, component, n_nodes):
+    """Every nodal value of every field the tangent reads.
+
+    All of them, rather than the ones a free-symbol scan finds: the reference
+    gradient of a component is a contraction over that component's nodes, so a
+    component the material reads is read at every node of the element.
+    """
+    gathered = []
+    for role in roles:
+        gathered.extend(
+            _gathered_names(
+                role.name, component, n_nodes, _all_names(role.name, component, n_nodes)
+            )
+        )
+    return gathered
+
+
+def _explicit_gradient_source(
+    roles, component, basis_reads, tables, weight, n_nodes, dim,
+):
+    """A source that stages the nodal values and contracts them in the kernel.
+
+    Shared by the two strategies that evaluate the basis explicitly: an
+    EXPANDED element, whose basis gradients are literals, and a QUADRATURE
+    element, which reads them from the shared reference struct inside the loop.
+    """
+    gathered = _nodal_staging(roles, component, n_nodes)
+    scratch = _CONNECTIVITY_BY_USE[bool(gathered)](n_nodes)
+    scratch.extend("    s_t b%s[VS];" % value for value, _s, _n, _r in gathered)
+    lane_lines = [
+        "      const s_t %s = b%s[lane];" % (value, value)
+        for value, _s, _n, _r in gathered
+    ]
+    lane_lines.extend(basis_reads)
+    return _GradientSource(
+        tables=tuple(tables),
+        scratch=tuple(scratch),
+        gathers=tuple(_STAGED_GATHERS_BY_USE[bool(gathered)](gathered)),
+        lane_lines=tuple(lane_lines),
+        weight=weight,
+    )
+
+
+def _expanded_gradient_source(
+    roles, component, reference, weights, n_nodes, dim, rule, plan,
+):
+    """An EXPANDED element: one point, and the basis gradients are numbers.
+
+    `plans.evaluation_strategy` says a lowest-order simplex evaluates in closed
+    form -- "no quadrature loop, no per-point geometry, no reference-basis
+    tables" -- so the first gradient stage is the nodal contraction with those
+    numbers substituted, and the point's weight is a rational the tangent
+    carries rather than a table lookup.
+    """
+    basis_symbols = basis_gradient_symbols(n_nodes, dim)
+    literals = {
+        basis_symbols[node][axis]: reference[0][node][axis]
+        for node in range(n_nodes)
+        for axis in range(dim)
+    }
+    definitions = tuple(
+        (symbol, expression.xreplace(literals))
+        for symbol, expression in _explicit_reference_definitions(
+            roles, basis_symbols, n_nodes, dim
+        )
+    )
+    source = _explicit_gradient_source(
+        roles, component, (), (), weights[0], n_nodes, dim
+    )
+    return dataclasses.replace(source, stages=(definitions,))
+
+
+def _tabulated_gradient_source(
+    roles, component, reference, weights, n_nodes, dim, rule, plan,
+):
+    """A QUADRATURE element: the basis gradients come from the shared struct.
+
+    `ref_<element>_<rule><s_t>::grad_ref_x()` and `quad_<cell>_<rule>::q_weight()`
+    are what every other kernel on this element reads, and reading them here is
+    what `quadrature_reference_accessor` exists for.
+    """
+    basis_symbols = basis_gradient_symbols(n_nodes, dim)
+    tables = [kernel_constant("NQ", len(weights), indent="    ")]
+    tables.extend(
+        "    const s_t *const RSTR qgrad_%s = %s;"
+        % (axis, quadrature_reference_accessor(rule, "grad_ref_%s" % axis))
+        for axis in REFERENCE_AXES[:dim]
+    )
+    tables.append(
+        "    const s_t *const RSTR qweight = %s;"
+        % quadrature_reference_accessor(rule, "q_weight")
+    )
+    tables.extend(_measure_lines(quadrature_measure(rule)))
+    basis_reads = _BASIS_READS_BY_USE[bool(roles)](basis_symbols, n_nodes, dim)
+    source = _explicit_gradient_source(
+        roles, component, basis_reads, tables, "qweight[q] * QMEASURE",
+        n_nodes, dim,
+    )
+    return dataclasses.replace(
+        source,
+        stages=(
+            _explicit_reference_definitions(roles, basis_symbols, n_nodes, dim),
+        ),
+    )
+
+
+def _sum_factorized_gradient_source(
+    roles, component, reference, weights, n_nodes, dim, rule, plan,
+):
+    """A tensor-product element: `tensor_gradient_contiguous` does the first stage.
+
+    The strategy is sum factorization, so this kernel does what every other
+    tensor-product kernel in the framework does -- stage the nodal values in the
+    Cartesian shape order the contraction is written against, hand them to the
+    shared contraction with the one-dimensional tables, and read the reference
+    field gradient back out per point.  The element's full reference gradients
+    are never formed, which is the whole point of the strategy and the reason
+    this kernel no longer carries a private table of them.
+    """
+    n_qp = len(weights)
+    shape_order = tensor_product_cartesian_shape_order(dim, n_nodes)
+    tables = [
+        kernel_constant("NQ", n_qp, indent="    "),
+        kernel_constant("NQ1", rule.tensor_product_n_qp_1d, indent="    "),
+    ]
+    # The one-dimensional basis tables belong to the contraction, so a material
+    # whose tangent reads no field -- linear elasticity's -- names none of them
+    # and keeps the weights, which the quadrature sum needs whatever the
+    # material is.
+    tables.extend(_CONTRACTION_TABLES_BY_USE[bool(roles)](rule, n_nodes))
+    tables.append(
+        "    const s_t *const RSTR q_weight_1d = %s;"
+        % quadrature_reference_accessor(rule, "q_weight_1d")
+    )
+    tables.extend(_measure_lines(tensor_product_weight_measure(rule, dim)))
+
+    scratch = _CONNECTIVITY_BY_USE[bool(roles)](n_nodes)
+    gathers = []
+    q_prologue = list(tensor_product_q_index_lines(dim, "      "))
+    lane_lines = []
+    for role in roles:
+        scratch.append("    s_t b%s_data[NS * %d][VS];" % (role.name, dim))
+        scratch.append("    s_t g%s_ref_q[NQ * %d * VS];" % (role.name, dim * dim))
+        gathers.extend(
+            _lane_loop(
+                [
+                    "      b%s_data[%d][lane] = %s%s[bev%d[lane] * %s_stride];"
+                    % (
+                        role.name,
+                        shape * dim + field,
+                        role.name,
+                        component[field],
+                        shape_order[shape],
+                        role.name,
+                    )
+                    for shape in range(n_nodes)
+                    for field in range(dim)
+                ]
+            )
+        )
+        gathers.extend(
+            "    tensor_gradient_contiguous<s_t, NQ, NS, VS, %d, %d>"
+            "(ne, shape_1d, grad_1d, b%s_data, %d, &g%s_ref_q[%d * VS]);"
+            % (dim, dim, role.name, field, role.name, field * n_qp * dim)
+            for field in range(dim)
+        )
+        q_prologue.extend(
+            "      const s_t *const RSTR g%s_ref%d = &g%s_ref_q[(%d + q * %d) * VS];"
+            % (role.name, field * dim + axis, role.name, field * n_qp * dim + axis, dim)
+            for field in range(dim)
+            for axis in range(dim)
+        )
+        lane_lines.extend(
+            "      const s_t %s = g%s_ref%d[lane];"
+            % (role.reference[field][axis], role.name, field * dim + axis)
+            for field in range(dim)
+            for axis in range(dim)
+        )
+    return _GradientSource(
+        tables=tuple(tables),
+        scratch=tuple(scratch),
+        gathers=tuple(gathers),
+        q_prologue=tuple(q_prologue),
+        lane_lines=tuple(lane_lines),
+        weight="%s * QMEASURE" % tensor_product_quadrature_weight_expr(dim),
+    )
+
+
+def _basis_reads(basis_symbols, n_nodes, dim):
+    """One point's reference basis gradients, from the shared struct."""
+    return [
+        "      const s_t %s = qgrad_%s[q * %d + %d];"
+        % (basis_symbols[node][axis], REFERENCE_AXES[axis], n_nodes, node)
+        for node in range(n_nodes)
+        for axis in range(dim)
     ]
 
 
-def _quadrature_point_lines(
-    integrand, integrand_symbols, gradient_symbols, lane_prologue,
-    n_nodes, dim, strategy,
+def _contraction_tables(rule, n_nodes):
+    """What `tensor_gradient_contiguous` is given: the node count and the 1D bases."""
+    return [
+        kernel_constant("NS", n_nodes, indent="    "),
+        "    const s_t *const RSTR shape_1d = %s;"
+        % quadrature_reference_accessor(rule, "shape_1d"),
+        "    const s_t *const RSTR grad_1d = %s;"
+        % quadrature_reference_accessor(rule, "grad_1d"),
+    ]
+
+
+#: A tangent that reads no field reads no basis either.  Tables rather than
+#: branches, as elsewhere here.
+_BASIS_READS_BY_USE = {
+    True: _basis_reads,
+    False: lambda basis_symbols, n_nodes, dim: [],
+}
+_CONTRACTION_TABLES_BY_USE = {
+    True: _contraction_tables,
+    False: lambda rule, n_nodes: [],
+}
+
+
+def _gradient_stage_lines(source, indent):
+    """The gradient stages, each with its own common-subexpression pass.
+
+    One pass per stage rather than one over all of them: the physical gradient
+    is a function of the reference gradient, so they are consecutive
+    computations rather than independent outputs, and a single pass would name a
+    temporary before the value it reads exists.
+    """
+    lines = []
+    for index, stage in enumerate(source.stages):
+        lines.extend(_assignment_lines(list(stage), "gradient%d" % index, indent=indent))
+    return lines
+
+
+def _measure_lines(measure):
+    """The reciprocal total weight, as the one constant the point scales by."""
+    return [
+        "    static constexpr s_t QMEASURE = %s;"
+        % cpp_scalar_literal(float(sp.sympify(measure).evalf(20)))
+    ]
+
+
+#: Where one point's physical field gradients come from, per evaluation
+#: strategy.  A table, because the choice belongs to `plans.evaluation_strategy`
+#: and emission only looks the answer up.
+_GRADIENT_SOURCE_BY_STRATEGY = {
+    EvaluationStrategy.EXPANDED: _expanded_gradient_source,
+    EvaluationStrategy.QUADRATURE: _tabulated_gradient_source,
+    EvaluationStrategy.SUM_FACTORIZED: _sum_factorized_gradient_source,
+}
+
+#: Whether a strategy's tangent needs a quadrature loop around its lane loop.
+_NEEDS_QUADRATURE_LOOP = {
+    EvaluationStrategy.EXPANDED: False,
+    EvaluationStrategy.QUADRATURE: True,
+    EvaluationStrategy.SUM_FACTORIZED: True,
+}
+
+
+def _expanded_tangent_body(
+    integrand, integrand_symbols, source, lane_prologue, plan,
 ):
+    """An EXPANDED element: one lane loop, nothing around it.
+
+    The point's weight is a rational, so it multiplies the integrand here and
+    the whole element is one straight-line block: gradients, material, store.
+    """
+    tangent_symbols = [
+        sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
+    ]
+    compute = list(lane_prologue)
+    compute.extend(
+        "  %s" % line for line in _gradient_stage_lines(source, "    ")
+    )
+    compute.extend(
+        "  %s" % line
+        for line in _assignment_lines(
+            [
+                (symbol, source.weight * expression)
+                for symbol, expression in zip(tangent_symbols, integrand)
+            ],
+            "tangent",
+        )
+    )
+    compute.extend(
+        "      %s = tangent_t(tangent%d);" % (_BLOCKED_TANGENT_LANE % slot, slot)
+        for slot in range(plan.tangent_components)
+    )
+    return compute, None
+
+
+def _quadrature_point_lines(integrand, integrand_symbols, source, lane_prologue):
     """One quadrature point's contribution, for one lane.
 
     Straight-line: this is the body of a lane loop and carries no loop of its
-    own.  Only the gradients the integrand actually reads are loaded -- a
-    state-independent tangent, linear elasticity's, reads none of them, and
-    loading all of them anyway is what
-    `test_no_kernel_computes_a_value_nothing_reads` catches.
+    own.  The gradient stages come first because the material is a function of
+    them and of nothing else, and they are CSEd together with it.
     """
-    read = set()
-    for expression in integrand:
-        read |= expression.free_symbols
     lines = list(lane_prologue)
-    lines.extend(
-        "        const s_t %s = %s;"
-        % (
-            gradient_symbols[node][axis],
-            _GRADIENT_READ_BY_STRATEGY[strategy](node, axis, n_nodes, dim),
-        )
-        for node in range(n_nodes)
-        for axis in range(dim)
-        if gradient_symbols[node][axis] in read
-    )
-    lines.append("        const s_t qw = %s;" % _WEIGHT_READ_BY_STRATEGY[strategy])
+    lines.append("        const s_t qw = %s;" % source.weight)
+    # Two blocks, in this order and not one: the material is a function of the
+    # gradients, so they are values it reads rather than results beside it, and
+    # a single common-subexpression pass over both would hoist a temporary above
+    # the definition it depends on.
+    lines.extend("    %s" % line for line in _gradient_stage_lines(source, "        "))
     lines.extend(
         "    %s" % line
         for line in _assignment_lines(
@@ -480,147 +847,8 @@ def _quadrature_point_lines(
     return lines
 
 
-def _single_point_compute(
-    integrand, integrand_symbols, gradient_symbols, reference, weights,
-    n_nodes, dim, rule, plan,
-):
-    """An EXPANDED element: no loop, no tables, the gradients folded in.
-
-    `plans.evaluation_strategy` says a lowest-order simplex evaluates in closed
-    form -- "no quadrature loop, no per-point geometry, no reference-basis
-    tables" -- and this is that, for the tangent.
-    """
-    substitution = {
-        gradient_symbols[node][axis]: reference[0][node][axis]
-        for node in range(n_nodes)
-        for axis in range(dim)
-    }
-    weight = weights[0]
-    folded = [weight * expression.xreplace(substitution) for expression in integrand]
-    tangent_symbols = [
-        sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
-    ]
-    return [
-        "  %s" % line
-        for line in _assignment_lines(list(zip(tangent_symbols, folded)), "tangent")
-    ]
-
-
-def _folded_gradient_tables(reference, weights, n_nodes, dim, rule):
-    values = [
-        reference[point][node][axis]
-        for point in range(len(weights))
-        for node in range(n_nodes)
-        for axis in range(dim)
-    ]
-    return (
-        [kernel_constant("NQ", len(weights), indent="    ")]
-        + _quadrature_table_lines("QGRAD", values)
-        + _quadrature_table_lines("QWEIGHT", weights)
-    )
-
-
-def _no_quadrature_tables(reference, weights, n_nodes, dim, rule):
-    """An EXPANDED element indexes no table, so it declares none."""
-    return []
-
-
-def _shared_reference_tables(reference, weights, n_nodes, dim, rule):
-    """Aliases onto the shared reference struct this rule already publishes.
-
-    `ref_<element>_<rule><s_t>::grad_ref_x()` and `quad_<cell>_<rule>::q_weight()`
-    are what every other kernel on this element reads; a private copy is what
-    `quadrature_reference_accessor` was written to remove.
-    """
-    lines = [kernel_constant("NQ", len(weights), indent="    ")]
-    lines.extend(
-        "    const s_t *const RSTR qgrad_%s = %s;"
-        % (axis, quadrature_reference_accessor(rule, "grad_ref_%s" % axis))
-        for axis in _REFERENCE_AXES[:dim]
-    )
-    lines.append(
-        "    const s_t *const RSTR qweight = %s;"
-        % quadrature_reference_accessor(rule, "q_weight")
-    )
-    # The shared table holds the rule's own weights; `Sbar` is their weighted
-    # average, so the reciprocal of their sum rides beside them as one constant.
-    measure = sum((sp.nsimplify(weight) for weight in rule.weights), sp.Integer(0))
-    lines.append(
-        "    static constexpr s_t QMEASURE = %s;"
-        % cpp_scalar_literal(float(sp.Integer(1) / measure))
-    )
-    return lines
-
-
-#: The reference gradient tables are named by axis, as the shared structs name
-#: them.
-_REFERENCE_AXES = ("x", "y", "z")
-
-
-#: Keyed on whether the rule has a single point, so emission looks the answer up
-#: rather than branching on the rule.
-#: How the tangent's quadrature sum is emitted, per evaluation strategy.  A
-#: table, because the choice belongs to `plans.evaluation_strategy` and emission
-#: only looks up the answer.
-#:
-#: SUM_FACTORIZED is honest rather than correct here: the strategy calls for
-#: contraction through one-dimensional operators and this kernel still walks the
-#: points with the element's full reference gradients, which is why it carries a
-#: folded gradient table instead of reading the shared 1D factors.  That is the
-#: remaining gap, and naming it in this table is what keeps it visible.
-#: Whether a strategy's tangent needs a quadrature loop around its lane loop.
-_NEEDS_QUADRATURE_LOOP = {
-    EvaluationStrategy.EXPANDED: False,
-    EvaluationStrategy.QUADRATURE: True,
-    EvaluationStrategy.SUM_FACTORIZED: True,
-}
-
-_QUADRATURE_TABLES_BY_STRATEGY = {
-    EvaluationStrategy.EXPANDED: _no_quadrature_tables,
-    EvaluationStrategy.QUADRATURE: _shared_reference_tables,
-    EvaluationStrategy.SUM_FACTORIZED: _folded_gradient_tables,
-}
-
-#: Where one point's reference gradient is read from, per strategy.
-_GRADIENT_READ_BY_STRATEGY = {
-    EvaluationStrategy.QUADRATURE: (
-        lambda node, axis, n_nodes, dim: "qgrad_%s[q * %d + %d]"
-        % (_REFERENCE_AXES[axis], n_nodes, node)
-    ),
-    EvaluationStrategy.SUM_FACTORIZED: (
-        lambda node, axis, n_nodes, dim: "QGRAD[q * %d + %d]"
-        % (n_nodes * dim, node * dim + axis)
-    ),
-}
-
-_WEIGHT_READ_BY_STRATEGY = {
-    EvaluationStrategy.QUADRATURE: "qweight[q] * QMEASURE",
-    EvaluationStrategy.SUM_FACTORIZED: "QWEIGHT[q]",
-}
-
-
-def _expanded_tangent_body(
-    integrand, integrand_symbols, gradient_symbols, reference, weights,
-    lane_prologue, n_nodes, dim, strategy, plan,
-):
-    """An EXPANDED element: one lane loop, nothing around it."""
-    compute = list(lane_prologue)
-    compute.extend(
-        _single_point_compute(
-            integrand, integrand_symbols, gradient_symbols, reference, weights,
-            n_nodes, dim, None, plan,
-        )
-    )
-    compute.extend(
-        "      %s = tangent_t(tangent%d);" % (_BLOCKED_TANGENT_LANE % slot, slot)
-        for slot in range(plan.tangent_components)
-    )
-    return compute, None
-
-
 def _quadrature_tangent_body(
-    integrand, integrand_symbols, gradient_symbols, reference, weights,
-    lane_prologue, n_nodes, dim, strategy, plan,
+    integrand, integrand_symbols, source, lane_prologue, plan,
 ):
     """A quadrature loop *around* three lane loops: zero, accumulate, write out.
 
@@ -639,8 +867,7 @@ def _quadrature_tangent_body(
     )
     point = _lane_loop_node(
         _quadrature_point_lines(
-            integrand, integrand_symbols, gradient_symbols, lane_prologue,
-            n_nodes, dim, strategy,
+            integrand, integrand_symbols, source, lane_prologue
         ),
         pragma,
     )
@@ -650,7 +877,10 @@ def _quadrature_tangent_body(
         q,
         iteration_range(0, expr_ref("NQ", "quadrature_points")),
         pre_increment(q),
-        body=(point,),
+        body=(
+            RawLinesNode(source.q_prologue, reason="point-invariant addresses"),
+            point,
+        ),
     )
     write_out = _lane_loop_node(
         [
@@ -678,7 +908,8 @@ _TANGENT_BODY_BY_LOOP = {
 
 def _tangent_lines(
     prefix, dim, n_nodes, component, parameters, used_state, used_previous,
-    integrand, gradient_symbols, weights, reference, rule, plan,
+    integrand, state, previous_state, gradient_symbols, previous_gradient_symbols,
+    adjugate, determinant, weights, reference, rule, plan,
 ):
     """The partial assembly: `Sbar` accumulated over the quadrature points.
 
@@ -693,49 +924,42 @@ def _tangent_lines(
     and 4.45 GB on one kernel.  The arithmetic is the same; what changed is that
     the repetition is a loop again.
 
+    How the gradients reach that loop is `plans.evaluation_strategy`'s answer
+    and nothing this file re-derives: a lowest-order simplex folds the basis
+    gradients in as literals, a higher-order simplex reads the shared reference
+    struct, and a tensor-product element contracts through `tensor_gradient`.
+
     Takes the previous state only when the material reads one, so a
     rate-independent material keeps the shorter signature.
     """
-    tangent_symbols = [
-        sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
-    ]
     integrand_symbols = [
         sp.Symbol("integrand%d" % slot) for slot in range(plan.tangent_components)
     ]
-    gathered = _gathered_names("u", component, n_nodes, used_state)
-    gathered.extend(_gathered_names("z", component, n_nodes, used_previous))
+    strategy = evaluation_strategy(plan.element_type)
+    roles = _gradient_roles(
+        dim, state, previous_state, gradient_symbols, previous_gradient_symbols,
+        used_state, used_previous,
+    )
+    source = _GRADIENT_SOURCE_BY_STRATEGY[strategy](
+        roles, component, reference, weights, n_nodes, dim, rule, plan,
+    )
+    source = dataclasses.replace(
+        source,
+        stages=tuple(source.stages)
+        + (_physical_definitions(roles, adjugate, determinant, dim),),
+    )
 
-    # Only a material whose tangent reads the state needs the connectivity: a
-    # linear one is a function of the geometry alone, and gathering nodes it
-    # never looks at would leave an empty lane loop behind.
-    scratch = _CONNECTIVITY_BY_USE[bool(gathered)](n_nodes)
-    scratch.extend("    s_t b%s[VS];" % value for value, _s, _n, _r in gathered)
-
-    gathers = _STAGED_GATHERS_BY_USE[bool(gathered)](gathered)
+    gathers = list(source.gathers)
     gathers.extend(_blocked_geometry_bases(dim))
     gathers.extend(_blocked_tangent_bases(plan.tangent_components))
 
-    # A one-point rule is a sum with one term.  Opening a loop for it, and
-    # reading the gradients out of a table the loop indexes, would be arithmetic
-    # the generator already knows the answer to -- and the affine simplices,
-    # where the projection is exact, are all one-point rules.  They get the
-    # point's gradients folded in as the literals they are.
-    # How this element is evaluated is `plans.evaluation_strategy`'s answer, not
-    # a property of the rule this file re-derives.  A one-point rule and an
-    # EXPANDED element coincide on the simplices, which is why testing the point
-    # count looked right; it is the element's family that decides.
-    strategy = evaluation_strategy(plan.element_type)
-    lane_prologue = [
-        "      const s_t %s = b%s[lane];" % (value, value)
-        for value, _s, _n, _r in gathered
-    ] + _blocked_geometry_lines(dim)
+    lane_prologue = _blocked_geometry_lines(dim) + list(source.lane_lines)
     compute, inner = _TANGENT_BODY_BY_LOOP[_NEEDS_QUADRATURE_LOOP[strategy]](
-        integrand, integrand_symbols, gradient_symbols, reference, weights,
-        lane_prologue, n_nodes, dim, strategy, plan,
+        integrand, integrand_symbols, source, lane_prologue, plan,
     )
 
     signature = ["    const ptrdiff_t nelements,"]
-    signature.extend(_CONNECTIVITY_ARGUMENT_BY_USE[bool(gathered)])
+    signature.extend(_CONNECTIVITY_ARGUMENT_BY_USE[bool(roles)])
     signature.extend(_geometry_arguments(dim))
     signature.extend("    const s_t %s," % name for name in parameters)
     signature.extend(_STATE_STREAMS_BY_USE[bool(used_state)](component))
@@ -746,9 +970,7 @@ def _tangent_lines(
             "    tangent_t *const RSTR tangent",
         ]
     )
-    tables = _QUADRATURE_TABLES_BY_STRATEGY[strategy](
-        reference, weights, n_nodes, dim, rule
-    )
+    tables = list(source.tables)
     # The accumulator survives the quadrature loop and stays per-lane, so it is
     # lane-major scratch.  Declared only where there is a loop to survive.
     tables.extend(
@@ -757,8 +979,9 @@ def _tangent_lines(
     return _blocked_function_lines(
         "%s_inexact_apply_tangent_a_msoa" % prefix,
         ("typename s_t", "typename g_t", "typename tangent_t", "int VS"),
-        signature, tables + scratch, gathers, compute, [], inner=inner,
+        signature, tables + list(source.scratch), gathers, compute, [], inner=inner,
     )
+
 
 
 def _stored_lines(prefix, n_nodes, component, plan, action_body, layout="standard"):

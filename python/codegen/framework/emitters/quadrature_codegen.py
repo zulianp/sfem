@@ -199,3 +199,35 @@ class SfemReferenceLike(object):
     def __init__(self, name, values):
         self.name = name
         self.values = tuple(values)
+
+
+#: The three reference axes, in the order the shared structs name their tables.
+REFERENCE_AXES = ("x", "y", "z")
+
+
+def tensor_product_q_index_lines(dim, indent):
+    """The flat quadrature index taken apart into its one-dimensional factors.
+
+    A tensor-product rule's points are a lattice, and every kernel that walks
+    them needs the same decomposition to index the one-dimensional tables.  It
+    lives here rather than in one emitter because the energy path, the residual
+    path and the inexact tangent all walk the same lattice.
+    """
+    if dim == 2:
+        return (
+            "%sconst int qx = q %% NQ1;" % indent,
+            "%sconst int qy = q / NQ1;" % indent,
+        )
+    if dim == 3:
+        return (
+            "%sconst int qx = q %% NQ1;" % indent,
+            "%sconst int qy = (q / NQ1) %% NQ1;" % indent,
+            "%sconst int qz = q / (NQ1 * NQ1);" % indent,
+        )
+    raise ValueError("tensor-product reference generation requires dim 2 or 3")
+
+
+def tensor_product_quadrature_weight_expr(dim, weight_name="q_weight_1d"):
+    """A lattice point's weight: the product of its one-dimensional weights."""
+    factors = ["%s[%s]" % (weight_name, name) for name in ("qx", "qy", "qz")[:dim]]
+    return " * ".join(factors)
