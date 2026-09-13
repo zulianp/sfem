@@ -125,6 +125,8 @@ from codegen.framework.emitters.quadrature_codegen import (
     quadrature_reference_accessor,
     reference_header_files,
     reference_include_lines,
+    tensor_product_q_index_lines,
+    tensor_product_quadrature_weight_expr,
 )
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.form_transformations import (
@@ -1482,7 +1484,7 @@ def _sfem_soa_pointwise_block_function(
                 kernel_constant("NS1", "%d" % quadrature_rule.tensor_product_n_shape_1d, indent="  "),
             ]
         )
-        lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "  "))
+        lines.extend(tensor_product_q_index_lines(quadrature_rule.dim, "  "))
 
     lines.extend(_work_item_loop_lines(source_builder, "  "))
     lines.append("    s_t u[NS * %d];" % dim)
@@ -1688,10 +1690,10 @@ def _append_sfem_soa_tensor_weak_form_lines(
             )
 
     lines.append("  for (int q = 0; q < NQ; ++q) {")
-    lines.extend(_tensor_product_q_index_lines(dim, "    "))
+    lines.extend(tensor_product_q_index_lines(dim, "    "))
     lines.append(
         "    const s_t qw = %s;"
-        % _tensor_product_quadrature_weight_expr(dim)
+        % tensor_product_quadrature_weight_expr(dim)
     )
     if uses_current:
         lines.extend(
@@ -2569,21 +2571,6 @@ def _append_sfem_soa_statement_lines(lines, expression_graph, output_name):
             output_index += 1
 
 
-def _tensor_product_q_index_lines(dim, indent):
-    if dim == 2:
-        return (
-            "%sconst int qx = q %% NQ1;" % indent,
-            "%sconst int qy = q / NQ1;" % indent,
-        )
-    if dim == 3:
-        return (
-            "%sconst int qx = q %% NQ1;" % indent,
-            "%sconst int qy = (q / NQ1) %% NQ1;" % indent,
-            "%sconst int qz = q / (NQ1 * NQ1);" % indent,
-        )
-    raise ValueError("tensor-product reference generation requires dim 2 or 3")
-
-
 def _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes):
     if (
         (
@@ -2730,11 +2717,6 @@ def _tensor_product_dynamic_reference_gradient_expr(
         node_axis_name = ("sx", "sy", "sz")[axis]
         table_name = grad_name if axis == derivative_axis else shape_name
         factors.append("%s[%s * NS1 + %s]" % (table_name, qp_name, node_axis_name))
-    return " * ".join(factors)
-
-
-def _tensor_product_quadrature_weight_expr(dim, weight_name="q_weight_1d"):
-    factors = ["%s[%s]" % (weight_name, name) for name in ("qx", "qy", "qz")[:dim]]
     return " * ".join(factors)
 
 
@@ -4244,7 +4226,7 @@ def _append_mesh_operator_isoparametric_flux(
     elif geometry_mode == "isoparametric" and form.weak_form is not None:
         lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
         if use_tensor_product_geometry:
-            lines.extend(_tensor_product_q_index_lines(dim, "      "))
+            lines.extend(tensor_product_q_index_lines(dim, "      "))
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
                 dim,
@@ -4875,10 +4857,10 @@ def _sfem_soa_mesh_operator_function(
     if form.weak_form is None:
         lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
         if use_tensor_product_reference:
-            lines.extend(_tensor_product_q_index_lines(dim, "      "))
+            lines.extend(tensor_product_q_index_lines(dim, "      "))
             lines.append(
                 "      const s_t tensor_q_weight = %s;"
-                % _tensor_product_quadrature_weight_expr(dim, tensor_weight_name)
+                % tensor_product_quadrature_weight_expr(dim, tensor_weight_name)
             )
 
     _append_mesh_operator_isoparametric_flux(
@@ -6261,7 +6243,7 @@ def _sfem_soa_mesh_objective_steps_function(
     elif geometry_mode == "isoparametric":
         lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
         if use_tensor_product_geometry:
-            lines.extend(_tensor_product_q_index_lines(dim, "      "))
+            lines.extend(tensor_product_q_index_lines(dim, "      "))
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
                 dim,
@@ -6565,10 +6547,10 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
         )
     lines.append("%sfor (int q = 0; q < NQ; ++q) {" % indent)
     if use_tensor_product_reference:
-        lines.extend(_tensor_product_q_index_lines(dim, indent + "  "))
+        lines.extend(tensor_product_q_index_lines(dim, indent + "  "))
         lines.append(
             "%s  const s_t qw = %s;"
-            % (indent, _tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+            % (indent, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
         )
     else:
         lines.append("%s  const s_t qw = %sq_weight[q];" % (indent, reference_prefix))

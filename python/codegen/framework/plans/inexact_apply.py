@@ -663,11 +663,9 @@ def projected_tangent(
     rule,
     adjugate,
     determinant,
-    state,
     is_deformation_gradient,
-    previous_state=None,
 ):
-    """`Sbar`'s integrand at one quadrature point, and that point's gradient symbols.
+    """`Sbar`'s integrand at one point, in that point's field-gradient symbols.
 
     This is the projection itself, and it lives here rather than in the
     emitter because two kernels need the same answer: the fused apply, which
@@ -692,8 +690,7 @@ def projected_tangent(
     gives the same value and the average is that value, which is the sense in
     which the kernel is exact there.
     """
-    dim, n_nodes = plan.dim, plan.n_nodes
-    inverse = adjugate / determinant
+    dim = plan.dim
 
     variables = list(flux_form.gradient)
     flux = list(flux_form.flux)
@@ -708,39 +705,44 @@ def projected_tangent(
     previous = tuple(flux_form.previous_gradient)
 
     # The integrand at *one* quadrature point, in symbols for that point's
-    # reference gradients.  It used to be the sum over the points, formed here
-    # by substituting each point's gradients and adding -- which inlines the
-    # whole tangent once per point, and for a HEX8 rule that is eight copies of
-    # the largest expression the generator produces.  Measured on the
-    # Kelvin-Voigt viscous tangent that reached 3855 statements in one basic
-    # block and 234.8 s and 4.45 GB of gcc.  The quadrature sum is a loop, the
-    # way it is in every other kernel in this framework, so this returns the
-    # body of that loop and the emitter writes the loop around it.
-    gradient_symbols = tuple(
-        tuple(sp.Symbol("gref_%d_%d" % (node, axis)) for axis in range(dim))
-        for node in range(n_nodes)
-    )
-
-    def physical(nodal, c, axis):
-        return sum(
-            nodal[c][j]
-            * sum(gradient_symbols[j][m] * inverse[m, axis] for m in range(dim))
-            for j in range(n_nodes)
-        )
+    # *physical field gradients*.  Two things used to be inlined here and are
+    # not any more.
+    #
+    # The first is the quadrature sum, which was formed by substituting each
+    # point's gradients and adding -- which inlines the whole tangent once per
+    # point, and for a HEX8 rule that is eight copies of the largest expression
+    # the generator produces.  Measured on the Kelvin-Voigt viscous tangent that
+    # reached 3855 statements in one basic block and 234.8 s and 4.45 GB of gcc.
+    # The quadrature sum is a loop, the way it is in every other kernel in this
+    # framework, so this returns the body of that loop and the emitter writes
+    # the loop around it.
+    #
+    # The second is `grad u` itself, which was inlined as the nodal contraction
+    # `sum_j u_{c,j} * sum_m dphi_j/dxi_m * inv_{m,axis}` at every one of its
+    # occurrences in the tangent.  That is the one thing this framework never
+    # spells inline: every other kernel computes the reference field gradient
+    # first -- by sum factorization on a tensor-product element, by the shared
+    # reference tables elsewhere -- pulls it through the geometry, and then
+    # evaluates the material in those `dim * dim` values.  Naming them here is
+    # what lets this kernel do the same, and it is what lets a tensor-product
+    # element reach `tensor_gradient` instead of carrying a private table of the
+    # element's full reference gradients.
+    gradient_symbols = field_gradient_symbols(dim, "gu")
+    previous_gradient_symbols = field_gradient_symbols(dim, "gz")
 
     substitution = {}
     for c in range(dim):
         for axis in range(dim):
-            substitution[variables[c * dim + axis]] = shift * int(c == axis) + (
-                physical(state, c, axis)
+            substitution[variables[c * dim + axis]] = (
+                shift * int(c == axis) + gradient_symbols[c][axis]
             )
     # The previous state is data, not a variable: it is substituted, never
     # differentiated against.
     if previous:
         for c in range(dim):
             for axis in range(dim):
-                substitution[previous[c * dim + axis]] = physical(
-                    previous_state, c, axis
+                substitution[previous[c * dim + axis]] = (
+                    previous_gradient_symbols[c][axis]
                 )
 
     integrand = [sp.Integer(0)] * plan.tangent_components
@@ -758,7 +760,85 @@ def projected_tangent(
             / determinant
         )
         integrand[slot] = pulled.subs(substitution)
-    return tuple(integrand), gradient_symbols
+    return tuple(integrand), gradient_symbols, previous_gradient_symbols
+
+
+def field_gradient_symbols(dim, role):
+    """`grad u` at one point, named -- `gu_<component>_<axis>`.
+
+    The material is evaluated in these and in nothing else, which is what makes
+    how they are *computed* a separate decision the element gets to make.
+    """
+    return tuple(
+        tuple(sp.Symbol("%s_%d_%d" % (role, component, axis)) for axis in range(dim))
+        for component in range(dim)
+    )
+
+
+def reference_field_gradient_symbols(dim, role):
+    """The same gradients before the geometry, on the reference cell."""
+    return tuple(
+        tuple(sp.Symbol("%s_ref_%d_%d" % (role, component, axis)) for axis in range(dim))
+        for component in range(dim)
+    )
+
+
+def basis_gradient_symbols(n_nodes, dim):
+    """One point's reference basis gradients, `dphi_<node>/dxi_<axis>`.
+
+    An element that evaluates its basis explicitly -- a simplex, from literals
+    or from the shared reference tables -- contracts these with the nodal values
+    to reach the reference field gradient.  A tensor-product element never forms
+    them: sum factorization produces the contracted answer directly, which is
+    the whole point of it.
+    """
+    return tuple(
+        tuple(sp.Symbol("gref_%d_%d" % (node, axis)) for axis in range(dim))
+        for node in range(n_nodes)
+    )
+
+
+def reference_field_gradient_definitions(
+    nodal, basis_symbols, reference_symbols, n_nodes, dim
+):
+    """`du_c/dxi_m = sum_j u_{c,j} * dphi_j/dxi_m`, as (symbol, expression) pairs.
+
+    The explicit contraction, for the elements that do it explicitly.
+    """
+    return [
+        (
+            reference_symbols[component][axis],
+            sum(
+                nodal[component][node] * basis_symbols[node][axis]
+                for node in range(n_nodes)
+            ),
+        )
+        for component in range(dim)
+        for axis in range(dim)
+    ]
+
+
+def physical_field_gradient_definitions(
+    reference_symbols, gradient_symbols, adjugate, determinant, dim
+):
+    """`du_c/dx_a = sum_m du_c/dxi_m * adj_{m,a} / det`, as (symbol, expression) pairs.
+
+    The second of the two steps, and the one that is the same for every element:
+    whatever produced the reference gradient, the geometry enters here and only
+    here.
+    """
+    inverse = adjugate / determinant
+    return [
+        (
+            gradient_symbols[component][axis],
+            sum(
+                reference_symbols[component][m] * inverse[m, axis]
+                for m in range(dim)
+            ),
+        )
+        for component in range(dim)
+        for axis in range(dim)
+    ]
 
 
 def quadrature_accumulation(rule):
@@ -771,6 +851,47 @@ def quadrature_accumulation(rule):
     weights = tuple(sp.nsimplify(weight) for weight in rule.weights)
     measure = sum(weights, sp.Integer(0))
     return tuple(weight / measure for weight in weights)
+
+
+def quadrature_measure(rule):
+    """The reciprocal of the rule's total weight, as one constant.
+
+    `Sbar` is the weighted *average* over the element, so a point's share is
+    `w_q / sum(w)`.  The shared reference tables hold the rule's own weights, so
+    the division rides beside them as a single number rather than appearing in
+    every summed expression.
+    """
+    weights = tuple(sp.nsimplify(weight) for weight in rule.weights)
+    return sp.Integer(1) / sum(weights, sp.Integer(0))
+
+
+def tensor_product_weight_measure(rule, dim):
+    """The same constant, against the *one-dimensional* weights.
+
+    A tensor-product rule's point weight is the product of the one-dimensional
+    weights the shared `q_weight_1d` table already holds, so the kernel can read
+    that table and scale once instead of carrying the element's own weight
+    table.  The ratio is checked to be a single number rather than assumed: if a
+    rule ever orders its points differently from `q = qx + NQ1 * (qy + NQ1 * qz)`
+    the assumption fails here, at generation time, instead of producing a kernel
+    that quietly weights the wrong point.
+    """
+    weights_1d = tuple(sp.nsimplify(weight) for weight in rule.tensor_product_weights_1d)
+    n_1d = len(weights_1d)
+    measures = set()
+    for point, share in enumerate(quadrature_accumulation(rule)):
+        index = point
+        product = sp.Integer(1)
+        for _axis in range(dim):
+            product *= weights_1d[index % n_1d]
+            index //= n_1d
+        measures.add(sp.Rational(share / product))
+    if len(measures) != 1:
+        raise ValueError(
+            "tensor-product weights do not reproduce the rule's weights for '%s'"
+            % rule.element_type
+        )
+    return measures.pop()
 
 
 def reference_gradients_by_point(rule, n_nodes, dim):

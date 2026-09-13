@@ -1,5 +1,8 @@
 #pragma once
 #include "../../../kernel_math.hpp"
+#include "../../../reference/line_p1_q2.hpp"
+#include "../../../reference/quad_line_q2.hpp"
+#include "../../../tensor_product_kernels.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -21,8 +24,9 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)((nelements - evb) < (ptrdiff_t)VS ? (nelements - evb) : (ptrdiff_t)VS);
     static constexpr int NQ = 4;
-    static constexpr s_t QGRAD[32] = {s_t(-0.78867513459481287), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(0.21132486540518711), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(-0.78867513459481287), s_t(0.21132486540518711), s_t(-0.21132486540518711), s_t(0.78867513459481287), s_t(0.21132486540518711), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(-0.21132486540518711), s_t(-0.21132486540518711), s_t(0.21132486540518711), s_t(-0.78867513459481287), s_t(0.78867513459481287), s_t(0.78867513459481287), s_t(-0.78867513459481287), s_t(0.21132486540518711)};
-    static constexpr s_t QWEIGHT[4] = {s_t(0.25), s_t(0.25), s_t(0.25), s_t(0.25)};
+    static constexpr int NQ1 = 2;
+    const s_t *const RSTR q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
+    static constexpr s_t QMEASURE = s_t(1);
     s_t btangent_acc[10][VS];
     const g_t *const RSTR bg_adj0 = g_adj0 + evb;
     const g_t *const RSTR bg_adj1 = g_adj1 + evb;
@@ -53,6 +57,8 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl
         btangent_acc[9][lane] = s_t(0);
     }
     for (int q = 0; q < NQ; ++q) {
+      const int qx = q % NQ1;
+      const int qy = q / NQ1;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
       const s_t adjugate0 = s_t(bg_adj0[lane]);
@@ -60,7 +66,7 @@ static SFEM_INLINE int linear_elasticity_quad4_inexact_apply_tangent_a_msoa_impl
       const s_t adjugate2 = s_t(bg_adj2[lane]);
       const s_t adjugate3 = s_t(bg_adj3[lane]);
       const s_t determinant = s_t(bg_det0[lane]);
-        const s_t qw = QWEIGHT[q];
+        const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * QMEASURE;
             const s_t integrand_t0 = pow_m1(determinant);
             const s_t integrand_t1 = pow_2(adjugate1);
             const s_t integrand_t2 = pow_2(adjugate0);
