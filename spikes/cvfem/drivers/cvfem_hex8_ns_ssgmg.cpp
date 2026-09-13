@@ -4213,6 +4213,8 @@ int main(int argc, char **argv) {
     // state. The level states are refreshed per Newton step below, since they do.
     std::shared_ptr<GmgLevels> gmg;
     if (use_gmg == 1) {  // 2 is the no-hierarchy control and must not build one
+        std::printf("preconditioner: geometric multigrid (smoother %s)\n",
+                    smesh::Env::read_string("SFEM_SMOOTHER", "vanka").c_str());
         gmg = build_gmg(f, op, xbuf, gmg_smooth);
         if (gmg) build_state_weights(*gmg);
         if (gmg) build_transfer_matrices(*gmg);
@@ -5093,6 +5095,19 @@ int main(int argc, char **argv) {
                 //            solve from the question entirely, which is what you want when
                 //            asking whether Newton and the conservation property are sound.
                 const std::string pc = smesh::Env::read_string("SFEM_PRECOND", "bjacobi");
+                // SAY WHICH ONE. The driver has never printed the preconditioner it selected,
+                // and over the course of this work four separate results were decided by a
+                // solver choice nobody had named -- BiCGStab inherited from a conditional
+                // default, block-Jacobi inherited from SFEM_PRECOND, a verification group that
+                // never ran, and a driver path that did not exist. A line of output is the
+                // cheapest possible guard against the next one.
+                // Once, not once per Newton step: the preconditioner is rebuilt every step
+                // and an unconditional print buries the rest of the output.
+                static bool said_pc = false;
+                if (!said_pc) {
+                    std::printf("preconditioner: %s (no multigrid)\n", pc.c_str());
+                    said_pc = true;
+                }
                 const real_t      om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
                 // simple and vanka need apply_blocks and a micro-element lattice, neither of
                 // which a flat mesh has. Both do say so further down, but from inside the
