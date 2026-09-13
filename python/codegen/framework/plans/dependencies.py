@@ -76,6 +76,37 @@ class ResidualCodegenDependencies:
 TEST_QUANTITY_ORDER = ("value", "gradient")
 
 
+def live_test_coefficients(dependencies, row, dim):
+    """One field row's live coefficients, as ``(kind, axis, name)``.
+
+    A coefficient multiplies the test function's value or one of its
+    derivatives, and ``TEST_QUANTITY_ORDER`` above is the order the two are
+    declared in.  Which of a row's coefficients exist follows from the lowered
+    form: a structurally zero one contributes nothing, and is neither staged nor
+    assigned nor contracted.
+
+    The gradient half of that was already a comprehension filter at four sites
+    in ``emitters/residual_codegen.py`` -- an absent coefficient simply not
+    appearing in the sequence -- while the value half was an ``if`` beside it
+    saying the same thing a different way.  One sequence says both, and a row
+    with nothing live yields nothing rather than being skipped by a test.
+
+    ``kind`` is ``TEST_QUANTITY_ORDER``'s word and ``axis`` is the derivative's
+    direction, or ``None`` for the value.  What the coefficient is *multiplied
+    by* stays with the caller: the local bodies spell the test factor one way
+    and the mixed ones another, with the field and the test index in the name.
+    """
+    coefficients = []
+    if dependencies.value_coefficients[row]:
+        coefficients.append(("value", None, "value_coeff%d" % row))
+    coefficients.extend(
+        ("gradient", axis, "grad_coeff%d_%d" % (row, axis))
+        for axis in range(dim)
+        if dependencies.gradient_coefficients[row][axis]
+    )
+    return tuple(coefficients)
+
+
 def publishes_kernel(dependencies):
     """Whether this form contributes anything, and so has a kernel at all.
 

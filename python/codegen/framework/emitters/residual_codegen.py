@@ -92,6 +92,7 @@ from codegen.framework.plans.residual_structure import (
     residual_local_phase_plans,
     residual_mesh_phase_plans,
 )
+from codegen.framework.plans.dependencies import live_test_coefficients
 from codegen.framework.plans.geometry_quantities import (
     local_geometry_streams,
     mesh_geometry_argument_names,
@@ -2304,40 +2305,22 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
         n_shape_name = layout.n_shape_constant(field)
         reference_index = layout.reference_index(row)
         for test in range(layout.n_shape(row)):
-            if dependencies.value_coefficients[row]:
-                lines.append(
-                    "      const s_t test_value_%s_%d = field_shape[%d][%s];"
-                    % (
-                        field.name,
-                        test,
-                        reference_index,
-                        c_sum(c_product("q", n_shape_name), test),
-                    )
+            # One declaration per live coefficient, in the order the plan lists
+            # them.  The value and the gradient were an `if` and a `continue`
+            # saying, twice, what the sequence says once.
+            lines.extend(
+                _MIXED_TEST_DECLARATION[kind](
+                    axis, field.name, test, reference_index, n_shape_name, dim
                 )
-            for d in range(dim):
-                if not dependencies.gradient_coefficients[row][d]:
-                    continue
-                terms = [
-                    "fgref[%s][%s] * adj%d"
-                    % (
-                        c_sum(c_product(reference_index, "ND"), k),
-                        c_sum(c_product("q", n_shape_name), test),
-                        k * dim + d,
-                    )
-                    for k in range(dim)
-                ]
-                lines.append(
-                    "      const s_t test_grad%d_%s_%d = (%s) / det;"
-                    % (d, field.name, test, " + ".join(terms))
+                for kind, axis, _name in live_test_coefficients(
+                    dependencies, row, dim
                 )
-            terms = []
-            if dependencies.value_coefficients[row]:
-                terms.append("value_coeff%d * test_value_%s_%d" % (row, field.name, test))
-            terms.extend(
-                "grad_coeff%d_%d * test_grad%d_%s_%d" % (row, d, d, field.name, test)
-                for d in range(dim)
-                if dependencies.gradient_coefficients[row][d]
             )
+            terms = [
+                "%s * %s"
+                % (name, _MIXED_TEST_FACTOR[kind](axis, field.name, test))
+                for kind, axis, name in live_test_coefficients(dependencies, row, dim)
+            ]
             if terms:
                 lines.append(
                     "      output[%d][lane] += q_weight[q] * det * (%s);"
@@ -2538,10 +2521,9 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         )
     )
     for row, field in enumerate(system.fields):
-        if dependencies.value_coefficients[row]:
-            value = "qw * det * value_coeff%d" % row
-        else:
-            value = "s_t(0)"
+        value = _VALUE_COEFFICIENT_TERM[
+            bool(dependencies.value_coefficients[row])
+        ](row)
         lines.append(
             "      %s_value_coeff_q[lane] = %s;" % (field.name, value)
         )
@@ -3030,18 +3012,11 @@ def _simplex_local_body(
                     )
                     for d in range(dim)
                 )
-    for row, _field in enumerate(system.fields):
-        if dependencies.value_coefficients[row]:
-            staging.append(
-                BufferDeclNode("s_t", "value_coeff%d_values" % row, ("VS",))
-            )
-        staging.extend(
-            BufferDeclNode(
-                "s_t", "grad_coeff%d_%d_values" % (row, d), ("VS",)
-            )
-            for d in range(dim)
-            if dependencies.gradient_coefficients[row][d]
-        )
+    staging.extend(
+        BufferDeclNode("s_t", "%s_values" % name, ("VS",))
+        for row in range(len(system.fields))
+        for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
+    )
 
     # Zero the staging buffers, then accumulate over trial functions.
     gather = []
@@ -3144,22 +3119,14 @@ def _simplex_local_body(
     material.extend(
         _coefficient_evaluation_nodes(system, coefficients, dependencies)
     )
-    for row, _field in enumerate(system.fields):
-        if dependencies.value_coefficients[row]:
-            material.append(
-                AssignmentNode(
-                    expr_ref("value_coeff%d_values[lane]" % row),
-                    expr_ref("value_coeff%d" % row),
-                )
-            )
-        material.extend(
-            AssignmentNode(
-                expr_ref("grad_coeff%d_%d_values[lane]" % (row, d)),
-                expr_ref("grad_coeff%d_%d" % (row, d)),
-            )
-            for d in range(dim)
-            if dependencies.gradient_coefficients[row][d]
+    material.extend(
+        AssignmentNode(
+            expr_ref("%s_values[lane]" % name),
+            expr_ref(name),
         )
+        for row in range(len(system.fields))
+        for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
+    )
 
     # Contract the staged coefficients against each test function.
     test_body = list(_geometry_value_nodes(dependencies, dim))
@@ -3181,14 +3148,10 @@ def _simplex_local_body(
             )
         )
     for row in range(len(system.fields)):
-        terms = []
-        if dependencies.value_coefficients[row]:
-            terms.append("value_coeff%d_values[lane] * test_value" % row)
-        terms.extend(
-            "grad_coeff%d_%d_values[lane] * test_grad%d" % (row, d, d)
-            for d in range(dim)
-            if dependencies.gradient_coefficients[row][d]
-        )
+        terms = [
+            "%s_values[lane] * %s" % (name, _LOCAL_TEST_FACTOR[kind](axis))
+            for kind, axis, name in live_test_coefficients(dependencies, row, dim)
+        ]
         if terms:
             test_body.append(
                 ScatterNode(
@@ -3850,11 +3813,9 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         _coefficient_evaluation_nodes(system, coefficients, dependencies)
     )
     for row in range(n_fields):
-        value = (
-            "qw * det * value_coeff%d" % row
-            if dependencies.value_coefficients[row]
-            else "s_t(0)"
-        )
+        value = _VALUE_COEFFICIENT_TERM[
+            bool(dependencies.value_coefficients[row])
+        ](row)
         quadrature_body.append(
             BufferDeclNode(
                 "s_t *const RSTR", "value_coeff_q%d" % row, (),
@@ -5419,6 +5380,66 @@ def _kernel_diagnostics_lines(
         "}",
     ]
     return lines
+
+
+def _mixed_test_value_declaration(axis, field, test, reference_index,
+                                  n_shape_name, dim):
+    """The test function's value at this point."""
+    return "      const s_t test_value_%s_%d = field_shape[%d][%s];" % (
+        field, test, reference_index, c_sum(c_product("q", n_shape_name), test)
+    )
+
+
+def _mixed_test_gradient_declaration(axis, field, test, reference_index,
+                                     n_shape_name, dim):
+    """One physical derivative of it, mapped through the adjugate."""
+    terms = [
+        "fgref[%s][%s] * adj%d"
+        % (
+            c_sum(c_product(reference_index, "ND"), k),
+            c_sum(c_product("q", n_shape_name), test),
+            k * dim + axis,
+        )
+        for k in range(dim)
+    ]
+    return "      const s_t test_grad%d_%s_%d = (%s) / det;" % (
+        axis, field, test, " + ".join(terms)
+    )
+
+
+#: What a mixed body declares for a coefficient of each kind.  Which kinds are
+#: live is `plans.dependencies.live_test_coefficients`; these are the two
+#: declarations, one per kind.
+_MIXED_TEST_DECLARATION = {
+    "value": _mixed_test_value_declaration,
+    "gradient": _mixed_test_gradient_declaration,
+}
+
+
+#: The same, in a mixed body, where the test function's name carries the field
+#: and the test index because several spaces share one kernel.
+_MIXED_TEST_FACTOR = {
+    "value": lambda axis, field, test: "test_value_%s_%d" % (field, test),
+    "gradient": lambda axis, field, test: "test_grad%d_%s_%d" % (axis, field, test),
+}
+
+#: A row's value-coefficient contribution to the quadrature buffer, or the zero
+#: that stands in its place.  The buffer exists for every row whatever the form
+#: needs, so unlike the staging above this cannot be an absent entry -- a row
+#: with no value coefficient writes a zero rather than writing nothing.
+_VALUE_COEFFICIENT_TERM = {
+    True: lambda row: "qw * det * value_coeff%d" % row,
+    False: lambda row: "s_t(0)",
+}
+
+
+#: What a coefficient of each kind multiplies, in a local body.  The plan says
+#: which coefficients are live and what they are called; this is the test
+#: function's half of the product, which is the body's own spelling.
+_LOCAL_TEST_FACTOR = {
+    "value": lambda axis: "test_value",
+    "gradient": lambda axis: "test_grad%d" % axis,
+}
 
 
 def _blocked_adjugate_array_lines(dependencies, dim, extent, indent):
