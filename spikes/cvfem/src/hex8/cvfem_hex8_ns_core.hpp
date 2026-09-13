@@ -1099,13 +1099,18 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     // SFEM_CONV_HO: deferred-correction convection. Off by default, and off is bit-for-bit the
     // scheme that every recorded number in this repository was measured with.
     //
-    // It currently runs only the sum-factored atomic path. That is a scope limit, not a design
-    // one: the correction needs the element's node coordinates and its eight nodal velocity
+    // On the FLAT mesh it runs only the sum-factored atomic path, so turning it on forces that
+    // path. The correction needs the element's node coordinates and its eight nodal velocity
     // gradients, and threading those through the packed SIMD face kernel is a larger change
-    // than the question this is being built to answer -- whether extrapolating the donor value
-    // recovers the order that the Re = 100 manufactured ladder says the first-order flux
-    // loses. Forcing the path here rather than silently producing a first-order answer under
-    // the packed layout is the difference between a limitation and a bug.
+    // than the question this was built to answer. Forcing the path here rather than silently
+    // producing a first-order answer under the packed layout is the difference between a
+    // limitation and a bug.
+    //
+    // The semi-structured path needs no such forcing: sscvfem_residual gathers through a
+    // local-to-global index array already, so the correction rides the production kernel
+    // directly. At equal resolution the two agree to every digit -- u_l2 2.422124e-02 at
+    // 19,652 dofs on both -- which is what says the semi-structured wiring is right, since
+    // a lattice at level 4 and a flat mesh of the same spacing are the same discretisation.
     d.conv_ho      = smesh::Env::read<int>("SFEM_CONV_HO", 0);
     // 0 = unlimited, 1 = bounded face. Default 1 when the correction is on: an unlimited
     // reconstruction is right only where the field is smooth, and defaulting to the setting
