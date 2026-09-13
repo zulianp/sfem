@@ -263,6 +263,58 @@ static void test_sideset_flux(sfem::Context &ctx, const int ss_level) {
         check_close((double)qw, W * RHO * U * LY * LZ, 1e-12, msg(tag, "constant weight scales the flux"));
 }
 
+// ------------------------------------------------- 5. plane Poiseuille, the budget's control
+//
+// The analytic profile, imposed directly -- no solver, so a disagreement is the diagnostic
+// and nothing else. u = 4 U y (Ly - y) / Ly^2 in x, zero elsewhere, which is pure shear with
+//
+//     gamma(y) = du_x/dy = 4 U (Ly - 2y) / Ly^2
+//     S:S = gamma^2 / 2        so     eps_visc = mu * integral gamma^2 dV
+//     integral_0^Ly gamma^2 dy = 16 U^2 / (3 Ly)
+//
+// This is the shape the verification matrix will judge the budget on, so it has to be right
+// here first, on a field where the answer is a closed form rather than a converged solve.
+static void test_poiseuille(sfem::Context &ctx, const int n) {
+    char tag[64];
+    std::snprintf(tag, sizeof(tag), "poi n=%d", n);
+
+    Setup s;
+    build(s, ctx, n);
+    if (!s.mesh) return;
+    const auto *const py = s.mesh->points()->data()[1];
+
+    const double U = 1.0;
+    for (ptrdiff_t i = 0; i < s.nnodes; ++i) {
+        const double Y = py[i];
+        s.x[(size_t)i * N_FIELDS + 0] = (real_t)(4.0 * U * Y * (LY - Y) / (LY * LY));
+        s.x[(size_t)i * N_FIELDS + 1] = 0;
+        s.x[(size_t)i * N_FIELDS + 2] = 0;
+        s.x[(size_t)i * N_FIELDS + 3] = 0;
+    }
+    if (s.op->nodal_velocity_gradient(s.x.data(), s.g.data()) != SFEM_SUCCESS) {
+        check(false, msg(tag, "gradient succeeds"));
+        return;
+    }
+
+    // The peak shear is at the wall and is what the closed form is dominated by, so report it
+    // alongside: a reconstruction that is right in the interior and wrong at the wall shows up
+    // here and not in the integral.
+    double gmax = 0;
+    for (ptrdiff_t i = 0; i < s.nnodes; ++i) gmax = std::fmax(gmax, std::fabs((double)s.g[(size_t)i * 9 + 1]));
+
+    const auto   st   = cvfem_diag::contract(s.nnodes, s.x.data(), s.g.data(), s.vol.data(), RHO, MU, 0.0);
+    const double want = MU * (16.0 * U * U / (3.0 * LY)) * LX * LZ;
+    const double wantE = 0.5 * RHO * (16.0 * U * U / 30.0) * LX * LY * LZ;
+    std::printf("%-62s      (gamma_max %.4f want %.4f)\n", msg(tag, "peak shear"), gmax, 4.0 * U / LY);
+    // For pure shear S:S and half the squared vorticity are the SAME contraction of the same
+    // array, so eps_visc must be exactly 2 mu times the enstrophy. If that identity fails,
+    // the disagreement is inside contract and not in the reconstruction feeding it.
+    check_close(st.eps_visc, 2.0 * MU * st.enstrophy, 1e-12,
+                msg(tag, "eps_visc == 2 mu * enstrophy (pure shear)"));
+    check_close(st.E, wantE, 5e-3, msg(tag, "kinetic energy"));
+    check_close(st.eps_visc, want, 5e-2, msg(tag, "dissipation is mu * int gamma^2"));
+}
+
 int main(int argc, char **argv) {
     sfem::Context ctx(argc, argv);
     test_linear(ctx);
@@ -272,6 +324,8 @@ int main(int argc, char **argv) {
     test_linear(ctx, 4);
     test_cfl(ctx);
     test_trig(ctx);
+    test_poiseuille(ctx, 16);
+    test_poiseuille(ctx, 32);
     test_sideset_flux(ctx, 1);
     test_sideset_flux(ctx, 4);
     std::printf("\n%s\n", g_failures ? "FAILED" : "PASSED");

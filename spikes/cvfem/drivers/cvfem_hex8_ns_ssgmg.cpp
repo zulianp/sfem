@@ -12,6 +12,7 @@
 // driver states the problem and the operator stays opaque.
 
 #include "cvfem_hex8_ns_op.hpp"
+#include "cvfem_flow_diagnostics.hpp"
 #include "cvfem_fgmres.hpp"
 #include "cvfem_ss_transfer.hpp"
 #include "cvfem_ss_galerkin_api.hpp"
@@ -35,8 +36,11 @@
 #include "smesh_semistructured.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
+#include <system_error>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -204,7 +208,12 @@ private:
                      "directly comparable.\n"
                      "\n"
                      "Environment:\n"
-                     "  SFEM_CASE            poiseuille | couette | cavity | cavity_reg | mms (required)\n"
+                     "  SFEM_CASE            poiseuille | couette | cavity | cavity_reg | mms | step |\n"
+                     "                       step_turb | pump | nozzle (required)\n"
+                     "  SFEM_NOZZLE_RE       FDA nozzle: throat Reynolds number (default 500)\n"
+                     "  SFEM_NOZZLE_NCORE SFEM_NOZZLE_NBORE SFEM_NOZZLE_NOUTER   nozzle cross-section\n"
+                     "                       cells: core square (even), bore rings, outer rings\n"
+                     "  SFEM_NOZZLE_NAXIAL   nozzle axial cells: \"inlet cone throat outlet\"\n"
                      "  SFEM_N               cells in y (default 8)\n"
                      "  SFEM_NX SFEM_NY SFEM_NZ   override cells per direction\n"
                      "  SFEM_LX SFEM_LY SFEM_LZ   channel size (default 4, 1, 1)\n"
@@ -2791,17 +2800,42 @@ int main(int argc, char **argv) {
     // arithmetic in that identity is visible rather than buried.
     const bool        want_pump   = case_req == "pump" || case_req == "diaphragm" ||
                            case_req == "diaphragm_pump";
+    // The FDA benchmark nozzle: SI units and the benchmark's blood analogue, so rho and mu
+    // default to its values rather than to the channel's. See NozzleGeometry in
+    // cvfem_ns_channel_case.hpp. Lx, Ly and Lz are its bounding box; nothing below uses them
+    // to find a boundary, because none of its boundaries but the two ends is a plane.
+    const bool        want_nozzle = case_req == "nozzle" || case_req == "fda_nozzle";
+    const cvfem_case::NozzleGeometry<real_t> nozzle;
     // 21 x 2 x 4 for the turbulent step: one step height of inlet, twenty downstream so the
     // shear layer has room to break down and reattach well clear of the outflow, and a span
     // of four step heights -- the box width the reference DNS uses, which is the narrowest
     // that does not constrain the spanwise structures it is there to permit.
-    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", want_step_turb ? 21 : (want_step ? 10 : ((want_mms || want_cavreg) ? 2 : ((want_cavity || want_pump) ? 1 : 4))));
-    const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg || want_any_step) ? 2 : 1);
-    const real_t      Lz         = smesh::Env::read<real_t>("SFEM_LZ", want_step_turb ? 4 : ((want_mms || want_cavreg) ? 2 : 1));
-    const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", 1);
-    const real_t      mu         = smesh::Env::read<real_t>("SFEM_MU", 0.01);
-    const real_t      U          = smesh::Env::read<real_t>("SFEM_U", 1);
-    const std::string geom_name  = smesh::Env::read_string("SFEM_GEOM", "affine");
+    const real_t      Lx         = want_nozzle ? nozzle.x_out - nozzle.x_in : smesh::Env::read<real_t>("SFEM_LX", want_step_turb ? 21 : (want_step ? 10 : ((want_mms || want_cavreg) ? 2 : ((want_cavity || want_pump) ? 1 : 4))));
+    const real_t      Ly         = want_nozzle ? 2 * nozzle.r_inlet : smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg || want_any_step) ? 2 : 1);
+    const real_t      Lz         = want_nozzle ? 2 * nozzle.r_inlet : smesh::Env::read<real_t>("SFEM_LZ", want_step_turb ? 4 : ((want_mms || want_cavreg) ? 2 : 1));
+    const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", want_nozzle ? 1056 : 1);
+    const real_t      mu         = smesh::Env::read<real_t>("SFEM_MU", want_nozzle ? 0.0035 : 0.01);
+    // The nozzle is specified by its throat Reynolds number, so its velocity scale is the
+    // bulk THROAT velocity that number implies, and its length scale is the throat diameter.
+    // Every "Re" this driver prints and continues in is rho U L_re / mu, which for the nozzle
+    // is then the benchmark's Re_t and for every other case is the Ly-based number it always
+    // was. SFEM_U is refused for the nozzle rather than ignored: two knobs for one quantity is
+    // a way to believe a run was at a Reynolds number it was not.
+    const real_t      nozzle_re  = smesh::Env::read<real_t>("SFEM_NOZZLE_RE", 500);
+    if (want_nozzle && std::getenv("SFEM_U")) {
+        std::fprintf(stderr, "nozzle: set SFEM_NOZZLE_RE (the throat Reynolds number), not SFEM_U\n");
+        return EXIT_FAILURE;
+    }
+    const real_t      U          = want_nozzle ? cvfem_case::nozzle_throat_velocity(nozzle, nozzle_re, rho, mu)
+                                               : smesh::Env::read<real_t>("SFEM_U", 1);
+    const real_t      L_re       = want_nozzle ? 2 * nozzle.r_throat : Ly;
+    // Isoparametric by default on the nozzle, because its elements are not affine and the
+    // affine kernels would silently integrate a different geometry.
+    const std::string geom_name  = smesh::Env::read_string("SFEM_GEOM", want_nozzle ? "isoparam" : "affine");
+    if (want_nozzle && geom_name != "isoparam") {
+        std::fprintf(stderr, "nozzle: SFEM_GEOM must be isoparam -- the mesh is not affine\n");
+        return EXIT_FAILURE;
+    }
     const int         max_newton = smesh::Env::read<int>("SFEM_NL_MAX_IT", 40);
     // Transient stepping. SFEM_DT <= 0 -- the default -- is the steady solve every existing
     // case runs, and nothing below changes for it. With a timestep the whole continuation
@@ -2865,9 +2899,47 @@ int main(int argc, char **argv) {
 
     const real_t step_x = smesh::Env::read<real_t>("SFEM_STEP_X", 1);
     const real_t step_y = smesh::Env::read<real_t>("SFEM_STEP_Y", 1);
-    auto mesh = want_any_step ? smesh::Mesh::create_hex8_lshape(ctx->communicator(), nx, ny, nz, Lx, Ly, Lz,
-                                                            step_x, step_y)
-                              : smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
+    std::shared_ptr<smesh::Mesh> mesh;
+    if (want_nozzle) {
+        // Flat only. The semi-structured operator hoists one Jacobian per macro element, which
+        // is exact for an affine macro element and wrong for every element of this mesh; a
+        // curved semi-structured path is future work, and until it exists the run is refused
+        // rather than handed a wrong operator.
+        if (smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1) > 1) {
+            std::fprintf(stderr, "nozzle: SFEM_ELEMENT_REFINE_LEVEL > 1 is not supported -- the "
+                                 "semi-structured operator requires affine macro elements\n");
+            return EXIT_FAILURE;
+        }
+        // Resolution, in cells: across the core square, ring layers out to the bore, ring
+        // layers from the bore to the expanded pipe, and per axial segment (inlet pipe, cone,
+        // throat, expanded pipe).
+        const ptrdiff_t n_core  = smesh::Env::read<int>("SFEM_NOZZLE_NCORE", 4);
+        const ptrdiff_t n_bore  = smesh::Env::read<int>("SFEM_NOZZLE_NBORE", 2);
+        const ptrdiff_t n_outer = smesh::Env::read<int>("SFEM_NOZZLE_NOUTER", 3);
+        const std::string axial = smesh::Env::read_string("SFEM_NOZZLE_NAXIAL", "8 6 16 32");
+        long              na[4];
+        if (std::sscanf(axial.c_str(), "%ld %ld %ld %ld", &na[0], &na[1], &na[2], &na[3]) != 4) {
+            std::fprintf(stderr, "nozzle: SFEM_NOZZLE_NAXIAL must be four cell counts, got '%s'\n",
+                         axial.c_str());
+            return EXIT_FAILURE;
+        }
+        const auto &g = nozzle;
+        mesh          = smesh::Mesh::create_hex8_nozzle(
+                ctx->communicator(),
+                {(smesh::geom_t)g.x_in, (smesh::geom_t)g.x_cone, (smesh::geom_t)g.x_throat,
+                 (smesh::geom_t)g.x_expansion, (smesh::geom_t)g.x_out},
+                {(smesh::geom_t)g.r_inlet, (smesh::geom_t)g.r_inlet, (smesh::geom_t)g.r_throat,
+                 (smesh::geom_t)g.r_throat, (smesh::geom_t)g.r_throat},
+                {(ptrdiff_t)na[0], (ptrdiff_t)na[1], (ptrdiff_t)na[2], (ptrdiff_t)na[3]},
+                3, (smesh::geom_t)g.r_inlet, n_core, n_bore, n_outer);
+        if (mesh)
+            std::printf("nozzle: mesh core %td  bore rings %td  outer rings %td  axial %ld %ld %ld %ld\n",
+                        n_core, n_bore, n_outer, na[0], na[1], na[2], na[3]);
+    } else {
+        mesh = want_any_step ? smesh::Mesh::create_hex8_lshape(ctx->communicator(), nx, ny, nz, Lx, Ly, Lz,
+                                                               step_x, step_y)
+                             : smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
+    }
     if (!mesh) {
         std::fprintf(stderr, "mesh generation failed\n");
         return EXIT_FAILURE;
@@ -2970,9 +3042,12 @@ int main(int argc, char **argv) {
     // knob supplies the missing control -- a box that differs from the working Poiseuille
     // case in the outlet treatment and nothing else -- and it is off by default, so no
     // existing run changes.
+    // The nozzle's outlet is always the do-nothing outflow: there is no outlet profile to
+    // prescribe, since the jet has not finished decaying where the domain is cut.
     const bool want_natural_outlet =
-            want_any_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet"
-                          : smesh::Env::read_string("SFEM_OUTLET", "dirichlet") == "natural";
+            want_nozzle ? true
+            : want_any_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet"
+                            : smesh::Env::read_string("SFEM_OUTLET", "dirichlet") == "natural";
     // A traction or pressure condition names one of these sidesets, so they have to exist
     // whether or not the outlet is natural. Read here rather than where the operator is
     // configured, several hundred lines below, because the sidesets are built now and a
@@ -2996,17 +3071,40 @@ int main(int argc, char **argv) {
     // here rather than a coincidence of naming.
     const bool outlet_governed = want_natural_outlet || want_traction_sideset == "outlet" ||
                                  want_pressure_sideset == "outlet";
-    std::shared_ptr<smesh::Sideset> step_skin, step_outlet;
+    // SFEM_DIAG_CSV names a file to write the flow diagnostics and the kinetic-energy budget
+    // to, one row per time step (one row total for a steady solve). Empty -- the default --
+    // means none of it runs and no existing number moves.
+    //
+    // It is read here rather than beside the other output knobs because the budget's boundary
+    // power is an integral over named sidesets, and the sidesets are built a few lines below.
+    const std::string diag_csv  = smesh::Env::read_string("SFEM_DIAG_CSV", "");
+    const bool        want_diag = !diag_csv.empty();
+
+    std::shared_ptr<smesh::Sideset> step_skin, step_outlet, step_inlet;
     // Kept so they survive to_semistructured, which builds a new Mesh and copies none.
     std::shared_ptr<smesh::Sideset> pump_skin, pump_port, pump_diaphragm;
-    if (!want_pump && (want_any_step || want_natural_outlet || want_named_bc)) {
+    if (!want_pump && (want_any_step || want_natural_outlet || want_named_bc || want_diag)) {
         step_skin = smesh::skin_sideset(mesh);
-        auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)Lx, 1e-6);
+        // The nozzle's outlet is the plane x = x_out, not x = Lx: its bounding box starts at
+        // x_in < 0. Its two ends are the only planes it has, so a plane selector is exact there.
+        const smesh::geom_t x_outlet = (smesh::geom_t)(want_nozzle ? nozzle.x_out : Lx);
+        auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, x_outlet, 1e-6);
         if (!step_skin || outs.empty()) {
             std::fprintf(stderr, "could not build the boundary sidesets\n");
             return EXIT_FAILURE;
         }
         step_outlet = outs.front();
+        if (want_nozzle) {
+            // Named so the inflow nodes and the inflow flux both come from this one set of
+            // faces rather than from a coordinate test on nodes.
+            auto ins = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)nozzle.x_in, 1e-6);
+            if (ins.empty()) {
+                std::fprintf(stderr, "nozzle: could not build the inlet sideset\n");
+                return EXIT_FAILURE;
+            }
+            mesh->add_sideset("inlet", ins.front());
+            std::printf("sidesets: inlet %td faces\n", (ptrdiff_t)ins.front()->parent()->size());
+        }
         // Register them on the flat mesh as well, so a run at refine_level 1 -- which never
         // reaches the re-attachment below, because it does not rebuild the mesh -- still has
         // the named sidesets the operator asks for.
@@ -3014,7 +3112,22 @@ int main(int argc, char **argv) {
         mesh->add_sideset("outlet", step_outlet);
         std::printf("sidesets: skin %td faces, outlet %td faces\n",
                     (ptrdiff_t)step_skin->parent()->size(), (ptrdiff_t)step_outlet->parent()->size());
-        setenv("SFEM_BOUNDARY_MASK", "1", 0);
+        // The inlet plane, for the energy budget's P_in. The nozzle already built its own
+        // above, at x = x_in rather than x = 0. A named sideset nothing refers to is inert --
+        // the operator compiles a mask only for the sidesets it is handed as a traction,
+        // pressure or natural-outflow surface -- so registering this costs nothing to a run
+        // that is not measuring a budget.
+        if (!want_nozzle) {
+            auto ins = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)0, 1e-6);
+            if (!ins.empty() && ins.front()) {
+                step_inlet = ins.front();
+                mesh->add_sideset("inlet", step_inlet);
+                std::printf("sidesets: inlet %td faces\n", (ptrdiff_t)step_inlet->parent()->size());
+            }
+        }
+        // NOT widened to want_diag. This changes what the operator computes, and asking for a
+        // diagnostic must not change the thing being diagnosed.
+        if (want_any_step || want_natural_outlet || want_named_bc) setenv("SFEM_BOUNDARY_MASK", "1", 0);
     }
 
     // The pump's two openings, both derived from the SAME coordinate predicates the
@@ -3087,6 +3200,7 @@ int main(int argc, char **argv) {
         if (mesh && step_skin) {
             mesh->add_sideset("skin", step_skin);
             mesh->add_sideset("outlet", step_outlet);
+            if (step_inlet) mesh->add_sideset("inlet", step_inlet);
         }
         // The pump's, for the same reason. (parent, lfi) addresses the MACRO element, which
         // the conversion leaves alone, so re-attaching is exact and not a re-derivation --
@@ -3269,6 +3383,9 @@ int main(int argc, char **argv) {
     real_t p_seed_port = 0;
     double mesh_coord_checksum = 0;
     std::shared_ptr<sfem::DirichletConditions> dirichlet;
+    // The nozzle's wall and inflow nodes, per node in the operator's numbering. Built with the
+    // constraints below and kept, because the wall-pressure profile reads the same wall.
+    std::vector<char> nozzle_inlet_node, nozzle_wall_node;
 
     // Built after op->initialize(), and that order is required rather than incidental:
     // initialize() renumbers the mesh nodes for the packed layout, so node indices taken
@@ -3322,6 +3439,60 @@ int main(int argc, char **argv) {
             ptrdiff_t n_skin = 0;
             for (auto c : skin_node) n_skin += c;
             std::printf("step: skin nodes %td of %td\n", n_skin, nnodes);
+        }
+
+        // The nozzle's walls are the skin minus its two ends, taken face by face, so that the
+        // curved bore, the cone and the expansion annulus are walls without any of them being
+        // described. Nodes are then no-slip if they touch a wall face, inflow if they touch the
+        // inlet and no wall, and free otherwise -- which leaves the outlet disc free and puts
+        // its RIM on the wall. The rim matters: the pump measured a free rim carrying a fifth of
+        // the flux out through the wall faces beside it.
+        if (flow == cvfem_case::FlowCase::Nozzle) {
+            auto skin    = smesh::skin_sideset(mesh);
+            auto inlets  = mesh->sidesets("inlet");
+            auto outlets = mesh->sidesets("outlet");
+            if (!skin || inlets.empty() || outlets.empty()) {
+                std::fprintf(stderr, "nozzle: missing the skin, inlet or outlet sideset\n");
+                return EXIT_FAILURE;
+            }
+            const ptrdiff_t   ne = mesh->n_elements(0);
+            std::vector<char> end_face((size_t)ne * 6, 0);
+            for (const auto &ss : {inlets.front(), outlets.front()})
+                for (ptrdiff_t k = 0; k < ss->parent()->size(); ++k)
+                    end_face[(size_t)ss->parent()->data()[k] * 6 + (size_t)ss->lfi()->data()[k]] = 1;
+            std::vector<smesh::element_idx_t> wall_parent;
+            std::vector<smesh::i16>           wall_lfi;
+            for (ptrdiff_t k = 0; k < skin->parent()->size(); ++k) {
+                const auto e = skin->parent()->data()[k];
+                const auto l = skin->lfi()->data()[k];
+                if (end_face[(size_t)e * 6 + (size_t)l]) continue;
+                wall_parent.push_back(e);
+                wall_lfi.push_back(l);
+            }
+            auto wp = smesh::create_host_buffer<smesh::element_idx_t>(wall_parent.size());
+            auto wl = smesh::create_host_buffer<smesh::i16>(wall_lfi.size());
+            std::copy(wall_parent.begin(), wall_parent.end(), wp->data());
+            std::copy(wall_lfi.begin(), wall_lfi.end(), wl->data());
+            auto wall = smesh::Sideset::create(skin->comm(), wp, wl);
+
+            auto flag = [&](const std::shared_ptr<smesh::Sideset> &ss, std::vector<char> &out) {
+                out.assign((size_t)nnodes, 0);
+                auto ns = smesh::create_nodeset_from_sideset(mesh, ss);
+                if (!ns) return false;
+                for (ptrdiff_t k = 0; k < ns->size(); ++k) out[(size_t)ns->data()[k]] = 1;
+                return true;
+            };
+            if (!flag(inlets.front(), nozzle_inlet_node) || !flag(wall, nozzle_wall_node)) {
+                std::fprintf(stderr, "nozzle: create_nodeset_from_sideset failed\n");
+                return EXIT_FAILURE;
+            }
+            ptrdiff_t n_in = 0, n_wall = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                n_wall += nozzle_wall_node[(size_t)i];
+                n_in += nozzle_inlet_node[(size_t)i] && !nozzle_wall_node[(size_t)i];
+            }
+            std::printf("nozzle: wall faces %td  wall nodes %td  inflow nodes %td (rim excluded)\n",
+                        (ptrdiff_t)wall_parent.size(), n_wall, n_in);
         }
 
         std::vector<idx_t>  uvw_nodes, uz_nodes;
@@ -3384,6 +3555,18 @@ int main(int argc, char **argv) {
                         uvw_uy.push_back(real_t(0));
                         uvw_uz.push_back(real_t(0));
                     }
+                }
+            } else if (flow == cvfem_case::FlowCase::Nozzle) {
+                // Wall faces no-slip, the inlet the developed pipe profile, the outlet disc free.
+                // A node on both the inlet and a wall is the inlet's rim and takes the wall's zero,
+                // which is also the profile's value there, so the two conditions agree on it.
+                const bool wall  = nozzle_wall_node[(size_t)i] != 0;
+                const bool inlet = nozzle_inlet_node[(size_t)i] != 0;
+                if (wall || inlet) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(wall ? real_t(0) : cvfem_case::nozzle_inflow_ux<real_t>(nozzle, y, z, U));
+                    uvw_uy.push_back(real_t(0));
+                    uvw_uz.push_back(real_t(0));
                 }
             } else if (flow == cvfem_case::FlowCase::Step) {
                 // Constrain the skin, minus the outflow plane. The skin comes from the same
@@ -3570,7 +3753,7 @@ int main(int argc, char **argv) {
         const real_t re_h   = rho * u_bulk * step_y / std::max(mu, real_t(1e-30));
         std::printf("step: h=%g  inlet %g x %g  U_peak=%g  U_bulk=%g  Re_h=%g  (continuation Re_phys=%g)\n",
                     (double)step_y, (double)(Ly - step_y), (double)Lz, (double)U, (double)u_bulk,
-                    (double)re_h, (double)(rho * U * Ly / std::max(mu, real_t(1e-30))));
+                    (double)re_h, (double)(rho * U * L_re / std::max(mu, real_t(1e-30))));
         std::printf("step: exact inflow flux %.12g\n",
                     (double)cvfem_case::step_inflow_flux<real_t>(step_y, Ly, Lz, U));
     }
@@ -3728,8 +3911,8 @@ int main(int argc, char **argv) {
     // taking rho = mu / (U Ly), and the second continues from that solution at the
     // physical density. Without it this diverges to inf, which is how its absence was
     // found rather than reasoned about.
-    const real_t Re_phys = rho * U * Ly / std::max(mu, real_t(1e-30));
-    const real_t rho_re1 = mu / std::max(U * Ly, real_t(1e-30));
+    const real_t Re_phys = rho * U * L_re / std::max(mu, real_t(1e-30));
+    const real_t rho_re1 = mu / std::max(U * L_re, real_t(1e-30));
 
     // The two-stage scheme above stops working between Re=200 and Re=400.
     //
@@ -3777,7 +3960,7 @@ int main(int argc, char **argv) {
     {
         std::printf("continuation: %d stages, Re =", (int)rho_schedule.size());
         for (size_t k = 0; k < rho_schedule.size(); ++k)
-            std::printf(" %g", (double)(rho_schedule[k] * U * Ly / std::max(mu, real_t(1e-30))));
+            std::printf(" %g", (double)(rho_schedule[k] * U * L_re / std::max(mu, real_t(1e-30))));
         std::printf("\n");
     }
 
@@ -4160,6 +4343,15 @@ int main(int argc, char **argv) {
     const real_t pump_period = smesh::Env::read<real_t>("SFEM_PUMP_PERIOD", real_t(1));
     real_t       pump_scale  = 1;
 
+    // Diagnostics state that has to outlive one step: the previous FlowState is what dE/dt is
+    // differenced against, and the volume array is geometry so it is built once. The file
+    // handle is opened lazily at the first row so a run that never reaches one leaves no
+    // empty file behind.
+    cvfem_diag::FlowState diag_prev{};
+    bool                  diag_have_prev = false;
+    std::vector<real_t>   diag_vol, diag_grad, diag_w;
+    FILE                 *diag_fh = nullptr;
+
     for (int tstep = 0; tstep < (dt_step > real_t(0) ? nsteps : 1); ++tstep) {
     // Absolute, so a segmented run and a single one report the same instants and a frame
     // written in segment three is not labelled as though it were the third frame overall.
@@ -4256,7 +4448,7 @@ int main(int argc, char **argv) {
                 (int)stage + 1,
                 (int)rho_schedule.size(),
                 (double)rho_use,
-                (double)(rho_use * U * Ly / std::max(mu, real_t(1e-30))));
+                (double)(rho_use * U * L_re / std::max(mu, real_t(1e-30))));
 
     converged = false;
     real_t prev_rnorm = 0; // previous Newton residual, for the adaptive band's rate test
@@ -5080,7 +5272,7 @@ int main(int argc, char **argv) {
                             re_retries, re_retry);
             else
                 std::printf("  stage failed; retrying via Re = %g (step x%.3f, retry %d/%d)\n",
-                            (double)(next * U * Ly / std::max(mu, real_t(1e-30))),
+                            (double)(next * U * L_re / std::max(mu, real_t(1e-30))),
                             (double)step_f, re_retries, re_retry);
             --stage;  // the for-increment lands back on the inserted stage
             continue;
@@ -5140,6 +5332,109 @@ int main(int argc, char **argv) {
         if (tf) {
             std::fprintf(tf, "%.17g\n", (double)t_abs);
             std::fclose(tf);
+        }
+    }
+
+    // -------------------------------------------------------- flow diagnostics, one row
+    //
+    // The kinetic-energy budget, which is what makes a claim about this scheme's numerical
+    // dissipation possible at all:
+    //
+    //     dE/dt = P_in - P_out - eps_visc - eps_num
+    //
+    // Every term but the last is measured; eps_num is DEFINED as what they leave over. That
+    // is the measurement, not an error bar -- the convection operator is first-order upwind
+    // with no limiter, so the |mdot| term is the entire subgrid model and this is the number
+    // that says how large it is.
+    //
+    // The terms come from machinery that already existed and had no caller: cvfem_diag::
+    // contract for the volume sums, energy_flux_weight + Op::sideset_flux_weighted for the
+    // boundary power, and cvfem_diag::close to difference consecutive states. The weight is
+    // |u|^2/2 + p/rho, so w * (rho u.n) integrates to the rate the surface does work.
+    //
+    // SIGNS. Both fluxes are handed to close() RAW, in the positive-leaving convention that
+    // sideset_mass_flux documents -- close() negates the inlet itself (`e.p_in = -q_in`).
+    // Pre-negating here double-negates, which is exactly what the Poiseuille control caught:
+    // P_in read -0.3348 where the magnitudes were right, so P_in - P_out came out at -0.457
+    // against an analytic dissipation of +0.2133. Measured, the convention is mdot_in
+    // -0.664062 and mdot_out +0.664062 on a channel whose analytic bulk flux is 0.666667.
+    //
+    // A missing inlet or outlet sideset leaves that half of the budget at zero, reported in
+    // the have_in/have_out columns rather than silently absorbed into eps_num.
+    if (want_diag) {
+        cvfem_diag::FlowState st{};
+        {
+            if (diag_vol.empty()) {
+                diag_vol.assign((size_t)nnodes, 0);
+                op->node_volume(diag_vol.data());
+            }
+            diag_grad.assign((size_t)nnodes * 9, 0);
+            if (op->nodal_velocity_gradient(x, diag_grad.data()) != SFEM_SUCCESS) {
+                std::fprintf(stderr, "diag: nodal_velocity_gradient failed; no row written\n");
+            } else {
+                st = cvfem_diag::contract(nnodes, x, diag_grad.data(), diag_vol.data(),
+                                          (double)op->rho, (double)op->mu, (double)dt_step);
+                real_t q_in = 0, q_out = 0;
+                cvfem_diag::energy_flux_weight(nnodes, x, (double)op->rho, diag_w);
+                auto weighted = [&](const char *name, real_t &q) {
+                    auto named = mesh->sidesets(name);
+                    if (named.empty() || !named.front()) return false;
+                    return op->sideset_flux_weighted(x, name, diag_w.data(), q) == SFEM_SUCCESS;
+                };
+                const bool have_in  = weighted("inlet", q_in);
+                const bool have_out = weighted("outlet", q_out);
+                // The unweighted mass fluxes alongside, which cost one more pass each and
+                // pin the sign convention down in the output instead of leaving it to be
+                // reasoned about: sideset_mass_flux is positive LEAVING, so a channel reads
+                // mdot_in negative and mdot_out positive, and mdot_in + mdot_out is the
+                // mass-balance residual for free.
+                real_t mdot_in = 0, mdot_out = 0;
+                if (have_in) op->sideset_mass_flux(x, "inlet", mdot_in);
+                if (have_out) op->sideset_mass_flux(x, "outlet", mdot_out);
+
+                // THE FIRST SAMPLE HAS NO PREDECESSOR, and close() centres eps_visc as
+                // (prev + cur)/2. Handing it a default-constructed FlowState therefore
+                // averages the dissipation against zero and reports exactly half of it --
+                // which is what the steady Poiseuille control caught, reading eps_visc
+                // 0.1006 against an analytic 0.2133 while P_in - P_out came out at 0.2131.
+                // Differencing against the current state instead makes the centring exact
+                // and dE/dt identically zero, which is the truth for a steady solve and a
+                // lie for the first step of a transient -- so that case is flagged rather
+                // than quietly reported.
+                const bool                   first = !diag_have_prev;
+                const cvfem_diag::FlowState &prev  = first ? st : diag_prev;
+                const auto b = cvfem_diag::close(prev, st, (double)dt_step,
+                                                 have_in ? (double)q_in : 0.0,
+                                                 have_out ? (double)q_out : 0.0);
+                const int budget_valid = (dt_step <= real_t(0) || !first) ? 1 : 0;
+                if (!diag_fh) {
+                    diag_fh = std::fopen(diag_csv.c_str(), "w");
+                    if (diag_fh)
+                        std::fprintf(diag_fh,
+                                     "step,t,ndof,E,dEdt,P_in,P_out,eps_visc,eps_num,closure,"
+                                     "enstrophy,omega_max,div_l2,div_inf,cfl_max,u_max,"
+                                     "newton_it,lin_it,have_in,have_out,budget_valid,mdot_in,mdot_out\n");
+                }
+                if (diag_fh) {
+                    std::fprintf(diag_fh,
+                                 "%d,%.17g,%td,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,"
+                                 "%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%d,%d,%d,%d,%d,%.17g,%.17g\n",
+                                 abs_step, (double)t_abs, (ptrdiff_t)ndof, st.E, b.dEdt, b.p_in,
+                                 b.p_out, b.eps_visc, b.eps_num, b.closure, st.enstrophy,
+                                 st.omega_max, st.div_l2, st.div_inf, st.cfl_max, st.u_max,
+                                 newton_it, lin_it_total, have_in ? 1 : 0, have_out ? 1 : 0,
+                                 budget_valid, (double)mdot_in, (double)mdot_out);
+                    std::fflush(diag_fh);
+                }
+                // Echoed as well as written, because a long run whose only output appears at
+                // the end is indistinguishable from one that has hung.
+                std::printf("diag: E %.6e  dEdt %.3e  P_in %.3e  P_out %.3e  eps_visc %.3e  "
+                            "eps_num %.3e  closure %.3e  cfl %.3f  div_l2 %.3e\n",
+                            st.E, b.dEdt, b.p_in, b.p_out, b.eps_visc, b.eps_num, b.closure,
+                            st.cfl_max, st.div_l2);
+                diag_prev      = st;
+                diag_have_prev = true;
+            }
         }
     }
 
@@ -5208,7 +5503,7 @@ int main(int argc, char **argv) {
         // announced "reached Re = 1000 of 1000 (AT TARGET)" for a run that tried Re=1000 four
         // times, failed every time, and whose solution had blown up to u_linf 3.4e+06. The
         // highest Re it had actually solved was 843.
-        const real_t re_solved = rho_solved * U * Ly / std::max(mu, real_t(1e-30));
+        const real_t re_solved = rho_solved * U * L_re / std::max(mu, real_t(1e-30));
         const bool   at_target = rho_solved > 0 && std::fabs(re_solved - Re_phys) <= real_t(1e-6) * Re_phys;
         std::printf("continuation: highest Re SOLVED = %g of %g target  %s\n",
                     (double)re_solved, (double)Re_phys,
@@ -5420,6 +5715,106 @@ int main(int argc, char **argv) {
             }
         }
 
+        // Quadrature-free mass balance. The continuity residual at a node is the net mass flux
+        // out of its control volume; summed over every node the interior faces cancel in pairs
+        // and what remains is the net flux through the domain boundary. Returns that sum and
+        // the sum of magnitudes, the scale it is judged against.
+        auto continuity_sums = [&](long double &net, long double &absnet) {
+            std::vector<real_t> rr((size_t)ndof, 0);
+            f->gradient(x, rr.data());
+            net = absnet = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                net += (long double)rr[(size_t)i * 4 + 3];
+                absnet += std::fabs((long double)rr[(size_t)i * 4 + 3]);
+            }
+        };
+        if (flow == cvfem_case::FlowCase::Nozzle) {
+            // Global mass balance, the identity the step is checked on, here on a mesh whose
+            // elements are curved -- so it is a check of the isoparametric boundary closure as
+            // much as of the scheme. Everything is divided by rho: the continuity rows carry a
+            // MASS flux, and the oracle Q is a volumetric one.
+            const long double rho_l = (long double)rho;
+            {
+                long double net, absnet;
+                continuity_sums(net, absnet);
+                std::printf("nozzle: sum of continuity residual %.6Le  (sum |.| %.6Le, ratio %.3Le)  [volumetric]\n",
+                            net / rho_l, absnet / rho_l, absnet > 0 ? std::fabs(net) / absnet : 0.0L);
+            }
+            // Through the operator's own sub-control surfaces, not a quadrature of this
+            // driver's: see sideset_flux_weighted for why that distinction has cost a false 17%.
+            // Outward-positive, so the inlet's flux is negative.
+            real_t q_in = 0, q_out = 0;
+            if (op->sideset_mass_flux(x, "inlet", q_in) != SFEM_SUCCESS ||
+                op->sideset_mass_flux(x, "outlet", q_out) != SFEM_SUCCESS) {
+                std::fprintf(stderr, "nozzle: sideset_mass_flux failed\n");
+                return EXIT_FAILURE;
+            }
+            const long double Q_exact = (long double)cvfem_case::nozzle_flow_rate(nozzle, U);
+            const long double Q_in = -(long double)q_in / rho_l, Q_out = (long double)q_out / rho_l;
+            // RELATIVE error here, where the step prints an absolute one: the step's Q is 1/9,
+            // so the two nearly coincide there, while this Q is 5e-6 m^3/s and an absolute
+            // error of it would pass any tolerance. What it measures is the inscribed-polygon
+            // inlet and the nodal quadrature of the parabola, both O(h^2).
+            std::printf("nozzle: Re_t %g  u_t %.6e m/s  Q %.9Le m^3/s\n", (double)(rho * U * L_re / mu),
+                        (double)U, Q_exact);
+            std::printf("nozzle: inflow flux %.9Le  (exact %.9Le, err %.3Le)\n", Q_in, Q_exact,
+                        std::fabs(Q_in - Q_exact) / Q_exact);
+            std::printf("nozzle: outflow flux %.9Le   imbalance (out-in) %.3Le  relative %.3Le\n", Q_out,
+                        Q_out - Q_in, std::fabs((Q_out - Q_in) / (Q_in != 0 ? Q_in : 1)));
+
+            // The quantities the benchmark is compared on: axial velocity on the centreline,
+            // and wall pressure along one generator. The generator puts nodes exactly on the
+            // axis and exactly on the plane z = 0, so both are node selections rather than
+            // interpolations off the mesh. Where several wall nodes share an x -- the annulus of
+            // the expansion -- the outermost is the wall.
+            const auto *const px = mesh->points()->data()[0];
+            const auto *const py = mesh->points()->data()[1];
+            const auto *const pz = mesh->points()->data()[2];
+            std::vector<std::array<double, 3>> centre;  // x, ux, p
+            std::map<double, std::pair<double, double>> wall_line;  // x -> (radius, p)
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                if (py[i] == 0 && pz[i] == 0)
+                    centre.push_back({(double)px[i], (double)x[(size_t)i * 4 + 0], (double)x[(size_t)i * 4 + 3]});
+                if (nozzle_wall_node[(size_t)i] && pz[i] == 0 && py[i] > 0) {
+                    auto it = wall_line.find((double)px[i]);
+                    if (it == wall_line.end() || (double)py[i] > it->second.first)
+                        wall_line[(double)px[i]] = {(double)py[i], (double)x[(size_t)i * 4 + 3]};
+                }
+            }
+            std::sort(centre.begin(), centre.end());
+            const double u_in = (double)(U * nozzle.r_throat * nozzle.r_throat / (nozzle.r_inlet * nozzle.r_inlet));
+            // The PIV stations of the published data sets.
+            for (const double xs : {-0.088, -0.064, -0.048, -0.02, -0.008, 0.0, 0.008, 0.016, 0.024, 0.032, 0.06, 0.08}) {
+                auto hi = std::lower_bound(centre.begin(), centre.end(), std::array<double, 3>{xs, -1e300, -1e300});
+                if (hi == centre.end() || hi == centre.begin()) continue;
+                const auto  &b = *hi, &a = *(hi - 1);
+                const double t = (b[0] > a[0]) ? (xs - a[0]) / (b[0] - a[0]) : 0.0;
+                std::printf("nozzle: station x %+.4f  u_x/u_in %.4f\n", xs, ((1 - t) * a[1] + t * b[1]) / u_in);
+            }
+            std::error_code ec;
+            std::filesystem::create_directories(out_folder, ec);
+            FILE *fc = ec ? nullptr : std::fopen((out_folder + "/nozzle_centerline.csv").c_str(), "w");
+            FILE *fw = ec ? nullptr : std::fopen((out_folder + "/nozzle_wall.csv").c_str(), "w");
+            if (fc && fw) {
+                std::fprintf(fc, "x,ux,p\n");
+                for (const auto &c : centre) std::fprintf(fc, "%.9e,%.9e,%.9e\n", c[0], c[1], c[2]);
+                std::fprintf(fw, "x,p\n");
+                for (const auto &w : wall_line) std::fprintf(fw, "%.9e,%.9e\n", w.first, w.second.second);
+                std::printf("nozzle: wrote %s/nozzle_centerline.csv (%zu) and nozzle_wall.csv (%zu)\n",
+                            out_folder.c_str(), centre.size(), wall_line.size());
+            } else {
+                std::printf("nozzle: could not write profiles to '%s'\n", out_folder.c_str());
+            }
+            if (fc) std::fclose(fc);
+            if (fw) std::fclose(fw);
+
+            std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
+            if (!converged) {
+                std::fprintf(stderr, "verification failed (nozzle did not converge)\n");
+                return EXIT_FAILURE;
+            }
+            return EXIT_SUCCESS;
+        }
         if (flow == cvfem_case::FlowCase::Step) {
             // Global mass balance. This is the check that detects an unclosed control volume
             // along the step: if a step face is missing its boundary sub-control-surface
@@ -5455,13 +5850,8 @@ int main(int argc, char **argv) {
             // this separates "the discretisation leaks mass" from "my trapezoidal rule on the
             // inlet and outlet planes disagrees with itself".
             {
-                std::vector<real_t> rr((size_t)ndof, 0);
-                f->gradient(x, rr.data());
-                long double net = 0, absnet = 0;
-                for (ptrdiff_t i = 0; i < nnodes; ++i) {
-                    net += (long double)rr[(size_t)i * 4 + 3];
-                    absnet += std::fabs((long double)rr[(size_t)i * 4 + 3]);
-                }
+                long double net, absnet;
+                continuity_sums(net, absnet);
                 std::printf("step: sum of continuity residual %.6Le  (sum |.| %.6Le, ratio %.3Le)\n",
                             net, absnet, absnet > 0 ? std::fabs(net) / absnet : 0.0L);
             }
