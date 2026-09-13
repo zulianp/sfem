@@ -519,7 +519,38 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Twenty-five, ordered by what unblocks what. Four are new since the last pass, and two of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Twenty-six, ordered by what unblocks what. Five are new since the last pass, and two of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 25</div>
+    <div class="body">
+      <div class="op-title">The inexact-apply family is half-wired into the stack <span class="chip c-part">the arithmetic conforms; the scaffolding around it does not</span></div>
+
+      <p><b>What this entry is.</b> OP 22 recorded that partial assembly exists, is on the C ABI and is measured. This one records what it is made of. The kernels answer correctly &mdash; 53 recorded digests and 28 packed/unpacked parity pairs &mdash; and until recently almost none of that answer came through the layers the rest of the tree lowers through. Three passes have closed part of it; what is left is enumerated here so it stops being rediscovered one defect at a time.</p>
+
+      <p><b>Closed, and worth stating because each was found as a shape rather than as a wrong answer.</b> The quadrature sum was carried out symbolically in the plan, so a HEX8 kernel inlined the whole material tangent once per point and reached <b>3,855 straight-line statements in one basic block &mdash; 234.8 s and 4.45 GB of gcc for a single kernel</b>, against 9.7 s and 221 MB for a sibling that kept its loops. It is a loop again. The kernel is built from <code>FunctionDefNode</code> and <code>LoopNode</code> rather than concatenated strings, so the printer, the target binding and the ratchets can see it. And the tensor-product tangent carried a private <code>QGRAD[192]</code>/<code>QWEIGHT[8]</code> table of the element&rsquo;s full reference gradients &mdash; a second path to something <code>tensor_product_kernels.hpp</code> publishes &mdash; which it could not stop carrying while the plan inlined <code>grad u</code> as a nodal contraction at every occurrence in the tangent. The plan now names the physical field gradients, the two stages every other kernel goes through (reference gradient, then geometry) are explicit, and each strategy reaches the first stage the prescribed way: literals on a lowest-order simplex, the shared reference struct on a higher-order one, <code>tensor_gradient_contiguous</code> on a tensor product. <b>Evaluation strategy now follows the element everywhere; this was the last exception.</b></p>
+
+      <p><b>The emitter is a printer, which makes it the only one that is.</b> <code>inexact_apply_codegen.py</code> contributes <b>0 of the 194 decision branches</b> in emission. <code>energy_codegen.py</code> holds 98 and <code>residual_codegen.py</code> 88. It is by far the smallest of the three, so this is a demonstration rather than a result &mdash; but it is a demonstration that the conversion terminates.</p>
+
+      <p><b>What is left, and it is all the same defect.</b> The emitter reaches <b>two of the twenty-six plan modules</b>; the energy emitter reaches eleven. Everything it does not reach it spells itself:</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>what it spells privately</th><th>the component that owns it</th><th>what that costs</th></tr>
+        <tr><td>gathers and scatters</td><td><code>plans/streams</code> · <code>plans/layout</code></td><td>the component-major/node-major bug that produced garbage from MRKV <code>hessian_bsr</code> was a disagreement between two spellings of one layout</td></tr>
+        <tr><td>geometry staging</td><td><code>plans/geometry_quantities</code> · <code>fem/geometry</code></td><td>the adjugate and determinant preamble is a third copy</td></tr>
+        <tr><td>the C ABI</td><td><code>emitters/runtime_typed_abi</code> · <code>plans/kernel_signature</code> · <code>plans/conventions</code></td><td>a divergent spelling once linked cleanly and segfaulted</td></tr>
+        <tr><td>lane-major staging</td><td>&mdash; <b>no shared component exists</b></td><td>private in all three emitters; the one gap that is a missing component rather than a bypassed one</td></tr>
+      </table>
+
+      <p><b>It publishes no FLOP or arithmetic-intensity function.</b> The goal asks for them on every kernel, so that performance reports are generated rather than written. The energy and matrix-format kernels have them; <code>plans/flops</code> cannot see this family at all, so the roofline that motivated the whole variant has to be assembled by hand.</p>
+
+      <p><b>Scalar type still multiplies symbols, and the ratchet does not say so.</b> <b>69 <code>_float</code> entry points</b> are in the shipped tree &mdash; 36 inexact, 26 boundary, 7 MRKV <code>hessian_bsr</code>. The first two families are excused <em>by filename</em> in <code>test_precision_variants_share_a_body</code>&rsquo;s <code>_UNCONVERTED</code> list, so only the seven fail. An exemption keyed on a path is the same shape of hiding place as a snapshot exemption, and Part 2&rsquo;s &ldquo;zero <code>_float</code> entry points remain&rdquo; should be read against it.</p>
+
+      <p><b>And it does not delegate to its Cartesian twin.</b> The energy <code>hex8</code> operator publishes <code>proteus_hex8</code> symbols: the mesh-order element forwards to the lexicographic micro-kernel and the kernel reorders nothing. The inexact HEX8 kernel instead folds the mesh&rarr;Cartesian map into its own gather indices. <code>test_no_kernel_reorders_its_own_nodes</code> does not catch it, because the map is in the indices rather than in a reorder pass &mdash; which says the measure is narrower than the rule it was written to enforce.</p>
+
+      <div class="op-facts"><span><i>plan modules reached</i> 2 of 26</span><span><i>decisions in emission</i> 0 of 194</span><span><i>FLOP/AI functions</i> 0</span><span><i>_float entry points</i> 69 tree-wide, 62 exempt by filename</span><span><i>gcc on one kernel, before</i> 234.8 s · 4.45 GB</span><span><i>answer gate</i> 53 digests · 28 parity pairs</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 24</div>
