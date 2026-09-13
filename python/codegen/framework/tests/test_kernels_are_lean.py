@@ -50,7 +50,11 @@ def _generated_tree():
 #:
 #: 127 -> 87 when the `(void)name;` discards went: the scan counts a mention as
 #: a read, so every discard was keeping its own subject alive.
-DEAD_ASSIGNMENT_BUDGET = 87
+#:
+#: 87 -> 66 when the inexact-apply tangent stopped forming the element's full
+#: reference gradients.  It left this list entirely: the 29 it contributed are
+#: gone, and what remains is 58 in the mixed local bodies and 8 elsewhere.
+DEAD_ASSIGNMENT_BUDGET = 66
 
 #: Runs of back-to-back single-statement `#pragma omp simd` lane loops.  A run
 #: longer than one is N loops and N pragmas where one loop with N statements
@@ -92,7 +96,11 @@ UNUSED_CONSTANT_BUDGET = 0
 #: cached metric instead -- the fix there is for the plan to stop putting the
 #: stream on the boundary, not for emission to unname it.  A ratchet to drive
 #: down, not a target that has been met.
-UNUSED_PARAMETER_BUDGET = 74
+#:
+#: 74 -> 56 with the same change: a tangent that reads no field no longer names
+#: the one-dimensional basis tables its contraction would have used.  All 56
+#: that remain are the simplex local kernels described above.
+UNUSED_PARAMETER_BUDGET = 56
 
 #: Node-ordering permutations built inside a kernel.
 #:
