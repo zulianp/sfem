@@ -4949,7 +4949,7 @@ def _sfem_soa_mesh_operator_function(
     if geometry_mode == "isoparametric":
         for array_input in element_inputs:
             for stream in _soa_array_stream_names(array_input):
-                extent = "NQ * VS" if form.weak_form is not None else "VS"
+                extent = _BLOCK_BUFFER_EXTENT[form_contraction(form)]
                 lines.append("    s_t b%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
         if uses_current:
@@ -5009,14 +5009,14 @@ def _sfem_soa_mesh_operator_function(
         uses_direction,
     )
 
-    if form.weak_form is None:
-        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
-        if use_tensor_product_reference:
-            lines.extend(tensor_product_q_index_lines(dim, "      "))
-            lines.append(
-                "      const s_t tensor_q_weight = %s;"
-                % tensor_product_quadrature_weight_expr(dim, tensor_weight_name)
-            )
+    # A pointwise form is contracted at each quadrature point, so its block call
+    # sits inside a loop this opens, indents and closes below.  A deferred-flux
+    # form is handed the whole element and opens nothing.
+    lines.extend(
+        _MESH_QUADRATURE_SCOPE[form_contraction(form)](
+            quadrature_rule, dim, use_tensor_product_reference, tensor_weight_name
+        )
+    )
 
     _append_mesh_operator_isoparametric_flux(
         coordinate_streams_name,
@@ -5038,10 +5038,9 @@ def _sfem_soa_mesh_operator_function(
     )
 
     call_args = ["ne"]
-    if form.weak_form is not None:
-        call_args.append("0" if geometry_mode == "affine" else "VS")
-    else:
-        call_args.append("q")
+    call_args.append(
+        _MESH_GEOMETRY_CALL_ARGUMENT[form_contraction(form)](geometry_mode)
+    )
     if geometry_mode == "affine":
         call_args.extend(
             _BLOCK_FMT % stream
@@ -5065,15 +5064,12 @@ def _sfem_soa_mesh_operator_function(
         )
     else:
         call_args.extend("%s%s" % (reference_prefix, array_input.name) for array_input in reference_inputs)
-    if form.weak_form is not None:
-        call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
-        call_args.extend(material_parameter_names)
-    elif use_tensor_product_reference:
-        call_args.append("tensor_q_weight")
-        call_args.extend(material_parameter_names)
-    else:
-        call_args.append("%s[q]" % scalar_weight_name)
-        call_args.extend(material_parameter_names)
+    call_args.append(
+        _MESH_WEIGHT_CALL_ARGUMENT[form_contraction(form)](
+            use_tensor_product_reference, tensor_weight_name, scalar_weight_name
+        )
+    )
+    call_args.extend(material_parameter_names)
     if use_stream_arrays:
         if uses_current:
             call_args.append("bu_streams")
@@ -5088,7 +5084,7 @@ def _sfem_soa_mesh_operator_function(
         if uses_direction:
             call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("h", n_field_components, n_nodes))
         call_args.extend(_BLOCK_FMT % stream for stream in _output_stream_names(form, n_field_components, n_nodes))
-    call_indent = "    " if form.weak_form is not None else "      "
+    call_indent = _MESH_BLOCK_CALL_INDENT[form_contraction(form)]
     lines.extend(
         [
             "",
@@ -5096,8 +5092,7 @@ def _sfem_soa_mesh_operator_function(
             % (call_indent, block_name, ", ".join(call_args)),
         ]
     )
-    if form.weak_form is None:
-        lines.append("    }")
+    lines.extend(_MESH_QUADRATURE_SCOPE_CLOSE[form_contraction(form)])
     lines.append("")
 
     _append_mesh_operator_scalar_output(
@@ -10168,6 +10163,70 @@ def _zero_fill_lines(output, source_builder, work_item, indent="    "):
         for depth in reversed(range(len(output.extents)))
     )
     return lines
+
+
+#: Whether the mesh kernel's block call sits inside a quadrature loop, and
+#: everything that follows from it.  `plans.form_emission.form_contraction`
+#: decides: a pointwise form is contracted at each point and its block is called
+#: inside a loop this file opens, indents and closes; a deferred-flux form is
+#: handed the whole element and opens nothing.
+#:
+#: Six sites in `_sfem_soa_mesh_operator_function` asked `form.weak_form is
+#: None` separately -- the buffer extent, the loop, the geometry argument, the
+#: weight, the indent and the closing brace.  `form_contraction`'s own docstring
+#: named this function as where eight of its twenty-three copies lived.
+_BLOCK_BUFFER_EXTENT = {
+    FormContraction.DEFERRED_FLUX: "NQ * VS",
+    FormContraction.POINTWISE: "VS",
+}
+
+_MESH_BLOCK_CALL_INDENT = {
+    FormContraction.DEFERRED_FLUX: "    ",
+    FormContraction.POINTWISE: "      ",
+}
+
+_MESH_QUADRATURE_SCOPE_CLOSE = {
+    FormContraction.DEFERRED_FLUX: (),
+    FormContraction.POINTWISE: ("    }",),
+}
+
+
+def _pointwise_mesh_quadrature_scope(quadrature_rule, dim, use_tensor_product_reference,
+                                     tensor_weight_name):
+    lines = ["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")]
+    if use_tensor_product_reference:
+        lines.extend(tensor_product_q_index_lines(dim, "      "))
+        lines.append(
+            "      const s_t tensor_q_weight = %s;"
+            % tensor_product_quadrature_weight_expr(dim, tensor_weight_name)
+        )
+    return lines
+
+
+_MESH_QUADRATURE_SCOPE = {
+    FormContraction.DEFERRED_FLUX: (
+        lambda rule, dim, tensor, weight_name: []
+    ),
+    FormContraction.POINTWISE: _pointwise_mesh_quadrature_scope,
+}
+
+_MESH_GEOMETRY_CALL_ARGUMENT = {
+    FormContraction.DEFERRED_FLUX: (
+        lambda geometry_mode: "0" if geometry_mode == "affine" else "VS"
+    ),
+    FormContraction.POINTWISE: lambda geometry_mode: "q",
+}
+
+_MESH_WEIGHT_CALL_ARGUMENT = {
+    FormContraction.DEFERRED_FLUX: (
+        lambda tensor, tensor_name, scalar_name: tensor_name if tensor else scalar_name
+    ),
+    FormContraction.POINTWISE: (
+        lambda tensor, tensor_name, scalar_name: "tensor_q_weight"
+        if tensor
+        else "%s[q]" % scalar_name
+    ),
+}
 
 
 #: How the two output shapes cross the C boundary.  A scalar is one pointer; a
