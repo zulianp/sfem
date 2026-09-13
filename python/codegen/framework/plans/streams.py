@@ -187,6 +187,23 @@ def field_stream_group(dependencies, name):
 _FIELD_STREAM_ORDER = ("current", "previous", "direction")
 
 
+def field_stream_layout(stream_layout):
+    """The layout a caller's stream-layout word means.
+
+    ``"contiguous"`` is a lane-major tile the kernel indexes directly;
+    anything else is an array of pointers, one per stream.  The word is the
+    caller's and the layout is this layer's, and four sites in
+    ``emitters/residual_codegen.py`` compared the word themselves to pick a
+    spelling -- a helper-name suffix, two call arguments and a C parameter --
+    which is four places for the word to change out from under.
+    """
+    return (
+        DataStreamLayout.AOS
+        if stream_layout == "contiguous"
+        else DataStreamLayout.SOA
+    )
+
+
 def local_kernel_stream_plans(
     dependencies,
     *,
@@ -294,7 +311,7 @@ def local_kernel_stream_plans(
             )
         )
 
-    contiguous = stream_layout == "contiguous"
+    contiguous = field_stream_layout(stream_layout) is DataStreamLayout.AOS
     for name in _FIELD_STREAM_ORDER:
         if not getattr(dependencies, name):
             continue

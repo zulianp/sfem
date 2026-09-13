@@ -172,7 +172,18 @@ PLAN_INPUTS = (
 #: buffer and called the entry point that does not take it, or the reverse,
 #: would not compile -- but nothing said the two were one decision.  Both read
 #: the same plan answer now.
-BUDGET = 157
+#:
+#: 157 -> 153: `stream_layout == "contiguous"`, to zero.  `plans/streams` was
+#: already turning that word into a `DataStreamLayout` -- AOS for a lane-major
+#: tile the kernel indexes directly, SOA for an array of pointers -- and four
+#: sites compared the word themselves to pick a spelling: a helper-name suffix,
+#: two call arguments and a C parameter declaration.
+#:
+#: The word is the caller's and the layout is the plan's, so `field_stream_layout`
+#: states the mapping once and `local_kernel_stream_plans` reads it too.  What
+#: stays in emission is what an offset into a tile looks like against a pointer
+#: array, which is C.
+BUDGET = 153
 
 
 def _tested_names(test):

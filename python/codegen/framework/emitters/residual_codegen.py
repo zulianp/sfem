@@ -96,6 +96,7 @@ from codegen.framework.plans.dependencies import (
     contracted_gradient_components,
     live_test_coefficients,
 )
+from codegen.framework.plans.streams import field_stream_layout
 from codegen.framework.plans.geometry_quantities import (
     local_geometry_streams,
     mesh_geometry_argument_names,
@@ -2361,7 +2362,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         return lines
     # One fact -- whether the streams arrive contiguous -- decided once and
     # spelled into four helper names, rather than asked four times.
-    contiguous_suffix = "_contiguous" if stream_layout == "contiguous" else ""
+    contiguous_suffix = _STREAM_HELPER_SUFFIX[field_stream_layout(stream_layout)]
     tensor_evaluate_name = "tensor_evaluate" + contiguous_suffix
     tensor_evaluate_value_name = "tensor_evaluate_value" + contiguous_suffix
     tensor_integrate_name = "tensor_integrate" + contiguous_suffix
@@ -2386,18 +2387,10 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                     "  s_t %s_%s_grad_ref[NQ * ND * VS];"
                     % (group.name, field.name)
                 )
-            if stream_layout == "contiguous":
-                stream_arg = "%s + %d" % (group.name, layout.offset(field_index))
-            else:
-                stream_arg = "%s_%s_streams" % (group.name, field.name)
-                lines.append(
-                    "  const s_t *const %s[%s] = {%s};"
-                    % (
-                        stream_arg,
-                        shape_name,
-                        _field_stream_initializer(layout, field_index, group.name),
-                    )
-                )
+            stream_arg, declaration = _FIELD_STREAM_ARGUMENT[
+                field_stream_layout(stream_layout)
+            ](layout, field_index, field, group, shape_name)
+            lines.extend(declaration)
             if read.uses_gradient:
                 lines.extend(
                     [
@@ -2546,20 +2539,10 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         shape_name = layout.n_shape_constant(field)
         offset = layout.offset(row)
         reference_index = layout.reference_index(row)
-        if stream_layout == "contiguous":
-            output_arg = "output + %d" % offset
-        else:
-            output_arg = "%s_output_streams" % field.name
-            lines.append(
-                "  s_t *const %s[%s] = {%s};"
-                % (
-                    output_arg,
-                    shape_name,
-                    _indexed_stream_range_initializer(
-                        "output", offset, layout.n_shape(row)
-                    ),
-                )
-            )
+        output_arg, declaration = _OUTPUT_STREAM_ARGUMENT[
+            field_stream_layout(stream_layout)
+        ](layout, row, field, offset, shape_name)
+        lines.extend(declaration)
         if dependencies.uses_test_gradients:
             lines.extend(
                 [
@@ -2809,9 +2792,9 @@ def _mixed_stream_declaration(name, total_streams, stream_layout, mutable=False)
     the layout choice repeated inside each.
     """
     qualifier = "s_t" if mutable else "const s_t"
-    if stream_layout == "contiguous":
-        return "%s %s[%d][VS]" % (qualifier, name, total_streams)
-    return "%s *const RSTR %s[%d]" % (qualifier, name, total_streams)
+    return _STREAM_PARAMETER[field_stream_layout(stream_layout)](
+        qualifier, name, total_streams
+    )
 
 
 def _stream_call_arguments(streams, spell):
@@ -5374,6 +5357,65 @@ def _kernel_diagnostics_lines(
         "}",
     ]
     return lines
+
+
+#: How each stream layout is spelled.  Which layout it is belongs to
+#: `plans.streams.field_stream_layout`; a lane-major tile the kernel indexes
+#: directly against an array of pointers is C, and stays here.
+_STREAM_HELPER_SUFFIX = {
+    DataStreamLayout.AOS: "_contiguous",
+    DataStreamLayout.SOA: "",
+}
+
+_STREAM_PARAMETER = {
+    DataStreamLayout.AOS: (
+        lambda qualifier, name, total: "%s %s[%d][VS]" % (qualifier, name, total)
+    ),
+    DataStreamLayout.SOA: (
+        lambda qualifier, name, total: "%s *const RSTR %s[%d]"
+        % (qualifier, name, total)
+    ),
+}
+
+
+def _aos_field_stream_argument(layout, field_index, field, group, shape_name):
+    """An offset into the tile: no pointer array to declare."""
+    return "%s + %d" % (group.name, layout.offset(field_index)), ()
+
+
+def _soa_field_stream_argument(layout, field_index, field, group, shape_name):
+    """A pointer array, declared here and passed by name."""
+    name = "%s_%s_streams" % (group.name, field.name)
+    return name, (
+        "  const s_t *const %s[%s] = {%s};"
+        % (name, shape_name, _field_stream_initializer(layout, field_index, group.name)),
+    )
+
+
+def _aos_output_stream_argument(layout, row, field, offset, shape_name):
+    return "output + %d" % offset, ()
+
+
+def _soa_output_stream_argument(layout, row, field, offset, shape_name):
+    name = "%s_output_streams" % field.name
+    return name, (
+        "  s_t *const %s[%s] = {%s};"
+        % (
+            name,
+            shape_name,
+            _indexed_stream_range_initializer("output", offset, layout.n_shape(row)),
+        ),
+    )
+
+
+_FIELD_STREAM_ARGUMENT = {
+    DataStreamLayout.AOS: _aos_field_stream_argument,
+    DataStreamLayout.SOA: _soa_field_stream_argument,
+}
+_OUTPUT_STREAM_ARGUMENT = {
+    DataStreamLayout.AOS: _aos_output_stream_argument,
+    DataStreamLayout.SOA: _soa_output_stream_argument,
+}
 
 
 #: Which contraction entry point a tensor-product kernel calls, per the test
