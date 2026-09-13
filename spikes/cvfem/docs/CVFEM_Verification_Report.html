@@ -10,14 +10,14 @@
 <div class="report-head">
   <span class="mark">CVFEM</span>
   <span>verification</span>
-  <span>machine <dfn>nid006552</dfn></span>
+  <span>machine <dfn>nid006545</dfn></span>
   <span>threads <dfn>72</dfn></span>
-  <span>2026-09-09</span>
+  <span>2026-09-13</span>
 </div>
 <h1>CVFEM verification report</h1>
 <p>Every claim below is an identity or a fitted rate checked against a threshold, so this page states whether the code is right rather than inviting a reader to judge a plot.</p>
 <h2>Summary</h2>
-<p><strong>6 of 6 checks pass.</strong></p>
+<p><strong>13 of 13 checks pass.</strong></p>
 <table>
 <thead>
 <tr>
@@ -28,13 +28,23 @@
 </thead>
 <tbody>
 <tr>
-<td>Spatial order, u L2</td>
-<td>rate 2.330 (expect &gt;= 1.65)</td>
+<td>Spatial order, u L2 (Re 1)</td>
+<td>rate 2.308 (expect &gt;= 1.65)</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
-<td>Spatial order, p L2 shifted</td>
-<td>rate 1.514 (expect &gt;= 0.95)</td>
+<td>Spatial order, p L2 shifted (Re 1)</td>
+<td>rate 1.458 (expect &gt;= 0.95)</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>Spatial order, u L2 (Re 100)</td>
+<td>rate 0.727 (expect &gt;= 0.50)</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>Spatial order, p L2 shifted (Re 100)</td>
+<td>rate 1.127 (expect &gt;= 0.50)</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -43,8 +53,28 @@
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
-<td>Pressure port shifts the level by p_bar - p_exact</td>
+<td>Pressure port shifts the level by p_bar - p_exact (direct)</td>
 <td>8 of 8 values verified</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>Pressure port shifts the level by p_bar - p_exact (mg)</td>
+<td>8 of 8 values verified</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>Pressure port shifts the level by p_bar - p_exact (vanka)</td>
+<td>8 of 8 values verified</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>Budget closes and eps_num vanishes at second order (mg)</td>
+<td>rate 2.022, closure 1.81e-03 at the finest</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>Budget is the same on both solver stacks</td>
+<td>0.000e+00 relative to eps_visc at 75140 dof</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -54,7 +84,12 @@
 </tr>
 <tr>
 <td>Global mass balance</td>
-<td>1 of 1 case(s) verified</td>
+<td>2 of 2 case(s) verified</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>Every run converged</td>
+<td>47 of 47 converged</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 </tbody>
@@ -63,12 +98,14 @@
 <p>Manufactured solution, volume-weighted L2 against the exact field, with the
 pressure gauge offset removed (<code>p_l2_shifted</code>). The rate is fitted by log-log
 least squares against <code>h ~ ndof^(-1/3)</code>.</p>
+<h3>Re = 1 -- upwinding inactive, a consistency statement</h3>
 <table>
 <thead>
 <tr>
 <th>ndof</th>
 <th>h</th>
 <th>u L2</th>
+<th>local rate</th>
 <th>p L2</th>
 <th>p L2 shifted</th>
 </tr>
@@ -77,30 +114,34 @@ least squares against <code>h ~ ndof^(-1/3)</code>.</p>
 <tr>
 <td>500</td>
 <td>0.1260</td>
-<td>3.970e-01</td>
-<td>2.320e+00</td>
-<td>2.320e+00</td>
+<td>3.979e-01</td>
+<td>--</td>
+<td>2.676e+00</td>
+<td>2.676e+00</td>
 </tr>
 <tr>
 <td>2916</td>
 <td>0.0700</td>
-<td>9.158e-02</td>
-<td>9.321e-01</td>
-<td>9.321e-01</td>
+<td>9.090e-02</td>
+<td>2.51</td>
+<td>1.159e+00</td>
+<td>1.159e+00</td>
 </tr>
 <tr>
 <td>19652</td>
 <td>0.0371</td>
-<td>2.015e-02</td>
-<td>3.451e-01</td>
-<td>3.451e-01</td>
+<td>2.106e-02</td>
+<td>2.30</td>
+<td>4.598e-01</td>
+<td>4.598e-01</td>
 </tr>
 <tr>
 <td>143748</td>
 <td>0.0191</td>
-<td>4.924e-03</td>
-<td>1.345e-01</td>
-<td>1.345e-01</td>
+<td>5.071e-03</td>
+<td>2.15</td>
+<td>1.708e-01</td>
+<td>1.708e-01</td>
 </tr>
 </tbody>
 </table>
@@ -118,16 +159,16 @@ least squares against <code>h ~ ndof^(-1/3)</code>.</p>
 <tbody>
 <tr>
 <td>u L2</td>
-<td>2.330</td>
-<td>0.9987</td>
+<td>2.308</td>
+<td>0.9988</td>
 <td>4</td>
 <td>&ge; 1.65</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
 <td>p L2 shifted</td>
-<td>1.514</td>
-<td>0.9995</td>
+<td>1.458</td>
+<td>0.9999</td>
 <td>4</td>
 <td>&ge; 0.95</td>
 <td><span class="st-pass">pass</span></td>
@@ -135,31 +176,140 @@ least squares against <code>h ~ ndof^(-1/3)</code>.</p>
 </tbody>
 </table>
 <p><svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
-<title>MMS convergence</title>
-<line x1="68" y1="234.0" x2="704" y2="234.0" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
-<text class="mut" x="60" y="238.0" text-anchor="end">1e-2</text>
-<line x1="68" y1="151.3" x2="704" y2="151.3" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
-<text class="mut" x="60" y="155.3" text-anchor="end">1e-1</text>
-<line x1="68" y1="68.6" x2="704" y2="68.6" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
-<text class="mut" x="60" y="72.6" text-anchor="end">1e0</text>
+<title>MMS convergence (Re 1)</title>
+<line x1="68" y1="235.8" x2="704" y2="235.8" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="239.8" text-anchor="end">1e-2</text>
+<line x1="68" y1="154.6" x2="704" y2="154.6" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="158.6" text-anchor="end">1e-1</text>
+<line x1="68" y1="73.4" x2="704" y2="73.4" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="77.4" text-anchor="end">1e0</text>
 <line x1="600.4" y1="16" x2="600.4" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
 <text class="mut" x="600.4" y="302" text-anchor="middle">1e-1</text>
 <text class="mut" x="386.0" y="324" text-anchor="middle">h  (~ ndof^-1/3)</text>
 <text class="mut" x="14" y="150.0" text-anchor="middle" transform="rotate(-90 14 150.0)">L2 error</text>
-<circle cx="669.9" cy="101.8" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<circle cx="493.1" cy="154.4" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<circle cx="301.7" cy="208.8" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<circle cx="102.1" cy="259.5" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<text x="76" y="30" fill="var(--s1, #d97757)">u L2: rate 2.33</text>
-<path d="M102.1 261.7 L669.9 103.7" fill="none" stroke="var(--s2, #8c8880)" stroke-width="2" stroke-dasharray="6 4"/>
-<text x="76" y="46" fill="var(--s2, #8c8880)">  fit h^2.33</text>
-<circle cx="669.9" cy="38.3" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<circle cx="493.1" cy="71.1" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<circle cx="301.7" cy="106.8" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<circle cx="102.1" cy="140.7" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
-<text x="76" y="62" fill="var(--s3, #4a6fa5)">p L2 shifted: rate 1.51</text>
-<path d="M102.1 141.6 L669.9 38.9" fill="none" stroke="var(--s4, #a8a29a)" stroke-width="2" stroke-dasharray="6 4"/>
-<text x="76" y="78" fill="var(--s4, #a8a29a)">  fit h^1.51</text>
+<circle cx="669.9" cy="105.9" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="493.1" cy="158.0" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="301.7" cy="209.6" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="102.1" cy="259.8" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<text x="76" y="30" fill="var(--s1, #d97757)">u L2: rate 2.31</text>
+<path d="M102.1 261.7 L669.9 108.0" fill="none" stroke="var(--s2, #8c8880)" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="76" y="46" fill="var(--s2, #8c8880)">  fit h^2.31</text>
+<circle cx="669.9" cy="38.7" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="493.1" cy="68.2" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="301.7" cy="100.8" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="102.1" cy="135.8" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<text x="76" y="62" fill="var(--s3, #4a6fa5)">p L2 shifted: rate 1.46</text>
+<path d="M102.1 135.4 L669.9 38.3" fill="none" stroke="var(--s4, #a8a29a)" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="76" y="78" fill="var(--s4, #a8a29a)">  fit h^1.46</text>
+</svg></p>
+<h3>Re = 100 -- upwinding active, the accuracy statement</h3>
+<p>The scheme is first-order donor-cell upwind with no limiter, so a
+rate near 1 here is the expected result, not a defect -- and it is
+the measurement that decides whether a higher-order convection
+scheme is worth its cost.</p>
+<p>Read the local rates, not just the fit. They do not settle, so the
+fitted value is a bound on the order rather than a measurement of
+it: what is established is that the ladder converges and that the
+order is nowhere near the 2.3 the Re = 1 arm reports. The gate is
+set well below the fitted rate for that reason.</p>
+<table>
+<thead>
+<tr>
+<th>ndof</th>
+<th>h</th>
+<th>u L2</th>
+<th>local rate</th>
+<th>p L2</th>
+<th>p L2 shifted</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>500</td>
+<td>0.1260</td>
+<td>3.355e-01</td>
+<td>--</td>
+<td>2.462e-01</td>
+<td>2.458e-01</td>
+</tr>
+<tr>
+<td>2916</td>
+<td>0.0700</td>
+<td>1.580e-01</td>
+<td>1.28</td>
+<td>8.757e-02</td>
+<td>8.694e-02</td>
+</tr>
+<tr>
+<td>19652</td>
+<td>0.0371</td>
+<td>1.191e-01</td>
+<td>0.44</td>
+<td>4.578e-02</td>
+<td>4.546e-02</td>
+</tr>
+<tr>
+<td>143748</td>
+<td>0.0191</td>
+<td>7.950e-02</td>
+<td>0.61</td>
+<td>2.835e-02</td>
+<td>2.825e-02</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>quantity</th>
+<th>fitted rate</th>
+<th>R^2</th>
+<th>levels</th>
+<th>threshold</th>
+<th>status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>u L2</td>
+<td>0.727</td>
+<td>0.9465</td>
+<td>4</td>
+<td>&ge; 0.50</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>p L2 shifted</td>
+<td>1.127</td>
+<td>0.9588</td>
+<td>4</td>
+<td>&ge; 0.50</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+</tbody>
+</table>
+<p><svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
+<title>MMS convergence (Re 100)</title>
+<line x1="68" y1="141.6" x2="704" y2="141.6" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="145.6" text-anchor="end">1e-1</text>
+<line x1="600.4" y1="16" x2="600.4" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="600.4" y="302" text-anchor="middle">1e-1</text>
+<text class="mut" x="386.0" y="324" text-anchor="middle">h  (~ ndof^-1/3)</text>
+<text class="mut" x="14" y="150.0" text-anchor="middle" transform="rotate(-90 14 150.0)">L2 error</text>
+<circle cx="669.9" cy="38.3" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="493.1" cy="102.5" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="301.7" cy="126.7" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="102.1" cy="161.1" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<text x="76" y="30" fill="var(--s1, #d97757)">u L2: rate 0.73</text>
+<path d="M102.1 166.8 L669.9 49.9" fill="none" stroke="var(--s2, #8c8880)" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="76" y="46" fill="var(--s2, #8c8880)">  fit h^0.73</text>
+<circle cx="669.9" cy="64.9" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="493.1" cy="153.5" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="301.7" cy="208.8" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="102.1" cy="249.4" r="3.5" fill="var(--s3, #4a6fa5)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<text x="76" y="62" fill="var(--s3, #4a6fa5)">p L2 shifted: rate 1.13</text>
+<path d="M102.1 261.7 L669.9 80.2" fill="none" stroke="var(--s4, #a8a29a)" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="76" y="78" fill="var(--s4, #a8a29a)">  fit h^1.13</text>
 </svg></p>
 <h2>Boundary conditions</h2>
 <h3>Traction generalises the do-nothing outflow</h3>
@@ -179,23 +329,28 @@ to agree.</p>
 <tbody>
 <tr>
 <td>u_linf</td>
-<td>5.497e-02</td>
-<td>5.497e-02</td>
+<td>4.836e-02</td>
+<td>4.836e-02</td>
 <td>0.000e+00</td>
 </tr>
 <tr>
 <td>p_linf</td>
-<td>1.760e-01</td>
-<td>1.760e-01</td>
+<td>1.844e-01</td>
+<td>1.844e-01</td>
 <td>0.000e+00</td>
 </tr>
 </tbody>
 </table>
-<h3>A pressure port fixes the level and nothing else</h3>
+<h3>A pressure port fixes the level and nothing else -- flat mesh, exact linear solve</h3>
 <p>Holding a port at <code>p_bar</code> should shift the whole pressure field by
 <code>p_bar - p_exact(outlet)</code> and leave the velocity alone. Both halves are
 checked: the shift against that closed form, and the velocity against the
 exact solution.</p>
+<p>Run on both solver stacks the spike uses. A group that exercises one of
+them certifies one of them, and this group spent a long time on a third
+-- block-Jacobi on a flat mesh, inherited from unset defaults -- which
+fails even at <code>p_bar = p_exact(outlet)</code>, where the boundary condition
+asks for nothing unusual.</p>
 <table>
 <thead>
 <tr>
@@ -210,15 +365,15 @@ exact solution.</p>
 <tbody>
 <tr>
 <td>-0.16</td>
-<td>7.493e-12</td>
-<td>1.437e-12</td>
+<td>5.702e-13</td>
+<td>2.159e-14</td>
 <td>0.000e+00</td>
-<td>1.437e-12</td>
+<td>2.159e-14</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
 <td>-0.08</td>
-<td>5.557e-12</td>
+<td>5.704e-13</td>
 <td>8.000e-02</td>
 <td>8.000e-02</td>
 <td>0.000e+00</td>
@@ -226,7 +381,7 @@ exact solution.</p>
 </tr>
 <tr>
 <td>0</td>
-<td>5.060e-12</td>
+<td>5.701e-13</td>
 <td>1.600e-01</td>
 <td>1.600e-01</td>
 <td>0.000e+00</td>
@@ -234,7 +389,7 @@ exact solution.</p>
 </tr>
 <tr>
 <td>0.16</td>
-<td>3.356e-09</td>
+<td>5.712e-13</td>
 <td>3.200e-01</td>
 <td>3.200e-01</td>
 <td>0.000e+00</td>
@@ -242,7 +397,7 @@ exact solution.</p>
 </tr>
 <tr>
 <td>0.5</td>
-<td>2.711e-12</td>
+<td>5.712e-13</td>
 <td>6.600e-01</td>
 <td>6.600e-01</td>
 <td>0.000e+00</td>
@@ -250,7 +405,7 @@ exact solution.</p>
 </tr>
 <tr>
 <td>1</td>
-<td>8.714e-12</td>
+<td>5.710e-13</td>
 <td>1.160e+00</td>
 <td>1.160e+00</td>
 <td>0.000e+00</td>
@@ -258,7 +413,7 @@ exact solution.</p>
 </tr>
 <tr>
 <td>1.5</td>
-<td>7.360e-12</td>
+<td>5.715e-13</td>
 <td>1.660e+00</td>
 <td>1.660e+00</td>
 <td>0.000e+00</td>
@@ -266,7 +421,7 @@ exact solution.</p>
 </tr>
 <tr>
 <td>3</td>
-<td>2.739e-11</td>
+<td>5.745e-13</td>
 <td>3.160e+00</td>
 <td>3.160e+00</td>
 <td>0.000e+00</td>
@@ -275,7 +430,7 @@ exact solution.</p>
 </tbody>
 </table>
 <p><svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
-<title>Pressure port linearity</title>
+<title>Pressure port linearity (direct)</title>
 <line x1="68" y1="261.7" x2="704" y2="261.7" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
 <text class="mut" x="60" y="265.7" text-anchor="end">0</text>
 <line x1="68" y1="191.0" x2="704" y2="191.0" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
@@ -306,6 +461,317 @@ exact solution.</p>
 <path d="M102.1 261.7 L116.4 256.0 L130.8 250.4 L159.6 239.1 L220.7 215.0 L310.5 179.7 L400.4 144.3 L669.9 38.3" fill="none" stroke="var(--s2, #8c8880)" stroke-width="2" stroke-dasharray="6 4"/>
 <text x="76" y="46" fill="var(--s2, #8c8880)">predicted |p_bar - p_exact|</text>
 </svg></p>
+<h3>A pressure port fixes the level and nothing else -- FGMRES + geometric multigrid</h3>
+<p>Holding a port at <code>p_bar</code> should shift the whole pressure field by
+<code>p_bar - p_exact(outlet)</code> and leave the velocity alone. Both halves are
+checked: the shift against that closed form, and the velocity against the
+exact solution.</p>
+<p>Run on both solver stacks the spike uses. A group that exercises one of
+them certifies one of them, and this group spent a long time on a third
+-- block-Jacobi on a flat mesh, inherited from unset defaults -- which
+fails even at <code>p_bar = p_exact(outlet)</code>, where the boundary condition
+asks for nothing unusual.</p>
+<table>
+<thead>
+<tr>
+<th>p_bar</th>
+<th>u_linf</th>
+<th>p_linf</th>
+<th>predicted shift</th>
+<th>error</th>
+<th>status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-0.16</td>
+<td>1.904e-07</td>
+<td>3.109e-08</td>
+<td>0.000e+00</td>
+<td>3.109e-08</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>-0.08</td>
+<td>1.904e-07</td>
+<td>8.000e-02</td>
+<td>8.000e-02</td>
+<td>2.000e-08</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>0</td>
+<td>1.904e-07</td>
+<td>1.600e-01</td>
+<td>1.600e-01</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>0.16</td>
+<td>1.904e-07</td>
+<td>3.200e-01</td>
+<td>3.200e-01</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>0.5</td>
+<td>1.880e-07</td>
+<td>6.600e-01</td>
+<td>6.600e-01</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>1</td>
+<td>1.880e-07</td>
+<td>1.160e+00</td>
+<td>1.160e+00</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>1.5</td>
+<td>1.904e-07</td>
+<td>1.660e+00</td>
+<td>1.660e+00</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>1.685e-07</td>
+<td>3.160e+00</td>
+<td>3.160e+00</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+</tbody>
+</table>
+<p><svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
+<title>Pressure port linearity (mg)</title>
+<line x1="68" y1="261.7" x2="704" y2="261.7" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="265.7" text-anchor="end">0</text>
+<line x1="68" y1="191.0" x2="704" y2="191.0" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="195.0" text-anchor="end">1</text>
+<line x1="68" y1="120.3" x2="704" y2="120.3" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="124.3" text-anchor="end">2</text>
+<line x1="68" y1="49.6" x2="704" y2="49.6" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="53.6" text-anchor="end">3</text>
+<line x1="130.8" y1="16" x2="130.8" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="130.8" y="302" text-anchor="middle">0</text>
+<line x1="310.5" y1="16" x2="310.5" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="310.5" y="302" text-anchor="middle">1</text>
+<line x1="490.2" y1="16" x2="490.2" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="490.2" y="302" text-anchor="middle">2</text>
+<line x1="669.9" y1="16" x2="669.9" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="669.9" y="302" text-anchor="middle">3</text>
+<text class="mut" x="386.0" y="324" text-anchor="middle">prescribed p_bar</text>
+<text class="mut" x="14" y="150.0" text-anchor="middle" transform="rotate(-90 14 150.0)">pressure offset</text>
+<circle cx="102.1" cy="261.7" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="116.4" cy="256.0" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="130.8" cy="250.4" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="159.6" cy="239.1" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="220.7" cy="215.0" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="310.5" cy="179.7" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="400.4" cy="144.3" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="669.9" cy="38.3" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<text x="76" y="30" fill="var(--s1, #d97757)">measured p_linf</text>
+<path d="M102.1 261.7 L116.4 256.0 L130.8 250.4 L159.6 239.1 L220.7 215.0 L310.5 179.7 L400.4 144.3 L669.9 38.3" fill="none" stroke="var(--s2, #8c8880)" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="76" y="46" fill="var(--s2, #8c8880)">predicted |p_bar - p_exact|</text>
+</svg></p>
+<h3>A pressure port fixes the level and nothing else -- FGMRES + Vanka, no multigrid</h3>
+<p>Holding a port at <code>p_bar</code> should shift the whole pressure field by
+<code>p_bar - p_exact(outlet)</code> and leave the velocity alone. Both halves are
+checked: the shift against that closed form, and the velocity against the
+exact solution.</p>
+<p>Run on both solver stacks the spike uses. A group that exercises one of
+them certifies one of them, and this group spent a long time on a third
+-- block-Jacobi on a flat mesh, inherited from unset defaults -- which
+fails even at <code>p_bar = p_exact(outlet)</code>, where the boundary condition
+asks for nothing unusual.</p>
+<table>
+<thead>
+<tr>
+<th>p_bar</th>
+<th>u_linf</th>
+<th>p_linf</th>
+<th>predicted shift</th>
+<th>error</th>
+<th>status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-0.16</td>
+<td>1.904e-07</td>
+<td>3.109e-08</td>
+<td>0.000e+00</td>
+<td>3.109e-08</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>-0.08</td>
+<td>1.904e-07</td>
+<td>8.000e-02</td>
+<td>8.000e-02</td>
+<td>2.000e-08</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>0</td>
+<td>1.904e-07</td>
+<td>1.600e-01</td>
+<td>1.600e-01</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>0.16</td>
+<td>1.904e-07</td>
+<td>3.200e-01</td>
+<td>3.200e-01</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>0.5</td>
+<td>1.880e-07</td>
+<td>6.600e-01</td>
+<td>6.600e-01</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>1</td>
+<td>1.880e-07</td>
+<td>1.160e+00</td>
+<td>1.160e+00</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>1.5</td>
+<td>1.904e-07</td>
+<td>1.660e+00</td>
+<td>1.660e+00</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>1.692e-07</td>
+<td>3.160e+00</td>
+<td>3.160e+00</td>
+<td>0.000e+00</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+</tbody>
+</table>
+<p><svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
+<title>Pressure port linearity (vanka)</title>
+<line x1="68" y1="261.7" x2="704" y2="261.7" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="265.7" text-anchor="end">0</text>
+<line x1="68" y1="191.0" x2="704" y2="191.0" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="195.0" text-anchor="end">1</text>
+<line x1="68" y1="120.3" x2="704" y2="120.3" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="124.3" text-anchor="end">2</text>
+<line x1="68" y1="49.6" x2="704" y2="49.6" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="60" y="53.6" text-anchor="end">3</text>
+<line x1="130.8" y1="16" x2="130.8" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="130.8" y="302" text-anchor="middle">0</text>
+<line x1="310.5" y1="16" x2="310.5" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="310.5" y="302" text-anchor="middle">1</text>
+<line x1="490.2" y1="16" x2="490.2" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="490.2" y="302" text-anchor="middle">2</text>
+<line x1="669.9" y1="16" x2="669.9" y2="284" stroke="var(--grid, #e4e1d8)" stroke-width="1"/>
+<text class="mut" x="669.9" y="302" text-anchor="middle">3</text>
+<text class="mut" x="386.0" y="324" text-anchor="middle">prescribed p_bar</text>
+<text class="mut" x="14" y="150.0" text-anchor="middle" transform="rotate(-90 14 150.0)">pressure offset</text>
+<circle cx="102.1" cy="261.7" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="116.4" cy="256.0" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="130.8" cy="250.4" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="159.6" cy="239.1" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="220.7" cy="215.0" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="310.5" cy="179.7" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="400.4" cy="144.3" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<circle cx="669.9" cy="38.3" r="3.5" fill="var(--s1, #d97757)" stroke="var(--surface, #ffffff)" stroke-width="1.5"/>
+<text x="76" y="30" fill="var(--s1, #d97757)">measured p_linf</text>
+<path d="M102.1 261.7 L116.4 256.0 L130.8 250.4 L159.6 239.1 L220.7 215.0 L310.5 179.7 L400.4 144.3 L669.9 38.3" fill="none" stroke="var(--s2, #8c8880)" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="76" y="46" fill="var(--s2, #8c8880)">predicted |p_bar - p_exact|</text>
+</svg></p>
+<h2>The kinetic-energy budget</h2>
+<p><code>dE/dt = P_in - P_out - eps_visc - eps_num</code>, with every term but the last
+measured on the operator's own control volumes and sub-control surfaces, and
+<code>eps_num</code> defined as the residual. On steady Poiseuille <code>dE/dt</code> is zero and the
+flow is resolved, so <code>eps_num</code> is discretisation error: it must fall at the
+scheme's order, and <code>closure</code> -- <code>|eps_num|</code> against the largest term it is
+differenced from -- must fall with it.</p>
+<h3>FGMRES + geometric multigrid</h3>
+<table>
+<thead>
+<tr>
+<th>ndof</th>
+<th>E</th>
+<th>eps_visc</th>
+<th>eps_num</th>
+<th>closure</th>
+<th>div_l2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10692</td>
+<td>1.066e+00</td>
+<td>2.013e-01</td>
+<td>8.750e-03</td>
+<td>2.622e-02</td>
+<td>7.294e-14</td>
+</tr>
+<tr>
+<td>75140</td>
+<td>1.067e+00</td>
+<td>2.102e-01</td>
+<td>2.344e-03</td>
+<td>7.000e-03</td>
+<td>2.181e-13</td>
+</tr>
+<tr>
+<td>561924</td>
+<td>1.067e+00</td>
+<td>2.125e-01</td>
+<td>6.055e-04</td>
+<td>1.807e-03</td>
+<td>1.750e-13</td>
+</tr>
+</tbody>
+</table>
+<p>Observed order of <code>eps_num</code>: <strong>2.022</strong> (R^2 1.0000 over 3 levels, expect &gt;= 1.65).</p>
+<h3>FGMRES + Vanka, no multigrid</h3>
+<table>
+<thead>
+<tr>
+<th>ndof</th>
+<th>E</th>
+<th>eps_visc</th>
+<th>eps_num</th>
+<th>closure</th>
+<th>div_l2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>75140</td>
+<td>1.067e+00</td>
+<td>2.102e-01</td>
+<td>2.344e-03</td>
+<td>7.000e-03</td>
+<td>4.470e-13</td>
+</tr>
+</tbody>
+</table>
+<p>Solver independence at 75140 dof: <code>eps_num</code> 2.344e-03 (mg) against 2.344e-03 (vanka), difference 0.000e+00 of eps_visc.</p>
 <h2>Diaphragm pump</h2>
 <p>A closed chamber with a diaphragm that moves and one port that lets fluid in or
 out. The diaphragm is transpiration on a fixed mesh: the wall does not move, its
@@ -372,8 +838,8 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.</p>
 <td>+0.0000</td>
 <td>+0.000000000</td>
 <td>+0.000000000</td>
-<td>1.667e-19</td>
-<td>1.667e-19</td>
+<td>3.303e-18</td>
+<td>3.303e-18</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 <tr>
@@ -392,8 +858,8 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.</p>
 <td>-0.0000</td>
 <td>-0.000000000</td>
 <td>-0.000000000</td>
-<td>2.028e-17</td>
-<td>2.028e-17</td>
+<td>2.502e-18</td>
+<td>2.502e-18</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 </tbody>
@@ -460,19 +926,30 @@ is kept because it does check the prescribed profile, against its own tolerance.
 <tr>
 <td>lshape</td>
 <td>7060</td>
-<td>1.489e-16</td>
-<td>1.340e-15</td>
-<td>9.766e-02</td>
+<td>4.108e-17</td>
+<td>3.698e-16</td>
+<td>1.111e-01</td>
 <td>1.345e-02</td>
-<td>5.198e-01</td>
+<td>5.066e-01</td>
+<td><span class="st-pass">pass</span></td>
+</tr>
+<tr>
+<td>re500</td>
+<td>4540</td>
+<td>9.625e-24</td>
+<td>1.849e-18</td>
+<td>4.226e-06</td>
+<td>1.883e-01</td>
+<td>1.944e-16</td>
 <td><span class="st-pass">pass</span></td>
 </tr>
 </tbody>
 </table>
 <h2>Solver behaviour</h2>
-<p>Reported for context, not asserted here: a verification result from a run that
-did not converge is not a verification result. Timings carry the dof count they
-were measured on, and the machine is named in Provenance.</p>
+<p>Convergence is asserted by the check above; the physics checks abstain on a run
+that did not converge, because a verification result from such a run is not a
+verification result. Timings carry the dof count they were measured on, and the
+machine is named in Provenance.</p>
 <table>
 <thead>
 <tr>
@@ -488,52 +965,92 @@ were measured on, and the machine is named in Provenance.</p>
 </thead>
 <tbody>
 <tr>
-<td>n4</td>
+<td>re1_n4</td>
 <td>500</td>
 <td>yes</td>
-<td>2</td>
-<td>171</td>
-<td>0.066</td>
+<td>3</td>
+<td>305</td>
+<td>0.047</td>
 <td>2</td>
 <td>zero mean</td>
 </tr>
 <tr>
-<td>n8</td>
+<td>re1_n8</td>
 <td>2916</td>
 <td>yes</td>
 <td>2</td>
-<td>276</td>
-<td>0.219</td>
+<td>500</td>
+<td>0.136</td>
 <td>2</td>
 <td>zero mean</td>
 </tr>
 <tr>
-<td>n16</td>
+<td>re1_n16</td>
 <td>19652</td>
 <td>yes</td>
 <td>2</td>
-<td>679</td>
-<td>1.407</td>
+<td>1956</td>
+<td>1.731</td>
 <td>2</td>
 <td>zero mean</td>
 </tr>
 <tr>
-<td>n32</td>
+<td>re1_n32</td>
 <td>143748</td>
 <td>yes</td>
 <td>2</td>
-<td>1764</td>
-<td>6.255</td>
+<td>4744</td>
+<td>13.108</td>
 <td>2</td>
+<td>zero mean</td>
+</tr>
+<tr>
+<td>re100_n4</td>
+<td>500</td>
+<td>yes</td>
+<td>16</td>
+<td>5304</td>
+<td>0.827</td>
+<td>200</td>
+<td>zero mean</td>
+</tr>
+<tr>
+<td>re100_n8</td>
+<td>2916</td>
+<td>yes</td>
+<td>8</td>
+<td>4390</td>
+<td>1.200</td>
+<td>200</td>
+<td>zero mean</td>
+</tr>
+<tr>
+<td>re100_n16</td>
+<td>19652</td>
+<td>yes</td>
+<td>5</td>
+<td>6815</td>
+<td>6.004</td>
+<td>200</td>
+<td>zero mean</td>
+</tr>
+<tr>
+<td>re100_n32</td>
+<td>143748</td>
+<td>yes</td>
+<td>4</td>
+<td>10894</td>
+<td>30.618</td>
+<td>200</td>
 <td>zero mean</td>
 </tr>
 <tr>
 <td>dirichlet</td>
-<td>33124</td>
+<td>4900</td>
 <td>yes</td>
 <td>0</td>
-<td>557</td>
-<td>1.437</td>
+<td>3</td>
+<td>0.033</td>
 <td>100</td>
 <td>zero mean</td>
 </tr>
@@ -542,8 +1059,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>33124</td>
 <td>yes</td>
 <td>3</td>
-<td>8168</td>
-<td>18.119</td>
+<td>13526</td>
+<td>12.694</td>
 <td>100</td>
 <td>determined by the do-nothing outflow</td>
 </tr>
@@ -551,99 +1068,299 @@ were measured on, and the machine is named in Provenance.</p>
 <td>traction0</td>
 <td>33124</td>
 <td>yes</td>
-<td>4</td>
-<td>9227</td>
-<td>20.532</td>
+<td>3</td>
+<td>13526</td>
+<td>12.557</td>
 <td>100</td>
 <td>determined by the traction surface</td>
 </tr>
 <tr>
-<td>p-0.16</td>
-<td>33124</td>
+<td>direct_p-0.16</td>
+<td>4900</td>
 <td>yes</td>
 <td>0</td>
-<td>1139</td>
-<td>2.548</td>
+<td>3</td>
+<td>0.033</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
-<td>p-0.08</td>
-<td>33124</td>
+<td>direct_p-0.08</td>
+<td>4900</td>
 <td>yes</td>
 <td>0</td>
-<td>1056</td>
-<td>2.367</td>
+<td>3</td>
+<td>0.033</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
-<td>p0</td>
-<td>33124</td>
+<td>direct_p0</td>
+<td>4900</td>
 <td>yes</td>
 <td>0</td>
-<td>844</td>
-<td>1.902</td>
+<td>3</td>
+<td>0.037</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
-<td>p0.16</td>
-<td>33124</td>
+<td>direct_p0.16</td>
+<td>4900</td>
 <td>yes</td>
 <td>0</td>
-<td>1208</td>
-<td>2.742</td>
+<td>3</td>
+<td>0.036</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
-<td>p0.5</td>
-<td>33124</td>
+<td>direct_p0.5</td>
+<td>4900</td>
 <td>yes</td>
 <td>0</td>
-<td>1377</td>
-<td>3.062</td>
+<td>3</td>
+<td>0.035</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
-<td>p1.0</td>
-<td>33124</td>
+<td>direct_p1.0</td>
+<td>4900</td>
 <td>yes</td>
 <td>0</td>
-<td>812</td>
-<td>1.810</td>
+<td>3</td>
+<td>0.033</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
-<td>p1.5</td>
-<td>33124</td>
+<td>direct_p1.5</td>
+<td>4900</td>
 <td>yes</td>
 <td>0</td>
-<td>1006</td>
-<td>2.250</td>
+<td>3</td>
+<td>0.033</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
 </tr>
 <tr>
-<td>p3.0</td>
+<td>direct_p3.0</td>
+<td>4900</td>
+<td>yes</td>
+<td>0</td>
+<td>3</td>
+<td>0.033</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_p-0.16</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>183</td>
+<td>0.927</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_p-0.08</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>184</td>
+<td>0.909</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_p0</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>183</td>
+<td>0.945</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_p0.16</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>173</td>
+<td>0.848</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_p0.5</td>
 <td>33124</td>
 <td>yes</td>
 <td>0</td>
-<td>815</td>
-<td>1.817</td>
+<td>160</td>
+<td>0.782</td>
 <td>100</td>
 <td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_p1.0</td>
+<td>33124</td>
+<td>yes</td>
+<td>0</td>
+<td>159</td>
+<td>0.800</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_p1.5</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>159</td>
+<td>0.790</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_p3.0</td>
+<td>33124</td>
+<td>yes</td>
+<td>0</td>
+<td>147</td>
+<td>0.745</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>vanka_p-0.16</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>1735</td>
+<td>1.187</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>vanka_p-0.08</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>1766</td>
+<td>1.190</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>vanka_p0</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>1760</td>
+<td>1.188</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>vanka_p0.16</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>1673</td>
+<td>1.123</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>vanka_p0.5</td>
+<td>33124</td>
+<td>yes</td>
+<td>0</td>
+<td>1467</td>
+<td>1.000</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>vanka_p1.0</td>
+<td>33124</td>
+<td>yes</td>
+<td>0</td>
+<td>1477</td>
+<td>0.988</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>vanka_p1.5</td>
+<td>33124</td>
+<td>yes</td>
+<td>1</td>
+<td>1498</td>
+<td>1.003</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>vanka_p3.0</td>
+<td>33124</td>
+<td>yes</td>
+<td>0</td>
+<td>1299</td>
+<td>0.868</td>
+<td>100</td>
+<td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>mg_n2l4</td>
+<td>10692</td>
+<td>yes</td>
+<td>0</td>
+<td>62</td>
+<td>0.232</td>
+<td>100</td>
+<td>zero mean</td>
+</tr>
+<tr>
+<td>mg_n2l8</td>
+<td>75140</td>
+<td>yes</td>
+<td>0</td>
+<td>138</td>
+<td>1.756</td>
+<td>100</td>
+<td>zero mean</td>
+</tr>
+<tr>
+<td>mg_n4l8</td>
+<td>561924</td>
+<td>yes</td>
+<td>0</td>
+<td>592</td>
+<td>43.738</td>
+<td>100</td>
+<td>zero mean</td>
+</tr>
+<tr>
+<td>vanka_n2l8</td>
+<td>75140</td>
+<td>yes</td>
+<td>0</td>
+<td>1179</td>
+<td>2.816</td>
+<td>100</td>
+<td>zero mean</td>
 </tr>
 <tr>
 <td>lshape</td>
 <td>7060</td>
 <td>yes</td>
 <td>3</td>
-<td>0</td>
-<td>0.496</td>
+<td>17</td>
+<td>0.388</td>
 <td>20</td>
 <td>determined by the do-nothing outflow</td>
 </tr>
@@ -651,9 +1368,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>steady</td>
 <td>2916</td>
 <td>yes</td>
-<td>3</td>
-<td>0</td>
-<td>0.055</td>
+<td>7</td>
+<td>24</td>
+<td>0.090</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -661,8 +1378,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>t1</td>
 <td>2916</td>
 <td>yes</td>
-<td>3</td>
-<td>0</td>
+<td>6</td>
+<td>20</td>
 <td>0.076</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
@@ -671,8 +1388,8 @@ were measured on, and the machine is named in Provenance.</p>
 <td>t2</td>
 <td>2916</td>
 <td>yes</td>
-<td>3</td>
-<td>0</td>
+<td>7</td>
+<td>27</td>
 <td>0.104</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
@@ -681,9 +1398,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>t4</td>
 <td>2916</td>
 <td>yes</td>
-<td>3</td>
-<td>0</td>
-<td>0.204</td>
+<td>9</td>
+<td>43</td>
+<td>0.161</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -691,9 +1408,9 @@ were measured on, and the machine is named in Provenance.</p>
 <td>t6</td>
 <td>2916</td>
 <td>yes</td>
-<td>3</td>
-<td>0</td>
-<td>0.327</td>
+<td>7</td>
+<td>59</td>
+<td>0.221</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
 </tr>
@@ -701,11 +1418,21 @@ were measured on, and the machine is named in Provenance.</p>
 <td>t8</td>
 <td>2916</td>
 <td>yes</td>
-<td>3</td>
-<td>0</td>
-<td>0.420</td>
+<td>8</td>
+<td>73</td>
+<td>0.275</td>
 <td>20</td>
 <td>determined by the prescribed pressure</td>
+</tr>
+<tr>
+<td>re500</td>
+<td>4540</td>
+<td>yes</td>
+<td>16</td>
+<td>85</td>
+<td>0.773</td>
+<td>500</td>
+<td>determined by the do-nothing outflow</td>
 </tr>
 </tbody>
 </table>
@@ -720,11 +1447,11 @@ were measured on, and the machine is named in Provenance.</p>
 <tbody>
 <tr>
 <td>generated</td>
-<td>2026-09-09 20:30:43</td>
+<td>2026-09-13 18:54:30</td>
 </tr>
 <tr>
 <td>machine</td>
-<td>nid006552</td>
+<td>nid006545</td>
 </tr>
 <tr>
 <td>threads</td>
@@ -736,22 +1463,22 @@ were measured on, and the machine is named in Provenance.</p>
 </tr>
 <tr>
 <td>linear solver</td>
-<td>--</td>
+<td>direct</td>
 </tr>
 <tr>
 <td>element refine level</td>
-<td>--</td>
+<td>1</td>
 </tr>
 <tr>
 <td>run directory</td>
-<td>/Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-4632318</td>
+<td>/Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-direct-4658814</td>
 </tr>
 <tr>
 <td>runs parsed</td>
-<td>22 of 22</td>
+<td>47 of 47</td>
 </tr>
 </tbody>
 </table>
-<p>Regenerate with <code>python3 python/cvfem_verify_report.py verification_runs/grace-4632318</code>.</p>
+<p>Regenerate with <code>python3 python/cvfem_verify_report.py verification_runs/grace-direct-4658814</code>.</p>
 </body>
 </html>
