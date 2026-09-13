@@ -932,6 +932,33 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     //              variable and there is no velocity scale in this signature to form it
     //              from. Without it the limiter stays active everywhere, which costs
     //              accuracy at smooth extrema but cannot reintroduce a switch.
+    //
+    // MEASURED, AND NEITHER LIMITER IS USABLE YET. On the step at Re = 40, unlimited reaches
+    // the target in 24 Newton steps at 7,060 dof and 18 at 47,268; the clip stalls at Re
+    // 14.04 and the smooth form at Re 21.92, and on the finer mesh at 3.51 and 5.32. So
+    // smoothing the switch is worth a consistent factor of about 1.5 and nothing more, and
+    // the default is 0 because 0 is what converges.
+    //
+    // The factor of four between the meshes is the diagnosis. It is a limiter property --
+    // unlimited converges on both -- and it says what is wrong with the BOUND rather than
+    // with its smoothness: [min(u_i,u_j), max(u_i,u_j)] is a two-node interval that collapses
+    // as h -> 0, while the reconstruction it is asked to contain does not collapse with it.
+    // The sub-control surface's centroid is offset from the edge, so on an edge lying along
+    // the flow -- most of the edges in a channel core -- u_i and u_j agree to round-off while
+    // the true face value legitimately differs from both in the transverse direction. The
+    // limiter then clips a correction that was right, and which of the two bounds it clips to
+    // is decided by round-off in u_i - u_j. Refining widens the region where that is true,
+    // which is the h^-2.
+    //
+    // Venkatakrishnan's epsilon^2 addresses exactly those near-constant regions and is the
+    // obvious next thing to try, but it is unlikely to be the whole answer on its own: his
+    // epsilon^2 = (K dx)^3 is below O(h^2) and so vanishes against a smooth field's own
+    // Delta^2, leaving the ee = 0 behaviour -- psi = 3/4 where the clip passes the increment
+    // through -- across most of the mesh. The bound itself is what is too narrow, and the
+    // standard remedy is Barth and Jespersen's actual bound, taken over ALL neighbours of the
+    // node rather than over the two nodes of one edge. That needs a per-node min/max pass,
+    // which is a new sweep this file does not have and which the deferred correction's
+    // existing nodal-gradient pass could carry.
     auto lim = [&](const scalar_t *const u, const scalar_t inc_i, const scalar_t inc_j,
                    scalar_t &oi, scalar_t &oj) {
         oi = inc_i;
