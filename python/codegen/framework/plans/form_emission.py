@@ -135,32 +135,29 @@ def mesh_output_shape(form):
 def mesh_output_streams(form, n_field_components, n_nodes, component_name):
     """The streams the kernel writes, in ABI order.
 
-    Asked of a wider question than ``mesh_output_shape`` and able to disagree
-    with it, on purpose.  A form carrying a weak form is scalar exactly when its
-    order is zero; one lowered through an expression graph instead is scalar
-    when that graph has a single output, whatever its order says.  The six sites
-    that shaped the buffer and the parameters asked only the first.
+    The names for the buffer ``mesh_output_shape`` shapes, and they answer the
+    same question, so the two cannot disagree: a scalar output is one stream, a
+    per-shape one is a stream per shape function per field component.
 
-    Collapsing the two would change what is emitted for a graph-lowered form of
-    non-zero order with one output.  Recording that they are two questions is
-    the first step to finding out whether that was ever intended.
+    They did not always.  This site used to ask a wider question -- a form
+    lowered through an expression graph rather than a weak form was called
+    scalar when that graph had a single output, whatever its order said -- while
+    the six sites shaping the buffer and the parameters asked
+    ``writes_per_shape``.  Nothing reconciled them.  Nothing had to, as it
+    turned out: every form that reaches here carries a weak form, for which the
+    wider question is the narrower one, so the second answer was never once
+    computed and could only ever have diverged silently.
 
     ``component_name`` spells a field component's suffix, which is the caller's
     convention rather than this layer's.
     """
-    if _names_one_output(form):
+    if not writes_per_shape(form):
         return ("value",)
     return tuple(
         "out%s%d" % (component_name(d), node)
         for node in range(n_nodes)
         for d in range(n_field_components)
     )
-
-
-def _names_one_output(form):
-    if getattr(form, "weak_form", None) is not None:
-        return not writes_per_shape(form)
-    return len(form.expression_graph.evaluation_plan.outputs) == 1
 
 
 class FormAccumulation(Enum):
