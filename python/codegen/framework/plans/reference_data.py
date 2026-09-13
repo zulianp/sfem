@@ -305,6 +305,13 @@ def validate_reference_data_plan(
     isoparametric_rule,
     family,
 ):
+    # A reference-data plan is optional -- every emitter defaults it to None --
+    # so validating one that was not supplied is vacuous, and saying so here is
+    # what stops three call sites each guarding the call.  Its sibling
+    # `plans.diagnostics.validate_diagnostics_plan_names` already answered this
+    # the same way.
+    if plan is None:
+        return None
     if not isinstance(plan, ReferenceDataPlan):
         raise TypeError("reference_data_plan must be a ReferenceDataPlan")
     if plan.prefix != str(prefix):

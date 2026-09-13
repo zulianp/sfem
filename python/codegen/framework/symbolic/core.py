@@ -6,19 +6,6 @@ import sympy as sp
 import sympy.codegen.ast as ast
 from sympy.printing.c import C99CodePrinter
 
-def _validate_diagnostics_plan_names(plan, expected_names):
-    if plan is None:
-        return None
-    expected_names = tuple(str(name) for name in expected_names)
-    public_names = tuple(getattr(plan, "public_names", ()))
-    missing = tuple(name for name in expected_names if name not in public_names)
-    if missing:
-        raise ValueError(
-            "diagnostics plan is missing entries: %s" % ", ".join(missing)
-        )
-    return plan
-
-
 
 SympyExpr = Union[sp.Expr, ast.Assignment, ast.AddAugmentedAssignment]
 
