@@ -42,7 +42,7 @@ $CXX -std=c++17 -O2 -DNDEBUG $TAKES_STATE -DELEMENT_${ELEMENT} ${WARP_EXTRA_FLAG
     -DSTORED_APPLY=${MATERIAL}_${KLOWER}_inexact_apply_stored_a_msoa_impl \
     -o "$WORK/warp_${MATERIAL}_${LOWER}" "$HERE/warp_sweep.cpp" \
     "$GEN/${MATERIAL}_${LOWER}_operator.cpp" $EXTRA \
-    -I "$HERE" -I "$GEN" -I "$WORK/gen/$MATERIAL" -I "$WORK/gen/$MATERIAL/d3" \
+    -I "$HERE" -I "$GEN" -I "$KGEN" -I "$WORK/gen/$MATERIAL" -I "$WORK/gen/$MATERIAL/d3" \
     -I "$SFEM/base" -I "$SFEM/algebra" -I "$SFEM/operators" \
     -I "$BUILD" -I "$BUILD/external/smesh" \
     $(find "$SFEM/external/smesh/src" -type d | sed 's/^/-I /') 2>&1 | stdbuf -oL tee -a "$LOG"
