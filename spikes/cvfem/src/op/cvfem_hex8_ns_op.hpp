@@ -131,8 +131,7 @@ namespace sfem {
         // sideset's sub-control surfaces. With w = 1/2 |u|^2 + p/rho this is the rate at
         // which the surface does work on the fluid, which is the term an energy budget needs
         // on an open boundary and which no independent quadrature could be trusted to match.
-        // Flat HEX8 only -- a weighted call on a semi-structured mesh fails rather than
-        // quietly dropping the weight.
+        // Both the flat and the semi-structured path carry the weight.
         int sideset_flux_weighted(const real_t *const x, const std::string &sideset,
                                   const real_t *const w, real_t &out);
 
@@ -142,7 +141,7 @@ namespace sfem {
 
     private:
         int sideset_mass_flux_ss(const real_t *const x, const std::shared_ptr<smesh::Sideset> &ss,
-                                 real_t &out);
+                                 const real_t *const w, real_t &out);
 
     public:
 
@@ -176,8 +175,13 @@ namespace sfem {
         // component, and it is exact for a globally linear field (tests/cvfem_nodal_grad_test).
         //
         // `x` is the interleaved state the solver carries, so the components are read with a
-        // stride rather than compacted first. Flat HEX8 only for now; the semi-structured twin
-        // is sscvfem_nodal_grad_strided and would slot in the same way node_volume does.
+        // stride rather than compacted first. Both the flat and the semi-structured path are
+        // supported -- the latter through sscvfem_nodal_grad_strided -- because the energy
+        // budget this feeds has to be measurable where the solver is actually run, and FGMRES
+        // preconditioned by multigrid needs a micro-element lattice.
+        //
+        // `out` must hold 9 * n_nodes reals, with n_nodes the node count of whichever mesh is
+        // live; node_volume sizes against the same count.
         int nodal_velocity_gradient(const real_t *const x, real_t *const out) const;
 
         ptrdiff_t n_dofs_domain() const override;
