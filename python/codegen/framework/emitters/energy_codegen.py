@@ -94,6 +94,8 @@ from codegen.framework.targets import current_target
 from codegen.framework.plans.matrix_formats import (
     BSRAssemblyPlan,
     BlockDiagSymAssemblyPlan,
+    packed_crs_passes,
+    published_matrix_formats,
 )
 from codegen.framework.symbolic.core import (
     ExpressionRole,
@@ -581,7 +583,7 @@ def generate_sfem_soa_cpp_files(
     # The header holds one thing, the direct element matrix, and only a matrix
     # assembly calls it.  A material with no matrix format publishes no header.
     emits_hessian_header = bool(
-        _matrix_formats_from_plan(matrix_format_plan)
+        published_matrix_formats(matrix_format_plan)
     ) and _sfem_soa_emits_hessian_header(
         forms,
         array_inputs,
@@ -7298,7 +7300,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
     source_builder=None,
 ):
     n_field_components = form_n_field_components(form, dim)
-    formats = _matrix_formats_from_plan(matrix_format_plan)
+    formats = published_matrix_formats(matrix_format_plan)
     if not formats:
         return []
     element_inputs = _sfem_soa_element_inputs(array_inputs)
@@ -7315,7 +7317,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         return []
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
-    packed_crs_passes = _packed_crs_passes(matrix_format_plan)
+    crs_passes = packed_crs_passes(matrix_format_plan)
     material_parameter_names = form_material_parameter_names(form)
     uses_current = form_reads_current(form, default=True)
 
@@ -7360,7 +7362,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
 
     lines = []
     lines.extend(_sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_field_components=n_field_components))
-    if packed_crs_passes:
+    if crs_passes:
         lines.extend(
             _sfem_soa_hessian_packed_crs_helper_lines(
                 function_base,
@@ -7586,7 +7588,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         n_nodes,
         n_qp,
         omit_reference_basis_inputs,
-        packed_crs_passes,
+        crs_passes,
         prefix,
         quadrature_rule,
         reference_inputs,
@@ -7618,36 +7620,10 @@ def _sfem_soa_hessian_matrix_assembly_function(
             formats,
             material_parameter_names,
             uses_current,
-            packed_crs_passes,
+            crs_passes,
         )
     )
     return lines
-
-
-def _matrix_formats_from_plan(matrix_format_plan):
-    if matrix_format_plan is None or getattr(matrix_format_plan, "is_empty", True):
-        return ()
-    formats = []
-    for matrix_format in matrix_format_plan.formats:
-        value = getattr(matrix_format, "value", str(matrix_format)).lower()
-        if value not in formats:
-            formats.append(value)
-    return tuple(formats)
-
-
-def _packed_crs_passes(matrix_format_plan):
-    if matrix_format_plan is None or getattr(matrix_format_plan, "is_empty", True):
-        return ()
-    passes = []
-    for variant in matrix_format_plan.variants:
-        matrix_format = getattr(variant.matrix_format, "value", str(variant.matrix_format)).lower()
-        mesh_layout = getattr(variant.mesh_layout, "value", str(variant.mesh_layout)).lower()
-        if matrix_format != "crs" or mesh_layout != "packed":
-            continue
-        packed_pass = getattr(variant.packed_pass, "value", str(variant.packed_pass)).lower()
-        if packed_pass and packed_pass != "none" and packed_pass not in passes:
-            passes.append(packed_pass)
-    return tuple(passes)
 
 
 def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):

@@ -285,7 +285,33 @@ PLAN_INPUTS = (
 #: either way and a staged zero is cheaper than a second kernel shape.  The
 #: emitter's own `_TENSOR_INTEGRATE_BY_QUANTITIES` had recorded that in a
 #: comment; now a plan says it, and both tables key on the same sequence.
-BUDGET = 125
+#:
+#: 125 -> 118, and this one was not duplication *within* an emitter but between
+#: the two of them.  `_packed_crs_passes` existed in both files with
+#: byte-identical bodies, and `_matrix_formats_from_plan` in one was
+#: `_matrix_format_values` in the other -- the same code differing only in what
+#: it called a local list.
+#:
+#: Both are questions about a `MatrixFormatPlan`, and what the emitters were
+#: really doing was lowering its enums to the words the ABI carries with
+#: `getattr(f, "value", str(f)).lower()` -- a fallback for not being sure what
+#: they had been handed.  In `plans/matrix_formats` that uncertainty is not
+#: available: `MatrixAssemblyVariantPlan.__post_init__` coerces every field
+#: through its enum, so a format *is* a `MatrixFormat`.
+#:
+#: One filter went with them rather than moving.  Their version skipped a
+#: variant whose pass was `none`, and a packed variant cannot have one --
+#: `__post_init__` rejects `PACKED` with `NONE` outright, which is the stronger
+#: statement and the one the plan's docstring keeps.
+#:
+#: Worth recording because it nearly went wrong: the plan function
+#: `packed_crs_passes` collides with a local of that name in two emitter
+#: functions and with a parameter of that name in three more.  Renaming only
+#: the assignment would have left `if packed_crs_passes:` resolving to the
+#: imported function object, which is always truthy.  Scope was checked with an
+#: AST pass rather than with grep, and byte-identity was the gate that would
+#: have caught it regardless.
+BUDGET = 118
 
 
 def _tested_names(test):
