@@ -3816,13 +3816,33 @@ int main(int argc, char **argv) {
         // default geometry the two differ by a factor of 4.5, which is more than enough to
         // make a run look like it reached a Reynolds number it never approached. Print both,
         // labelled, so a reader cannot take one for the other.
-        const real_t u_bulk = (real_t(4) / real_t(9)) * U;
-        const real_t re_h   = rho * u_bulk * step_y / std::max(mu, real_t(1e-30));
+        //
+        // AND the two step cases do not share an inflow profile, so they do not share these
+        // numbers either. `step_turb` is fed step_inflow_ux, whose peak is U and whose flux
+        // is (4/9) U (Ly - step_y) Lz. `step` is fed exact_state's literal transcription of
+        // Farrell's 4(2-y)(y-1) z(1-z), whose peak is U/4 and whose flux is U/9 -- a factor
+        // of four apart on the default geometry, in a line whose whole purpose is to be the
+        // oracle a measured mass flux is compared against.
+        const bool   farrell = flow == cvfem_case::FlowCase::Step;
+        const real_t u_peak  = farrell ? real_t(0.25) * U : U;
+        const real_t u_bulk  = (real_t(4) / real_t(9)) * u_peak;
+        const real_t re_h    = rho * u_bulk * step_y / std::max(mu, real_t(1e-30));
         std::printf("step: h=%g  inlet %g x %g  U_peak=%g  U_bulk=%g  Re_h=%g  (continuation Re_phys=%g)\n",
-                    (double)step_y, (double)(Ly - step_y), (double)Lz, (double)U, (double)u_bulk,
+                    (double)step_y, (double)(Ly - step_y), (double)Lz, (double)u_peak, (double)u_bulk,
                     (double)re_h, (double)(rho * U * L_re / std::max(mu, real_t(1e-30))));
-        std::printf("step: exact inflow flux %.12g\n",
-                    (double)cvfem_case::step_inflow_flux<real_t>(step_y, Ly, Lz, U));
+        const double q_in_exact =
+                farrell ? (double)cvfem_case::step_farrell_inflow_flux<real_t>(step_y, Ly, Lz, U)
+                        : (double)cvfem_case::step_inflow_flux<real_t>(step_y, Ly, Lz, U);
+        if (std::isnan(q_in_exact)) {
+            // Only reachable for `step`, whose profile is hard-coded to Ly = 2, step_y = 1,
+            // Lz = 1. Say there is no oracle rather than print one that is not this run's.
+            std::printf("step: exact inflow flux UNAVAILABLE -- the `step` profile is written "
+                        "for Ly=2 step_y=1 Lz=1 and this run is %g/%g/%g; use step_turb for "
+                        "another geometry\n",
+                        (double)Ly, (double)step_y, (double)Lz);
+        } else {
+            std::printf("step: exact inflow flux %.12g\n", q_in_exact);
+        }
     }
     std::printf("nnodes: %td  nelements: %td  ndof: %td\n", nnodes, mesh->n_elements(0), ndof);
     if (flow == cvfem_case::FlowCase::MMS) {
