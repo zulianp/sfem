@@ -264,24 +264,31 @@ namespace cvfem_ss {
                     lpgz[(size_t)a]       = d.pgz[(size_t)gn];
                 }
 
+                // Per macro element, and the curved branch below reads the same one: a call per
+                // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
+                // which then became a call in every cell of the block diagonal, 9% slower on boxes.
+                const Hex8RcConfig rc_macro = sscvfem_rc_config(d);
                 SSMacroGeom mg;
                 // Outside the block: the Rhie-Chow term below takes its node distances from the
-                // same corners mg was built from. See sscvfem_residual for what the cell's own
-                // coordinates cost on a curved macro element.
+                // same hoisted cell mg was built from. See sscvfem_residual for what the cell's
+                // own coordinates cost on a curved macro element.
                 scalar_t ex[8], ey[8], ez[8];
                 {
+                    int ext[8];
+                    sscvfem_macro_corner_offsets(L, ext);
                     for (int a = 0; a < 8; ++a) {
-                        const int l = off[a];
+                        const int l = ext[a];
                         ex[a]       = lx[(size_t)l];
                         ey[a]       = ly[(size_t)l];
                         ez[a]       = lz[(size_t)l];
                     }
-                    const Hex8RcConfig rcfg = sscvfem_rc_config(d);
-                    sscvfem_macro_geom(ex, ey, ez, rho, mu, rcfg.scale, rcfg.tau, mg);
+                    sscvfem_hoisted_cell(ex, ey, ez, L, ex, ey, ez);
+                    sscvfem_macro_geom(ex, ey, ez, rho, mu, rc_macro.scale, rc_macro.tau, mg);
                 }
 
                 scalar_t *const Ce = g.C.data() + (size_t)(e - e0) * (size_t)nc * 27 * 16;
 
+                const bool curved_e = sscvfem_macro_curved(d, e);
                 for (int zi = 0; zi < L; ++zi) {
                     for (int yi = 0; yi < L; ++yi) {
                         for (int xi = 0; xi < L; ++xi) {
@@ -300,6 +307,13 @@ namespace cvfem_ss {
                                 pgx[a]      = lpgx[(size_t)l];
                                 pgy[a]      = lpgy[(size_t)l];
                                 pgz[a]      = lpgz[(size_t)l];
+                            }
+                            // A curved macro element: this cell's own geometry, not the hoisted one.
+                            if (curved_e) {
+                                sscvfem_macro_geom_cell(x, y, z, rho, mu, rc_macro, mg);
+                                std::copy(x, x + 8, ex);
+                                std::copy(y, y + 8, ey);
+                                std::copy(z, z + 8, ez);
                             }
 
                             scalar_t loc[64 * 16];
