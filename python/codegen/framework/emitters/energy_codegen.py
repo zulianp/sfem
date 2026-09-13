@@ -1658,6 +1658,64 @@ def _constant_p1_specialized_local_prefix(local_prefix, quadrature_rule):
     return "%s_%s" % (local_prefix, element_type)
 
 
+#: The two tails a tensor-product weak-form body can have.  Both take the same
+#: arguments because they are two implementations of one step -- what this body
+#: does with its integrand -- and which applies is
+#: `plans.form_emission.form_accumulation`.  They were an early return in the
+#: middle of the emitter, which is the same choice made where it cannot be
+#: named.
+def _tensor_weak_scalar_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, out_streams, closing,
+):
+    """A 0-form: weight the density and add it in.  Nothing to contract."""
+    _append_weak_objective_accumulation(
+        lines, form, weak_form, substitutions, work_item, geometry_value, closing
+    )
+
+
+def _tensor_weak_per_shape_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, out_streams, closing,
+):
+    """A 1- or 2-form: form the loperand, then sum-factorise it onto the tests."""
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        substitutions,
+        tuple(
+            sp.symbols("trial_grad[%d]" % i)
+            for i in range(weak_form.n_field_components * dim)
+        ),
+    )
+    lines.append("      s_t loperand[%d];" % (n_field_components * dim))
+    _append_transformed_loperand_lines(
+        lines,
+        material,
+        dim,
+        "weak_mat_tmp",
+        geometry_value,
+    )
+    for row in range(n_field_components):
+        for col in range(dim):
+            lines.append(
+                "      loperand%d[%s] = loperand[%d];"
+                % (row * dim + col, work_item, row * dim + col)
+            )
+    lines.extend(["    }", "  }"])
+    for row in range(n_field_components):
+        lines.append(
+            "  tensor_test<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, &loperand_q[%s], %s, %d);"
+            % (dim, n_field_components, c_product(row, "NQ", dim, "VS"), out_streams, row)
+        )
+
+
+_TENSOR_WEAK_TAIL = {
+    FormAccumulation.SCALAR: _tensor_weak_scalar_tail,
+    FormAccumulation.PER_SHAPE: _tensor_weak_per_shape_tail,
+}
+
+
 def _append_sfem_soa_tensor_weak_form_lines(
     lines,
     form,
@@ -1795,47 +1853,18 @@ def _append_sfem_soa_tensor_weak_form_lines(
         weak_form,
         "gu",
     )
-    if not writes_per_shape(form):
-        _append_weak_objective_accumulation(
-            lines,
-            form,
-            weak_form,
-            deformation_gradient_substitutions,
-            work_item,
-            geometry_value,
-            ["    }", "  }"],
-        )
-        return
-
-    material = _weak_form_material_expression(
-        weak_form,
-        form.name,
-        deformation_gradient_substitutions,
-        tuple(
-            sp.symbols("trial_grad[%d]" % i)
-            for i in range(weak_form.n_field_components * dim)
-        ),
-    )
-    lines.append("      s_t loperand[%d];" % (n_field_components * dim))
-    _append_transformed_loperand_lines(
+    _TENSOR_WEAK_TAIL[form_accumulation(form)](
         lines,
-        material,
+        form,
+        weak_form,
+        deformation_gradient_substitutions,
         dim,
-        "weak_mat_tmp",
+        n_field_components,
+        work_item,
         geometry_value,
+        out_streams,
+        ["    }", "  }"],
     )
-    for row in range(n_field_components):
-        for col in range(dim):
-            lines.append(
-                "      loperand%d[%s] = loperand[%d];"
-                % (row * dim + col, work_item, row * dim + col)
-            )
-    lines.extend(["    }", "  }"])
-    for row in range(n_field_components):
-        lines.append(
-            "  tensor_test<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, &loperand_q[%s], %s, %d);"
-            % (dim, n_field_components, c_product(row, "NQ", dim, "VS"), out_streams, row)
-        )
 
 
 def _scaled_cpp_term(factor, expression):
@@ -1984,6 +2013,72 @@ def _append_constant_p1_metric_weak_form_lines(
     lines.append("    }")
 
 
+#: The two tails A constant-P1 specialized body can have.  Both take the same arguments
+#: because they are two implementations of one step -- what this body does
+#: with its integrand -- and which applies is
+#: `plans.form_emission.form_accumulation`.
+def _constant_p1_weak_scalar_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, reference_gradients, use_stream_arrays, closing,
+):
+    """A 0-form: weight the density and add it in."""
+    _append_weak_objective_accumulation(
+        lines, form, weak_form, substitutions, work_item, geometry_value, closing
+    )
+
+
+def _constant_p1_weak_per_shape_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, reference_gradients, use_stream_arrays, closing,
+):
+    """A 1- or 2-form: form the loperand and contract it onto the tests."""
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        substitutions,
+        tuple(
+            sp.symbols("trial_grad%d" % i)
+            for i in range(weak_form.n_field_components * dim)
+        ),
+    )
+    _append_transformed_loperand_lines(
+        lines,
+        material,
+        dim,
+        "weak_mat_tmp",
+        geometry_value,
+        scalar_temporaries=True,
+    )
+    output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
+    op = output_assignment(form)
+    for shape in range(dim + 1):
+        for row in range(n_field_components):
+            terms = []
+            for col in range(dim):
+                factor = _constant_reference_gradient_expr(reference_gradients, shape, col)
+                if factor == 0:
+                    continue
+                terms.append(_scaled_cpp_term(factor, "loperand%d" % (row * dim + col)))
+            if terms:
+                lines.append(
+                    "      %s[%s][%s] %s %s;"
+                    % (
+                        output_streams,
+                        c_sum(c_product(shape, n_field_components), row),
+                        work_item,
+                        op,
+                        _sum_cpp_terms(terms),
+                    )
+                )
+    lines.extend(["      }", "    }"])
+
+
+_CONSTANT_P1_WEAK_TAIL = {
+    FormAccumulation.SCALAR: _constant_p1_weak_scalar_tail,
+    FormAccumulation.PER_SHAPE: _constant_p1_weak_per_shape_tail,
+}
+
+
 def _append_constant_p1_sfem_soa_weak_form_lines(
     lines,
     form,
@@ -2096,27 +2191,50 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     % (row * dim + col, " + ".join(terms))
                 )
 
-    if not writes_per_shape(form):
-        _append_weak_objective_accumulation(
-            lines,
-            form,
-            weak_form,
-            deformation_gradient_substitutions,
-            work_item,
-            geometry_value,
-            ["      }", "    }"],
-        )
-        return
+    _CONSTANT_P1_WEAK_TAIL[form_accumulation(form)](
+        lines,
+        form,
+        weak_form,
+        deformation_gradient_substitutions,
+        dim,
+        n_field_components,
+        work_item,
+        geometry_value,
+        reference_gradients,
+        use_stream_arrays,
+        ["      }", "    }"],
+    )
 
+
+#: The two tails A simplex weak-form body can have.  Both take the same arguments
+#: because they are two implementations of one step -- what this body does
+#: with its integrand -- and which applies is
+#: `plans.form_emission.form_accumulation`.
+def _simplex_weak_scalar_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, reference_gradient, source_builder, use_stream_arrays, closing,
+):
+    """A 0-form: weight the density and add it in."""
+    _append_weak_objective_accumulation(
+        lines, form, weak_form, substitutions, work_item, geometry_value, closing
+    )
+
+
+def _simplex_weak_per_shape_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, reference_gradient, source_builder, use_stream_arrays, closing,
+):
+    """A 1- or 2-form: form the loperand and contract it onto the tests."""
     material = _weak_form_material_expression(
         weak_form,
         form.name,
-        deformation_gradient_substitutions,
+        substitutions,
         tuple(
             sp.symbols("trial_grad%d" % i)
             for i in range(weak_form.n_field_components * dim)
         ),
     )
+
     _append_transformed_loperand_lines(
         lines,
         material,
@@ -2125,28 +2243,36 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         geometry_value,
         scalar_temporaries=True,
     )
-    output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
-    op = output_assignment(form)
-    for shape in range(dim + 1):
-        for row in range(n_field_components):
-            terms = []
-            for col in range(dim):
-                factor = _constant_reference_gradient_expr(reference_gradients, shape, col)
-                if factor == 0:
-                    continue
-                terms.append(_scaled_cpp_term(factor, "loperand%d" % (row * dim + col)))
-            if terms:
-                lines.append(
-                    "      %s[%s][%s] %s %s;"
-                    % (
-                        output_streams,
-                        c_sum(c_product(shape, n_field_components), row),
-                        work_item,
-                        op,
-                        _sum_cpp_terms(terms),
-                    )
-                )
+    for component in range(n_field_components * dim):
+        lines.append("      loperand%d_values[%s] = loperand%d;" % (component, work_item, component))
+    lines.append("      }")
+    lines.append("      for (int shape = 0; shape < NS; ++shape) {")
+    for row in range(n_field_components):
+        terms = [
+            "loperand%d_values[%s] * %s" % (row * dim + col, work_item, reference_gradient(col))
+            for col in range(dim)
+        ]
+        op = output_assignment(form)
+        output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
+        lines.extend(_work_item_loop_lines(source_builder, "        "))
+        lines.append(
+            "          %s[%s][%s] %s %s;"
+            % (
+                output_streams,
+                c_sum(c_product("shape", n_field_components), row),
+                work_item,
+                op,
+                " + ".join(terms),
+            )
+        )
+        lines.append("        }")
     lines.extend(["      }", "    }"])
+
+
+_SIMPLEX_WEAK_TAIL = {
+    FormAccumulation.SCALAR: _simplex_weak_scalar_tail,
+    FormAccumulation.PER_SHAPE: _simplex_weak_per_shape_tail,
+}
 
 
 def _append_sfem_soa_weak_form_lines(
@@ -2321,60 +2447,20 @@ def _append_sfem_soa_weak_form_lines(
                     % (row * dim + col, " + ".join(terms))
                 )
 
-    if not writes_per_shape(form):
-        _append_weak_objective_accumulation(
-            lines,
-            form,
-            weak_form,
-            deformation_gradient_substitutions,
-            work_item,
-            geometry_value,
-            ["      }", "    }"],
-        )
-        return
-
-    material = _weak_form_material_expression(
-        weak_form,
-        form.name,
-        deformation_gradient_substitutions,
-        tuple(
-            sp.symbols("trial_grad%d" % i)
-            for i in range(weak_form.n_field_components * dim)
-        ),
-    )
-
-    _append_transformed_loperand_lines(
+    _SIMPLEX_WEAK_TAIL[form_accumulation(form)](
         lines,
-        material,
+        form,
+        weak_form,
+        deformation_gradient_substitutions,
         dim,
-        "weak_mat_tmp",
+        n_field_components,
+        work_item,
         geometry_value,
-        scalar_temporaries=True,
+        reference_gradient,
+        source_builder,
+        use_stream_arrays,
+        ["      }", "    }"],
     )
-    for component in range(n_field_components * dim):
-        lines.append("      loperand%d_values[%s] = loperand%d;" % (component, work_item, component))
-    lines.append("      }")
-    lines.append("      for (int shape = 0; shape < NS; ++shape) {")
-    for row in range(n_field_components):
-        terms = [
-            "loperand%d_values[%s] * %s" % (row * dim + col, work_item, reference_gradient(col))
-            for col in range(dim)
-        ]
-        op = output_assignment(form)
-        output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
-        lines.extend(_work_item_loop_lines(source_builder, "        "))
-        lines.append(
-            "          %s[%s][%s] %s %s;"
-            % (
-                output_streams,
-                c_sum(c_product("shape", n_field_components), row),
-                work_item,
-                op,
-                " + ".join(terms),
-            )
-        )
-        lines.append("        }")
-    lines.extend(["      }", "    }"])
 
 
 def _append_transformed_loperand_lines(
