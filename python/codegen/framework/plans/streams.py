@@ -372,6 +372,59 @@ class MeshFieldRole:
 STATE_FIELD_ROLES = ("current", "previous")
 
 
+#: The other mesh field naming, for a kernel handed one *vector* field.
+#:
+#: ``MESH_FIELD_STREAMS`` above names a role by suffixing the field --
+#: ``u``, ``u_old``, ``u_direction`` -- which is right when the fields are
+#: separate scalars.  A kernel handed one vector field's components as separate
+#: streams names them the other way round: the role is a prefix and the
+#: component is the suffix, so the displacement's three streams are ``ux``,
+#: ``uy``, ``uz`` and the previous state's are ``zx``, ``zy``, ``zz``.
+#:
+#: Both are ABI and both are frozen -- the dispatch layer builds its calls out
+#: of these names, and `package/op_wrappers.py` reads the emitted signature for
+#: ``"ux"`` to decide whether a tangent takes the state at all.  What is not
+#: acceptable is a third site deriving either, which is why the second one is
+#: written here beside the first rather than in the emitter that needs it.
+COMPONENT_FIELD_STREAMS = (
+    ("current", "u"),
+    ("previous", "z"),
+    ("direction", "h"),
+    ("output", "out"),
+)
+
+
+@dataclass(frozen=True)
+class ComponentFieldRole:
+    """One vector field's role at the boundary, with its ABI names."""
+
+    name: str
+    prefix: str
+
+    @property
+    def stride(self):
+        return "%s_stride" % self.prefix
+
+    def component_pointer(self, component):
+        """The per-element array this role reads for one component."""
+        return "%s%s" % (self.prefix, component)
+
+
+def component_field_role(name):
+    """One role by name, or ``None`` when the boundary has no such role."""
+    for role_name, prefix in COMPONENT_FIELD_STREAMS:
+        if role_name == name:
+            return ComponentFieldRole(name=role_name, prefix=prefix)
+    return None
+
+
+def component_stream_names(role, components):
+    """A role's boundary names: its stride, then one buffer per component."""
+    return (role.stride,) + tuple(
+        role.component_pointer(component) for component in components
+    )
+
+
 def live_field_roles(dependencies, roles=None):
     """The field roles this kernel reads, in the order the ABI lists them.
 

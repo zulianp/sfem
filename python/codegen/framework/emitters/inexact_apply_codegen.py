@@ -51,6 +51,10 @@ from codegen.framework.emitters.quadrature_codegen import (
     tensor_product_quadrature_weight_expr,
 )
 from codegen.framework.plans.layout import gather_shape_order
+from codegen.framework.plans.streams import (
+    component_field_role,
+    component_stream_names,
+)
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
     render_kernel_ast_lines,
@@ -75,6 +79,8 @@ from codegen.framework.plans.inexact_apply import (
     basis_gradient_symbols,
     emittable_inexact_apply_plan,
     flux_form_for_collection,
+    geometry_argument_names,
+    geometry_parameters,
     physical_field_gradient_definitions,
     projected_tangent,
     quadrature_accumulation,
@@ -337,45 +343,53 @@ def _gather_lines(role, component, n_nodes, wanted, indent="    "):
     ]
 
 
-def _geometry_lines(dim, indent="    "):
-    lines = [
-        "%sconst s_t adjugate%d = s_t(g_adj%d[element]);"
-        % (indent, index, index)
-        for index in range(dim * dim)
-    ]
-    lines.append(
-        "%sconst s_t determinant = s_t(g_det0[element]);"
-        % indent
-    )
-    return lines
-
-
 def _geometry_arguments(dim):
-    lines = [
-        "    const g_t *const RSTR g_adj%d," % index
-        for index in range(dim * dim)
+    """The geometry the tangent takes, named by `plans/inexact_apply`."""
+    return [
+        "    %s," % parameter
+        for parameter in geometry_parameters(dim, "const g_t *const RSTR")
     ]
-    lines.append("    const g_t *const RSTR g_det0,")
-    return lines
+
+
+#: The boundary names of the four field roles these kernels carry.  The
+#: prefixes are `plans/streams.COMPONENT_FIELD_STREAMS`, which is where the
+#: convention is stated -- one vector field's components as separate streams,
+#: role first and component last.  The emitter reads the prefixes off the plan
+#: rather than repeating the letters, so a role renamed there reaches the
+#: signature, the gather and the C boundary together.
+_FIELD_ROLE = {
+    name: component_field_role(name)
+    for name in ("current", "previous", "direction", "output")
+}
+_CURRENT = _FIELD_ROLE["current"].prefix
+_PREVIOUS = _FIELD_ROLE["previous"].prefix
+_DIRECTION = _FIELD_ROLE["direction"].prefix
+_OUTPUT = _FIELD_ROLE["output"].prefix
+
+#: Which role each staging prefix belongs to, so a site holding the prefix can
+#: still ask the plan for the names.
+_ROLE_BY_PREFIX = {role.prefix: role for role in _FIELD_ROLE.values()}
+
+
+def _stream_declarations(prefix, component, declaration="const s_t *const RSTR"):
+    """One role at a kernel boundary: its stride, then one buffer per component.
+
+    The names come from `plans/streams`; only how C spells a pointer is this
+    emitter's business.
+    """
+    stride, *buffers = component_stream_names(_ROLE_BY_PREFIX[prefix], component)
+    return ["const ptrdiff_t %s" % stride] + [
+        "%s %s" % (declaration, name) for name in buffers
+    ]
 
 
 def _stream_arguments(role, component):
-    lines = ["    const ptrdiff_t %s_stride," % role]
-    lines.extend(
-        "    const s_t *const RSTR %s%s," % (role, name)
-        for name in component
-    )
-    return lines
+    return ["    %s," % line for line in _stream_declarations(role, component)]
 
 
 def _output_arguments(component):
-    lines = ["    const ptrdiff_t out_stride,"]
-    lines.extend(
-        "    s_t *const RSTR out%s%s"
-        % (name, "," if index + 1 < len(component) else "")
-        for index, name in enumerate(component)
-    )
-    return lines
+    lines = _stream_declarations(_OUTPUT, component, "s_t *const RSTR")
+    return ["    %s," % line for line in lines[:-1]] + ["    %s" % lines[-1]]
 
 
 def _scatter_body(component, n_nodes, scale=""):
@@ -1178,28 +1192,32 @@ def _connectivity_scratch(n_nodes, index_type="idx_t"):
 
 
 def _blocked_geometry_bases(dim):
-    """The block's geometry as base pointers, one per component.
+    """The block's geometry as base pointers, one per stream.
 
     The geometry is element-indexed and therefore already contiguous across the
     block, so it needs no staging -- only a pointer to the block's first
     element, so the lane loop reads `bg_adj0[lane]` rather than rebuilding the
     address per lane.
+
+    Which streams there are is `plans/inexact_apply.geometry_streams`, which
+    forwards to `plans/geometry_quantities`; only the `b` prefix is this
+    emitter's own.
     """
-    lines = [
-        "    const g_t *const RSTR bg_adj%d = g_adj%d + evb;" % (index, index)
-        for index in range(dim * dim)
+    return [
+        "    const g_t *const RSTR b%s = %s + evb;" % (name, name)
+        for name in geometry_argument_names(dim)
     ]
-    lines.append("    const g_t *const RSTR bg_det0 = g_det0 + evb;")
-    return lines
 
 
 def _blocked_geometry_lines(dim, indent="      "):
-    lines = [
-        "%sconst s_t adjugate%d = s_t(bg_adj%d[lane]);" % (indent, index, index)
-        for index in range(dim * dim)
+    """The lane's geometry, by the local name the arithmetic is written in."""
+    return [
+        "%sconst s_t %s = s_t(b%s[lane]);" % (indent, local, name)
+        for local, name in zip(
+            ["adjugate%d" % index for index in range(dim * dim)] + ["determinant"],
+            geometry_argument_names(dim),
+        )
     ]
-    lines.append("%sconst s_t determinant = s_t(bg_det0[lane]);" % indent)
-    return lines
 
 
 def _blocked_tangent_bases(n_components, qualifier=""):
@@ -1603,17 +1621,13 @@ _ABI_TANGENT_STORE = "metric_tensor_t"
 
 
 def _abi_stream(role, component, const="const "):
-    """One field at the boundary: its stride, then one buffer per component."""
-    return ["const ptrdiff_t %s_stride" % role] + [
-        "%ss_t *const RSTR %s%s" % (const, role, name) for name in component
-    ]
+    """The same role at the C boundary, where the scalar is not a template."""
+    return _stream_declarations(role, component, "%ss_t *const RSTR" % const)
 
 
 def _abi_geometry(dim):
-    """The affine geometry the tangent reads, one stream per adjugate entry."""
-    return [
-        "const geom_t *const RSTR g_adj%d" % index for index in range(dim * dim)
-    ] + ["const geom_t *const RSTR g_det0"]
+    """The affine geometry the tangent reads, as the C boundary declares it."""
+    return list(geometry_parameters(dim))
 
 
 def _packed_abi_prologue():
