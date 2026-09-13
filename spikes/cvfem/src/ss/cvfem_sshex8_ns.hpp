@@ -89,6 +89,8 @@ struct SSMeshData {
     // Transient term; dt <= 0 means steady and nothing is evaluated. Mirrors the flat
     // core's fields -- see the note there on why pressure carries no history.
     scalar_t              dt{0};
+    // The PREVIOUS step size, for variable-step BDF2. Zero means none recorded.
+    scalar_t              dt_prev{0};
     int                   bdf_order{1};
     std::vector<scalar_t> u_prev;   // u^n,     3 * nnodes
     std::vector<scalar_t> u_prev2;  // u^{n-1}, 3 * nnodes, BDF2 only
@@ -1977,9 +1979,22 @@ inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t 
     if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
     const bool     two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
-    const scalar_t a0  = two ? scalar_t(1.5) : scalar_t(1);
-    const scalar_t a1  = two ? scalar_t(-2) : scalar_t(-1);
-    const scalar_t a2  = two ? scalar_t(0.5) : scalar_t(0);
+    // Variable-step BDF2 when a previous step size has been recorded; see bdf_coeffs in the
+    // flat core for the derivation and for why using the uniform coefficients after the step
+    // changes is the wrong scheme rather than an approximation. w = 1 and dt_prev = 0 both
+    // reduce to {3/2, -2, 1/2} exactly, so nothing that does not adapt moves.
+    scalar_t a0 = two ? scalar_t(1.5) : scalar_t(1);
+    scalar_t a1 = two ? scalar_t(-2) : scalar_t(-1);
+    scalar_t a2 = two ? scalar_t(0.5) : scalar_t(0);
+    if (two && d.dt_prev > scalar_t(0)) {
+        const scalar_t w = d.dt / d.dt_prev;
+        if (w != scalar_t(1)) {
+            const scalar_t den = scalar_t(1) + w;
+            a0 = (scalar_t(1) + scalar_t(2) * w) / den;
+            a1 = -den;
+            a2 = w * w / den;
+        }
+    }
     const scalar_t inv = scalar_t(1) / d.dt;
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -2010,7 +2025,14 @@ inline scalar_t sscvfem_transient_diag_weight(const SSMeshData &d, const scalar_
     // preconditioner anyway.
     if ((ptrdiff_t)d.u_prev.size() == 3 * d.nnodes) {
         const bool two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
-        return (two ? scalar_t(1.5) : scalar_t(1)) * rho / d.dt;
+        // a0 must track the residual's, or a variable step leaves the Jacobian diagonal
+        // differentiating a scheme the residual is no longer running.
+        scalar_t a0 = two ? scalar_t(1.5) : scalar_t(1);
+        if (two && d.dt_prev > scalar_t(0)) {
+            const scalar_t w = d.dt / d.dt_prev;
+            if (w != scalar_t(1)) a0 = (scalar_t(1) + scalar_t(2) * w) / (scalar_t(1) + w);
+        }
+        return a0 * rho / d.dt;
     }
     return (d.bdf_order >= 2 ? scalar_t(1.5) : scalar_t(1)) * rho / d.dt;
 }

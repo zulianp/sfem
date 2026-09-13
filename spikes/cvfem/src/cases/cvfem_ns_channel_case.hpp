@@ -17,7 +17,7 @@
 
 namespace cvfem_case {
 
-    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step, StepTurb, Pump };
+    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step, StepTurb, Pump, Nozzle };
 
     inline bool parse_case(const std::string &name, FlowCase &out) {
         if (name == "poiseuille") {
@@ -57,7 +57,75 @@ namespace cvfem_case {
             out = FlowCase::Pump;
             return true;
         }
+        if (name == "nozzle" || name == "fda_nozzle") {
+            out = FlowCase::Nozzle;
+            return true;
+        }
         return false;
+    }
+
+    // ------------------------------------------------------------- FDA benchmark nozzle
+    //
+    // The nozzle of FDA's first computational round robin: Hariharan et al., J. Biomech. Eng.
+    // 133(4) 041002 (2011) for the experiment, Stewart et al., Cardiovasc. Eng. Technol. 3(2)
+    // 139-160 (2012) for the 28 simulations it was compared against. Data and CAD are at
+    // github.com/OSEL-DAM/CFD-and-Blood-Damage-Benchmarks/tree/main/Nozzle.
+    //
+    //   inlet pipe     radius 6 mm
+    //   cone           20 degrees included, 22.685 mm long, 6 mm down to 2 mm
+    //   throat         radius 2 mm, 40 mm long, ending at x = 0
+    //   expansion      sudden, back to radius 6 mm at x = 0
+    //
+    // The axis is x and the origin is the expansion, which is the convention of the published
+    // data ("geometry-sudden-z 0.0" in every PIV file), so a station read from those files is
+    // a coordinate here without translation. SI units throughout, because the data are.
+    //
+    // Flow is +x: contraction through the cone, a jet out of the sudden expansion -- the
+    // files' "Sudden Expansion" orientation. The reverse orientation, the "Conical Diffuser"
+    // data, is the same mesh with inlet and outlet exchanged and is not wired up here.
+    //
+    // The inlet and outlet are placed where the domain is cut, not where the experiment's
+    // tubing ended (150 D upstream, 60 D downstream): the inflow is the fully developed pipe
+    // profile the experiment's entrance length produced, and the outlet only has to be far
+    // enough downstream that the jet has decayed and nothing re-enters.
+    template <typename T>
+    struct NozzleGeometry {
+        T r_inlet     = T(0.006);
+        T r_throat    = T(0.002);
+        T x_cone      = T(-0.062685);  // start of the cone; the throat starts at x_throat
+        T x_throat    = T(-0.04);
+        T x_expansion = T(0);
+        T x_in        = T(-0.1);       // domain inlet; the first PIV station is at -0.088
+        T x_out       = T(0.16);       // domain outlet; the last PIV station is at +0.08
+    };
+
+    // Bulk throat velocity for a throat Reynolds number, which is how the benchmark is
+    // specified: Re_t = rho u_t d_t / mu.
+    template <typename T>
+    inline T nozzle_throat_velocity(const NozzleGeometry<T> &g, const T Re_t, const T rho, const T mu) {
+        return Re_t * mu / (rho * T(2) * g.r_throat);
+    }
+
+    // The fully developed inflow, u = 2 u_in (1 - r^2 / R^2) with u_in the bulk inlet velocity,
+    // u_in = u_t (r_t / r_in)^2 by continuity. Written in terms of the THROAT velocity, because
+    // that is the scale the Reynolds number and the continuation are expressed in.
+    //
+    // Clamped at zero outside the pipe: the mesh's wall nodes sit on an inscribed polygon whose
+    // vertices lie exactly on r = r_in, so float rounding can put one a hair outside, and a
+    // negative inflow there would be a backwards jet out of the wall.
+    template <typename T>
+    inline T nozzle_inflow_ux(const NozzleGeometry<T> &g, const T y, const T z, const T u_throat) {
+        const T u_in = u_throat * (g.r_throat * g.r_throat) / (g.r_inlet * g.r_inlet);
+        const T s    = (y * y + z * z) / (g.r_inlet * g.r_inlet);
+        return s < T(1) ? T(2) * u_in * (T(1) - s) : T(0);
+    }
+
+    // The volumetric flux of that profile over the smooth disc, Q = pi r_t^2 u_t. It is the
+    // oracle a mass balance is scaled by, not one it is compared to exactly: the mesh's inlet
+    // is an inscribed polygon, whose area is short of the disc by a relative O(h^2).
+    template <typename T>
+    inline T nozzle_flow_rate(const NozzleGeometry<T> &g, const T u_throat) {
+        return T(M_PI) * g.r_throat * g.r_throat * u_throat;
     }
 
     // Relative tolerance, so it does not become meaningless on a large domain and does
@@ -234,6 +302,15 @@ namespace cvfem_case {
                 ux = T(0);
             }
             p = T(0);
+            return;
+        }
+        if (flow == FlowCase::Nozzle) {
+            // Boundary data, not a solution. The inflow needs the nozzle geometry, which this
+            // signature does not carry, so the driver evaluates nozzle_inflow_ux itself -- the
+            // split StepTurb and the pump use. Zero is the no-slip every wall wants, and without
+            // this branch the case would fall through to the Poiseuille formula below.
+            ux = uy = uz = T(0);
+            p            = T(0);
             return;
         }
         if (flow == FlowCase::StepTurb) {
