@@ -55,7 +55,7 @@ uenv run $UENV_ARGS -- env \
     BUILD="${BUILD:-$SPIKE_ROOT/build_blk}" \
     DRIVER="${DRIVER:-${BUILD:-$SPIKE_ROOT/build_blk}/cvfem_hex8_ns_ssgmg}" \
     OUT="$OUT" \
-    VERIFY_GROUPS="${VERIFY_GROUPS:-mms bc port step pump}" \
+    VERIFY_GROUPS="${VERIFY_GROUPS:-mms bc port budget step pump nozzle}" \
     VERIFY_LEVEL="${VERIFY_LEVEL:-1}" \
     VERIFY_SOLVER="${VERIFY_SOLVER:-direct}" \
     VERIFY_RESTART="${VERIFY_RESTART:-480}" \

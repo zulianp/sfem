@@ -38,7 +38,7 @@ case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 # group IDs, so ${GROUPS:-...} silently expands to a numeric GID and never to the
 # default. That is exactly what happened -- a job ran with "groups : 33203" and
 # selected nothing at all.
-VERIFY_GROUPS=${VERIFY_GROUPS:-"unit mms bc port step pump"}
+VERIFY_GROUPS=${VERIFY_GROUPS:-"unit mms bc port budget step pump nozzle"}
 # 4/8/16/32 reproduces the dof ladder docs/CVFEM_Verification_Farrell.md records
 # (500, 2916, 19652, 143748), so a rate measured here is comparable with the one there.
 MMS_LADDER=${MMS_LADDER:-"4 8 16 32"}
@@ -288,6 +288,47 @@ if want port; then
     done
 fi
 
+# ---- the kinetic-energy budget, on a flow where every term has a closed form ----
+#
+# This is the gate for every dissipation number this spike will ever report. The convection
+# operator is first-order upwind with no limiter, so the |mdot| term IS the scheme's subgrid
+# model, and eps_num -- what dE/dt, the boundary power and the viscous dissipation leave over
+# -- is the only measurement of how big that model is. A residual definition inherits every
+# error in the terms it is subtracted from, which is why it has to be shown to vanish where it
+# must before it is believed where it matters.
+#
+# Steady Poiseuille is where it must: dE/dt is zero, the flow is resolved, the exact solution
+# is representable, so eps_num is discretisation error and nothing else. Analytic values for
+# LX=4 LY=1 LZ=1 MU=0.01 U=1, against which the report's table can be read directly:
+#
+#     E        = 1/2 rho (16 U^2/30) Lx Ly Lz      = 1.066667
+#     eps_visc = mu (16 U^2 / (3 Ly)) Lx Lz        = 0.213333
+#     P_in - P_out                                 = eps_visc
+#
+# A ladder of three on the production stack to fit the order, plus one Vanka run at the middle
+# size. That last one is not a duplicate: the budget is a property of the DISCRETE SOLUTION,
+# so two solvers that converge to it must report the same numbers, and a disagreement would
+# mean one of them is not converging rather than that the budget is wrong.
+#
+# Semi-structured throughout, because that is where multigrid and Vanka are available at all,
+# and the diagnostics were wired for both mesh paths precisely so this group could run there.
+if want budget; then
+    for arm in mg vanka; do
+        case $arm in
+            mg)    B_ENV="SFEM_GMG=1"; B_LADDER="2:4 2:8 4:8" ;;
+            vanka) B_ENV="SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"; B_LADDER="2:8" ;;
+        esac
+        for nl in $B_LADDER; do
+            BN=${nl%%:*}; BL=${nl##*:}
+            run budget "${arm}_n${BN}l${BL}" "stack=$arm" -- \
+                SFEM_LX=4 SFEM_LY=1 SFEM_LZ=1 SFEM_MU=0.01 SFEM_U=1 SFEM_CASE=poiseuille \
+                SFEM_N=$BN SFEM_ELEMENT_REFINE_LEVEL=$BL \
+                SFEM_FGMRES=1 $B_ENV \
+                SFEM_DIAG_CSV="$OUT/budget_${arm}_n${BN}l${BL}.csv"
+        done
+    done
+fi
+
 # ---- global mass conservation on the one non-box domain the spike has ----
 if want step; then
     # Flat, Re = 20, no multigrid, and an exact linear solve.
@@ -317,6 +358,43 @@ if want pump; then
         run pump "t$ns" "" -- SFEM_CASE=pump SFEM_N=$(lvl_n 8) $LEVEL_ENV SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV \
             SFEM_DT=0.125 SFEM_NSTEPS=$ns SFEM_PUMP_PERIOD=1 SFEM_BDF_ORDER=2
     done
+fi
+
+# ---- the FDA benchmark nozzle: global mass balance on a curved, non-affine mesh ----
+#
+# The first case here whose elements are not affine, so it is what the isoparametric kernels
+# and the isoparametric boundary closure are verified on. What is scored is the identity the
+# step is scored on -- the summed continuity residual against the flow rate -- and it holds
+# at any resolution, so the mesh is sized for the dense LU rather than for accuracy. Accuracy
+# against the PIV data is a validation question for python/fda_nozzle_compare.py and a
+# resolved run, not for this matrix.
+#
+# Flat and isoparametric by necessity: the semi-structured operator refuses a curved macro
+# element, so there is no multigrid arm yet, and no Vanka. SFEM_FGMRES=1 explicitly, as for
+# every case.
+#
+# The flow rate is the benchmark's Q at throat Re 500, pi r_t^2 u_t with u_t = Re mu / (rho d_t),
+# which the PIV files state as 5.20624e-06 m^3/s.
+#
+# The mesh is the coarsest of a ladder measured at Re 1 on Grace (job 4656808), where the
+# centreline has a known answer -- 2 u_in in the pipes, 18 u_in in the throat:
+#
+#   core  ndof     pipe    throat   expanded pipe   inflow vs Q   probed LU
+#   2     4,540    2.079   18.71    2.269           18.8%          17 s
+#   4     15,740   2.018   18.17    2.054           5.05%         782 s
+#
+# Second order in every column. The axial cell counts matter as much as the cross-section: 2
+# cells in the inlet pipe put the pipe axis at 4 u_in and the throat at 5, while conserving
+# mass exactly. Core 4 is out of reach here because SFEM_PRECOND=direct probes the Jacobian a
+# column at a time, so core 2 it is -- and its inflow error is the inscribed-polygon inlet,
+# O(h^2), which is why this run carries its own inflow tolerance rather than the step's 5%.
+# Measured on Grace (job 4656924): 4,540 dof, 10 continuation stages, 83 Newton steps, 295 s,
+# nearly all of it the probed LU; residual sum 2.7e-09 of its magnitude, out - in exactly 0.
+if want nozzle; then
+    NOZZLE_Q=$(awk 'BEGIN{ut=500*0.0035/(1056*0.004); printf "%.12g", 3.141592653589793*0.002*0.002*ut}')
+    run nozzle re500 "mass_exact=$NOZZLE_Q,inflow_tol=0.25" -- SFEM_CASE=nozzle SFEM_NOZZLE_RE=500 \
+        SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_GMG=0 SFEM_FGMRES=1 $SOLVER_ENV \
+        SFEM_NOZZLE_NCORE=2 SFEM_NOZZLE_NBORE=1 SFEM_NOZZLE_NOUTER=1 "SFEM_NOZZLE_NAXIAL=8 6 16 24"
 fi
 
 # ---- assemble the manifest ----
