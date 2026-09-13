@@ -210,7 +210,19 @@ PLAN_INPUTS = (
 #: five of their six properties are already in the general path, and the sixth,
 #: specialising a unit material constant out at compile time, is the kernel form
 #: to aim at.
-BUDGET = 144
+#:
+#: 144 -> 138: which field streams a form's element API carries.  Five sites
+#: asked the current half and one the direction half, which is the shape
+#: `plans/streams.live_field_roles` describes for the mesh boundary -- "emission
+#: asks this as an unrolled loop ... wherever a buffer is declared, a gather is
+#: emitted, a scratch slot is taken or a stream argument is named".
+#:
+#: `element_api_field_roles` is the element API's version of that sequence, and
+#: separate because the defaults differ: a form carrying no lowered dependencies
+#: still has an element API, and the answer there is that the current state is
+#: present and the direction follows the form's own `has_direction`.  That
+#: default was the whole of the difference and was restated at every site.
+BUDGET = 138
 
 
 def _tested_names(test):
