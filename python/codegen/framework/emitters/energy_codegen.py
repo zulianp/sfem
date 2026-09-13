@@ -100,7 +100,6 @@ from codegen.framework.plans.matrix_formats import (
 from codegen.framework.symbolic.core import (
     ExpressionRole,
     KernelExpressions,
-    _validate_diagnostics_plan_names,
 )
 from codegen.framework.plans.scheduling import (
     ExpressionCost,
@@ -147,6 +146,7 @@ from codegen.framework.emitters.quadrature_codegen import (
     tensor_product_q_index_lines,
     tensor_product_quadrature_weight_expr,
 )
+from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.form_transformations import (
     constant_p1_simplex_reference_gradients,
@@ -553,22 +553,20 @@ def generate_sfem_soa_cpp_files(
                 % (array_input.name, array_input.n_shape, n_nodes)
             )
     _validate_sfem_soa_quadrature_rule(quadrature_rule, dim, n_nodes, n_qp, array_inputs)
-    if reference_data_plan is not None:
-        validate_reference_data_plan(
-            reference_data_plan,
-            prefix,
-            affine_quadrature_rule,
-            quadrature_rule,
-            basis_family,
-        )
-    if diagnostics_plan is not None:
-        _validate_diagnostics_plan_names(
-            diagnostics_plan,
-            tuple(
-                _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
-                for form in forms
-            ),
-        )
+    validate_reference_data_plan(
+        reference_data_plan,
+        prefix,
+        affine_quadrature_rule,
+        quadrature_rule,
+        basis_family,
+    )
+    validate_diagnostics_plan_names(
+        diagnostics_plan,
+        tuple(
+            _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
+            for form in forms
+        ),
+    )
 
     local_prefix = prefix if local_prefix is None else str(local_prefix)
     use_shared_weak_local = local_prefix != prefix

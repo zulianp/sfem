@@ -1732,24 +1732,22 @@ def generate_coupled_residual_sfem_files(
     mesh_kernel = mesh_kernel_plan_for_element(prefix, element_type)
     local_prefix = local_kernel.name if local_prefix is None else str(local_prefix)
     element_prefix = mesh_kernel.name if operator_prefix is None else str(operator_prefix)
-    if reference_data_plan is not None:
-        validate_reference_data_plan(
-            reference_data_plan,
-            element_prefix,
-            affine_specialization.quadrature_rule,
-            specialization.quadrature_rule,
-            family,
-        )
-    if diagnostics_plan is not None:
-        expected_diagnostics = [
-            "%s_residual_esoa" % element_prefix,
-        ]
-        expected_diagnostics.extend(
-            "%s_%s" % (element_prefix, jacobian_block_plan(block).name)
-            for block in system.jacobian_blocks()
-        )
-        expected_diagnostics.append("%s_jacobian_action_esoa" % element_prefix)
-        validate_diagnostics_plan_names(diagnostics_plan, expected_diagnostics)
+    validate_reference_data_plan(
+        reference_data_plan,
+        element_prefix,
+        affine_specialization.quadrature_rule,
+        specialization.quadrature_rule,
+        family,
+    )
+    expected_diagnostics = [
+        "%s_residual_esoa" % element_prefix,
+    ]
+    expected_diagnostics.extend(
+        "%s_%s" % (element_prefix, jacobian_block_plan(block).name)
+        for block in system.jacobian_blocks()
+    )
+    expected_diagnostics.append("%s_jacobian_action_esoa" % element_prefix)
+    validate_diagnostics_plan_names(diagnostics_plan, expected_diagnostics)
     local_name = local_kernel.header if local_name is None else str(local_name)
     operator_name = mesh_kernel.source if operator_name is None else str(operator_name)
     local_source = _local_header(
@@ -1850,14 +1848,13 @@ def generate_mixed_residual_sfem_files(
     _assert_geometry_plans_agree(emission_plan)
     family = emission_plan.basis_family
     geometry_family = emission_plan.geometry_family
-    if reference_data_plan is not None:
-        validate_reference_data_plan(
-            reference_data_plan,
-            prefix,
-            affine_specialization.quadrature_rule,
-            cell_specialization.quadrature_rule,
-            family,
-        )
+    validate_reference_data_plan(
+        reference_data_plan,
+        prefix,
+        affine_specialization.quadrature_rule,
+        cell_specialization.quadrature_rule,
+        family,
+    )
     # As in the coupled path, the names come from the plan.  The mixed path adds
     # a "_mixed" suffix and labels the operator with the compatible element pair;
     # it deliberately does not apply the coupled path's idempotence rule, because
@@ -1866,14 +1863,13 @@ def generate_mixed_residual_sfem_files(
     mesh_kernel = MeshKernelPlan(prefix=prefix, element_label=compatible_element.name)
     local_prefix = local_kernel.name if local_prefix is None else str(local_prefix)
     element_prefix = mesh_kernel.name if operator_prefix is None else str(operator_prefix)
-    if diagnostics_plan is not None:
-        validate_diagnostics_plan_names(
-            diagnostics_plan,
-            (
-                "%s_residual_esoa" % element_prefix,
-                "%s_jacobian_action_esoa" % element_prefix,
-            ),
-        )
+    validate_diagnostics_plan_names(
+        diagnostics_plan,
+        (
+            "%s_residual_esoa" % element_prefix,
+            "%s_jacobian_action_esoa" % element_prefix,
+        ),
+    )
     local_name = local_kernel.header if local_name is None else str(local_name)
     operator_name = mesh_kernel.source if operator_name is None else str(operator_name)
     local_source = _mixed_local_header(

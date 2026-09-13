@@ -311,7 +311,35 @@ PLAN_INPUTS = (
 #: imported function object, which is always truthy.  Scope was checked with an
 #: AST pass rather than with grep, and byte-identity was the gate that would
 #: have caught it regardless.
-BUDGET = 118
+#:
+#: 118 -> 112: who decides that an optional plan was not supplied.
+#:
+#: A third copy of one function, and this one across layers.
+#: `_validate_diagnostics_plan_names` lived in `symbolic/core.py` -- the bottom
+#: of the stack, which has no business knowing that diagnostics plans exist --
+#: and was `plans.diagnostics.validate_diagnostics_plan_names` minus its type
+#: check.  `energy_codegen.py` imported the first and `residual_codegen.py` the
+#: second, so each emitter had its own.  The symbolic copy had one user and is
+#: gone.
+#:
+#: The six guards around the two validators were redundant in a more
+#: interesting way.  `validate_diagnostics_plan_names` already opens with `if
+#: plan is None: return None`, so three `if diagnostics_plan is not None:` in
+#: emission were re-deciding what the validator had decided.  Its sibling
+#: `validate_reference_data_plan` raised `TypeError` on None instead, which
+#: forced its three callers to guard.  Every emitter defaults both parameters to
+#: None, so validating an unsupplied plan is vacuous; the two siblings answer
+#: that the same way now, and the callers just call.
+#:
+#: What is deliberately *not* counted down: four `emission_plan is None`
+#: branches remain, and they are precondition raises at emitter entry points.
+#: They choose nothing about what to emit -- they refuse to emit -- so this
+#: measure counts them only because `emission_plan` is a plan input.  Excluding
+#: a branch whose body is solely a `raise` would lower the number without
+#: improving anything, which is adjusting the scorer rather than the code.  Both
+#: the guards and the measure stay as they are; the note is here so the next
+#: reader knows the remainder is not all emission logic.
+BUDGET = 112
 
 
 def _tested_names(test):
