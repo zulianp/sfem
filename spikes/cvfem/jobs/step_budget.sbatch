@@ -73,6 +73,13 @@ BASE="SFEM_CASE=step SFEM_U=1 SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_G
 #   sbatch --export=ALL,MESHES="2:4",MUS=0.05 jobs/step_budget.sbatch   # one cell, to time it
 MESHES=${MESHES:-"2:4 4:4 4:8"}
 MUS=${MUS:-"0.05 0.02 0.01"}
+# HOS exists because a non-convergent arm is not free. The deferred correction runs its
+# Newton cap out -- 385 to 399 steps against 10 to 21 for first order -- so on the expensive
+# mesh three of those cells consume the whole debug allocation and starve the first-order
+# rows, which are the ones that can be reported. Until conv_limiter.sbatch says why it
+# stalls, run HOS=0 on 4:8 and keep both arms on the cheap meshes where the failure is
+# already characterised.
+HOS=${HOS:-"0 1"}
 
 run_one() {
     local tag=$1; shift
@@ -127,7 +134,7 @@ for MU in $MUS; do
     # N=1 aborts in the mesh generator, which is how this job first failed.
     for NL in $MESHES; do
         NN=${NL%%:*}; LV=${NL##*:}
-        for HO in 0 1; do
+        for HO in $HOS; do
             run_one "re${RE}_n${NN}l${LV}_ho${HO}" SFEM_MU=$MU SFEM_N=$NN \
                 SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=$HO SFEM_CONV_LIMITER=1
         done
