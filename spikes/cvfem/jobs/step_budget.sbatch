@@ -55,6 +55,25 @@ echo
 # group in the verification matrix uses a dense LU.
 BASE="SFEM_CASE=step SFEM_U=1 SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"
 
+# NOT a dense LU, even on the smallest mesh where one is affordable in memory. Measured, the
+# 7,060-dof cell spent t_precond 324.95 s against t_solve 0.42 s -- nineteen factorisations of
+# a 7,060-square dense matrix -- so six of these cells alone overrun the debug wall and the
+# job produced one row of eighteen before it was cancelled. Taking the linear solver out of
+# the question is worth paying for in the port study, where the question IS the solver; here
+# the question is a budget read off a converged state, and FGMRES driven to a tight tolerance
+# reaches the same state whichever preconditioner got it there. Every cell converges to
+# ||R||/||R_0|| ~ 1e-9 or better and the log records it, which is the thing that has to be
+# true.
+#
+# The matrix is split across jobs rather than run as one, because a debug allocation is 28
+# minutes and the cost spread over these meshes is two orders of magnitude:
+#
+#   sbatch --export=ALL,MESHES="2:4 4:4"      jobs/step_budget.sbatch   # the cheap ladder
+#   sbatch --export=ALL,MESHES="4:8"          jobs/step_budget.sbatch   # the expensive rung
+#   sbatch --export=ALL,MESHES="2:4",MUS=0.05 jobs/step_budget.sbatch   # one cell, to time it
+MESHES=${MESHES:-"2:4 4:4 4:8"}
+MUS=${MUS:-"0.05 0.02 0.01"}
+
 run_one() {
     local tag=$1; shift
     local log="$OUT/$tag.log"
@@ -68,37 +87,49 @@ run_one() {
     # From the CSV rather than the echoed line: the echo shares stdout with the driver's
     # other output and interleaves with stderr under load, which has already truncated one
     # number in this work.
+    local mi mo mbal="--"
     if [ -s "$OUT/$tag.csv" ]; then
         ev=$(tail -1 "$OUT/$tag.csv" | cut -d, -f8)
         en=$(tail -1 "$OUT/$tag.csv" | cut -d, -f9)
         cl=$(tail -1 "$OUT/$tag.csv" | cut -d, -f10)
+        mi=$(tail -1 "$OUT/$tag.csv" | cut -d, -f22)
+        mo=$(tail -1 "$OUT/$tag.csv" | cut -d, -f23)
     fi
+    # THE BUDGET'S OWN VALIDITY CHECK, and it belongs in the table rather than in the CSV
+    # where nobody looks. eps_num is DEFINED as the residual of the energy budget, so
+    # anything the budget does not account for lands in it -- and mass crossing a surface
+    # the budget does not integrate over is exactly that. mdot_in + mdot_out is zero for a
+    # flow that enters and leaves through these two planes and nowhere else; printed
+    # relative to |mdot_in| it says what fraction of eps_num might be a bookkeeping error
+    # rather than numerical dissipation. The first run of this job read 0.4454 here, which
+    # is not a number a budget may be reported from.
+    mbal=$(python3 -c "
+mi=float('${mi:-0}'); mo=float('${mo:-0}')
+print('%.4f' % (abs(mi+mo)/abs(mi)) if mi else '--')" 2>/dev/null || echo "--")
     local frac="--"
     [ -n "${ev:-}" ] && [ -n "${en:-}" ] && frac=$(python3 -c "
 ev=abs(float('${ev:-0}')); en=abs(float('${en:-0}'))
 print('%.4f' % (en/(ev+en)) if (ev+en) > 0 else '--')" 2>/dev/null || echo "--")
-    printf '%-22s %9s %5s %7s %8s %13s %13s %9s %9s\n' \
-        "$tag" "${ndof:--}" "${conv:-$rc}" "${nt:--}" "${li:--}" "${ev:---}" "${en:---}" "$frac" "${cl:---}"
+    printf '%-22s %9s %5s %7s %8s %13s %13s %9s %9s %9s\n' \
+        "$tag" "${ndof:--}" "${conv:-$rc}" "${nt:--}" "${li:--}" "${ev:---}" "${en:---}" "$frac" \
+        "${cl:---}" "$mbal"
 }
-HDR() { printf '%-22s %9s %5s %7s %8s %13s %13s %9s %9s\n' \
-        cell ndof conv newton lin_it eps_visc eps_num num_frac closure; }
+HDR() { printf '%-22s %9s %5s %7s %8s %13s %13s %9s %9s %9s\n' \
+        cell ndof conv newton lin_it eps_visc eps_num num_frac closure mass_err; }
 
 # Re = rho U Ly / mu with Ly = 2: mu 0.05 is Re 40, 0.02 is Re 100, 0.01 is Re 200.
-for MU in 0.05 0.02 0.01; do
+for MU in $MUS; do
     RE=$(python3 -c "print(int(1*1*2/$MU))")
     echo "== Re = $RE  (mu = $MU)"
     HDR
     # N must be EVEN. create_hex8_lshape refuses a step that does not fall on a grid line --
     # step_y/ymax*ny must be an integer, and with ymax = 2 and step_y = 1 that means ny even.
     # N=1 aborts in the mesh generator, which is how this job first failed.
-    for NL in "2:4" "4:4" "4:8"; do
+    for NL in $MESHES; do
         NN=${NL%%:*}; LV=${NL##*:}
-        # A dense LU is affordable at 7,060 dofs and refused above 20,000, so the smallest
-        # mesh removes the linear solver entirely and the larger two use Vanka.
-        if [ "$NN" = 2 ]; then PC="SFEM_PRECOND=direct"; else PC="SFEM_PRECOND=vanka"; fi
         for HO in 0 1; do
             run_one "re${RE}_n${NN}l${LV}_ho${HO}" SFEM_MU=$MU SFEM_N=$NN \
-                SFEM_ELEMENT_REFINE_LEVEL=$LV $PC SFEM_CONV_HO=$HO SFEM_CONV_LIMITER=1
+                SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=$HO SFEM_CONV_LIMITER=1
         done
     done
     echo

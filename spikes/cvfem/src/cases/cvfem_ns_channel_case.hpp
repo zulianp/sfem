@@ -13,6 +13,7 @@
 #include "cvfem_ns_mms_case.hpp"
 
 #include <cmath>
+#include <limits>
 #include <string>
 
 namespace cvfem_case {
@@ -234,6 +235,29 @@ namespace cvfem_case {
     template <typename T>
     inline T step_inflow_flux(const T step_y, const T Ly, const T Lz, const T U) {
         return (T(4) / T(9)) * U * (Ly - step_y) * Lz;
+    }
+
+    // THE `step` CASE DOES NOT USE THE PROFILE ABOVE, so it does not use that oracle either.
+    // exact_state spells Farrell, Mitchell & Wechsung's inflow out literally as
+    // 4(2-y)(y-1) z(1-z), whose peak is U/4 rather than U because the z factor is z(1-z) and
+    // not 4 z(1-z). Its flux is therefore a quarter of the parameterised one:
+    //
+    //     int_1^2 4(2-y)(y-1) dy = 2/3,   int_0^1 z(1-z) dz = 1/6,   product U/9.
+    //
+    // Getting this wrong is not a cosmetic error in a header line. Measured on the budget
+    // job at 4 micro-cells across the inlet, the driver read a mass flux of 0.0977 -- the
+    // trapezoidal quadrature of U/9 on that grid, to the digit -- while printing 0.4444 as
+    // the exact value beside it, which reads as a solve losing three quarters of its mass.
+    //
+    // Valid only on the geometry those literals assume; a caller on any other one is asking
+    // about a profile exact_state does not produce there, so it gets a NaN rather than a
+    // number that looks like an answer.
+    template <typename T>
+    inline T step_farrell_inflow_flux(const T step_y, const T Ly, const T Lz, const T U) {
+        const T tol = T(1e-9);
+        if (std::fabs(step_y - T(1)) > tol || std::fabs(Ly - T(2)) > tol || std::fabs(Lz - T(1)) > tol)
+            return std::numeric_limits<T>::quiet_NaN();
+        return U / T(9);
     }
 
     // Fully developed flow between plates at y = 0 and y = Ly. Couette is driven by the
