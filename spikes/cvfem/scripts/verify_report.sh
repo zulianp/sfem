@@ -172,12 +172,44 @@ fi
 # ---- spatial order of accuracy, manufactured solution ----
 # mu = 1/Re is mandated by the manufactured pressure, so this group overrides it.
 if want mms; then
-    # Re = 1, which is the informative point rather than a convenient one: upwinding is
-    # inactive there, so a first-order reading would mean a consistency error rather than
-    # benign upwind diffusion. The manufactured pressure also mandates rho = 1, mu = 1/Re.
-    for n in $MMS_LADDER; do
-        run mms "n$n" "" -- SFEM_CASE=mms SFEM_N=$(lvl_n $n) $LEVEL_ENV \
-            SFEM_MU=1 SFEM_RHO=1
+    # TWO LADDERS, at two Reynolds numbers, and they answer different questions.
+    #
+    # Re = 1 is the CONSISTENCY statement. Upwinding is inactive there, so a first-order
+    # reading would mean a consistency error rather than benign upwind diffusion -- which is
+    # exactly what makes it the right place to detect one, and exactly what makes it silent
+    # about accuracy anywhere else.
+    #
+    # Re = 100 is the ACCURACY statement, and it is the one that was missing. The convection
+    # operator is first-order donor-cell upwind with no limiter, so at a cell Peclet number
+    # of any size the scheme is O(h) and its numerical diffusion scales like |u| h / 2. The
+    # matrix has never measured order where that term is active, which means the 2.308 the
+    # Re = 1 ladder reports has been doing duty as an accuracy claim it cannot support.
+    #
+    # Re enters through mu alone: exact_state derives Re = 1/mu, cvfem_mms::pressure carries
+    # Re as a real parameter, and body_force is recomputed nodally at every continuation stage
+    # with that stage's rho, so the exact solution does not move as the continuation runs. rho
+    # must be 1 at the final stage and the domain must be [0,2]^3 -- the driver now enforces
+    # both rather than asserting them in a comment.
+    #
+    # 100 rather than more: the forcing is a degree-13 polynomial whose 1/Re-weighted and O(1)
+    # terms diverge in magnitude as mu shrinks, and a much larger value would need a
+    # cancellation check before its numbers meant anything.
+    # The solver is NAMED here rather than inherited, which it was until now -- this group is
+    # the only one that did not pass $SOLVER_ENV while the report header printed the solver
+    # choice as though it were global. It cannot take $SOLVER_ENV either: that is
+    # SFEM_PRECOND=direct by default, and the finest level is 143,748 dofs against a dense-LU
+    # cap of 20,000. Multigrid is not available because this ladder is deliberately flat, so
+    # what is left is FGMRES with point block-Jacobi. That is the weak preconditioner -- the
+    # Re = 100, N = 32 run takes 10,952 linear iterations -- but it converges here, and the
+    # alternative is changing the mesh type and with it every number this group has ever
+    # reported.
+    MMS_SOLVER="SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=bjacobi"
+    for re_mu in "1:1" "100:0.01"; do
+        MMS_RE=${re_mu%%:*}; MMS_MU=${re_mu##*:}
+        for n in $MMS_LADDER; do
+            run mms "re${MMS_RE}_n$n" "mms_re=$MMS_RE" -- SFEM_CASE=mms SFEM_N=$(lvl_n $n) $LEVEL_ENV \
+                $MMS_SOLVER SFEM_MU=$MMS_MU SFEM_RHO=1
+        done
     done
 fi
 

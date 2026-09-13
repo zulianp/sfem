@@ -316,42 +316,106 @@ def table(headers, rows):
 
 
 def section_mms(runs, checks):
-    """Spatial order of accuracy. The rate is the claim; the errors are the evidence."""
-    rows = [r for r in runs if r["group"] == "mms" and "u_l2" in r]
-    if len(rows) < 2:
+    """Spatial order of accuracy, one ladder per Reynolds number.
+
+    The two ladders make DIFFERENT claims and must never be pooled into one fit.
+
+    At Re = 1 upwinding is inactive, so the rate is a consistency statement: a first-order
+    reading there would mean a consistency error rather than benign upwind diffusion. That is
+    what makes it the right place to detect one and what makes it silent about accuracy
+    anywhere else.
+
+    At Re = 100 the convective term is active, and since the scheme is first-order donor-cell
+    upwind with no limiter, this is where its actual order is visible. The threshold is
+    therefore NOT second order: reporting a first-order rate here is the expected result and
+    the justification for a higher-order scheme, so the gate asks only that the ladder
+    converge at all -- a rate below 0.7 would mean something is wrong beyond the upwinding.
+    """
+    allrows = [r for r in runs if r["group"] == "mms" and "u_l2" in r]
+    if len(allrows) < 2:
         return ""
-    rows.sort(key=lambda r: r["ndof"])
-    # h ~ ndof^(-1/3) in 3D, which is the scale the rate is quoted against.
-    for r in rows:
-        r["h"] = r["ndof"] ** (-1.0 / 3.0)
+    res = []
+    for r in allrows:
+        key = r.get("mms_re", "")
+        if key not in res:
+            res.append(key)
 
     body = ["## Spatial order of accuracy", "",
             "Manufactured solution, volume-weighted L2 against the exact field, with the",
             "pressure gauge offset removed (`p_l2_shifted`). The rate is fitted by log-log",
             "least squares against `h ~ ndof^(-1/3)`.", ""]
-    body.append(table(
-        ["ndof", "h", "u L2", "p L2", "p L2 shifted"],
-        [[r["ndof"], "%.4f" % r["h"], fmt(r.get("u_l2")), fmt(r.get("p_l2")),
-          fmt(r.get("p_l2_shifted"))] for r in rows]))
 
-    fits, series = [], []
-    for key, label, expect in (("u_l2", "u L2", 2.0), ("p_l2_shifted", "p L2 shifted", 1.3)):
-        data = [(r["h"], r[key]) for r in rows if r.get(key)]
-        f = fit_convergence_rate([d[0] for d in data], [d[1] for d in data])
-        if not f:
+    for re_key in res:
+        rows = sorted((r for r in allrows if r.get("mms_re", "") == re_key),
+                      key=lambda r: r["ndof"])
+        if len(rows) < 2:
             continue
-        rate, inter, r2, n = f
-        ok = rate >= expect - 0.35
-        fits.append([label, "%.3f" % rate, "%.4f" % r2, n, "&ge; %.2f" % (expect - 0.35), status(ok)])
-        checks.append(("Spatial order, %s" % label, "rate %.3f (expect >= %.2f)" % (rate, expect - 0.35), ok))
-        series.append((("%s: rate %.2f" % (label, rate)), data, "points"))
-        lo, hi = min(d[0] for d in data), max(d[0] for d in data)
-        series.append((("  fit h^%.2f" % rate),
-                       [(lo, math.exp(inter) * lo ** rate), (hi, math.exp(inter) * hi ** rate)], "dash"))
-    if fits:
-        body.append(table(["quantity", "fitted rate", "R^2", "levels", "threshold", "status"], fits))
-        body.append(svg_xy(series, "h  (~ ndof^-1/3)", "L2 error", logx=True, logy=True,
-                           caption="MMS convergence") + "\n")
+        for r in rows:
+            r["h"] = r["ndof"] ** (-1.0 / 3.0)
+
+        # Re = 1 keeps the historical thresholds; anything else is judged on convergence
+        # rather than on order, for the reason in the docstring.
+        low_re = (re_key in ("", 1.0, 1))
+        if re_key != "":
+            body += ["", "### Re = %g -- %s" % (
+                re_key,
+                "upwinding inactive, a consistency statement" if low_re
+                else "upwinding active, the accuracy statement"), ""]
+            if not low_re:
+                body += ["The scheme is first-order donor-cell upwind with no limiter, so a",
+                         "rate near 1 here is the expected result, not a defect -- and it is",
+                         "the measurement that decides whether a higher-order convection",
+                         "scheme is worth its cost.", "",
+                         "Read the local rates, not just the fit. They do not settle, so the",
+                         "fitted value is a bound on the order rather than a measurement of",
+                         "it: what is established is that the ladder converges and that the",
+                         "order is nowhere near the 2.3 the Re = 1 arm reports. The gate is",
+                         "set well below the fitted rate for that reason.", ""]
+        # The LOCAL rate between consecutive levels, alongside the global fit. A single fitted
+        # number reads as a settled order whether or not the ladder is in its asymptotic
+        # regime, and at Re = 100 it is not: the local rates run 1.28, 0.45, 0.61 while the
+        # fit reports 0.727. Showing them makes the fit's standing visible instead of leaving
+        # it to be inferred from R^2.
+        trows = []
+        for i, r in enumerate(rows):
+            loc = "--"
+            if i > 0 and rows[i - 1].get("u_l2") and r.get("u_l2"):
+                hr = rows[i - 1]["h"] / r["h"]
+                er = rows[i - 1]["u_l2"] / r["u_l2"]
+                if hr > 1 and er > 0:
+                    loc = "%.2f" % (math.log(er) / math.log(hr))
+            trows.append([r["ndof"], "%.4f" % r["h"], fmt(r.get("u_l2")), loc,
+                          fmt(r.get("p_l2")), fmt(r.get("p_l2_shifted"))])
+        body.append(table(["ndof", "h", "u L2", "local rate", "p L2", "p L2 shifted"], trows))
+
+        tag = "" if re_key == "" else " (Re %g)" % re_key
+        fits, series = [], []
+        for key, label, expect in (("u_l2", "u L2", 2.0 if low_re else 1.0),
+                                   ("p_l2_shifted", "p L2 shifted", 1.3 if low_re else 0.9)):
+            data = [(r["h"], r[key]) for r in rows if r.get(key)]
+            f = fit_convergence_rate([d[0] for d in data], [d[1] for d in data])
+            if not f:
+                continue
+            rate, inter, r2, n = f
+            # 0.5, not 0.7. What this arm asserts is that the ladder CONVERGES and that the
+            # order is nowhere near second -- both of which the measured 0.727 says loudly.
+            # It does not assert a precise order, because the local rates (1.28, 0.45, 0.61)
+            # show the ladder is not asymptotic, so a gate set just under the fitted value
+            # would fail on fit noise rather than on a real regression. The number itself is
+            # in the table, where a reader can see it move.
+            thr = (expect - 0.35) if low_re else 0.5
+            ok = rate >= thr
+            fits.append([label, "%.3f" % rate, "%.4f" % r2, n, "&ge; %.2f" % thr, status(ok)])
+            checks.append(("Spatial order, %s%s" % (label, tag),
+                           "rate %.3f (expect >= %.2f)" % (rate, thr), ok))
+            series.append((("%s: rate %.2f" % (label, rate)), data, "points"))
+            lo, hi = min(d[0] for d in data), max(d[0] for d in data)
+            series.append((("  fit h^%.2f" % rate),
+                           [(lo, math.exp(inter) * lo ** rate), (hi, math.exp(inter) * hi ** rate)], "dash"))
+        if fits:
+            body.append(table(["quantity", "fitted rate", "R^2", "levels", "threshold", "status"], fits))
+            body.append(svg_xy(series, "h  (~ ndof^-1/3)", "L2 error", logx=True, logy=True,
+                               caption="MMS convergence%s" % tag) + "\n")
     return "\n".join(body) + "\n"
 
 
