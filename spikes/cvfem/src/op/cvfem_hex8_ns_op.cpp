@@ -1053,12 +1053,14 @@ namespace sfem {
         return impl_->semi_structured ? impl_->ss.bdf_order : impl_->d.bdf_order;
     }
 
-    void CVFEMNavierStokes::set_time_step(const real_t dt, const int bdf_order) {
+    void CVFEMNavierStokes::set_time_step(const real_t dt, const int bdf_order, const real_t dt_prev) {
         if (impl_->semi_structured) {
             impl_->ss.dt        = (scalar_t)dt;
+            impl_->ss.dt_prev   = (scalar_t)dt_prev;
             impl_->ss.bdf_order = bdf_order;
         } else {
             impl_->d.dt        = (scalar_t)dt;
+            impl_->d.dt_prev   = (scalar_t)dt_prev;
             impl_->d.bdf_order = bdf_order;
         }
     }

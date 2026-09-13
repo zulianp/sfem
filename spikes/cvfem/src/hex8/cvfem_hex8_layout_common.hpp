@@ -281,6 +281,11 @@ struct MeshData {
     // one velocity history level per BDF order, and nothing else. dt <= 0 means steady,
     // which is the default and is what every existing measurement was taken with.
     scalar_t              dt{0};
+    // The PREVIOUS step size, for variable-step BDF2. Zero means none recorded, which is the
+    // uniform case and every existing caller. Mirrors the solver core's MeshData so the two
+    // bdf_coeffs stay the same function -- the benchmark is the performance gate for these
+    // kernels and it measuring a different scheme would make that gate meaningless.
+    scalar_t              dt_prev{0};
     int                   bdf_order{1};
     std::vector<scalar_t> u_prev, u_prev2;  // 3 * nnodes, interleaved
     std::vector<scalar_t> node_vol;
@@ -698,8 +703,28 @@ struct BdfCoeffs {
 
 static BdfCoeffs bdf_coeffs(const MeshData &d) {
     const bool have_two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
-    if (have_two) return {scalar_t(1.5), scalar_t(-2), scalar_t(0.5), 2};
-    return {scalar_t(1), scalar_t(-1), scalar_t(0), 1};
+    if (!have_two) return {scalar_t(1), scalar_t(-1), scalar_t(0), 1};
+
+    // BDF2 on a VARIABLE step. With w = dt / dt_prev,
+    //
+    //     a0 = (1 + 2w)/(1 + w),   a1 = -(1 + w),   a2 = w^2/(1 + w)
+    //
+    // which is {3/2, -2, 1/2} at w = 1 and reduces to it exactly, so a run that never changes
+    // its step is bit-for-bit what it was. dt_prev <= 0 means nothing has recorded a previous
+    // step -- a fresh run, a coarse level built by clone_onto, any caller that does not adapt
+    // -- and those take the uniform branch rather than a guess.
+    //
+    // The guard matters more than the formula. Using {3/2, -2, 1/2} after the step size has
+    // changed is not an approximation, it is the wrong scheme: the truncation error stops
+    // cancelling and BDF2 silently becomes first order while still reporting itself as second.
+    if (d.dt_prev > scalar_t(0) && d.dt > scalar_t(0)) {
+        const scalar_t w = d.dt / d.dt_prev;
+        if (w != scalar_t(1)) {
+            const scalar_t den = scalar_t(1) + w;
+            return {(scalar_t(1) + scalar_t(2) * w) / den, -den, w * w / den, 2};
+        }
+    }
+    return {scalar_t(1.5), scalar_t(-2), scalar_t(0.5), 2};
 }
 
 static SFEM_NOINLINE void apply_transient_pass(MeshData &d, const scalar_t rho) {

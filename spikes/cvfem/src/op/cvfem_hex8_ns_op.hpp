@@ -156,7 +156,12 @@ namespace sfem {
         // layout the state vector already uses, and prev2 may be null -- BDF2 then falls
         // back to BDF1, which is the correct start-up for the first step of a run.
         // Passing null for prev clears the history and switches the term off.
-        void set_time_step(const real_t dt, const int bdf_order);
+        // dt_prev is the PREVIOUS step size, and it matters only for BDF2 on a variable step:
+        // the coefficients {3/2, -2, 1/2} are second order for uniform spacing alone, and
+        // using them after the step has changed is not an approximation but a different,
+        // first-order scheme reporting itself as second. 0 -- the default, and what every
+        // fixed-step caller gets -- selects the uniform coefficients.
+        void set_time_step(const real_t dt, const int bdf_order, const real_t dt_prev = 0);
         // Updates the LIVE prescribed pressure, not just the field initialize() reads.
         void set_pressure_value(const real_t p);
         void set_velocity_history(const real_t *prev, const real_t *prev2);

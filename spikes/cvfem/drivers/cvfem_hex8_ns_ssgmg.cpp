@@ -2879,6 +2879,27 @@ int main(int argc, char **argv) {
     // second history level; that is the standard start-up.
     const real_t      dt_step   = smesh::Env::read<real_t>("SFEM_DT", real_t(0));
     const int         nsteps    = std::max(1, smesh::Env::read<int>("SFEM_NSTEPS", 1));
+    // CFL-DRIVEN TIMESTEP. cfl_max has been computed by the flow diagnostics since they were
+    // wired up and consumed by nothing; this closes that loop.
+    //
+    //     dt_next = dt * (target / cfl_measured)
+    //
+    // clamped by a growth factor per step and by absolute bounds, so one anomalous step
+    // cannot take the step size somewhere the next one cannot recover from.
+    //
+    // 0 -- the default -- keeps the fixed step, which is what every recorded transient number
+    // was measured with and what keeps a run reproducible. It requires the diagnostics, since
+    // cfl_max comes from them: asking for adaptation without SFEM_DIAG_CSV is refused rather
+    // than silently ignored.
+    //
+    // BDF2 IS THE REASON dt_prev EXISTS. Its coefficients {3/2, -2, 1/2} are second order on a
+    // uniform step and on nothing else, so changing dt under them is not an approximation --
+    // it is a first-order scheme still calling itself second. The variable-step form is now
+    // in bdf_coeffs and the driver feeds it the previous step.
+    const real_t      cfl_target = smesh::Env::read<real_t>("SFEM_CFL_TARGET", real_t(0));
+    const real_t      cfl_grow   = smesh::Env::read<real_t>("SFEM_CFL_GROW", real_t(1.25));
+    const real_t      dt_min     = smesh::Env::read<real_t>("SFEM_DT_MIN", real_t(0));
+    const real_t      dt_max     = smesh::Env::read<real_t>("SFEM_DT_MAX", real_t(0));
     const int         bdf_order = smesh::Env::read<int>("SFEM_BDF_ORDER", 2);
     const real_t      nl_rtol    = smesh::Env::read<real_t>("SFEM_NL_RTOL", 1e-8);
     const real_t      nl_atol    = smesh::Env::read<real_t>("SFEM_NL_ATOL", 1e-12);
@@ -3114,6 +3135,17 @@ int main(int argc, char **argv) {
     // power is an integral over named sidesets, and the sidesets are built a few lines below.
     const std::string diag_csv  = smesh::Env::read_string("SFEM_DIAG_CSV", "");
     const bool        want_diag = !diag_csv.empty();
+
+    // The live step size and the one before it. Equal to SFEM_DT and 0 for a fixed-step run,
+    // which is every run that does not ask for adaptation.
+    real_t dt_now       = dt_step;
+    real_t dt_prev_step = 0;
+    if (cfl_target > real_t(0) && !want_diag) {
+        std::fprintf(stderr, "SFEM_CFL_TARGET needs SFEM_DIAG_CSV: the CFL number it steers on "
+                             "is measured by the flow diagnostics, and adapting on a number "
+                             "nothing computed would just be a fixed step with extra steps.\n");
+        return EXIT_FAILURE;
+    }
 
     std::shared_ptr<smesh::Sideset> step_skin, step_outlet, step_inlet;
     // Kept so they survive to_semistructured, which builds a new Mesh and copies none.
@@ -4279,7 +4311,7 @@ int main(int argc, char **argv) {
     real_t            t0            = 0;
     bool              resumed       = false;
     if (dt_step > real_t(0)) {
-        op->set_time_step(dt_step, bdf_order);
+        op->set_time_step(dt_now, bdf_order, dt_prev_step);
         u_hist.assign((size_t)nnodes * 3, real_t(0));
         // The initial condition is whatever the state holds when stepping starts, so the
         // first step is consistent with it rather than with an implied zero field.
@@ -5407,8 +5439,13 @@ int main(int argc, char **argv) {
             if (op->nodal_velocity_gradient(x, diag_grad.data()) != SFEM_SUCCESS) {
                 std::fprintf(stderr, "diag: nodal_velocity_gradient failed; no row written\n");
             } else {
+                // dt_now, not dt_step: with SFEM_CFL_TARGET the step size moves, and a CFL
+                // computed from the step the run STARTED with does not describe the step it
+                // just took. Measured with dt_step here, the controller read a constant 0.190
+                // while dt grew 0.02 -> 0.0610 and simply multiplied by its growth cap every
+                // step -- an adaptive scheme steering on a number that could not respond to it.
                 st = cvfem_diag::contract(nnodes, x, diag_grad.data(), diag_vol.data(),
-                                          (double)op->rho, (double)op->mu, (double)dt_step);
+                                          (double)op->rho, (double)op->mu, (double)dt_now);
                 real_t q_in = 0, q_out = 0;
                 cvfem_diag::energy_flux_weight(nnodes, x, (double)op->rho, diag_w);
                 auto weighted = [&](const char *name, real_t &q) {
@@ -5438,7 +5475,7 @@ int main(int argc, char **argv) {
                 // than quietly reported.
                 const bool                   first = !diag_have_prev;
                 const cvfem_diag::FlowState &prev  = first ? st : diag_prev;
-                const auto b = cvfem_diag::close(prev, st, (double)dt_step,
+                const auto b = cvfem_diag::close(prev, st, (double)dt_now,
                                                  have_in ? (double)q_in : 0.0,
                                                  have_out ? (double)q_out : 0.0);
                 const int budget_valid = (dt_step <= real_t(0) || !first) ? 1 : 0;
@@ -5467,6 +5504,23 @@ int main(int argc, char **argv) {
                             "eps_num %.3e  closure %.3e  cfl %.3f  div_l2 %.3e\n",
                             st.E, b.dEdt, b.p_in, b.p_out, b.eps_visc, b.eps_num, b.closure,
                             st.cfl_max, st.div_l2);
+                // Choose the next step from the CFL this one actually ran at. Done here
+                // because this is where cfl_max is current; applied at the top of the next
+                // step through set_time_step.
+                if (cfl_target > real_t(0) && dt_step > real_t(0) && st.cfl_max > 0) {
+                    const real_t want = dt_now * (real_t)(cfl_target / st.cfl_max);
+                    real_t       nxt  = want;
+                    if (nxt > dt_now * cfl_grow) nxt = dt_now * cfl_grow;
+                    if (nxt < dt_now / cfl_grow) nxt = dt_now / cfl_grow;
+                    if (dt_min > real_t(0) && nxt < dt_min) nxt = dt_min;
+                    if (dt_max > real_t(0) && nxt > dt_max) nxt = dt_max;
+                    if (nxt != dt_now) {
+                        std::printf("cfl: measured %.3f, target %g -> dt %g to %g\n",
+                                    st.cfl_max, (double)cfl_target, (double)dt_now, (double)nxt);
+                        dt_prev_step = dt_now;
+                        dt_now       = nxt;
+                    }
+                }
                 diag_prev      = st;
                 diag_have_prev = true;
             }
@@ -5970,13 +6024,20 @@ int main(int argc, char **argv) {
     std::printf("u_linf: %.6e  p_linf: %.6e\n", u_linf, p_linf);
         std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
 
-        // The pump has no closed-form solution, so u_linf against exact_state -- which
-        // returns its boundary data -- measures nothing and would fail every correct run.
-        // Its verification is the swept-volume identity printed above, which is exact and is
-        // what the report checks; convergence is still required.
-        if (flow == cvfem_case::FlowCase::Pump) {
+        // The pump and the turbulent step have no closed-form solution, so u_linf against
+        // exact_state -- which returns their boundary data -- measures nothing and would fail
+        // every correct run. The pump's verification is the swept-volume identity printed
+        // above; the turbulent step's is the energy budget and the mass balance. Convergence
+        // is still required of both.
+        //
+        // StepTurb was missing from this list while cvfem_ns_channel_case.hpp:320 asserted it
+        // was in it -- "the verification block exempts this case from the u_linf gate for the
+        // reason the pump is exempt". It did not, and since exact_state returns zero velocity
+        // everywhere for that case, u_linf is max|u| and any real run failed the 1e-2 gate.
+        if (flow == cvfem_case::FlowCase::Pump || flow == cvfem_case::FlowCase::StepTurb) {
             if (!converged) {
-                std::fprintf(stderr, "verification failed (pump did not converge)\n");
+                std::fprintf(stderr, "verification failed (%s did not converge)\n",
+                             flow == cvfem_case::FlowCase::Pump ? "pump" : "step_turb");
                 return EXIT_FAILURE;
             }
         } else if (!converged || u_linf > verify_tol) {
