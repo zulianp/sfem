@@ -96,6 +96,7 @@ from codegen.framework.plans.dependencies import (
     contracted_gradient_components,
     live_test_coefficients,
 )
+from codegen.framework.plans.geometry_variants import packed_kernel_forms
 from codegen.framework.plans.streams import field_stream_layout
 from codegen.framework.plans.geometry_quantities import (
     local_geometry_streams,
@@ -5637,7 +5638,7 @@ def _mesh_operator_source(
                 gradient_metric,
             )
         )
-        if form == "jacobian_action":
+        for _packed_form in packed_kernel_forms(form):
             lines.extend(
                 _scalar_packed_affine_jacobian_action_source(
                     system,
@@ -5875,7 +5876,7 @@ def _mesh_operator_source(
             ],
         )
     )
-    if form == "jacobian_action":
+    for _packed_form in packed_kernel_forms(form):
         lines.extend(
             _scalar_packed_affine_jacobian_action_source(
                 system,
@@ -5918,7 +5919,7 @@ def _mesh_operator_source(
                 geometry_family,
             )
         )
-    if form == "jacobian_action":
+    for _packed_form in packed_kernel_forms(form):
         lines.extend(
             _scalar_packed_jacobian_action_source(
                 system,

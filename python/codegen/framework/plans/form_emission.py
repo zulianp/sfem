@@ -223,6 +223,45 @@ def form_contraction(form):
     )
 
 
+def form_reads_current(form, default):
+    """Whether a form reads the current state, with a default for an unlowered one.
+
+    These three predicates are pure questions about a form -- does it read the
+    state, does it read a direction, which material constants does it name --
+    and they were answered in `emitters/energy_codegen.py`, each carrying its
+    own "a form that has not been lowered through a dependency set" fallback.
+
+    That fallback is the part that is not `getattr`: what such a form reads is
+    the caller's declaration rather than anything a dependency set knows, and
+    saying so three times in emission is saying it in the wrong layer.
+    """
+    return _form_dependency(form, "current", default)
+
+
+def form_reads_direction(form, default):
+    """Whether a form reads a direction, with the same fallback."""
+    return _form_dependency(form, "direction", default)
+
+
+def form_material_parameter_names(form):
+    """The material constants a form names, in order.
+
+    An unlowered form names none: the fallback here is emptiness rather than a
+    caller's declaration, because a parameter list cannot be guessed.
+    """
+    dependencies = getattr(form, "dependencies", None)
+    if dependencies is None:
+        return ()
+    return tuple(str(parameter) for parameter in getattr(dependencies, "parameters", ()))
+
+
+def _form_dependency(form, role, default):
+    dependencies = getattr(form, "dependencies", None)
+    if dependencies is None:
+        return bool(default)
+    return bool(getattr(dependencies, role, False))
+
+
 #: The field roles a form's element API carries, by the names those kernels use
 #: for them.  `plans/streams.MESH_FIELD_STREAMS` is the same axis at the mesh
 #: boundary, where the roles are spelled `current`/`previous`/`direction`; the
@@ -247,16 +286,11 @@ def element_api_field_roles(form):
     a dependency set knows.  That default is the whole of the difference, and
     stating it here is what stops it being restated at nine sites.
     """
-    dependencies = getattr(form, "dependencies", None)
     defaults = {"current": True, "direction": bool(getattr(form, "has_direction", False))}
     return tuple(
         (role, prefix)
         for role, prefix in ELEMENT_API_FIELD_ROLES
-        if (
-            defaults[role]
-            if dependencies is None
-            else bool(getattr(dependencies, role, False))
-        )
+        if _form_dependency(form, role, defaults[role])
     )
 
 
