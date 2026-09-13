@@ -196,7 +196,21 @@ PLAN_INPUTS = (
 #: form passes the geometry stride.  Six separate `if`s said that; six tables
 #: keyed on the same plan answer say it now, and the buffer extent cannot
 #: disagree with the loop that indexes it.
-BUDGET = 147
+#:
+#: 147 -> 144: the Laplacian special cases, removed.  Three specialised
+#: generators in `residual_codegen.py` -- 579 lines -- were reached by a
+#: nine-term conjunction on the material's *name*, `prefix ==
+#: "laplace_proteus_hex8"` and two twins, plus three `#include` branches naming
+#: SFEM's hand-written headers.  Emission pattern-matching a material is what
+#: "no `if kind == ...` in a backend" forbids outright.
+#:
+#: They were dead: laplace is written as an energy now and reaches this emitter
+#: for nothing, so the tree is byte-identical without them and no measured
+#: performance moved.  What they knew is recorded as ARCHITECTURE.html OP 26 --
+#: five of their six properties are already in the general path, and the sixth,
+#: specialising a unit material constant out at compile time, is the kernel form
+#: to aim at.
+BUDGET = 144
 
 
 def _tested_names(test):

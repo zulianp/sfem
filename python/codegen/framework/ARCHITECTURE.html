@@ -519,7 +519,36 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Twenty-six, ordered by what unblocks what. Five are new since the last pass, and three of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Twenty-seven, ordered by what unblocks what. Six are new since the last pass, and four of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 26</div>
+    <div class="body">
+      <div class="op-title">The Laplacian special cases are gone, and what they knew is written here <span class="chip c-part">removed; one property not yet in the general path</span></div>
+
+      <p><b>What was there.</b> <code>emitters/residual_codegen.py</code> carried three specialised generators &mdash; 579 lines &mdash; reached by a nine-term conjunction on the material's <em>name</em>: <code>not two_pass and prefix == "laplace_proteus_hex8" and dim == 3 and n_shape == 8 and n_fields == 1 and not uses_cached_affine_metric and dependencies.uses_adjugate and not dependencies.current and not dependencies.previous and len(dependencies.parameters) == 1</code>, with twins for <code>laplace_tet4</code> and <code>laplace_tet10</code>, and three <code>#include</code> branches naming SFEM's hand-written Laplacian headers. Emission pattern-matching a material by name is what "no <code>if kind == "energy_soa"</code> in a backend" forbids, and the conjunction reconstructs in the emitter a property the plan layer should hold.</p>
+
+      <p><b>They were dead.</b> Laplace is written as an energy now and no longer reaches this emitter, so no generated file included those headers and removing all of it leaves the tree byte-identical. <b>No shipped kernel changed and no measured performance moved</b>, because nothing generated through them. The regression they guard against is latent: a Laplacian written as a <em>residual</em> would now get the general kernel.</p>
+
+      <p><b>So what they knew is recorded here instead.</b> Six properties, of which the general path already has five:</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>property of the specialised kernel</th><th>general path</th></tr>
+        <tr><td>The symmetric metric built once per element, six components staged lane-major from the nine adjugate entries and the determinant, before any arithmetic</td><td>has it &mdash; <code>GeometryVariantPlan</code>'s cached metric</td></tr>
+        <tr><td>Gather, arithmetic and scatter in separate lane loops, with only the arithmetic under <code>#pragma omp simd</code></td><td>has it</td></tr>
+        <tr><td>Pack-local scratch, with the scatter epilogue split three ways: plain writes for nodes this pack owns alone, atomics for shared nodes and ghosts</td><td>has it</td></tr>
+        <tr><td>The mesh&rarr;lexicographic permutation folded into the gather and scatter indices rather than applied as a pass</td><td>has it</td></tr>
+        <tr><td>The whole element contraction as one inlined primitive call rather than an expression tree</td><td>has it &mdash; the tensor-product contraction</td></tr>
+        <tr><td><b>The material constant specialised out at compile time</b>: <code>template &lt;typename s_t, typename g_t, bool UnitKappa&gt;</code>, with <code>metric_factor = UnitKappa ? s_t(1) : kappa</code></td><td><b>does not have it</b> &mdash; <code>kappa</code> is a runtime <code>const s_t</code></td></tr>
+      </table>
+
+      <p><b>The one that is missing is the ideal kernel form to aim at, and it generalises past Laplace.</b> A uniform material parameter whose common value is the identity &mdash; unit conductivity, unit density, a unit scaling &mdash; costs a multiply per element per component at run time and nothing at all if the kernel is instantiated for it. The specialised generator carried it as a second template parameter and dispatched on the value once, outside the element loop.</p>
+
+      <p>The framework already has the machinery to decide this: <code>plans/loperand.py</code> pattern-matches element-varying parameters into the isolated matrix, and <code>plans/geometry_variants.py</code> decides the cached metric. <b>Which uniform parameters are worth a compile-time instantiation is the same kind of question and belongs beside them</b> &mdash; not in a conjunction on a prefix string. What is not yet measured is what it buys, and that is what this entry waits on: the old kernels are in history immediately before this removal, and the comparison is a <code>UnitKappa</code> instantiation of the current packed apply against the runtime one, on Grace, at 72 threads, both layouts.</p>
+
+      <div class="op-facts"><span><i>lines removed</i> 630</span><span><i>decision branches removed</i> 6</span><span><i>generated tree</i> byte-identical</span><span><i>properties already in the general path</i> 5 of 6</span><span><i>missing</i> compile-time specialisation of a unit material constant</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 25</div>

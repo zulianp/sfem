@@ -241,8 +241,15 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     """
 
     #: file -> literal pragmas remaining.  Lower these; never raise them.
+    #: 15 -> 9 in the residual emitter when the three Laplacian special cases
+    #: went: each carried its own `#pragma omp parallel` and `#pragma omp for`,
+    #: written out rather than asked of the target, because each was a
+    #: hand-shaped kernel rather than something the emitters build.  Removing a
+    #: path that bypassed the target binding is the cheapest way to improve this
+    #: budget, and the least informative -- the six that left were never going
+    #: to be ported, they were going to be deleted.
     BUDGET = {
-        "residual_codegen.py": 15,
+        "residual_codegen.py": 9,
         "energy_codegen.py": 9,
     }
 
