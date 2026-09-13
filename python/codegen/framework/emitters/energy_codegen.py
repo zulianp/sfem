@@ -26,6 +26,12 @@ from codegen.framework.plans.affine_element_kernel import (
     p1_simplex_metric_apply_plan,
 )
 from codegen.framework.plans.geometry_variants import geometry_variant_plan
+from codegen.framework.emitters.kernel_diagnostics_record import (
+    STRUCT_NAME,
+    DiagnosticsRecord,
+    diagnostics_accessor_lines,
+    diagnostics_record_lines,
+)
 from codegen.framework.emitters.runtime_typed_abi import (
     cast_arguments,
     runtime_typed_entry_point_lines,
@@ -8879,69 +8885,46 @@ def _sfem_soa_diagnostics_lines(
         "namespace sfem {",
         "namespace codegen {",
         "",
-        "static const %s %s = {" % (struct_name, variable_name),
-        '  "%s",' % public_name,
-        '  "%s",' % element_type,
-        "  %d," % dim,
-        "  %d," % n_qp,
-        "  %d," % n_nodes,
-        "  %d," % vector_size,
-        "  %d," % quadrature_order,
-        "  %d," % cost.adds,
-        "  %d," % cost.muls,
-        "  %d," % cost.divs,
-        "  %d," % cost.sqrts,
-        "  %d," % cost.pows,
-        "  %d," % cost.exps,
-        "  %d," % cost.logs,
-        "  %d," % cost.trigs,
-        "  %d," % cost.loads,
-        "  %d," % cost.stores,
-        "  %d," % cost.flops,
-        "  %d," % affine_extra_flops,
-        "  %d," % isoparametric_extra_flops,
-        "  %d," % cost.temporaries,
-        "  %d," % cost.estimated_registers,
-        "  %d," % geometry_streams,
-        "  %d," % reference_scalars,
-        "  %d," % quadrature_weight_scalars,
-        "  2,",
-        "  %d," % u_streams,
-        "  %d," % h_streams,
-        "  %d," % output_streams,
-        "  %d," % output_reads,
-        "  %d," % output_writes,
-        "  1.0,",
-        "  1.0,",
-        "  8.0,",
-        "  12.0,",
-        "  16.0,",
-        "  20.0,",
-        "  20.0,",
-        "  24.0,",
-        "  1.0,",
-        "  1.0",
-        "};",
-        "",
-        "} // namespace codegen",
-        "} // namespace sfem",
-        "",
-        # The record is the only thing a caller cannot compute for itself.
-        # `KernelDiagnostics_arithmetic_intensity` and the three
-        # `KernelDiagnostics_print_rate*` helpers take that record and are
-        # already in `kernel_diagnostics.hpp`, so a per-kernel wrapper around
-        # each of them published a name for a call the caller can spell.  There
-        # were 1136 print-rate wrappers and 264 intensity wrappers in the tree
-        # and nothing outside the generator referenced any of them.
-        'extern "C" const sfem::codegen::%s *%s_diagnostics(void) {' % (struct_name, public_name),
-        "  return &sfem::codegen::%s;" % variable_name,
-        "}",
     ]
+    lines.extend(
+        diagnostics_record_lines(
+            DiagnosticsRecord(
+                public_name=public_name,
+                element_type=element_type,
+                dim=dim,
+                n_qp=n_qp,
+                n_shape=n_nodes,
+                vector_size=vector_size,
+                quadrature_order=quadrature_order,
+                cost=cost,
+                affine_mesh_flops_per_element=affine_extra_flops,
+                isoparametric_mesh_flops_per_element=isoparametric_extra_flops,
+                geometry_streams=geometry_streams,
+                reference_scalars=reference_scalars,
+                quadrature_weight_scalars=quadrature_weight_scalars,
+                material_scalars=2,
+                u_streams=u_streams,
+                h_streams=h_streams,
+                output_streams=output_streams,
+                output_reads_per_element=output_reads,
+                output_writes_per_element=output_writes,
+            )
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    lines.extend(diagnostics_accessor_lines(public_name))
     return lines
 
 
 def _sfem_soa_diagnostics_struct_name():
-    return "KernelDiagnostics"
+    return STRUCT_NAME
 
 
 def _validate_sfem_soa_quadrature_rule(quadrature_rule, dim, n_nodes, n_qp, array_inputs):

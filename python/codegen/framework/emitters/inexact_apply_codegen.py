@@ -36,6 +36,11 @@ import functools
 import sympy as sp
 
 from codegen.framework.emitters.cprinter import _sfem_ccode
+from codegen.framework.emitters.kernel_diagnostics_record import (
+    DiagnosticsRecord,
+    diagnostics_accessor_lines,
+    diagnostics_record_lines,
+)
 from codegen.framework.emitters.kernel_prologue import kernel_constant
 from codegen.framework.emitters.runtime_typed_abi import (
     cast_arguments,
@@ -69,6 +74,11 @@ from codegen.framework.ir.kernel_ast import (
     iteration_range,
     iterator,
     pre_increment,
+)
+from codegen.framework.plans.flops import (
+    expression_cost,
+    inexact_apply_element_flops,
+    inexact_tangent_element_flops,
 )
 from codegen.framework.plans.evaluation_strategy import (
     EvaluationStrategy,
@@ -206,8 +216,12 @@ def _inexact_apply_kernel_source(
     ]
     stages = action_stages(plan, tangent_symbols, increment, output)
     action_body = []
+    action_body_expressions = []
     for stage in stages:
         action_body.extend(_assignment_lines(stage.assignments, stage.name))
+        action_body_expressions.extend(
+            expression for _symbol, expression in stage.assignments
+        )
 
     parameters = tuple(str(name) for name in parameter_names)
     prefix = "%s_%s" % (material_name, str(element_type).lower())
@@ -248,10 +262,17 @@ def _inexact_apply_kernel_source(
     # before it -- and which the library build does not.
     operator_lines = [
         '#include "../../op/sfem_%s_c_abi.hpp"' % op_name,
+        '#include "kernel_diagnostics.hpp"',
         "",
         '#include "%s_inexact_apply_inline.hpp"' % prefix,
         "",
     ]
+    operator_lines.extend(
+        _diagnostics_lines(
+            prefix, plan, rule, dim, n_nodes, len(parameters), integrand,
+            action_body_expressions, bool(used_state),
+        )
+    )
     operator_lines.extend(
         _c_abi_lines(
             prefix, dim, n_nodes, component, parameters, used_previous,
@@ -272,6 +293,110 @@ def _inexact_apply_kernel_source(
 _KERNEL_BY_APPLICABILITY = {
     True: lambda plan, *arguments: _inexact_apply_kernel_source(plan, *arguments),
     False: lambda plan, *arguments: None,
+}
+
+
+def _diagnostics_lines(
+    prefix, plan, rule, dim, n_nodes, n_parameters, integrand,
+    action_expressions, reads_state,
+):
+    """One `KernelDiagnostics` record per published kernel.
+
+    The goal asks for a FLOP and arithmetic-intensity function on every kernel
+    "so performance reports are generated rather than written".  This family
+    published none, so the roofline that motivated the variant had to be
+    assembled by hand against numbers nobody could check.
+
+    The record's shape and its field order are
+    `emitters/kernel_diagnostics_record`; the costs are `plans/flops`.  Nothing
+    is counted here.
+    """
+    n_qp = int(getattr(rule, "n_qp", 1) or 1)
+    tangent_flops = inexact_tangent_element_flops(
+        plan.element_type, dim, n_qp, n_nodes, dim, rule, integrand,
+        plan.tangent_components, reads_state,
+    )
+    stored_flops = inexact_apply_element_flops(action_expressions)
+    # The compressed apply scales the outputs rather than the forty-five stored
+    # components: the action is linear in `Sbar`, so it is the same number
+    # arrived at with fewer multiplies.
+    compressed_flops = inexact_apply_element_flops(
+        action_expressions, output_scale_flops=dim * n_nodes
+    )
+
+    lines = ["namespace sfem {", "namespace codegen {", ""]
+    accessors = []
+    for suffix, flops, points, u_streams, output_streams in (
+        ("tangent", tangent_flops, n_qp, dim * n_nodes if reads_state else 0, 0),
+        ("stored", stored_flops, 0, 0, dim * n_nodes),
+        ("compressed", compressed_flops, 0, 0, dim * n_nodes),
+    ):
+        name = "%s_inexact_apply_%s_a_msoa" % (prefix, suffix)
+        lines.extend(
+            diagnostics_record_lines(
+                DiagnosticsRecord(
+                    public_name=name,
+                    element_type=str(rule.element_type),
+                    dim=dim,
+                    n_qp=points,
+                    n_shape=n_nodes,
+                    vector_size=_ABI_VECTOR_SIZE,
+                    quadrature_order=int(getattr(rule, "order", 0) or 0),
+                    cost=_DIAGNOSTIC_COST[suffix](integrand, action_expressions),
+                    affine_mesh_flops_per_element=flops.affine_mesh_flops_per_element,
+                    isoparametric_mesh_flops_per_element=(
+                        flops.isoparametric_mesh_flops_per_element
+                    ),
+                    # The store is the kernel's own geometry: the tangent writes
+                    # it and both applies read it instead of an adjugate.
+                    geometry_streams=_DIAGNOSTIC_GEOMETRY[suffix](dim),
+                    reference_scalars=0,
+                    quadrature_weight_scalars=points,
+                    material_scalars=_DIAGNOSTIC_MATERIAL[suffix](n_parameters),
+                    u_streams=u_streams,
+                    h_streams=output_streams,
+                    output_streams=output_streams,
+                    output_reads_per_element=output_streams,
+                    output_writes_per_element=output_streams,
+                )
+            )
+        )
+        lines.append("")
+        accessors.extend(diagnostics_accessor_lines(name))
+    lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
+    lines.extend(accessors)
+    lines.append("")
+    return lines
+
+
+#: What each kernel's per-operation counts are taken from.  The tangent's are
+#: the integrand it evaluates at every point; both applies' are the contraction
+#: they perform once.
+#: The tangent evaluates its integrand at every point, so its counts are
+#: per-point and the record's `n_qp` multiplies them.  An apply has no points:
+#: its counts are the element's, and they are reported beside an `n_qp` of zero
+#: so that `n_qp * flops_per_qp + mesh_flops` still totals the kernel.
+_DIAGNOSTIC_COST = {
+    "tangent": lambda integrand, action: expression_cost(integrand),
+    "stored": lambda integrand, action: expression_cost(action),
+    "compressed": lambda integrand, action: expression_cost(action),
+}
+
+#: The material constants each kernel is handed.  The applies take none: the
+#: material has been evaluated away into the store, which is the whole point.
+_DIAGNOSTIC_MATERIAL = {
+    "tangent": lambda n_parameters: n_parameters,
+    "stored": lambda n_parameters: 0,
+    "compressed": lambda n_parameters: 0,
+}
+
+#: How many element-indexed streams each kernel is handed.  The tangent takes
+#: the adjugate and the determinant; the applies take the stored tangent
+#: instead, which is what makes them cheap to feed.
+_DIAGNOSTIC_GEOMETRY = {
+    "tangent": lambda dim: dim * dim + 1,
+    "stored": lambda dim: 0,
+    "compressed": lambda dim: 0,
 }
 
 
