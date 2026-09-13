@@ -93,9 +93,12 @@ for MU in 0.05 0.02 0.01; do
     # N=1 aborts in the mesh generator, which is how this job first failed.
     for NL in "2:4" "4:4" "4:8"; do
         NN=${NL%%:*}; LV=${NL##*:}
+        # A dense LU is affordable at 7,060 dofs and refused above 20,000, so the smallest
+        # mesh removes the linear solver entirely and the larger two use Vanka.
+        if [ "$NN" = 2 ]; then PC="SFEM_PRECOND=direct"; else PC="SFEM_PRECOND=vanka"; fi
         for HO in 0 1; do
             run_one "re${RE}_n${NN}l${LV}_ho${HO}" SFEM_MU=$MU SFEM_N=$NN \
-                SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=$HO SFEM_CONV_LIMITER=1
+                SFEM_ELEMENT_REFINE_LEVEL=$LV $PC SFEM_CONV_HO=$HO SFEM_CONV_LIMITER=1
         done
     done
     echo
