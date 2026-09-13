@@ -223,6 +223,25 @@ def form_contraction(form):
     )
 
 
+def publishes_objective_steps(form):
+    """Whether this form has a stepped objective kernel at all.
+
+    Stepping evaluates the energy at several points along a line, so it exists
+    only for a 0-form -- there is nothing to step in a gradient or a Hessian
+    action -- and only for one carrying a weak form, because the stepping is
+    done on the density before it is contracted.
+
+    Both halves are already this layer's words: the body shape and the
+    contraction.  The emitter asked `writes_per_shape(form) or form.weak_form is
+    None` and returned an empty list, which is the same statement made where
+    `plans/form_emission` cannot see it.
+    """
+    return (
+        form_accumulation(form) is FormAccumulation.SCALAR
+        and form_contraction(form) is FormContraction.DEFERRED_FLUX
+    )
+
+
 class FormReduction(Enum):
     """Where a 0-form's reduction to one scalar happens.
 
