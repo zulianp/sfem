@@ -3225,6 +3225,16 @@ int main(int argc, char **argv) {
     //       p = p there, with the viscous traction still from the interior state: a port
     //       held at a pressure.
     //
+    //       A continuation on the prescribed value exists and is OFF by default, because
+    //       measurement says it is not needed: with any working preconditioner the cases
+    //       that used to fail here converge without it, and it costs about 8 percent in
+    //       linear iterations. SFEM_P_STAGES=<n> turns the ramp on with n steps, in lockstep
+    //       with the Reynolds ramp; SFEM_P_PREDICT=1 additionally shifts the whole pressure
+    //       field by the change in the prescribed value, which for a velocity-driven case
+    //       with a single port is an exact predictor. Reach for them when a port case really
+    //       does resist -- two ports at different pressures would be the honest candidate --
+    //       not as a substitute for a preconditioner that can solve the problem.
+    //
     // The sideset must already exist on the mesh under that name. Both need
     // SFEM_BOUNDARY_MASK=1, and the operator refuses rather than proceeding without it.
     op->traction_sideset = want_traction_sideset;
@@ -3251,6 +3261,12 @@ int main(int argc, char **argv) {
     const ptrdiff_t     ndof   = nnodes * N_FIELDS;
     std::vector<real_t> p_exact;
     ptrdiff_t           pin_node = 0;  // pressure pin, needed again by the MMS diagnostics
+    // The pressure level the initial state already carries ON THE PORT. A prescribed pressure
+    // is a level, and the state has one of its own: the seed is the case's analytic pressure,
+    // whose value at the port is whatever drop the flow produces by itself (-0.16 for the
+    // 4x1x1 Poiseuille channel). The distance between the two is what makes a port case hard,
+    // not the prescribed value, so it has to be measured rather than assumed to be zero.
+    real_t p_seed_port = 0;
     double mesh_coord_checksum = 0;
     std::shared_ptr<sfem::DirichletConditions> dirichlet;
 
@@ -3457,6 +3473,26 @@ int main(int argc, char **argv) {
                 uz_nodes.push_back((idx_t)i);
                 uz_vals.push_back(uz);
             }
+        }
+
+        // The seed's level at the port, averaged over the port's nodes. Measured here because
+        // this is where p_exact exists and where the mesh is already in its final (possibly
+        // semi-structured, already renumbered) form -- the same place the step case takes its
+        // skin nodeset, so the machinery is known to work on both paths.
+        if (!want_pressure_sideset.empty()) {
+            auto named = mesh->sidesets(want_pressure_sideset);
+            if (!named.empty() && named.front()) {
+                auto ns = smesh::create_nodeset_from_sideset(mesh, named.front());
+                if (ns && ns->size() > 0) {
+                    real_t sum = 0;
+                    for (ptrdiff_t k = 0; k < ns->size(); ++k)
+                        sum += p_exact[(size_t)ns->data()[k]];
+                    p_seed_port = sum / (real_t)ns->size();
+                }
+            }
+            std::printf("prescribed pressure: seed level at '%s' = %g, target = %g\n",
+                        want_pressure_sideset.c_str(), (double)p_seed_port,
+                        (double)op->pressure_value);
         }
 
         real_t pux, puy, puz, pp;
@@ -3743,6 +3779,87 @@ int main(int argc, char **argv) {
         for (size_t k = 0; k < rho_schedule.size(); ++k)
             std::printf(" %g", (double)(rho_schedule[k] * U * Ly / std::max(mu, real_t(1e-30))));
         std::printf("\n");
+    }
+
+    // Continuation on the PRESCRIBED PRESSURE, alongside the one on Reynolds.
+    //
+    // The Reynolds ramp cannot help a pressure-driven case, and the failures say so plainly:
+    // the port sweep fails in the FIRST stage, at Re = 1, on a nearly-Stokes problem. It ramps
+    // rho to control Re = rho U Ly / mu, but when the flow is driven by a prescribed pressure
+    // the velocity is set by dp/mu and not by U, so "Re = 1" is a label on a scale that is not
+    // the one governing the difficulty. Nothing ramped the quantity that does.
+    //
+    // Measured, the failures are monotone in the imposed pressure and in nothing else:
+    //
+    //   p_bar   -0.16  -0.08   0    0.16   0.5   1.0   1.5   3.0
+    //   solves    y      y     y     y      y     n     n     n
+    //
+    // with p_exact_outlet = -0.16, the pressure drop the flow produces on its own. So a case
+    // fails in order of how far the imposed value sits from the one the flow would choose, and
+    // p=3.0 is about nineteen times it. Ramping the boundary condition is what Nalu and FUN3D
+    // do for exactly this, alongside under-relaxation and pseudo-transient marching.
+    //
+    // NOT a vector parallel to the Reynolds schedule, a COUNTER -- and that is the whole
+    // design, because the parallel vector was wrong. rho_schedule is rebuilt in place: a
+    // converged stage erases its tail and re-plans from the state just solved, and a failed
+    // one inserts an entry. A second vector indexed by the same `stage` silently stops
+    // meaning what its index says the moment either happens. Measured, p_bar = -3 ran its
+    // five stages, ended reporting AT TARGET, and left the pressure at -2.25: the erase
+    // shortened rho_schedule to five while p_schedule still held seven, so the last stage
+    // read the ramp's fourth entry instead of its last. The run looked converged and the
+    // answer was the wrong boundary condition.
+    //
+    // The counter cannot desynchronise because it is not indexed by anything. It holds how
+    // many increments are still owed, and each stage takes one of them from the level the
+    // last converged stage reached.
+    //
+    // TWO KNOBS, because there are two mechanisms and they must be separable. SFEM_P_STAGES
+    // sets the number of ramp steps and 0 turns the ramp off; SFEM_P_PREDICT turns off the
+    // level predictor below. Both off is the behaviour before any of this existed, which is
+    // the only honest control for an A/B -- with the predictor on, SFEM_P_STAGES=0 is already
+    // a large change, because the single step it leaves still carries the shift.
+    const real_t p_target  = op->pressure_value;
+    const bool   p_on      = !op->pressure_sideset.empty();
+    // DEFAULT OFF, both of them, and the measurement is why.
+    //
+    // The failures this was built for were a PRECONDITIONER failure wearing a boundary
+    // condition's clothes. At 33,124 dof on Grace, semi-structured, all FGMRES:
+    //
+    //   stack                          p_bar=-0.16   1.0     3.0    10.0    lin_it (p=3)
+    //   FGMRES + multigrid                  pass    pass    pass    pass         227
+    //   FGMRES + Vanka, no multigrid        pass    pass    pass    pass        2500
+    //   FGMRES + block-Jacobi, no MG        FAIL    FAIL    FAIL    FAIL   9000 (cap)
+    //
+    // The first column is the zero-severity control: p_exact(outlet), the level the flow
+    // produces on its own, where the port asks for nothing unusual. Block-Jacobi fails
+    // THERE. So the prescribed pressure was never the variable, and the monotone-looking
+    // sweep that made it look like one was recording where block-Jacobi happened to give up.
+    //
+    // Wherever the preconditioner works the continuation is pure cost: with multigrid
+    // 227 -> 245 linear iterations at p_bar = 3, with Vanka 2500 -> 2707. It is kept because
+    // it is correct, tested, and the one configuration that would genuinely need it -- two
+    // ports at different pressures, where the level is not a gauge and the predictor is not
+    // exact -- does not exist in this spike yet. Turning it on is then a deliberate act.
+    const bool   p_predict = smesh::Env::read<int>("SFEM_P_PREDICT", 0) != 0;
+    // The level of the last CONVERGED state, the level the state vector currently carries,
+    // and how many ramp increments are still owed. The first two start at the seed's own
+    // level, which the seed satisfies by construction.
+    real_t       p_solved      = p_seed_port;
+    real_t       p_state_level = p_seed_port;
+    int          p_ramp_left   = 0;
+    if (p_on) {
+        const int want = smesh::Env::read<int>("SFEM_P_STAGES", 0);
+        // Nothing to ramp toward a value the flow already produces: p_exact is the natural
+        // drop, so a p_bar near it is not a hard case and a ramp would only cost stages.
+        if (want > 0 && p_target != p_seed_port) {
+            p_ramp_left = want;
+            std::printf("pressure continuation: %d stages, p_bar =", want);
+            for (int k = 0; k < want; ++k)
+                std::printf(" %g", (double)(p_seed_port + (p_target - p_seed_port) *
+                                                                  (real_t)(k + 1) / (real_t)want));
+            std::printf(" (from the seed's %g, target %g)\n", (double)p_seed_port,
+                        (double)p_target);
+        }
     }
     // SFEM_FD_CHECK: is the Jacobian action actually the derivative of the residual?
     //
@@ -4091,6 +4208,34 @@ int main(int argc, char **argv) {
 
     for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
     const real_t rho_use = rho_schedule[stage];
+    // The stage's share of the prescribed pressure: one of the increments still owed,
+    // measured from the last converged level. With none owed this is the target itself, so
+    // every case without a port and every stage past the ramp takes the same path.
+    real_t p_stage = p_target;
+    if (p_on) {
+        p_stage = p_solved + (p_target - p_solved) / (real_t)std::max(p_ramp_left, 1);
+        // Shift the whole pressure field with the boundary condition -- the continuation's
+        // predictor, and for this class of problem an EXACT one.
+        //
+        // A prescribed pressure enters the momentum flux on the port face in place of the
+        // interior pressure, and every other boundary here fixes the velocity. Adding a
+        // constant to p and to p_bar together therefore changes nothing: each control volume
+        // is closed, so the constant's contribution sums to zero over its faces, port face
+        // included. Measured on the 4x1x1 channel, p_bar in {-0.16, 0, 0.16, 0.5} gives
+        // u_linf at round-off in all four and p_linf exactly |p_bar + 0.16| -- the velocity
+        // does not move and the pressure moves rigidly.
+        //
+        // So the state for the next stage is the state from this one plus the level
+        // difference, and without this the ramp does almost nothing: the state keeps whatever
+        // level it converged to and every stage re-discovers the shift through a Newton solve
+        // that starts O(dp) away from its own answer.
+        const real_t dp = p_predict ? p_stage - p_state_level : real_t(0);
+        if (dp != real_t(0)) {
+            for (ptrdiff_t i = 0; i < nnodes; ++i) x[(size_t)i * N_FIELDS + 3] += dp;
+            p_state_level = p_stage;
+        }
+        op->set_pressure_value(p_stage);
+    }
     // The manufactured forcing is a function of rho, so it must track the continuation. The
     // exact solution does not move -- u and p depend only on mu -- which is precisely why
     // the error measured at the final stage is still against the right reference.
@@ -4310,7 +4455,17 @@ int main(int argc, char **argv) {
         // Reproducible, and 22x faster on the same 10 Newton steps. A model of the same
         // effect -- redrawing the preconditioner with relative noise on every application --
         // gives BiCGStab a spread and leaves FGMRES exactly invariant up to 1e-10 noise.
-        const bool use_fgmres = smesh::Env::read<int>("SFEM_FGMRES", gmg ? 1 : 0) != 0;
+        // Default 1, unconditionally. It used to be `gmg ? 1 : 0`, which made BiCGStab the
+        // default for every run without multigrid -- and the numbers just above say BiCGStab
+        // is not a working default anywhere near this operator. The consequence was not
+        // hypothetical: a study of when a prescribed-pressure boundary makes the solver fail
+        // was run without naming a Krylov method, so it measured BiCGStab's breakdown and
+        // said nothing about the operator it was supposed to be about.
+        //
+        // A default is a claim about what to use when nobody has thought about it, so it has
+        // to be the thing that works. SFEM_FGMRES=0 still selects BiCGStab for anyone who
+        // wants to reproduce or measure it.
+        const bool use_fgmres = smesh::Env::read<int>("SFEM_FGMRES", 1) != 0;
 
         std::shared_ptr<sfem::FGMRES<real_t>>    fsolver;
         std::shared_ptr<sfem::BiCGStab<real_t>>  bsolver;
@@ -4837,6 +4992,11 @@ int main(int argc, char **argv) {
     (void)diverged;
     ++stages_run;
     if (converged) rho_solved = std::max(rho_solved, rho_use);
+    // One increment spent, and the level it reached is the one the next stage steps from.
+    if (converged && p_on) {
+        p_solved = p_stage;
+        if (p_ramp_left > 0) --p_ramp_left;
+    }
     if (converged && re_adapt && rho_solved > real_t(0) &&
         rho_solved < rho * (real_t(1) - real_t(1e-12))) {
         // The stage converged, so widen the step -- but re-plan from the state just solved,
@@ -4852,13 +5012,38 @@ int main(int argc, char **argv) {
         while (r * step_f < rho) { r *= step_f; rho_schedule.push_back(r); }
         rho_schedule.push_back(rho);
     }
+    // The pressure ramp must not be cut short by the Reynolds loop running out of stages.
+    // It piggybacks on that loop, so with the schedule at its last entry and increments still
+    // owed the loop simply ends -- and the run then reports a converged solution to a boundary
+    // condition nobody asked for. Measured at p_bar = 10: a retry doubled the four increments
+    // to eight, the five Reynolds stages spent five of them, and the run stopped at 6.19.
+    // Extending at the final rho costs one cheap stage per remaining increment; the count is
+    // bounded because it only doubles on a retry and the retry budget is finite.
+    if (converged && p_on && p_ramp_left > 0 && stage + 1 >= rho_schedule.size())
+        rho_schedule.push_back(rho_use);
     if (!converged) {
         // Roll back and halve the step in log space rather than giving up. The stage that
         // failed is retried from the last state known to be good, via an intermediate Re.
-        if ((stage > 0 || rho_solved > real_t(0) || have_guess) && re_retries < re_retry) {
+        // A first stage that fails used to be terminal: with no solved stage behind it there
+        // was nothing to roll back to. A prescribed pressure gives it one -- the seed's own
+        // level, which the state satisfies by construction -- so stage 0 can bisect the
+        // pressure even though it cannot bisect the Reynolds number.
+        const bool can_bisect_p = p_on && p_ramp_left > 0 && p_stage != p_solved;
+        if ((stage > 0 || rho_solved > real_t(0) || have_guess || can_bisect_p) &&
+            re_retries < re_retry) {
             std::copy(x_stage_start.begin(), x_stage_start.end(), x);
+            // A pressure-only retry keeps the Reynolds number where it is. The adaptive rule
+            // below shrinks the Re step and stops when it collapses, which at stage 0 it
+            // immediately does -- there is no solved Re behind the first stage to step from,
+            // so `next` lands on rho_use and the collapse test fires. That is correct for a
+            // Reynolds failure and wrong for a pressure one: the parameter that has room to
+            // move is the prescribed pressure, so the inserted stage repeats this stage's rho
+            // and only the pressure bisects.
+            const bool p_only_retry = stage == 0 && rho_solved <= real_t(0) && !have_guess;
             real_t next;
-            if (re_adapt) {
+            if (p_only_retry) {
+                next = rho_use;
+            } else if (re_adapt) {
                 // Shrink the increment towards 1 and re-step from the last solved state.
                 // The old rule bisected between the previous schedule entry and the failure,
                 // which converges on the ceiling from above and spends a stage per probe;
@@ -4882,10 +5067,21 @@ int main(int argc, char **argv) {
                 next = std::sqrt(rho_schedule[stage - 1] * rho_use);
             }
             rho_schedule.insert(rho_schedule.begin() + (ptrdiff_t)stage, next);
+            // The pressure step halves with it, or the inserted stage would retry exactly the
+            // pressure that just failed at a slightly smaller Reynolds number. Doubling what
+            // is owed halves the next increment, because each stage takes (target - solved)
+            // divided by the count.
+            if (p_on && p_ramp_left > 0 && p_ramp_left < 1024) p_ramp_left *= 2;
             ++re_retries;
-            std::printf("  stage failed; retrying via Re = %g (step x%.3f, retry %d/%d)\n",
-                        (double)(next * U * Ly / std::max(mu, real_t(1e-30))),
-                        (double)step_f, re_retries, re_retry);
+            if (p_only_retry)
+                std::printf("  stage failed; retrying via p_bar = %g (retry %d/%d)\n",
+                            (double)(p_solved + (p_target - p_solved) /
+                                                        (real_t)std::max(p_ramp_left, 1)),
+                            re_retries, re_retry);
+            else
+                std::printf("  stage failed; retrying via Re = %g (step x%.3f, retry %d/%d)\n",
+                            (double)(next * U * Ly / std::max(mu, real_t(1e-30))),
+                            (double)step_f, re_retries, re_retry);
             --stage;  // the for-increment lands back on the inserted stage
             continue;
         }
@@ -5018,6 +5214,17 @@ int main(int argc, char **argv) {
                     (double)re_solved, (double)Re_phys,
                     at_target ? "(AT TARGET)" : "(SHORT OF TARGET)");
         if (!at_target) converged = false;
+    }
+    // The same question for the other continuation parameter, and for the same reason: a ramp
+    // that stops short leaves a solution to a DIFFERENT boundary condition, and every error
+    // norm below is computed against the one that was asked for. This is the check that the
+    // schedule-desynchronisation bug would have failed -- it reported AT TARGET at p = -2.25
+    // of a requested -3, and nothing else in the output said so.
+    if (p_on && std::fabs(p_solved - p_target) >
+                        real_t(1e-9) * std::max(std::fabs(p_target), real_t(1))) {
+        std::printf("continuation: prescribed pressure SOLVED = %g of %g target"
+                    "  (SHORT OF TARGET)\n", (double)p_solved, (double)p_target);
+        converged = false;
     }
     std::printf("newton_converged: %d  newton_it: %d (last stage)  newton_total: %d over %d stage(s)  "
                 "lin_it_total: %d\n",

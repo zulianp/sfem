@@ -1049,6 +1049,21 @@ namespace sfem {
         }
     }
 
+    // The prescribed pressure, after initialize().
+    //
+    // pressure_value is copied into the mesh data's bc_p when the operator is initialized and
+    // the kernels read bc_p from then on, so assigning to pressure_value afterwards changes
+    // nothing -- which is exactly what a first attempt at pressure continuation did, and the
+    // giveaway was a ramp that printed its schedule while producing byte-identical results.
+    // Continuation on this boundary condition has to go through here.
+    void CVFEMNavierStokes::set_pressure_value(const real_t p) {
+        pressure_value = p;
+        if (impl_->semi_structured)
+            impl_->ss.bc_p = (scalar_t)p;
+        else
+            impl_->d.bc_p = (scalar_t)p;
+    }
+
     void CVFEMNavierStokes::set_velocity_history(const real_t *prev, const real_t *prev2) {
         const ptrdiff_t n = impl_->semi_structured ? impl_->ss.nnodes : impl_->d.nnodes;
         auto assign = [&](auto &dst_prev, auto &dst_prev2) {
