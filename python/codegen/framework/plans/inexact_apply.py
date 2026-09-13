@@ -667,7 +667,7 @@ def projected_tangent(
     is_deformation_gradient,
     previous_state=None,
 ):
-    """`Sbar` packed, as expressions in the adjugate, determinant and state.
+    """`Sbar`'s integrand at one quadrature point, and that point's gradient symbols.
 
     This is the projection itself, and it lives here rather than in the
     emitter because two kernels need the same answer: the fused apply, which
@@ -693,7 +693,6 @@ def projected_tangent(
     which the kernel is exact there.
     """
     dim, n_nodes = plan.dim, plan.n_nodes
-    gradients = reference_gradients_by_point(rule, n_nodes, dim)
     inverse = adjugate / determinant
 
     variables = list(flux_form.gradient)
@@ -707,48 +706,71 @@ def projected_tangent(
     shift = {True: sp.Integer(1), False: sp.Integer(0)}[bool(is_deformation_gradient)]
 
     previous = tuple(flux_form.previous_gradient)
-    weights = tuple(sp.nsimplify(weight) for weight in rule.weights)
-    measure = sum(weights, sp.Integer(0))
-    packed = [sp.Integer(0)] * plan.tangent_components
 
-    def physical(nodal, point, c, axis):
+    # The integrand at *one* quadrature point, in symbols for that point's
+    # reference gradients.  It used to be the sum over the points, formed here
+    # by substituting each point's gradients and adding -- which inlines the
+    # whole tangent once per point, and for a HEX8 rule that is eight copies of
+    # the largest expression the generator produces.  Measured on the
+    # Kelvin-Voigt viscous tangent that reached 3855 statements in one basic
+    # block and 234.8 s and 4.45 GB of gcc.  The quadrature sum is a loop, the
+    # way it is in every other kernel in this framework, so this returns the
+    # body of that loop and the emitter writes the loop around it.
+    gradient_symbols = tuple(
+        tuple(sp.Symbol("gref_%d_%d" % (node, axis)) for axis in range(dim))
+        for node in range(n_nodes)
+    )
+
+    def physical(nodal, c, axis):
         return sum(
             nodal[c][j]
-            * sum(gradients[point][j][m] * inverse[m, axis] for m in range(dim))
+            * sum(gradient_symbols[j][m] * inverse[m, axis] for m in range(dim))
             for j in range(n_nodes)
         )
 
-    for point, weight in enumerate(weights):
-        substitution = {}
-        for c in range(dim):
-            for axis in range(dim):
-                substitution[variables[c * dim + axis]] = shift * int(c == axis) + (
-                    physical(state, point, c, axis)
-                )
-        # The previous state is data, not a variable: it is substituted, never
-        # differentiated against.
-        for c in range(dim):
-            for axis in range(dim):
-                if not previous:
-                    continue
-                substitution[previous[c * dim + axis]] = physical(
-                    previous_state, point, c, axis
-                )
-        seen = set()
-        for i, k, m, n in itertools.product(range(dim), repeat=4):
-            slot = plan.tangent_index(i, k, m, n)
-            if slot in seen:
-                continue
-            seen.add(slot)
-            pulled = (
-                sum(
-                    tangent[(i, j, k, l)] * adjugate[n, j] * adjugate[m, l]
-                    for j, l in itertools.product(range(dim), repeat=2)
-                )
-                / determinant
+    substitution = {}
+    for c in range(dim):
+        for axis in range(dim):
+            substitution[variables[c * dim + axis]] = shift * int(c == axis) + (
+                physical(state, c, axis)
             )
-            packed[slot] += weight * pulled.subs(substitution) / measure
-    return tuple(packed)
+    # The previous state is data, not a variable: it is substituted, never
+    # differentiated against.
+    if previous:
+        for c in range(dim):
+            for axis in range(dim):
+                substitution[previous[c * dim + axis]] = physical(
+                    previous_state, c, axis
+                )
+
+    integrand = [sp.Integer(0)] * plan.tangent_components
+    seen = set()
+    for i, k, m, n in itertools.product(range(dim), repeat=4):
+        slot = plan.tangent_index(i, k, m, n)
+        if slot in seen:
+            continue
+        seen.add(slot)
+        pulled = (
+            sum(
+                tangent[(i, j, k, l)] * adjugate[n, j] * adjugate[m, l]
+                for j, l in itertools.product(range(dim), repeat=2)
+            )
+            / determinant
+        )
+        integrand[slot] = pulled.subs(substitution)
+    return tuple(integrand), gradient_symbols
+
+
+def quadrature_accumulation(rule):
+    """The weight each point contributes to the element average, as literals.
+
+    `Sbar` is the weighted *average* over the element, so each point carries
+    `w / sum(w)`; the division that used to sit inside every summed expression
+    is one number per point here.
+    """
+    weights = tuple(sp.nsimplify(weight) for weight in rule.weights)
+    measure = sum(weights, sp.Integer(0))
+    return tuple(weight / measure for weight in weights)
 
 
 def reference_gradients_by_point(rule, n_nodes, dim):
