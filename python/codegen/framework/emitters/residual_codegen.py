@@ -92,7 +92,10 @@ from codegen.framework.plans.residual_structure import (
     residual_local_phase_plans,
     residual_mesh_phase_plans,
 )
-from codegen.framework.plans.dependencies import live_test_coefficients
+from codegen.framework.plans.dependencies import (
+    contracted_gradient_components,
+    live_test_coefficients,
+)
 from codegen.framework.plans.geometry_quantities import (
     local_geometry_streams,
     mesh_geometry_argument_names,
@@ -3746,12 +3749,15 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
     nodes.append(
         BufferDeclNode("s_t", "value_coeff", ("NC * NQ * VS",))
     )
-    if dependencies.uses_test_gradients:
-        nodes.append(
-            BufferDeclNode(
-                "s_t", "grad_coeff_ref", ("NC * NQ * ND * VS",)
-            )
-        )
+    # One buffer per contracted quantity beyond the value, which is always
+    # staged.  `contracted_test_quantities` is the plan's list; a form that
+    # contracts no test gradient names no reference-gradient buffer because the
+    # sequence does not contain one.
+    nodes.extend(
+        BufferDeclNode("s_t", "grad_coeff_ref", ("NC * NQ * ND * VS",))
+        for quantity in contracted_test_quantities(dependencies)
+        if quantity == "gradient"
+    )
     nodes.append(
         BufferDeclNode(
             "static constexpr int", "NQ1", (), expr_ref("integer_root(NQ, ND)")
@@ -3830,9 +3836,10 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
                 expr_ref("value_coeff_q%d[lane]" % row), expr_ref(value)
             )
         )
-        if not dependencies.uses_test_gradients:
-            continue
-        for k in range(dim):
+        # `contracted_gradient_components` is this question phrased as a range,
+        # in its own words: empty when the form contracts only values, so the
+        # loop simply does not run.
+        for k in contracted_gradient_components(dependencies, dim):
             terms = [
                 "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
                 for d in range(dim)
@@ -3872,25 +3879,12 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         )
     )
 
-    if dependencies.uses_test_gradients:
-        nodes.append(
-            CallNode(
-                "tensor_integrate%s" % suffix,
-                ("ne", "shape_1d", "grad_1d", "value_coeff",
-                 "grad_coeff_ref", "output"),
-                templates,
-                wrap_arguments=True,
-            )
-        )
-    else:
-        nodes.append(
-            CallNode(
-                "tensor_integrate_value%s" % suffix,
-                ("ne", "shape_1d", "value_coeff", "output"),
-                templates,
-                wrap_arguments=True,
-            )
-        )
+    entry_point, arguments = _TENSOR_INTEGRATE_BY_QUANTITIES[
+        contracted_test_quantities(dependencies)
+    ]
+    nodes.append(
+        CallNode(entry_point % suffix, arguments, templates, wrap_arguments=True)
+    )
     return tuple(nodes)
 
 
@@ -5380,6 +5374,30 @@ def _kernel_diagnostics_lines(
         "}",
     ]
     return lines
+
+
+#: Which contraction entry point a tensor-product kernel calls, per the test
+#: quantities it contracts onto.  The one that takes the reference gradients and
+#: the one that does not are different functions, and a kernel that declared the
+#: gradient buffer and called the entry point without it -- or the reverse --
+#: would not compile.  Keying both off one plan answer is what makes that
+#: unrepresentable rather than merely true.
+_TENSOR_INTEGRATE_BY_QUANTITIES = {
+    ("value",): (
+        "tensor_integrate_value%s",
+        ("ne", "shape_1d", "value_coeff", "output"),
+    ),
+    ("value", "gradient"): (
+        "tensor_integrate%s",
+        ("ne", "shape_1d", "grad_1d", "value_coeff", "grad_coeff_ref", "output"),
+    ),
+    # A form with no value coefficient still stages `value_coeff` and still
+    # calls the contraction that reads it; only the gradient half is optional.
+    ("gradient",): (
+        "tensor_integrate%s",
+        ("ne", "shape_1d", "grad_1d", "value_coeff", "grad_coeff_ref", "output"),
+    ),
+}
 
 
 def _mixed_test_value_declaration(axis, field, test, reference_index,
