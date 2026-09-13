@@ -895,20 +895,73 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     //              at a SMOOTH extremum, where the true face value legitimately lies outside
     //              the nodal range; that is the classic Barth-Jespersen weakness and it is
     //              why the unlimited arm is kept and measured beside it.
+    //
+    //              THE CLAIM THAT IT NEEDS NO DIFFERENTIABILITY IS WRONG, and the paragraph
+    //              above records why it looked right: the limiter is indeed absent from the
+    //              Jacobian. But the deferred correction is a LAGGED term, so the Newton
+    //              loop is also a fixed-point iteration on it, and that iteration has to
+    //              settle. The clip is continuous with a derivative that jumps between 0 and
+    //              1 as the active branch flips, so the lagged source can flip with it and
+    //              the iteration chatters instead of converging. Measured on the step case
+    //              at 7,060 dof, Re = 40: first order converges in 14 Newton steps, the same
+    //              cell with this limiter ran 399 Newton steps and 103,441 linear iterations
+    //              without converging. This is the failure Venkatakrishnan describes above
+    //              -- the limiter "does not settle down" and "inhibits convergence to steady
+    //              state" -- and the requirement he states, a differentiable limiter when
+    //              Newton is used, applies to the deferred correction as much as to a fully
+    //              coupled one.
+    // limiter = 2: Venkatakrishnan's smooth form of the same bound, which is what he
+    //              proposes for exactly this reason. Write D- for the increment being
+    //              limited and D+ for the room the bound leaves it -- max(u_i,u_j) - u_i
+    //              when the increment is positive, min(u_i,u_j) - u_i when it is negative --
+    //              and scale the increment by
+    //
+    //                  psi = (D+^2 + 2 D- D+) / (D+^2 + 2 D-^2 + D- D+).
+    //
+    //              psi -> 1 as D- -> 0, so a small increment is not touched; psi -> D+/D- as
+    //              D- grows, so a large one saturates at the same bound the clip enforces;
+    //              psi = 0 when there is no room at all. It is rational in both arguments
+    //              with a strictly positive denominator, so it has no active set to flip.
+    //              The price is Venkatakrishnan's own: at D- = D+, where the clip would pass
+    //              the increment through untouched, psi = 3/4 -- the bound is approached
+    //              smoothly rather than met exactly, so this arm is slightly more diffusive
+    //              than limiter = 1 wherever the reconstruction is near its limit.
+    //
+    //              His epsilon^2 term, which deactivates the limiter outright in near-
+    //              constant regions, is NOT included: it is dimensional in the solution
+    //              variable and there is no velocity scale in this signature to form it
+    //              from. Without it the limiter stays active everywhere, which costs
+    //              accuracy at smooth extrema but cannot reintroduce a switch.
     auto lim = [&](const scalar_t *const u, const scalar_t inc_i, const scalar_t inc_j,
                    scalar_t &oi, scalar_t &oj) {
         oi = inc_i;
         oj = inc_j;
-        if (limiter != 1) return;
+        if (limiter != 1 && limiter != 2) return;
         const scalar_t a = u[i], b = u[j];
         const scalar_t lo = a < b ? a : b;
         const scalar_t hi = a < b ? b : a;
-        scalar_t       fi = a + inc_i;
-        scalar_t       fj = b + inc_j;
-        fi = fi < lo ? lo : (fi > hi ? hi : fi);
-        fj = fj < lo ? lo : (fj > hi ? hi : fj);
-        oi = fi - a;
-        oj = fj - b;
+        if (limiter == 1) {
+            scalar_t fi = a + inc_i;
+            scalar_t fj = b + inc_j;
+            fi = fi < lo ? lo : (fi > hi ? hi : fi);
+            fj = fj < lo ? lo : (fj > hi ? hi : fj);
+            oi = fi - a;
+            oj = fj - b;
+            return;
+        }
+        // The room each node's increment has before it leaves [lo, hi], signed the same way
+        // the increment is, so D+ and D- have the same sign and psi is positive.
+        auto vk = [&](const scalar_t base, const scalar_t inc) {
+            const scalar_t dp  = (inc >= scalar_t(0)) ? (hi - base) : (lo - base);
+            const scalar_t num = dp * dp + scalar_t(2) * inc * dp;
+            const scalar_t den = dp * dp + scalar_t(2) * inc * inc + inc * dp;
+            // den = 0 only when dp and inc are both zero, and then the increment is zero and
+            // the scaling is irrelevant; returning it unchanged is the dp -> 0, inc -> 0
+            // limit of psi = 1.
+            return (den != scalar_t(0)) ? (num / den) * inc : inc;
+        };
+        oi = vk(a, inc_i);
+        oj = vk(b, inc_j);
     };
 
     scalar_t ii, jj;
