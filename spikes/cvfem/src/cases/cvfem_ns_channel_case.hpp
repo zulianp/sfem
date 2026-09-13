@@ -17,7 +17,7 @@
 
 namespace cvfem_case {
 
-    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step, Pump };
+    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step, StepTurb, Pump };
 
     inline bool parse_case(const std::string &name, FlowCase &out) {
         if (name == "poiseuille") {
@@ -38,6 +38,15 @@ namespace cvfem_case {
         }
         if (name == "step" || name == "backward_facing_step" || name == "bfs") {
             out = FlowCase::Step;
+            return true;
+        }
+        // A separate case from `step` rather than a Reynolds number for it. The step is a
+        // verification case: its 1/9 flux oracle, its dense-LU gate and its no-slip span are
+        // what make that verification mean something, and every one of them has to change
+        // here. Sharing the enum would put a turbulent run's spanwise slip and its perturbed
+        // initial state into the case the matrix checks conservation on.
+        if (name == "step_turb" || name == "turbulent_step" || name == "bfs_turb") {
+            out = FlowCase::StepTurb;
             return true;
         }
         if (name == "mms" || name == "manufactured") {
@@ -126,6 +135,39 @@ namespace cvfem_case {
     }
 
 
+    // ------------------------------------------------------- the step inflow profile
+    //
+    // The parabolic-by-parabolic inlet the step is fed, written in terms of the geometry
+    // instead of in terms of the one geometry it used to assume.
+    //
+    // The `step` case spells this inline as 4(2-y)(y-1) z(1-z), which is correct only for
+    // Ly = 2, step_y = 1, Lz = 1 -- the domain that case hard-defaults to. A turbulent run
+    // wants a span several step heights wide, and at Lz = 4 those literals do not give a
+    // profile that is wrong at the edges, they give one that is negative across most of the
+    // span and silently drives flow backwards. Hence the parameters.
+    //
+    // Normalised so the PEAK is U, which is the quantity a Reynolds number is usually quoted
+    // on. The bulk velocity follows from the shape: the mean of 4 s(1-s) over [0,1] is 2/3,
+    // so U_bulk = (4/9) U and the volumetric flux is (4/9) U (Ly - step_y) Lz. Keeping that
+    // relation here, next to the profile, is what lets a mass-balance oracle be derived for
+    // any geometry rather than only for the one whose answer was 1/9.
+    template <typename T>
+    inline T step_inflow_ux(const T y, const T z, const T step_y, const T Ly, const T Lz, const T U) {
+        if (y < step_y || y > Ly || z < T(0) || z > Lz) return T(0);
+        const T sy = (y - step_y) / (Ly - step_y);
+        const T sz = z / Lz;
+        const T fy = T(4) * sy * (T(1) - sy);
+        const T fz = T(4) * sz * (T(1) - sz);
+        return (fy > T(0) && fz > T(0)) ? U * fy * fz : T(0);
+    }
+
+    // The exact volumetric flux of that profile, the oracle a mass balance is checked
+    // against. Mean of 4 s(1-s) is 2/3 in each direction, so (2/3)^2 = 4/9 of the peak.
+    template <typename T>
+    inline T step_inflow_flux(const T step_y, const T Ly, const T Lz, const T U) {
+        return (T(4) / T(9)) * U * (Ly - step_y) * Lz;
+    }
+
     // Fully developed flow between plates at y = 0 and y = Ly. Couette is driven by the
     // lid, Poiseuille by the pressure gradient G = 8 mu U / Ly^2 that produces peak
     // velocity U.
@@ -192,6 +234,17 @@ namespace cvfem_case {
                 ux = T(0);
             }
             p = T(0);
+            return;
+        }
+        if (flow == FlowCase::StepTurb) {
+            // Boundary data, not a solution -- there is none. The inflow itself is set by the
+            // driver through step_inflow_ux, because it needs step_y and Lz and this
+            // signature carries neither; the same split the pump uses for its port geometry.
+            // Returning zero here is what every no-slip face wants, and the verification
+            // block exempts this case from the u_linf gate for the reason the pump is
+            // exempt: there is nothing to compare against.
+            ux = uy = uz = T(0);
+            p            = T(0);
             return;
         }
         if (flow == FlowCase::CavityRegularized) {
