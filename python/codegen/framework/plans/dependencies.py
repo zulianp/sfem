@@ -153,6 +153,30 @@ def contracted_test_quantities(dependencies):
     return tuple(quantities)
 
 
+def staged_test_quantities(dependencies):
+    """Which per-field coefficient buffers a tensor-product body stages.
+
+    Deliberately not the same sequence as `contracted_test_quantities` above.
+    That one says which quantities the form *contracts*, and drops the value
+    when no coefficient multiplies it.  This says which buffers exist, and the
+    value buffer always does: the contraction reads it whether or not a
+    coefficient is live, so a row without one stages a zero rather than the
+    kernel taking a second shape.  `_TENSOR_INTEGRATE_BY_QUANTITIES` in
+    `emitters/residual_codegen.py` already records that from the other side, in
+    a comment beside its `("gradient",)` entry.
+
+    Three sites in that emitter asked `dependencies.uses_test_gradients`
+    instead: the buffer declaration, the assignment inside the quadrature loop,
+    and the contraction call that reads it.  That is one question about what is
+    staged, asked separately by the code that declares the buffer, the code
+    that fills it and the code that consumes it -- three places to disagree
+    about a buffer's existence.
+    """
+    if dependencies.uses_test_gradients:
+        return ("value", "gradient")
+    return ("value",)
+
+
 def residual_codegen_dependencies(system, coefficients, dependencies):
     free_symbols = set()
     for coefficient in coefficients:

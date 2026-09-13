@@ -269,7 +269,23 @@ PLAN_INPUTS = (
 #: listed "a gather is emitted" among the sites re-asking it; `MeshFieldRole`
 #: carries the suffix, so `role.field_pointer(field.name)` is the difference
 #: between the two copies.
-BUDGET = 128
+#:
+#: 128 -> 125: whether the test function's gradient is contracted, asked by the
+#: code that declares the buffer holding it, by the code that fills that buffer
+#: inside the quadrature loop, and by the code that calls the contraction which
+#: reads it.  One fact about what a body stages, and the three sites that have
+#: to agree about a buffer's existence were each deciding it for themselves.
+#:
+#: The middle one needed nothing new: `contracted_gradient_components` is that
+#: question already phrased as a range, and its docstring says it exists so
+#: emission can iterate instead of branching.  The other two read
+#: `plans.dependencies.staged_test_quantities`, which is deliberately *not*
+#: `contracted_test_quantities` beside it -- the value buffer is staged even
+#: when no coefficient multiplies the value, because the contraction reads it
+#: either way and a staged zero is cheaper than a second kernel shape.  The
+#: emitter's own `_TENSOR_INTEGRATE_BY_QUANTITIES` had recorded that in a
+#: comment; now a plan says it, and both tables key on the same sequence.
+BUDGET = 125
 
 
 def _tested_names(test):
