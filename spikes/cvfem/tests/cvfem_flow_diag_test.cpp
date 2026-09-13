@@ -25,6 +25,8 @@
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_sideset.hpp"
+#include "smesh_semistructured.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -44,6 +46,13 @@ static void check_close(const double got, const double want, const double tol, c
     if (!(rel <= tol)) ++g_failures;
 }
 
+// Names the assertion with the arm it came from, so a failure says which mesh it was on.
+static const char *msg(const char *tag, const char *what) {
+    static char buf[128];
+    std::snprintf(buf, sizeof(buf), "%s: %s", tag, what);
+    return buf;
+}
+
 static constexpr int    N_FIELDS = 4;
 static constexpr double LX = 1.0, LY = 1.0, LZ = 1.0;
 static constexpr double RHO = 1.3, MU = 0.07;
@@ -55,8 +64,15 @@ struct Setup {
     std::vector<real_t>                       x, g, vol;
 };
 
-static void build(Setup &s, sfem::Context &ctx, const int n) {
-    s.mesh  = smesh::Mesh::create_hex8_cube(ctx.communicator(), n, n, n, 0, 0, 0, LX, LY, LZ);
+static void build(Setup &s, sfem::Context &ctx, const int n, const int ss_level = 1) {
+    s.mesh = smesh::Mesh::create_hex8_cube(ctx.communicator(), n, n, n, 0, 0, 0, LX, LY, LZ);
+    if (ss_level > 1) {
+        s.mesh = smesh::to_semistructured(ss_level, s.mesh, true, false);
+        if (!s.mesh) {
+            check(false, "to_semistructured built a mesh");
+            return;
+        }
+    }
     auto fs = sfem::FunctionSpace::create(s.mesh, N_FIELDS);
     s.op    = std::make_shared<sfem::CVFEMNavierStokes>(fs);
     s.op->rho  = RHO;
@@ -75,9 +91,19 @@ static void build(Setup &s, sfem::Context &ctx, const int n) {
 // u = (a0 + a1 x + a2 y + a3 z, ...) has a constant gradient the reconstruction reproduces
 // exactly -- tests/cvfem_nodal_grad_test asserts that property for a scalar, and this is the
 // statement that the three-component wrapper did not transpose or misorder anything.
-static void test_linear(sfem::Context &ctx) {
+static void test_linear(sfem::Context &ctx, const int ss_level = 1) {
+    // The whole body is level-agnostic on purpose. A globally linear field has the same
+    // constant gradient whatever the mesh, so the semi-structured arm is the identical
+    // assertion against the identical closed form -- which is what makes it a wiring check
+    // for sscvfem_nodal_grad_strided rather than a second, weaker test.
+    char tag[64];
+    std::snprintf(tag, sizeof(tag), ss_level > 1 ? "linear/ss%d" : "linear", ss_level);
+
     Setup s;
-    build(s, ctx, 6);
+    // Fewer macro elements at level 4 so the node count, and the run time, stay comparable
+    // with the flat arm: 6^3 flat against 2^3 macros of 4^3 micro-cells.
+    build(s, ctx, ss_level > 1 ? 2 : 6, ss_level);
+    if (!s.mesh) return;
     const auto *const px = s.mesh->points()->data()[0];
     const auto *const py = s.mesh->points()->data()[1];
     const auto *const pz = s.mesh->points()->data()[2];
@@ -92,12 +118,12 @@ static void test_linear(sfem::Context &ctx) {
         s.x[(size_t)i * N_FIELDS + 3] = (real_t)0;
     }
     check(s.op->nodal_velocity_gradient(s.x.data(), s.g.data()) == SFEM_SUCCESS,
-          "linear: nodal_velocity_gradient succeeds");
+          msg(tag, "nodal_velocity_gradient succeeds"));
 
     double worst = 0;
     for (ptrdiff_t i = 0; i < s.nnodes; ++i)
         for (int k = 0; k < 9; ++k) worst = std::fmax(worst, std::fabs((double)s.g[(size_t)i * 9 + k] - A[k]));
-    std::printf("%-62s %s  (worst %.3e)\n", "linear: gradient exact at every node and entry",
+    std::printf("%-62s %s  (worst %.3e)\n", msg(tag, "gradient exact at every node and entry"),
                 worst < 1e-11 ? "OK" : "FAIL", worst);
     if (!(worst < 1e-11)) ++g_failures;
 
@@ -107,11 +133,11 @@ static void test_linear(sfem::Context &ctx) {
     const double SS  = s00 * s00 + s11 * s11 + s22 * s22 + 2 * (s01 * s01 + s02 * s02 + s12 * s12);
     const double V   = LX * LY * LZ;
     const auto   st  = cvfem_diag::contract(s.nnodes, s.x.data(), s.g.data(), s.vol.data(), RHO, MU, 0.0);
-    check_close(st.eps_visc, 2 * MU * SS * V, 1e-10, "linear: dissipation is 2 mu S:S times the volume");
-    check_close(st.div_inf, std::fabs(A[0] + A[4] + A[8]), 1e-10, "linear: divergence is the trace");
+    check_close(st.eps_visc, 2 * MU * SS * V, 1e-10, msg(tag, "dissipation is 2 mu S:S times the volume"));
+    check_close(st.div_inf, std::fabs(A[0] + A[4] + A[8]), 1e-10, msg(tag, "divergence is the trace"));
 
     const double wx = A[7] - A[5], wy = A[2] - A[6], wz = A[3] - A[1];
-    check_close(st.omega_max, std::sqrt(wx * wx + wy * wy + wz * wz), 1e-10, "linear: vorticity is curl u");
+    check_close(st.omega_max, std::sqrt(wx * wx + wy * wy + wz * wz), 1e-10, msg(tag, "vorticity is curl u"));
 }
 
 // ---------------------------------------------------------------- 2. CFL
@@ -188,11 +214,66 @@ static void test_trig(sfem::Context &ctx) {
     }
 }
 
+// ------------------------------------------------- 4. the weighted boundary flux, both paths
+//
+// The energy budget's P_in and P_out are sideset_flux_weighted with w = |u|^2/2 + p/rho, and
+// that call used to be refused on a semi-structured mesh. It is the one term of the budget
+// that is an integral over a surface rather than a sum over nodes, so it is the one that can
+// disagree between the two paths without anything else noticing.
+//
+// Checked two ways on the same cube. First the UNWEIGHTED flux against a closed form: with a
+// uniform u = (U,0,0) the flux through the x = LX face is exactly rho U Ly Lz, whatever the
+// mesh. Then the weighted flux against w times that, using a CONSTANT weight -- which makes
+// the expected value exact, so a disagreement is the weighting and not the field.
+static void test_sideset_flux(sfem::Context &ctx, const int ss_level) {
+    char tag[64];
+    std::snprintf(tag, sizeof(tag), ss_level > 1 ? "flux/ss%d" : "flux/flat", ss_level);
+
+    Setup s;
+    build(s, ctx, ss_level > 1 ? 2 : 6, ss_level);
+    if (!s.mesh) return;
+
+    // The outlet plane has to exist as a named sideset before the operator is initialized,
+    // the same order the driver uses.
+    const double U = 1.7, P = 0.3, W = 2.9;
+    for (ptrdiff_t i = 0; i < s.nnodes; ++i) {
+        s.x[(size_t)i * N_FIELDS + 0] = (real_t)U;
+        s.x[(size_t)i * N_FIELDS + 1] = 0;
+        s.x[(size_t)i * N_FIELDS + 2] = 0;
+        s.x[(size_t)i * N_FIELDS + 3] = (real_t)P;
+    }
+
+    auto outs = smesh::Sideset::create_from_plane(s.mesh, 1, 0, 0, (smesh::geom_t)LX, 1e-6);
+    if (outs.empty() || !outs.front()) {
+        check(false, msg(tag, "outlet sideset built"));
+        return;
+    }
+    s.mesh->add_sideset("outlet", outs.front());
+
+    real_t q = 0;
+    const int rc = s.op->sideset_mass_flux(s.x.data(), "outlet", q);
+    check(rc == SFEM_SUCCESS, msg(tag, "unweighted flux succeeds"));
+    if (rc == SFEM_SUCCESS) check_close((double)q, RHO * U * LY * LZ, 1e-12, msg(tag, "flux is rho U Ly Lz"));
+
+    std::vector<real_t> w((size_t)s.nnodes, (real_t)W);
+    real_t              qw = 0;
+    const int           rw = s.op->sideset_flux_weighted(s.x.data(), "outlet", w.data(), qw);
+    check(rw == SFEM_SUCCESS, msg(tag, "weighted flux succeeds"));
+    if (rw == SFEM_SUCCESS)
+        check_close((double)qw, W * RHO * U * LY * LZ, 1e-12, msg(tag, "constant weight scales the flux"));
+}
+
 int main(int argc, char **argv) {
     sfem::Context ctx(argc, argv);
     test_linear(ctx);
+    // The semi-structured arm. The budget it feeds has to work where the solver is run, and
+    // FGMRES preconditioned by multigrid needs a micro-element lattice, so a diagnostic that
+    // only worked flat would report on a configuration nobody uses.
+    test_linear(ctx, 4);
     test_cfl(ctx);
     test_trig(ctx);
+    test_sideset_flux(ctx, 1);
+    test_sideset_flux(ctx, 4);
     std::printf("\n%s\n", g_failures ? "FAILED" : "PASSED");
     return g_failures ? 1 : 0;
 }
