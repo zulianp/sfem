@@ -183,7 +183,29 @@ fi
 
 # ---- the boundary conditions, judged against each other and against a closed form ----
 if want bc; then
-    run bc dirichlet "" -- SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=$(lvl_n 12) $LEVEL_ENV \
+    # An EXACT linear solve, and pinned flat at N=8 to afford one.
+    #
+    # This case asks whether a Dirichlet outlet reproduces the exact Poiseuille solution. That
+    # is a claim about the boundary condition and the discretisation, so the linear solver
+    # should not be in it at all -- the same reason step and pump use a dense LU. It named no
+    # preconditioner before and therefore inherited point block-Jacobi on a flat mesh, which
+    # cannot solve this system: measured, the linear residual sat at rel 0.9998 for 1000
+    # iterations a step, 40 steps, 40,000 iterations, 45 s, and the run did not converge.
+    #
+    # N=6 rather than 12 because SFEM_PRECOND=direct builds a DENSE matrix and factors it
+    # afresh every Newton step, and that cost is cubic. 12 cells per unit length is 33,124
+    # dofs, which the driver refuses outright (SFEM_DIRECT_MAX_DOF=20000); 8 is 10,692 and
+    # measured 116 s per run on 72 Grace cores, which put this matrix over the debug
+    # partition's 28-minute wall and got it killed mid-pump with no manifest written; 6 is
+    # 4,900 and costs a few seconds. Resolution is not what this case tests, and the
+    # exactness claim survives the reduction intact -- u_linf 5.8e-13 at N=6 against
+    # 4.5e-14 at N=8, both twelve orders below the flow scale.
+    # Level 1 explicitly, not $LEVEL_ENV: a semi-structured mesh carries float32 node
+    # coordinates and caps the achievable error near 1e-7, which would blunt an exactness
+    # claim that currently reads 4.5e-14.
+    run bc dirichlet "" -- SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille \
+        SFEM_N=6 SFEM_ELEMENT_REFINE_LEVEL=1 \
+        SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=direct \
         SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet
     # This one does not converge -- the do-nothing outflow is not the exact Poiseuille
     # outlet -- so it is capped rather than left to grind out 5 continuation stages of 40
@@ -197,12 +219,72 @@ if want bc; then
 fi
 
 # ---- a port holds the level, and nothing else ----
+#
+# TWO SOLVER STACKS, WITH AND WITHOUT MULTIGRID, because a group that exercises one of them
+# certifies one of them. Both are configurations the spike runs and both belong here.
+#
+# This group used to run a single stack, and not by choice -- it named no Krylov method and
+# no preconditioner, so it inherited BiCGStab and point block-Jacobi on a flat mesh. That is
+# the weakest combination the driver can produce, and it is why this group has carried
+# failures at p_bar >= 1.0 that were read, for a long time, as the prescribed pressure being
+# hard. It is not. Measured at this same 33,124 dof on Grace:
+#
+#   stack                          p_bar=-0.16   1.0     3.0     10.0     lin_it (p=3)
+#   FGMRES + multigrid                  pass    pass    pass    pass          227
+#   FGMRES + Vanka, no multigrid        pass    pass    pass    pass         2500
+#   FGMRES + block-Jacobi, no MG        FAIL    FAIL    FAIL    FAIL         9000 (cap)
+#
+# The first column is the zero-severity control -- p_exact(outlet), the level the flow
+# produces on its own, where the boundary condition asks for nothing unusual. Block-Jacobi
+# fails THERE, which is the whole finding: the prescribed pressure was never the variable.
+#
+# Semi-structured because `vanka` needs a micro-element lattice; on a flat mesh the driver's
+# only preconditioners are bjacobi and direct, so "flat without multigrid" cannot be anything
+# but the crippled arm. PORT_LEVEL keeps the dof count at the 33,124 these cases have always
+# used, so the numbers stay comparable with every earlier report.
 if want port; then
-    for pb in $PORT_SWEEP; do
-        run port "p$pb" "p_exact_outlet=$P_EXACT_OUTLET" -- SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U \
-            SFEM_CASE=poiseuille SFEM_N=$(lvl_n 12) $LEVEL_ENV \
-            SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet \
-            SFEM_PRESSURE_SIDESET=outlet SFEM_PRESSURE=$pb
+    PORT_LEVEL=${PORT_LEVEL:-4}
+    if [ $(( 12 % PORT_LEVEL )) -ne 0 ]; then
+        echo "verify_report: PORT_LEVEL=$PORT_LEVEL must divide 12" >&2; exit 1
+    fi
+    PORT_N=$(( 12 / PORT_LEVEL ))
+    # THREE arms, and they answer two different questions that must not share a threshold.
+    #
+    #   direct  flat, dense LU. The linear solver is removed rather than exercised, so this
+    #           arm carries the EXACTNESS claim: the shift is p_bar - p_exact(outlet) to
+    #           round-off, and it is judged at 1e-6 relative.
+    #   mg      FGMRES + geometric multigrid, semi-structured.
+    #   vanka   FGMRES + Vanka, no multigrid, semi-structured.
+    #
+    # The last two carry the SOLVER claim -- that the production stacks, with and without
+    # multigrid, handle a prescribed pressure across the sweep. They are judged more loosely
+    # because they cannot do better: a semi-structured mesh stores node coordinates in
+    # float32, which differ from the flat mesh's by about 6e-08 and cap the relative error on
+    # the shift near 2e-06. Holding them to the flat arm's 1e-6 would be scoring them on the
+    # mesh's storage format rather than on the boundary condition.
+    for arm in direct mg vanka; do
+        case $arm in
+            # N=6 for the same reason bc dirichlet uses it: the dense factor is rebuilt
+            # every Newton step and the cost is cubic. At N=8 this arm alone measured
+            # 8 x 116 s and took the whole matrix past the debug wall.
+            direct) ARM_ENV="SFEM_GMG=0 SFEM_PRECOND=direct"
+                    ARM_MESH="SFEM_N=6 SFEM_ELEMENT_REFINE_LEVEL=1" ;;
+            mg)     ARM_ENV="SFEM_GMG=1"
+                    ARM_MESH="SFEM_N=$PORT_N SFEM_ELEMENT_REFINE_LEVEL=$PORT_LEVEL" ;;
+            # omega 1.0, not the driver's 0.35 default: measured on the standalone smoother
+            # probe, Vanka at omega=1 is the convergent setting (0.8279) and the damped one
+            # is slower for no benefit.
+            vanka)  ARM_ENV="SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"
+                    ARM_MESH="SFEM_N=$PORT_N SFEM_ELEMENT_REFINE_LEVEL=$PORT_LEVEL" ;;
+        esac
+        for pb in $PORT_SWEEP; do
+            run port "${arm}_p$pb" "p_exact_outlet=$P_EXACT_OUTLET,stack=$arm" -- \
+                SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U \
+                SFEM_CASE=poiseuille $ARM_MESH \
+                SFEM_FGMRES=1 $ARM_ENV \
+                SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet \
+                SFEM_PRESSURE_SIDESET=outlet SFEM_PRESSURE=$pb
+        done
     done
 fi
 

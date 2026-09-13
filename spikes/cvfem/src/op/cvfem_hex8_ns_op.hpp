@@ -158,6 +158,8 @@ namespace sfem {
         // back to BDF1, which is the correct start-up for the first step of a run.
         // Passing null for prev clears the history and switches the term off.
         void set_time_step(const real_t dt, const int bdf_order);
+        // Updates the LIVE prescribed pressure, not just the field initialize() reads.
+        void set_pressure_value(const real_t p);
         void set_velocity_history(const real_t *prev, const real_t *prev2);
 
         // Control volume per node -- the CVFEM lumped mass. Exposed because the driver
