@@ -1,6 +1,155 @@
 #include "../../op/sfem_GeneratedLinearElasticity_c_abi.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #include "linear_elasticity_tri3_inexact_apply_inline.hpp"
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics linear_elasticity_tri3_inexact_apply_tangent_a_msoa_diagnostics_data = {
+  "linear_elasticity_tri3_inexact_apply_tangent_a_msoa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  16,
+  38,
+  10,
+  0,
+  8,
+  0,
+  0,
+  0,
+  0,
+  0,
+  142,
+  20,
+  20,
+  0,
+  0,
+  5,
+  0,
+  1,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics linear_elasticity_tri3_inexact_apply_stored_a_msoa_diagnostics_data = {
+  "linear_elasticity_tri3_inexact_apply_stored_a_msoa",
+  "TRI3",
+  2,
+  0,
+  3,
+  16,
+  1,
+  18,
+  36,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  54,
+  54,
+  54,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  6,
+  6,
+  6,
+  6,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics linear_elasticity_tri3_inexact_apply_compressed_a_msoa_diagnostics_data = {
+  "linear_elasticity_tri3_inexact_apply_compressed_a_msoa",
+  "TRI3",
+  2,
+  0,
+  3,
+  16,
+  1,
+  18,
+  36,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  54,
+  60,
+  60,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  6,
+  6,
+  6,
+  6,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tri3_inexact_apply_tangent_a_msoa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tri3_inexact_apply_tangent_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tri3_inexact_apply_stored_a_msoa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tri3_inexact_apply_stored_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tri3_inexact_apply_compressed_a_msoa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tri3_inexact_apply_compressed_a_msoa_diagnostics_data;
+}
 
 extern "C" int linear_elasticity_tri3_inexact_apply_tangent_a_msoa(
     const int scalar_bytes,

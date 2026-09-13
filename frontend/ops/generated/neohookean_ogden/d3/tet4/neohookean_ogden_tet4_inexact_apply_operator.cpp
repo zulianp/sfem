@@ -1,6 +1,155 @@
 #include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #include "neohookean_ogden_tet4_inexact_apply_inline.hpp"
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics neohookean_ogden_tet4_inexact_apply_tangent_a_msoa_diagnostics_data = {
+  "neohookean_ogden_tet4_inexact_apply_tangent_a_msoa",
+  "TET4",
+  3,
+  1,
+  4,
+  16,
+  1,
+  30366,
+  35262,
+  369,
+  0,
+  1323,
+  0,
+  567,
+  0,
+  0,
+  0,
+  81243,
+  217,
+  217,
+  0,
+  0,
+  10,
+  0,
+  1,
+  2,
+  12,
+  0,
+  0,
+  0,
+  0,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics neohookean_ogden_tet4_inexact_apply_stored_a_msoa_diagnostics_data = {
+  "neohookean_ogden_tet4_inexact_apply_stored_a_msoa",
+  "TET4",
+  3,
+  0,
+  4,
+  16,
+  1,
+  87,
+  126,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  213,
+  213,
+  213,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  12,
+  12,
+  12,
+  12,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics neohookean_ogden_tet4_inexact_apply_compressed_a_msoa_diagnostics_data = {
+  "neohookean_ogden_tet4_inexact_apply_compressed_a_msoa",
+  "TET4",
+  3,
+  0,
+  4,
+  16,
+  1,
+  87,
+  126,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  213,
+  225,
+  225,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  12,
+  12,
+  12,
+  12,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tet4_inexact_apply_tangent_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_tet4_inexact_apply_tangent_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tet4_inexact_apply_stored_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_tet4_inexact_apply_stored_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tet4_inexact_apply_compressed_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_tet4_inexact_apply_compressed_a_msoa_diagnostics_data;
+}
 
 extern "C" int neohookean_ogden_tet4_inexact_apply_tangent_a_msoa(
     const int scalar_bytes,

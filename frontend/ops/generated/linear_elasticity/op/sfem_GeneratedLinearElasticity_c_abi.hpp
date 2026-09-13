@@ -616,6 +616,12 @@ extern "C" int linear_elasticity_inexact_apply_compressed_3d_a_msoa(
         void *const RSTR outz
 );
 
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_compressed_a_2d_msoa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_compressed_a_3d_msoa_diagnostics(
+    const smesh::ElemType element_type);
+
 extern "C" int linear_elasticity_inexact_apply_stored_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -647,6 +653,12 @@ extern "C" int linear_elasticity_inexact_apply_stored_3d_a_msoa(
         void *const RSTR outy,
         void *const RSTR outz
 );
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_stored_a_2d_msoa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_stored_a_3d_msoa_diagnostics(
+    const smesh::ElemType element_type);
 
 extern "C" int linear_elasticity_inexact_apply_stored_packed_two_pass_3d_a_msoa(
         const smesh::ElemType element_type,
@@ -711,6 +723,12 @@ extern "C" int linear_elasticity_inexact_apply_tangent_3d_a_msoa(
         const ptrdiff_t tangent_component_stride,
         metric_tensor_t *const RSTR tangent
 );
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_tangent_a_2d_msoa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_tangent_a_3d_msoa_diagnostics(
+    const smesh::ElemType element_type);
 
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_objective_2d_soa_diagnostics(
     const smesh::ElemType element_type);

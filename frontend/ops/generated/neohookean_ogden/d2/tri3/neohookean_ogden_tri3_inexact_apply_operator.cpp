@@ -1,6 +1,155 @@
 #include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #include "neohookean_ogden_tri3_inexact_apply_inline.hpp"
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics neohookean_ogden_tri3_inexact_apply_tangent_a_msoa_diagnostics_data = {
+  "neohookean_ogden_tri3_inexact_apply_tangent_a_msoa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  720,
+  732,
+  26,
+  0,
+  156,
+  0,
+  44,
+  0,
+  0,
+  0,
+  2696,
+  61,
+  61,
+  0,
+  0,
+  5,
+  0,
+  1,
+  2,
+  6,
+  0,
+  0,
+  0,
+  0,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics neohookean_ogden_tri3_inexact_apply_stored_a_msoa_diagnostics_data = {
+  "neohookean_ogden_tri3_inexact_apply_stored_a_msoa",
+  "TRI3",
+  2,
+  0,
+  3,
+  16,
+  1,
+  18,
+  36,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  54,
+  54,
+  54,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  6,
+  6,
+  6,
+  6,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics neohookean_ogden_tri3_inexact_apply_compressed_a_msoa_diagnostics_data = {
+  "neohookean_ogden_tri3_inexact_apply_compressed_a_msoa",
+  "TRI3",
+  2,
+  0,
+  3,
+  16,
+  1,
+  18,
+  36,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  54,
+  60,
+  60,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  6,
+  6,
+  6,
+  6,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tri3_inexact_apply_tangent_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_tri3_inexact_apply_tangent_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tri3_inexact_apply_stored_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_tri3_inexact_apply_stored_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tri3_inexact_apply_compressed_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_tri3_inexact_apply_compressed_a_msoa_diagnostics_data;
+}
 
 extern "C" int neohookean_ogden_tri3_inexact_apply_tangent_a_msoa(
     const int scalar_bytes,

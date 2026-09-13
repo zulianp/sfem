@@ -1,6 +1,155 @@
 #include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #include "neohookean_ogden_hex8_inexact_apply_inline.hpp"
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics neohookean_ogden_hex8_inexact_apply_tangent_a_msoa_diagnostics_data = {
+  "neohookean_ogden_hex8_inexact_apply_tangent_a_msoa",
+  "HEX8",
+  3,
+  8,
+  8,
+  16,
+  2,
+  30366,
+  35262,
+  369,
+  0,
+  1323,
+  0,
+  567,
+  0,
+  0,
+  0,
+  81243,
+  1928,
+  1928,
+  0,
+  0,
+  10,
+  0,
+  8,
+  2,
+  24,
+  0,
+  0,
+  0,
+  0,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics neohookean_ogden_hex8_inexact_apply_stored_a_msoa_diagnostics_data = {
+  "neohookean_ogden_hex8_inexact_apply_stored_a_msoa",
+  "HEX8",
+  3,
+  0,
+  8,
+  16,
+  2,
+  2136,
+  2376,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  4512,
+  4512,
+  4512,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  24,
+  24,
+  24,
+  24,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics neohookean_ogden_hex8_inexact_apply_compressed_a_msoa_diagnostics_data = {
+  "neohookean_ogden_hex8_inexact_apply_compressed_a_msoa",
+  "HEX8",
+  3,
+  0,
+  8,
+  16,
+  2,
+  2136,
+  2376,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  4512,
+  4536,
+  4536,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  24,
+  24,
+  24,
+  24,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_hex8_inexact_apply_tangent_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_hex8_inexact_apply_tangent_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_hex8_inexact_apply_stored_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_hex8_inexact_apply_stored_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *neohookean_ogden_hex8_inexact_apply_compressed_a_msoa_diagnostics(void) {
+  return &sfem::codegen::neohookean_ogden_hex8_inexact_apply_compressed_a_msoa_diagnostics_data;
+}
 
 extern "C" int neohookean_ogden_hex8_inexact_apply_tangent_a_msoa(
     const int scalar_bytes,

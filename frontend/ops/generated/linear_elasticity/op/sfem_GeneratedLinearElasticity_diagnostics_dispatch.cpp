@@ -19,6 +19,21 @@ extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_hex8_gradie
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_proteus_hex8_gradient_soa_diagnostics(void);
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_gradient_soa_diagnostics(void);
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet4_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_quad4_inexact_apply_compressed_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tri3_inexact_apply_compressed_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_hex8_inexact_apply_compressed_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_inexact_apply_compressed_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet4_inexact_apply_compressed_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_quad4_inexact_apply_stored_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tri3_inexact_apply_stored_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_hex8_inexact_apply_stored_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_inexact_apply_stored_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet4_inexact_apply_stored_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_quad4_inexact_apply_tangent_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tri3_inexact_apply_tangent_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_hex8_inexact_apply_tangent_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_inexact_apply_tangent_a_msoa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet4_inexact_apply_tangent_a_msoa_diagnostics(void);
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_proteus_quad4_objective_soa_diagnostics(void);
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_quad4_objective_soa_diagnostics(void);
 extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tri3_objective_soa_diagnostics(void);
@@ -87,6 +102,90 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" const sfem::codegen::KernelDiagnostics *lin
       return linear_elasticity_tet4_gradient_soa_diagnostics();
     default:
       std::fprintf(stderr, "linear_elasticity_gradient_3d_soa_diagnostics does not support element type %d\n", (int)element_type);
+      return nullptr;
+  }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_compressed_a_2d_msoa_diagnostics(
+    const smesh::ElemType element_type) {
+  switch (element_type) {
+    case smesh::QUAD4:
+      return linear_elasticity_quad4_inexact_apply_compressed_a_msoa_diagnostics();
+    case smesh::TRI3:
+      return linear_elasticity_tri3_inexact_apply_compressed_a_msoa_diagnostics();
+    default:
+      std::fprintf(stderr, "linear_elasticity_inexact_apply_compressed_a_2d_msoa_diagnostics does not support element type %d\n", (int)element_type);
+      return nullptr;
+  }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_compressed_a_3d_msoa_diagnostics(
+    const smesh::ElemType element_type) {
+  switch (element_type) {
+    case smesh::HEX8:
+      return linear_elasticity_hex8_inexact_apply_compressed_a_msoa_diagnostics();
+    case smesh::TET10:
+      return linear_elasticity_tet10_inexact_apply_compressed_a_msoa_diagnostics();
+    case smesh::TET4:
+      return linear_elasticity_tet4_inexact_apply_compressed_a_msoa_diagnostics();
+    default:
+      std::fprintf(stderr, "linear_elasticity_inexact_apply_compressed_a_3d_msoa_diagnostics does not support element type %d\n", (int)element_type);
+      return nullptr;
+  }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_stored_a_2d_msoa_diagnostics(
+    const smesh::ElemType element_type) {
+  switch (element_type) {
+    case smesh::QUAD4:
+      return linear_elasticity_quad4_inexact_apply_stored_a_msoa_diagnostics();
+    case smesh::TRI3:
+      return linear_elasticity_tri3_inexact_apply_stored_a_msoa_diagnostics();
+    default:
+      std::fprintf(stderr, "linear_elasticity_inexact_apply_stored_a_2d_msoa_diagnostics does not support element type %d\n", (int)element_type);
+      return nullptr;
+  }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_stored_a_3d_msoa_diagnostics(
+    const smesh::ElemType element_type) {
+  switch (element_type) {
+    case smesh::HEX8:
+      return linear_elasticity_hex8_inexact_apply_stored_a_msoa_diagnostics();
+    case smesh::TET10:
+      return linear_elasticity_tet10_inexact_apply_stored_a_msoa_diagnostics();
+    case smesh::TET4:
+      return linear_elasticity_tet4_inexact_apply_stored_a_msoa_diagnostics();
+    default:
+      std::fprintf(stderr, "linear_elasticity_inexact_apply_stored_a_3d_msoa_diagnostics does not support element type %d\n", (int)element_type);
+      return nullptr;
+  }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_tangent_a_2d_msoa_diagnostics(
+    const smesh::ElemType element_type) {
+  switch (element_type) {
+    case smesh::QUAD4:
+      return linear_elasticity_quad4_inexact_apply_tangent_a_msoa_diagnostics();
+    case smesh::TRI3:
+      return linear_elasticity_tri3_inexact_apply_tangent_a_msoa_diagnostics();
+    default:
+      std::fprintf(stderr, "linear_elasticity_inexact_apply_tangent_a_2d_msoa_diagnostics does not support element type %d\n", (int)element_type);
+      return nullptr;
+  }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_inexact_apply_tangent_a_3d_msoa_diagnostics(
+    const smesh::ElemType element_type) {
+  switch (element_type) {
+    case smesh::HEX8:
+      return linear_elasticity_hex8_inexact_apply_tangent_a_msoa_diagnostics();
+    case smesh::TET10:
+      return linear_elasticity_tet10_inexact_apply_tangent_a_msoa_diagnostics();
+    case smesh::TET4:
+      return linear_elasticity_tet4_inexact_apply_tangent_a_msoa_diagnostics();
+    default:
+      std::fprintf(stderr, "linear_elasticity_inexact_apply_tangent_a_3d_msoa_diagnostics does not support element type %d\n", (int)element_type);
       return nullptr;
   }
 }

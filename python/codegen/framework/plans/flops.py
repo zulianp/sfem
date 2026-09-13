@@ -61,11 +61,12 @@ from codegen.framework.plans.evaluation_strategy import (
 from codegen.framework.plans.scheduling import ExpressionCost, _op_counts
 
 
-def expression_flops(expressions):
-    """The weighted operation count of a list of sympy expressions.
+def expression_cost(expressions):
+    """The per-operation counts of a list of sympy expressions.
 
-    The same weights ``ExpressionCost.flops`` applies, so a count taken from an
-    expression list and one taken from an expression graph are on one scale.
+    The record rather than the weighted total, because a diagnostics record
+    carries both: `KernelDiagnostics` publishes the divides and the square roots
+    beside the flop count so a reader can see which of them the number is.
     """
     totals = [0] * 8
     for expression in expressions:
@@ -81,7 +82,16 @@ def expression_flops(expressions):
         exps=exps,
         logs=logs,
         trigs=trigs,
-    ).flops
+    )
+
+
+def expression_flops(expressions):
+    """The weighted operation count of a list of sympy expressions.
+
+    The same weights ``ExpressionCost.flops`` applies, so a count taken from an
+    expression list and one taken from an expression graph are on one scale.
+    """
+    return expression_cost(expressions).flops
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +331,78 @@ def isoparametric_geometry_flops(dim, n_qp, n_shape, quadrature_rule, strategy):
     return int(dim) * _stage_gradient_flops(
         strategy, dim, n_qp, n_shape, quadrature_rule
     ) + int(n_qp) * adjugate_and_determinant_flops_per_qp(dim)
+
+
+def inexact_tangent_element_flops(
+    element_type,
+    dim,
+    n_qp,
+    n_shape,
+    n_field_components,
+    quadrature_rule,
+    integrand,
+    tangent_components,
+    reads_state,
+):
+    """`Sbar`'s cost per element: gradients, the material tangent, the average.
+
+    The same composition ``local_element_flops`` writes, with the second half
+    absent: there is no flux to map back to the reference frame and no
+    contraction onto test functions, because the output *is* the projected
+    tangent.  What replaces them is the average -- a multiply and an add per
+    stored component per point.
+
+    A state-independent material brings no field onto the points at all, which
+    is why ``reads_state`` gates the gradient stages rather than being assumed.
+    The count is exact in the material term: the integrand is the expression
+    list the kernel emits.
+    """
+    strategy = evaluation_strategy(element_type)
+    n_qp = int(n_qp)
+    material_per_qp = expression_flops(integrand)
+    total = n_qp * material_per_qp
+    if reads_state:
+        total += int(n_field_components) * _stage_gradient_flops(
+            strategy, dim, n_qp, n_shape, quadrature_rule
+        )
+        total += n_qp * physical_gradient_transform_flops_per_qp(dim)
+    total += n_qp * 2 * int(tangent_components)
+    # Affine only: `Op::inexact_update` assembles from the cached affine
+    # geometry and refuses a domain without one, so there is no isoparametric
+    # kernel for this family and no per-point geometry to build.
+    return ElementFlopsPlan(
+        n_qp=n_qp,
+        material_flops_per_qp=material_per_qp,
+        affine_flops_per_element=total,
+        isoparametric_flops_per_element=total,
+        affine_is_exact=True,
+    )
+
+
+def inexact_apply_element_flops(action_expressions, output_scale_flops=0):
+    """One apply's cost per element, counted from the expressions it emits.
+
+    There is no quadrature loop here at all -- that is the whole point of the
+    variant -- so the element total is the contraction itself, exactly the way
+    ``closed_form_element_flops`` counts a closed-form simplex body.  The
+    compressed apply adds one multiply per output, which is the scale it
+    applies to the outputs rather than to the forty-five stored components.
+    """
+    contraction = expression_flops(action_expressions)
+    total = contraction + int(output_scale_flops)
+    # ``n_qp`` is zero and the whole cost is the per-element term, because that
+    # is what this kernel is: there are no quadrature points to have a per-point
+    # cost at.  Reporting it as ``1 * total`` instead would say the element has
+    # one point whose geometry is free, which is how
+    # ``test_no_kernel_in_the_tree_claims_its_geometry_is_free`` reads a model
+    # that has stopped describing its kernel.
+    return ElementFlopsPlan(
+        n_qp=0,
+        material_flops_per_qp=0,
+        affine_flops_per_element=total,
+        isoparametric_flops_per_element=total,
+        affine_is_exact=True,
+    )
 
 
 def element_flops_plan(

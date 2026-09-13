@@ -1,6 +1,155 @@
 #include "../../op/sfem_GeneratedLinearElasticity_c_abi.hpp"
+#include "../../../kernel_diagnostics.hpp"
 
 #include "linear_elasticity_tet10_inexact_apply_inline.hpp"
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics linear_elasticity_tet10_inexact_apply_tangent_a_msoa_diagnostics_data = {
+  "linear_elasticity_tet10_inexact_apply_tangent_a_msoa",
+  "TET10",
+  3,
+  11,
+  10,
+  16,
+  4,
+  81,
+  207,
+  45,
+  0,
+  27,
+  0,
+  0,
+  0,
+  0,
+  0,
+  675,
+  990,
+  990,
+  0,
+  0,
+  10,
+  0,
+  11,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics linear_elasticity_tet10_inexact_apply_stored_a_msoa_diagnostics_data = {
+  "linear_elasticity_tet10_inexact_apply_stored_a_msoa",
+  "TET10",
+  3,
+  0,
+  10,
+  16,
+  4,
+  762,
+  900,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1662,
+  1662,
+  1662,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  30,
+  30,
+  30,
+  30,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+static const KernelDiagnostics linear_elasticity_tet10_inexact_apply_compressed_a_msoa_diagnostics_data = {
+  "linear_elasticity_tet10_inexact_apply_compressed_a_msoa",
+  "TET10",
+  3,
+  0,
+  10,
+  16,
+  4,
+  762,
+  900,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1662,
+  1692,
+  1692,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  30,
+  30,
+  30,
+  30,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_inexact_apply_tangent_a_msoa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tet10_inexact_apply_tangent_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_inexact_apply_stored_a_msoa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tet10_inexact_apply_stored_a_msoa_diagnostics_data;
+}
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_inexact_apply_compressed_a_msoa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tet10_inexact_apply_compressed_a_msoa_diagnostics_data;
+}
 
 extern "C" int linear_elasticity_tet10_inexact_apply_tangent_a_msoa(
     const int scalar_bytes,
