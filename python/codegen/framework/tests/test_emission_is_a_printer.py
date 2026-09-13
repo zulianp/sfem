@@ -159,7 +159,20 @@ PLAN_INPUTS = (
 #: into the quadrature buffer whether or not it has a value coefficient, so a
 #: row without one writes a zero rather than writing nothing.  That is a table
 #: of two terms, not an empty sequence, and the difference is real.
-BUDGET = 160
+#:
+#: 160 -> 157, and none of it needed a new plan function.  `plans/dependencies`
+#: already had `contracted_gradient_components` -- "the same question
+#: `uses_test_gradients` answers, phrased as a range so that emission can
+#: iterate it instead of branching on it" -- and `contracted_test_quantities`
+#: beside it.  Three sites in `residual_codegen.py` were still asking the
+#: boolean: the reference-gradient buffer, the per-point contraction, and which
+#: of the two `tensor_integrate` entry points the kernel calls.
+#:
+#: The third is why they belong together.  A kernel that declared the gradient
+#: buffer and called the entry point that does not take it, or the reverse,
+#: would not compile -- but nothing said the two were one decision.  Both read
+#: the same plan answer now.
+BUDGET = 157
 
 
 def _tested_names(test):
