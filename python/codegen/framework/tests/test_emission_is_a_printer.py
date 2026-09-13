@@ -250,7 +250,26 @@ PLAN_INPUTS = (
 #: matrix-free apply, and a residual scatters once per Newton step while an
 #: objective scatters nothing, so neither has the cost packing exists to remove.
 #: A sequence, for the reason `packed_mesh_layouts` beside it is one.
-BUDGET = 132
+#:
+#: 132 -> 128: the packed matrix-assembly kernel's two state roles.
+#:
+#: Two of the four were not a decision about anything.  The packed call built
+#: its argument list by finding each state argument's position and assigning the
+#: *same value* back over it -- `args[args.index(x)] = x`, three times, guarded
+#: by the two role flags -- so the whole search-and-replace left the list as
+#: `list(call_args)` found it.  Only the output argument was actually
+#: substituted.  Presumably the packed kernel once took differently named
+#: arguments and the names later converged; what was left behind was the shell
+#: of a substitution that no longer substitutes.
+#:
+#: The other two are the pack gather, which wrote the same eleven-line block
+#: twice -- once for `pk_current` reading `u` through `current_stride`, once for
+#: `pk_previous` reading `u_old` through `previous_stride`.  `plans/streams`
+#: already names that sequence, and `live_field_roles`' own docstring already
+#: listed "a gather is emitted" among the sites re-asking it; `MeshFieldRole`
+#: carries the suffix, so `role.field_pointer(field.name)` is the difference
+#: between the two copies.
+BUDGET = 128
 
 
 def _tested_names(test):
