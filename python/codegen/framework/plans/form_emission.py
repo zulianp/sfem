@@ -22,6 +22,7 @@ asking -- but it makes the question one the form layer answers, which is the
 precondition for answering it in a table instead.
 """
 
+from dataclasses import dataclass
 from enum import Enum
 
 from codegen.framework.symbolic.forms import FormOrder
@@ -83,6 +84,83 @@ def output_assignment(form):
 def output_is_accumulated(form):
     """Whether the kernel reads its output before writing it."""
     return str(getattr(form, "output_mode", "")) == "accumulate"
+
+
+@dataclass(frozen=True)
+class MeshOutputShape:
+    """What a mesh kernel writes, and how much of it there is per element.
+
+    A 0-form accumulates one value over the element; a 1-form and a 2-form write
+    one contribution per shape function per field component.  That is one fact,
+    and it was asked as ``writes_per_shape(form)`` at seven sites in
+    ``emitters/energy_codegen.py``, each deciding for itself how the answer is
+    spelled: the C parameters, the staging buffer and its extents, the zero
+    fill, the pointer array, the call argument and the stream names.  Nothing
+    made the seven agree.
+
+    Only the *structure* is here.  How C declares a pointer or opens a loop
+    stays with emission; what this says is that a scalar output carries no
+    element stride and has no extent inside the lane, and a per-shape one has
+    both.
+
+    The shape depends on the form alone -- not on the element -- which is why
+    the stream *names* are a separate question below: the signature this shapes
+    is the same whatever the node count.
+    """
+
+    #: The element stride the ABI carries, or ``""`` for a scalar output, which
+    #: is indexed by element directly and has none.
+    stride: str
+    #: The name emission stages the block through.
+    block: str
+    #: The staging buffer's extents inside the lane, outermost first.  Empty for
+    #: a scalar -- ``s_t bvalue[VS]`` against ``s_t bout_data[NS * NC][VS]``.
+    extents: tuple
+    #: Whether there is one contribution per shape function.  The scatter and
+    #: the per-element accumulation are different operations rather than one
+    #: operation at two sizes, so this stays readable by the sites that spell
+    #: them.
+    per_shape: bool
+
+
+def mesh_output_shape(form):
+    """That record, for one form."""
+    if writes_per_shape(form):
+        return MeshOutputShape(
+            stride="out_stride", block="bout_data", extents=("NS * NC",), per_shape=True
+        )
+    return MeshOutputShape(stride="", block="bvalue", extents=(), per_shape=False)
+
+
+def mesh_output_streams(form, n_field_components, n_nodes, component_name):
+    """The streams the kernel writes, in ABI order.
+
+    Asked of a wider question than ``mesh_output_shape`` and able to disagree
+    with it, on purpose.  A form carrying a weak form is scalar exactly when its
+    order is zero; one lowered through an expression graph instead is scalar
+    when that graph has a single output, whatever its order says.  The six sites
+    that shaped the buffer and the parameters asked only the first.
+
+    Collapsing the two would change what is emitted for a graph-lowered form of
+    non-zero order with one output.  Recording that they are two questions is
+    the first step to finding out whether that was ever intended.
+
+    ``component_name`` spells a field component's suffix, which is the caller's
+    convention rather than this layer's.
+    """
+    if _names_one_output(form):
+        return ("value",)
+    return tuple(
+        "out%s%d" % (component_name(d), node)
+        for node in range(n_nodes)
+        for d in range(n_field_components)
+    )
+
+
+def _names_one_output(form):
+    if getattr(form, "weak_form", None) is not None:
+        return not writes_per_shape(form)
+    return len(form.expression_graph.evaluation_plan.outputs) == 1
 
 
 class FormContraction(Enum):

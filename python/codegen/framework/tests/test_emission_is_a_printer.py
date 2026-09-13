@@ -67,7 +67,26 @@ PLAN_INPUTS = (
 #: `plans.form_emission.output_assignment` and `output_is_accumulated` state it
 #: once, so the body and the diagnostics record cannot disagree about whether
 #: the kernel reads its output.
-BUDGET = 189
+#:
+#: 189 -> 183: `writes_per_shape(form)` was the largest remaining cluster, and
+#: seven of its sixteen sites were one question -- what a mesh kernel writes.
+#: `plans.form_emission.mesh_output_shape` states it: the element stride a
+#: scalar output does not carry, the staging buffer's name, and its extents
+#: inside the lane.  The parameters, the buffer, the zero fill and the call
+#: argument read that record instead of asking again.
+#:
+#: The zero fill is the one worth naming.  It was two texts -- a lane loop for
+#: the scalar, a stream loop around a lane loop for the per-shape output -- and
+#: it is now one text at two depths, because the plan says how many extents
+#: there are and emission opens a loop per extent.  An empty sequence emits the
+#: inner loop alone, which is what the scalar branch used to spell.
+#:
+#: What it also found: the six sites shaping the buffer asked
+#: `writes_per_shape`, while the one naming the streams asked a wider question,
+#: and for a graph-lowered form of non-zero order with a single output the two
+#: disagree.  `mesh_output_streams` keeps that behaviour and says so rather than
+#: collapsing it, because collapsing it would change what is emitted.
+BUDGET = 183
 
 
 def _tested_names(test):

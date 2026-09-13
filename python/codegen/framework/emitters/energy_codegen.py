@@ -41,6 +41,8 @@ from codegen.framework.plans.form_transformations import (
     metric_value_scale,
 )
 from codegen.framework.plans.form_emission import (
+    mesh_output_shape,
+    mesh_output_streams,
     output_assignment,
     output_is_accumulated,
     FormContraction,
@@ -3955,13 +3957,18 @@ def _mesh_operator_parameters(
             "const s_t *const RSTR h%s" % _component_name(d)
             for d in range(n_field_components)
         )
-    if not writes_per_shape(form):
-        output_params = ("s_t *const RSTR value",)
-    else:
-        output_params = tuple(["const ptrdiff_t out_stride"]) + tuple(
-            "s_t *const RSTR out%s" % _component_name(d)
-            for d in range(n_field_components)
+    # The output's shape is `plans.form_emission.mesh_output`; only how C
+    # declares a pointer is this emitter's business.  A scalar output carries no
+    # element stride, which is the plan's `stride` being empty.
+    output = mesh_output_shape(form)
+    output_params = tuple(
+        "const ptrdiff_t %s" % name for name in (output.stride,) if name
+    ) + tuple(
+        "s_t *const RSTR %s" % name
+        for name in _OUTPUT_ABI_BUFFERS[output.per_shape](
+            n_field_components, _component_name
         )
+    )
 
     impl_params = (
         tuple(base_params)
@@ -4161,10 +4168,11 @@ def _append_mesh_operator_compact_buffers(
             lines.append("    s_t bu_data[NS * NC][VS];")
         if uses_direction:
             lines.append("    s_t bh_data[NS * NC][VS];")
-        if writes_per_shape(form):
-            lines.append("    s_t bout_data[NS * NC][VS];")
-        else:
-            lines.append("    s_t bvalue[VS];")
+        output = mesh_output_shape(form)
+        lines.append(
+            "    s_t %s%s[VS];"
+            % (output.block, "".join("[%s]" % extent for extent in output.extents))
+        )
         if compact_coordinate_buffers:
             lines.append("    s_t bcoordinate_data[NS * ND][VS];")
     elif compact_coordinate_buffers:
@@ -4344,19 +4352,12 @@ def _append_mesh_operator_stream_buffer_views(
         if uses_direction:
             lines.append("          bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item)
         lines.extend(["        }", "      }", "    }"])
-        if not writes_per_shape(form):
-            lines.extend(_work_item_loop_lines(source_builder, "    "))
-            lines.extend(["      bvalue[%s] = s_t(0);" % work_item, "    }"])
-        else:
-            lines.extend(
-                [
-                    "    for (int stream = 0; stream < NS * NC; ++stream) {",
-                    *_work_item_loop_lines(source_builder, "      "),
-                    "        bout_data[stream][%s] = s_t(0);" % work_item,
-                    "      }",
-                    "    }",
-                ]
-            )
+        # One loop per extent the plan states, innermost the lane loop.  A
+        # scalar output has no extents and gets the lane loop alone, which is
+        # the same text the two branches here used to spell separately.
+        lines.extend(
+            _zero_fill_lines(mesh_output_shape(form), source_builder, work_item)
+        )
     else:
         lines.extend([""])
         lines.extend(_work_item_loop_lines(source_builder, "    "))
@@ -4932,10 +4933,9 @@ def _sfem_soa_mesh_operator_function(
             call_args.append("bu_streams")
         if uses_direction:
             call_args.append("bh_streams")
-        if not writes_per_shape(form):
-            call_args.append("bvalue")
-        else:
-            call_args.append("bout_streams")
+        call_args.append(
+            _OUTPUT_CALL_ARGUMENT[mesh_output_shape(form).per_shape]
+        )
     else:
         if uses_current:
             call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
@@ -9902,20 +9902,51 @@ def _cpp_scalar_literal(value, scalar_type="real_t"):
     return "%s(%.17g)" % (scalar_type, value)
 
 
-def _output_stream_names(form, n_field_components, n_nodes):
-    if form.weak_form is not None:
-        if not writes_per_shape(form):
-            return ("value",)
-        return tuple(
-            "out%s%d" % (_component_name(d), node)
-            for node in range(n_nodes)
-            for d in range(n_field_components)
+def _zero_fill_lines(output, source_builder, work_item, indent="    "):
+    """Clear the block's output staging, whatever shape the plan gives it.
+
+    `MeshOutputShape.extents` is the buffer's extents inside the lane: empty for
+    a scalar accumulator, one entry for a per-shape output.  Emission opens a
+    loop per extent and the lane loop inside them, so the two shapes are the
+    same text at two depths rather than two texts.
+    """
+    lines = []
+    subscripts = ""
+    for depth, extent in enumerate(output.extents):
+        index = "stream" if depth == 0 else "stream%d" % depth
+        lines.append(
+            "%sfor (int %s = 0; %s < %s; ++%s) {"
+            % (indent + "  " * depth, index, index, extent, index)
         )
-    output_count = len(form.expression_graph.evaluation_plan.outputs)
-    if output_count == 1:
-        return ("value",)
-    return tuple(
-        "out%s%d" % (_component_name(d), node)
-        for node in range(n_nodes)
-        for d in range(n_field_components)
+        subscripts += "[%s]" % index
+    inner = indent + "  " * len(output.extents)
+    lines.extend(_work_item_loop_lines(source_builder, inner))
+    lines.append(
+        "%s  %s%s[%s] = s_t(0);" % (inner, output.block, subscripts, work_item)
     )
+    lines.append("%s}" % inner)
+    lines.extend(
+        "%s}" % (indent + "  " * depth)
+        for depth in reversed(range(len(output.extents)))
+    )
+    return lines
+
+
+#: How the two output shapes cross the C boundary.  A scalar is one pointer; a
+#: per-shape output is one pointer per field component beside its stride.  The
+#: shape is `plans.form_emission.mesh_output`; this is only the spelling.
+_OUTPUT_ABI_BUFFERS = {
+    False: lambda n_field_components, component_name: ("value",),
+    True: lambda n_field_components, component_name: tuple(
+        "out%s" % component_name(d) for d in range(n_field_components)
+    ),
+}
+
+#: What the block kernel is handed.  The scalar accumulator is one buffer; the
+#: per-shape output is the pointer array built above it.
+_OUTPUT_CALL_ARGUMENT = {False: "bvalue", True: "bout_streams"}
+
+
+def _output_stream_names(form, n_field_components, n_nodes):
+    """The streams this kernel writes, named by `plans.form_emission`."""
+    return mesh_output_streams(form, n_field_components, n_nodes, _component_name)
