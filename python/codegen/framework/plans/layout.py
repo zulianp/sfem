@@ -21,6 +21,8 @@ from codegen.framework.fem.reference import (
     sfem_tensor_product_hex_uses_cartesian_ordering,
     sfem_tensor_product_quad_uses_cartesian_ordering,
 )
+from dataclasses import dataclass
+
 from codegen.framework.fem.tensor_product import (
     tensor_product_cartesian_shape_order,
     tensor_product_subspace_shape_order,
@@ -58,6 +60,58 @@ def uses_cartesian_ordering(element_type):
     return sfem_tensor_product_hex_uses_cartesian_ordering(
         element_type
     ) or sfem_tensor_product_quad_uses_cartesian_ordering(element_type)
+
+
+#: Which lexicographic element each mesh-ordered tensor-product element
+#: delegates its micro-kernel to, and the cell it shares with it.
+#:
+#: The rule is that a micro-kernel is written against the lexicographic basis
+#: and the mesh-order element reconciles the two in a forwarding wrapper, so the
+#: kernel itself reorders nothing.  This is the table that says which pairs
+#: exist; it was private to `emitters/energy_codegen.py`, which is the only
+#: place that had needed it until the inexact family did too.
+CARTESIAN_TWINS = (
+    ("quad4", "proteus_quad4", 2, 4),
+    ("hex8", "proteus_hex8", 3, 8),
+    ("hex27", "proteus_hex27", 3, 27),
+)
+
+
+@dataclass(frozen=True)
+class CartesianTwin:
+    """One mesh-ordered element and the lexicographic one it forwards to."""
+
+    element_name: str
+    twin_name: str
+    dim: int
+    n_shape: int
+    #: Entry `i` is the mesh node carrying lexicographic node `i`.
+    shape_order: tuple
+
+
+def cartesian_twin(element_type, dim=None, n_shape=None):
+    """This element's lexicographic twin, or ``None`` when it is one already.
+
+    ``None`` for a simplex, which has no tensor-product order to convert to,
+    and for a `PROTEUS_*` element, which is already lexicographic and is itself
+    the twin some other element forwards to.
+    """
+    name = str(element_type).lower()
+    for element_name, twin_name, twin_dim, twin_n_shape in CARTESIAN_TWINS:
+        if name != element_name:
+            continue
+        if dim is not None and int(dim) != twin_dim:
+            continue
+        if n_shape is not None and int(n_shape) != twin_n_shape:
+            continue
+        return CartesianTwin(
+            element_name=element_name,
+            twin_name=twin_name,
+            dim=twin_dim,
+            n_shape=twin_n_shape,
+            shape_order=tensor_product_cartesian_shape_order(twin_dim, twin_n_shape),
+        )
+    return None
 
 
 def gather_shape_order(element_type, dim, n_shape, tensor_product):

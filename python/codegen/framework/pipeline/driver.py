@@ -1438,12 +1438,44 @@ def _replace_legacy_tensor_product_sources_with_proteus_aliases(files):
                         break
                 if proteus_path not in files:
                     continue
+                # Only the aliases whose target this file's twin actually
+                # defines.  The whole list was written into every rewritten
+                # file, which is invisible while an element has one source and
+                # produces duplicate symbols the moment it has two -- the
+                # inexact apply is a second source for the same element.
+                defined = _extern_c_defined_names(files[proteus_path])
+                selected = [
+                    declaration
+                    for declaration in alias_declarations
+                    if _tensor_product_proteus_target_name(declaration["name"], alias)
+                    in defined
+                ]
+                if not selected:
+                    continue
                 files[source_path] = _tensor_product_proteus_alias_source(
                     source_path,
                     c_abi_path,
-                    alias_declarations,
+                    selected,
                     alias,
                 )
+
+
+def _extern_c_defined_names(source):
+    """The `extern "C"` functions this source *defines*, not merely declares.
+
+    A prototype ends in `);` and a definition in `) {`, so the two are
+    distinguishable without parsing C++.  The distinction is the whole point
+    here: a file that only declares a symbol is not the file that should be
+    aliased onto.
+    """
+    return frozenset(
+        match.group("name")
+        for match in re.finditer(
+            r'extern "C"\s+[^;{]*?\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\([^;{]*?\)\s*\{',
+            source,
+            re.DOTALL,
+        )
+    )
 
 
 def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
@@ -1454,11 +1486,18 @@ def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
         "shape_order": tensor_product_cartesian_shape_order(int(dim), int(n_shape)),
         "source_prefix": "d%d/%s/" % (int(dim), element_name),
         "target_prefix": "d%d/%s/" % (int(dim), proteus_name),
+        # The inexact apply is a second source file for the same element, and
+        # it is why the pass now selects per file which aliases it writes: the
+        # whole list into every rewritten file was invisible while each element
+        # had one source and produces duplicate symbols with two.
         "source_suffixes": (
             "_%s_operator.cpp" % element_name,
             "_%s_boundary_operator.cpp" % element_name,
+            "_%s_inexact_apply_operator.cpp" % element_name,
         ),
         "suffix_pairs": (
+            ("_%s_inexact_apply_operator.cpp" % element_name,
+             "_%s_inexact_apply_operator.cpp" % proteus_name),
             ("_%s_operator.cpp" % element_name, "_%s_operator.cpp" % proteus_name),
             ("_%s_boundary_operator.cpp" % element_name, "_%s_boundary_operator.cpp" % proteus_name),
         ),

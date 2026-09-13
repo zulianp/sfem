@@ -46,6 +46,7 @@ from codegen.framework.emitters.runtime_typed_abi import (
     cast_arguments,
     parameter_name,
     runtime_typed_entry_point_lines,
+    runtime_typed_parameters,
 )
 from codegen.framework.emitters.quadrature_codegen import (
     REFERENCE_AXES,
@@ -55,7 +56,7 @@ from codegen.framework.emitters.quadrature_codegen import (
     tensor_product_q_index_lines,
     tensor_product_quadrature_weight_expr,
 )
-from codegen.framework.plans.layout import gather_shape_order
+from codegen.framework.plans.layout import cartesian_twin, gather_shape_order
 from codegen.framework.plans.streams import (
     component_field_role,
     component_stream_names,
@@ -154,6 +155,18 @@ _PACK_SCRATCH_INCLUDE = {
 }
 
 
+#: The component letters, in the order every stream and every symbol uses them.
+_COMPONENT_NAMES = ("x", "y", "z")
+
+
+def _adjugate_and_determinant(dim):
+    """The geometry symbols the projected tangent is written in."""
+    return (
+        sp.Matrix(dim, dim, lambda r, c: sp.Symbol("adjugate%d" % (r * dim + c))),
+        sp.Symbol("determinant"),
+    )
+
+
 def _emits_packed(plan):
     return any(layout != "standard" for layout in plan.apply_layouts)
 
@@ -171,9 +184,8 @@ def _inexact_apply_kernel_source(
     is_deformation_gradient,
 ):
     """The three kernels, reached only when the plan layer said they apply."""
-    component = ["x", "y", "z"][:dim]
-    adjugate = sp.Matrix(dim, dim, lambda r, c: sp.Symbol("adjugate%d" % (r * dim + c)))
-    determinant = sp.Symbol("determinant")
+    component = list(_COMPONENT_NAMES[:dim])
+    adjugate, determinant = _adjugate_and_determinant(dim)
     state = [
         [sp.Symbol("u%s_%d" % (component[c], j)) for j in range(n_nodes)]
         for c in range(dim)
@@ -1807,19 +1819,31 @@ def _abi_entry_point(name, params, template, template_arguments):
     )
 
 
-def _c_abi_lines(
-    prefix, dim, n_nodes, component, parameters, used_previous, reads_state,
-    packed_layouts=(),
-):
-    """`extern "C"` wrappers, so the split is reachable from SFEM.
+@dataclasses.dataclass(frozen=True)
+class _AbiEntryPoint:
+    """One published symbol: its name, its parameters, and what it reaches."""
 
-    The templated kernels above are what the generator produces; these are what
-    the library links against.  One symbol each, carrying the scalar type as a
-    width and its buffers as `void *` -- the shape `emitters/runtime_typed_abi`
-    describes and the public dispatch above already had.
+    name: str
+    params: tuple
+    template: str
+    template_arguments: object
+    element_type: str = "idx_t"
+
+
+def _c_abi_entry_points(
+    prefix, dim, n_nodes, component, parameters, used_previous, reads_state,
+    packed_layouts=(), template_prefix=None,
+):
+    """The four symbols this element publishes, in the order it publishes them.
+
+    One list, two consumers: the element that owns the micro-kernel turns it
+    into definitions, and the one that delegates turns it into prototypes for
+    the alias pass to define.  Spelling the parameter lists twice is how the
+    two would come to disagree, and the dispatch builds its calls out of them.
     """
+    template_prefix = prefix if template_prefix is None else template_prefix
     gathers = bool(reads_state or used_previous)
-    lines = []
+    entry_points = []
 
     # --- the partial assembly -------------------------------------------
     params = ["const ptrdiff_t nelements"]
@@ -1834,12 +1858,12 @@ def _c_abi_lines(
             "%s *const RSTR tangent" % _ABI_TANGENT_STORE,
         ]
     )
-    lines.extend(
-        _abi_entry_point(
-            "%s_inexact_apply_tangent_a_msoa" % prefix,
-            params,
-            "%s_inexact_apply_tangent_a_msoa_impl" % prefix,
-            lambda scalar_type: "%s, geom_t, %s, %d"
+    entry_points.append(
+        _AbiEntryPoint(
+            name="%s_inexact_apply_tangent_a_msoa" % prefix,
+            params=tuple(params),
+            template="%s_inexact_apply_tangent_a_msoa_impl" % template_prefix,
+            template_arguments=lambda scalar_type: "%s, geom_t, %s, %d"
             % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
         )
     )
@@ -1853,12 +1877,12 @@ def _c_abi_lines(
     ]
     params.extend(_abi_stream("h", component))
     params.extend(_abi_stream("out", component, const=""))
-    lines.extend(
-        _abi_entry_point(
-            "%s_inexact_apply_stored_a_msoa" % prefix,
-            params,
-            "%s_inexact_apply_stored_a_msoa_impl" % prefix,
-            lambda scalar_type: "%s, %s, %d"
+    entry_points.append(
+        _AbiEntryPoint(
+            name="%s_inexact_apply_stored_a_msoa" % prefix,
+            params=tuple(params),
+            template="%s_inexact_apply_stored_a_msoa_impl" % template_prefix,
+            template_arguments=lambda scalar_type: "%s, %s, %d"
             % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
         )
     )
@@ -1869,13 +1893,15 @@ def _c_abi_lines(
         params.extend(_abi_stream("h", component))
         params.extend(_abi_stream("out", component, const=""))
         suffix = _LAYOUT_SUFFIX[layout]
-        lines.extend(
-            _abi_entry_point(
-                "%s_inexact_apply_stored%s_a_msoa" % (prefix, suffix),
-                params,
-                "%s_inexact_apply_stored%s_a_msoa_impl" % (prefix, suffix),
-                lambda scalar_type: "%s, %s, %d"
+        entry_points.append(
+            _AbiEntryPoint(
+                name="%s_inexact_apply_stored%s_a_msoa" % (prefix, suffix),
+                params=tuple(params),
+                template="%s_inexact_apply_stored%s_a_msoa_impl"
+                % (template_prefix, suffix),
+                template_arguments=lambda scalar_type: "%s, %s, %d"
                 % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
+                element_type="uint16_t",
             )
         )
 
@@ -1889,14 +1915,62 @@ def _c_abi_lines(
     ]
     params.extend(_abi_stream("h", component))
     params.extend(_abi_stream("out", component, const=""))
-    lines.extend(
-        _abi_entry_point(
-            "%s_inexact_apply_compressed_a_msoa" % prefix,
-            params,
-            "%s_inexact_apply_compressed_a_msoa_impl" % prefix,
-            lambda scalar_type: "%s, compressed_t, scaling_t" % scalar_type,
+    entry_points.append(
+        _AbiEntryPoint(
+            name="%s_inexact_apply_compressed_a_msoa" % prefix,
+            params=tuple(params),
+            template="%s_inexact_apply_compressed_a_msoa_impl" % template_prefix,
+            template_arguments=lambda scalar_type: "%s, compressed_t, scaling_t"
+            % scalar_type,
         )
     )
+    return tuple(entry_points)
+
+
+def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous,
+                 reads_state, packed_layouts=()):
+    """`extern "C"` definitions, so the split is reachable from SFEM.
+
+    The templated kernels above are what the generator produces; these are what
+    the library links against.  One symbol each, carrying the scalar type as a
+    width and its buffers as `void *` -- the shape `emitters/runtime_typed_abi`
+    describes and the public dispatch above already had.
+    """
+    lines = []
+    for entry_point in _c_abi_entry_points(
+        prefix, dim, n_nodes, component, parameters, used_previous, reads_state,
+        packed_layouts,
+    ):
+        lines.extend(
+            _abi_entry_point(
+                entry_point.name,
+                list(entry_point.params),
+                entry_point.template,
+                entry_point.template_arguments,
+            )
+        )
+    return lines
+
+
+def _c_abi_prototype_lines(prefix, dim, n_nodes, component, parameters,
+                           used_previous, reads_state, packed_layouts=()):
+    """The same symbols, declared and not defined.
+
+    What a delegating element publishes: the alias pass reads these to learn it
+    has the entry points, then writes the definitions that forward to the twin.
+    """
+    lines = []
+    for entry_point in _c_abi_entry_points(
+        prefix, dim, n_nodes, component, parameters, used_previous, reads_state,
+        packed_layouts,
+    ):
+        declared = runtime_typed_parameters(entry_point.params)
+        lines.append('extern "C" int %s(' % entry_point.name)
+        lines.extend(
+            "    %s%s" % (param, "," if index + 1 < len(declared) else "")
+            for index, param in enumerate(declared)
+        )
+        lines.extend([");", ""])
     return lines
 
 
@@ -1912,6 +1986,11 @@ def inexact_apply_files(material, unit, context):
 
     The header is named for the unit rather than the material, because a
     material with several units would otherwise have them collide on one path.
+
+    An element whose mesh does not number its nodes lexicographically publishes
+    no kernel of its own: `plans/layout.cartesian_twin` names the element whose
+    micro-kernel it forwards to, and this emits the symbols and the reordering
+    rather than a second body.
     """
     collection = getattr(unit, "form_collection", None)
     if collection is None:
@@ -1922,6 +2001,15 @@ def inexact_apply_files(material, unit, context):
         return ()
     flux_form, is_deformation_gradient = built
     rule = context.specialization.quadrature_rule
+    return _FILES_BY_DELEGATION[
+        cartesian_twin(context.element_type, dim, int(rule.n_shape)) is not None
+    ](material, unit, context, dim, rule, flux_form, is_deformation_gradient)
+
+
+def _own_kernel_files(
+    material, unit, context, dim, rule, flux_form, is_deformation_gradient
+):
+    """An element that owns its micro-kernel: the header and its symbols."""
     emitted = inexact_apply_kernel_source(
         _unit_name(material, unit),
         material.op_name,
@@ -1936,13 +2024,81 @@ def inexact_apply_files(material, unit, context):
     if emitted is None:
         return ()
     _function, header, operator_source = emitted
-    stem = "%s_%s_inexact_apply" % (
-        _unit_name(material, unit),
-        str(context.element_type).lower(),
-    )
+    stem = _inexact_stem(material, unit, context.element_type)
     return (
         ("%s_inline.hpp" % stem, header),
         ("%s_operator.cpp" % stem, operator_source),
+    )
+
+
+def _forwarded_kernel_files(
+    material, unit, context, dim, rule, flux_form, is_deformation_gradient
+):
+    """An element that delegates publishes its symbols and no micro-kernel.
+
+    The source it emits here is prototypes only.  `pipeline/driver.py`'s
+    tensor-product alias pass rewrites it into definitions that forward to the
+    twin's symbols with the connectivity reordered -- the same pass, and the
+    same reordering, the energy path has always used; the declarations are what
+    tell it this element has those entry points at all.
+
+    Writing the forwarders here instead produced four duplicate symbols at link
+    time, which is the shortest possible proof that the path was already there.
+    """
+    twin = cartesian_twin(context.element_type, dim, int(rule.n_shape))
+    plan = emittable_inexact_apply_plan(
+        twin.twin_name.upper(), dim, int(rule.n_shape), flux_form, rule
+    )
+    return _PROTOTYPES_BY_APPLICABILITY[plan is not None](
+        plan, twin, material, unit, context, dim, rule, flux_form,
+        is_deformation_gradient,
+    )
+
+
+def _delegated_prototype_files(
+    plan, twin, material, unit, context, dim, rule, flux_form,
+    is_deformation_gradient,
+):
+    """The symbols a delegating element publishes, where its twin has a plan."""
+    unit_name = _unit_name(material, unit)
+    prefix = "%s_%s" % (unit_name, str(context.element_type).lower())
+    component = list(_COMPONENT_NAMES[:dim])
+    adjugate, determinant = _adjugate_and_determinant(dim)
+    integrand, gradient_symbols, previous_gradient_symbols = projected_tangent(
+        plan, flux_form, rule, adjugate, determinant, is_deformation_gradient
+    )
+    lines = [
+        '#include "../../op/sfem_%s_c_abi.hpp"' % material.op_name,
+        "",
+    ]
+    lines.extend(
+        _c_abi_prototype_lines(
+            prefix, dim, plan.n_nodes, component,
+            tuple(str(name) for name in flux_form.parameters),
+            bool(plan.state_dependence(integrand, previous_gradient_symbols)),
+            bool(plan.state_dependence(integrand, gradient_symbols)),
+            tuple(l for l in plan.apply_layouts if l != "standard"),
+        )
+    )
+    stem = _inexact_stem(material, unit, context.element_type)
+    return ((("%s_operator.cpp" % stem), "\n".join(lines)),)
+
+
+#: Whether the twin has a plan at all, answered by the plan layer and looked up
+#: here -- the same table the owning path uses for the same question.
+_PROTOTYPES_BY_APPLICABILITY = {
+    True: _delegated_prototype_files,
+    False: lambda plan, *arguments: (),
+}
+
+#: Whether this element owns its micro-kernel or forwards to a twin's.
+_FILES_BY_DELEGATION = {False: _own_kernel_files, True: _forwarded_kernel_files}
+
+
+def _inexact_stem(material, unit, element_type):
+    return "%s_%s_inexact_apply" % (
+        _unit_name(material, unit),
+        str(element_type).lower(),
     )
 
 

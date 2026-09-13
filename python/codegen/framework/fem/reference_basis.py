@@ -17,6 +17,8 @@ from functools import lru_cache
 
 import sympy as sp
 
+from codegen.framework.fem.tensor_product import tensor_product_cartesian_shape_order
+
 
 #: The reference coordinates, in the order the element's limits use them.
 REFERENCE_COORDINATES = sp.symbols("xi0 xi1 xi2")
@@ -103,12 +105,31 @@ def _tet10():
     return [sp.expand(function) for function in functions], limits
 
 
+def _lexicographic_tensor_product(dim):
+    """The same basis, numbered the way a PROTEUS element's mesh numbers it.
+
+    `_corners` walks a face counter-clockwise, which is SFEM's and VTK's hex
+    ordering; a PROTEUS element is lexicographic, x fastest.  The two differ by
+    a permutation and by nothing else, so this permutes rather than writing a
+    second corner table -- `tensor_product_cartesian_shape_order` is the same
+    map the gathers already use, read the same way round: entry `i` is the mesh
+    node carrying lexicographic node `i`.
+    """
+    functions, limits = _tensor_product(dim)
+    order = tensor_product_cartesian_shape_order(dim, len(functions))
+    return tuple(functions[node] for node in order), limits
+
+
 _BASIS_BY_ELEMENT = {
     "TRI3": lambda: (2,) + _simplex(2),
     "TET4": lambda: (3,) + _simplex(3),
     "QUAD4": lambda: (2,) + _tensor_product(2),
     "HEX8": lambda: (3,) + _tensor_product(3),
     "TET10": lambda: (3,) + _tet10(),
+    # The lexicographic twins.  A micro-kernel is written against these and the
+    # mesh-ordered element forwards to it; see `plans/layout.cartesian_twin`.
+    "PROTEUS_QUAD4": lambda: (2,) + _lexicographic_tensor_product(2),
+    "PROTEUS_HEX8": lambda: (3,) + _lexicographic_tensor_product(3),
 }
 
 
