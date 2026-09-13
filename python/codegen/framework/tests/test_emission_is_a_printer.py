@@ -146,7 +146,20 @@ PLAN_INPUTS = (
 #: it is the sequence `mesh_geometry_streams` already published at the ABI.
 #: What separated them was only the frozen `g_` prefix, so the plan now states
 #: the sequence once and applies the prefix on top of it.
-BUDGET = 168
+#:
+#: 168 -> 160: which of a field row's coefficients are live.  The gradient half
+#: was already a comprehension filter at four sites -- an absent coefficient
+#: simply not appearing -- while the value half was an `if` beside it saying the
+#: same thing a different way, and one site said it a third way with a
+#: `continue`.  `plans.dependencies.live_test_coefficients` is the sequence;
+#: what a coefficient is multiplied by, and what a test function's declaration
+#: looks like, stay with the bodies that spell them differently.
+#:
+#: One of the eight is not an absence and did not become one: every row writes
+#: into the quadrature buffer whether or not it has a value coefficient, so a
+#: row without one writes a zero rather than writing nothing.  That is a table
+#: of two terms, not an empty sequence, and the difference is real.
+BUDGET = 160
 
 
 def _tested_names(test):
