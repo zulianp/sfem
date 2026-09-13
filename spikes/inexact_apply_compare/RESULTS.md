@@ -1553,3 +1553,77 @@ the white-noise increment.  `SFEM_MAIN_CHECKOUT`, `SFEM_BUILD`, `SFEM_PYTHON` an
 
 For OpenMP on macOS, add
 `-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include -L$(brew --prefix libomp)/lib -lomp`.
+
+
+## Grace again, after the codegen rework, and with the packed layout beside it
+
+The same measurement as *Neohookean Ogden on Grace* above, rerun on one GH200
+socket (`nid006549`, 72 Neoverse-V2 cores, GCC 13.3 from `prgenv-gnu/24.11`,
+`OMP_PLACES=cores`, `OMP_PROC_BIND=true`, twenty repetitions, 206763 dof).
+HEX8, and this time with the packed layout in the same run.
+
+**This is not a controlled A/B for any one change.** The recorded numbers predate
+the whole of the codegen rework: the tangent's quadrature sum became a loop, its
+`grad u` stopped being inlined at every occurrence, the tensor-product tangent
+started contracting through `tensor_gradient` instead of a private 192-entry
+table, the C ABI collapsed to one runtime-typed entry point, and HEX8 stopped
+publishing a micro-kernel and began forwarding to PROTEUS_HEX8.
+
+What makes it readable anyway is that **the exact apply is a control**: none of
+that work touches it, so its column says what the two runs have in common.
+
+| threads | exact | st. f64 | st. f32 | st. f16 | assembly |
+|---|---|---|---|---|---|
+| 1 | 3.58 | 13.65 | 11.27 | 10.33 | 1.85 |
+| 8 | 27.80 | 99.52 | 82.73 | 76.09 | 14.87 |
+| 32 | 105.79 | 336.21 | 286.04 | 271.50 | 59.48 |
+| 72 | 215.79 | 568.55 | 500.92 | 494.40 | 132.16 |
+
+Against the recorded run, as ratios:
+
+| threads | exact | st. f64 | st. f32 | st. f16 | assembly |
+|---|---|---|---|---|---|
+| 1 | 1.02 | 1.28 | 1.08 | 1.05 | 1.12 |
+| 8 | 1.01 | 1.23 | 1.05 | 1.02 | 1.13 |
+| 32 | 1.02 | 1.24 | 1.07 | 1.06 | 1.13 |
+| 72 | 0.98 | 1.07 | 0.97 | 0.96 | 1.13 |
+
+The control holds to within 2% at every thread count, which is the noise floor
+here and is what makes the rest of the table worth reading.  The same comparison
+on a ten-core laptop moved the control by 13%, so it resolves nothing and is not
+reported.
+
+**Nothing regressed, and the tangent assembly is 12 to 13% faster at every
+thread count.**  That is the one number with a clear cause: the tangent now
+reaches its reference gradients through `tensor_gradient_contiguous` and the
+shared one-dimensional tables, rather than walking the element's full reference
+gradients out of a table of its own.  It is consistent across the sweep, which
+noise at this level is not.  Break-even falls with it, from 3.2 applies per
+tangent to **2.6**.
+
+The apply columns are less clean: f64 gains 23 to 28% below 32 threads and only
+7% at 72, while f32 and f16 are within a few percent everywhere.  At 72 threads
+this kernel is bandwidth-bound and the store width is what matters, so the
+low-thread f64 gain is the part that wants explaining and this measurement does
+not explain it.
+
+**The packed layout is the result worth having**, and the recorded run had no
+packed column at all:
+
+| threads | exact | packed exact | st. f32 | packed st. f32 | packed speed-up |
+|---|---|---|---|---|---|
+| 1 | 3.58 | 4.08 | 11.27 | 17.28 | 1.53x |
+| 8 | 27.80 | 31.52 | 82.73 | 131.07 | 1.58x |
+| 32 | 105.79 | 121.32 | 286.04 | 465.08 | 1.63x |
+| 72 | 215.79 | 227.94 | 500.92 | 749.13 | 1.50x |
+
+**749 MDOF/s against 501**, and against 216 for the exact matrix-free apply on
+the same mesh: the projected apply on a packed mesh is 3.5x the exact one at 72
+threads.  Packing helps the projected apply far more than the exact one (1.50x
+against 1.06x), which is what the roofline predicts -- the stored apply moves
+384 of its 788 bytes per element in the scatter, and packing is what removes it.
+
+Every packed answer agrees with its standard counterpart to round-off (`pk diff`
+1.2e-16 for the exact apply) or exactly (3.6e-05 for the projected one, the same
+deviation the standard column reports), so the two layouts compute the same
+thing.
