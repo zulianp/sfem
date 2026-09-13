@@ -42,6 +42,7 @@ from codegen.framework.plans.form_transformations import (
 )
 from codegen.framework.plans.form_emission import (
     FormAccumulation,
+    publishes_objective_steps,
     form_accumulation,
     mesh_output_shape,
     mesh_output_streams,
@@ -1375,18 +1376,12 @@ def _sfem_soa_weak_form_block_function(
                 ),
             )
         )
-    if not use_stream_arrays and writes_per_shape(form):
-        lines.append(
-            "  s_t *const weak_out_streams[NS * %d] = {%s};"
-            % (
-                dim,
-                ", ".join(
-                    streams_in_shape_order(
-                        _output_stream_names(form, n_field_components, n_nodes),
-                        n_field_components,
-                        shared.stream_shape_order,
-                    )
-                ),
+    if not use_stream_arrays:
+        # Whether the block takes stream arrays is the caller's axis; what there
+        # is to declare is the plan's, and a scalar accumulator declares nothing.
+        lines.extend(
+            _WEAK_OUTPUT_STREAM_ARRAY[form_accumulation(form)](
+                form, dim, n_field_components, n_nodes, shared.stream_shape_order
             )
         )
     if shared.use_tensor_product_reference:
@@ -4146,33 +4141,130 @@ def _append_mesh_operator_stream_arrays(
                         ),
                     )
                 )
-        if writes_per_shape(form):
-            if compact_stream_buffers:
+        lines.extend(
+            _BLOCK_OUTPUT_STREAM_ARRAY[form_accumulation(form)](
+                form, dim, n_field_components, n_nodes,
+                compact_stream_buffers, stream_shape_order,
+            )
+        )
+
+
+def _per_shape_weak_output_stream_array(form, dim, n_field_components, n_nodes,
+                                        stream_shape_order):
+    """The stream array a per-shape weak block writes through."""
+    return [
+        "  s_t *const weak_out_streams[NS * %d] = {%s};"
+        % (
+            dim,
+            ", ".join(
+                streams_in_shape_order(
+                    _output_stream_names(form, n_field_components, n_nodes),
+                    n_field_components,
+                    stream_shape_order,
+                )
+            ),
+        )
+    ]
+
+
+_WEAK_OUTPUT_STREAM_ARRAY = {
+    FormAccumulation.SCALAR: (
+        lambda form, dim, n_field_components, n_nodes, order: []
+    ),
+    FormAccumulation.PER_SHAPE: _per_shape_weak_output_stream_array,
+}
+
+
+def _per_shape_block_output_stream_array(form, dim, n_field_components, n_nodes,
+                                         compact_stream_buffers, stream_shape_order):
+    """The pointer array the block writes its per-shape output through."""
+    if compact_stream_buffers:
+        return _ordered_stream_pointer_array_lines(
+            "s_t *", "bout_streams", "bout_data", dim, stream_shape_order, "    "
+        )
+    return [
+        "    s_t *const bout_streams[NS * %d] = {%s};"
+        % (
+            dim,
+            ", ".join(
+                _BLOCK_FMT % stream
+                for stream in streams_in_shape_order(
+                    _output_stream_names(form, n_field_components, n_nodes),
+                    n_field_components,
+                    stream_shape_order,
+                )
+            ),
+        )
+    ]
+
+
+#: The output pointer arrays a block declares.  A scalar accumulator has none --
+#: an empty sequence, which emits nothing without anyone deciding not to.
+_BLOCK_OUTPUT_STREAM_ARRAY = {
+    FormAccumulation.SCALAR: (
+        lambda form, dim, n_field_components, n_nodes, compact, order: []
+    ),
+    FormAccumulation.PER_SHAPE: _per_shape_block_output_stream_array,
+}
+
+
+#: How a mesh kernel's block reaches the mesh: the two are different operations
+#: rather than one at two sizes.  A scalar accumulator adds its lane into the
+#: element's slot; a per-shape output scatters through the connectivity, which
+#: is an indirect write and needs the atomics the target supplies.  Which
+#: applies is `plans.form_emission.form_accumulation`.
+def _scalar_output_scatter(lines, form, dim, n_nodes, n_field_components,
+                           compact_stream_buffers, work_item, source_builder):
+    """One accumulator per element, written where the element is."""
+    lines.extend(_work_item_loop_lines(source_builder, "    "))
+    lines.append("      value[evb + %s] += bvalue[%s];" % (work_item, work_item))
+    lines.append("    }")
+
+
+def _per_shape_output_scatter(lines, form, dim, n_nodes, n_field_components,
+                              compact_stream_buffers, work_item, source_builder):
+    """One contribution per shape function, scattered through the connectivity."""
+    if compact_stream_buffers:
+        lines.append("    s_t *const out_components[NC] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)))
+        lines.extend(
+            [
+                "",
+                "    for (int shape = 0; shape < NS; ++shape) {",
+                "      const idx_t *const RSTR ev_shape = &ev[shape * VS];",
+                "      for (int d = 0; d < NC; ++d) {",
+                *_scatter_add_lines(
+                    source_builder,
+                    "out_components[d]",
+                    "ev_shape[%s] * out_stride",
+                    "bout_data[shape * NC + d][%s]",
+                    "        ",
+                ),
+                "      }",
+                "    }",
+            ]
+        )
+    else:
+        for shape in range(n_nodes):
+            for d in range(dim):
+                component = _component_name(d)
                 lines.extend(
-                    _ordered_stream_pointer_array_lines(
-                        "s_t *",
-                        "bout_streams",
-                        "bout_data",
-                        dim,
-                        stream_shape_order,
-                        "    ",
+                    list(
+                        _scatter_add_lines(
+                            source_builder,
+                            "out%s" % component,
+                            "ev[%d * VS + %%s] * out_stride" % shape,
+                            "bout%s%d[%%s]" % (component, shape),
+                            "    ",
+                        )
                     )
+                    + [""]
                 )
-            else:
-                lines.append(
-                    "    s_t *const bout_streams[NS * %d] = {%s};"
-                    % (
-                        dim,
-                        ", ".join(
-                            _BLOCK_FMT % stream
-                            for stream in streams_in_shape_order(
-                                _output_stream_names(form, n_field_components, n_nodes),
-                                n_field_components,
-                                stream_shape_order,
-                            )
-                        ),
-                    )
-                )
+
+
+_OUTPUT_SCATTER = {
+    FormAccumulation.SCALAR: _scalar_output_scatter,
+    FormAccumulation.PER_SHAPE: _per_shape_output_scatter,
+}
 
 
 def _append_mesh_operator_scalar_output(
@@ -4193,46 +4285,10 @@ def _append_mesh_operator_scalar_output(
     down.
     """
     n_field_components = form_n_field_components(form, dim)
-    if not writes_per_shape(form):
-        lines.extend(_work_item_loop_lines(source_builder, "    "))
-        lines.append("      value[evb + %s] += bvalue[%s];" % (work_item, work_item))
-        lines.append("    }")
-    else:
-        if compact_stream_buffers:
-            lines.append("    s_t *const out_components[NC] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)))
-            lines.extend(
-                [
-                    "",
-                    "    for (int shape = 0; shape < NS; ++shape) {",
-                    "      const idx_t *const RSTR ev_shape = &ev[shape * VS];",
-                    "      for (int d = 0; d < NC; ++d) {",
-                    *_scatter_add_lines(
-                        source_builder,
-                        "out_components[d]",
-                        "ev_shape[%s] * out_stride",
-                        "bout_data[shape * NC + d][%s]",
-                        "        ",
-                    ),
-                    "      }",
-                    "    }",
-                ]
-            )
-        else:
-            for shape in range(n_nodes):
-                for d in range(dim):
-                    component = _component_name(d)
-                    lines.extend(
-                        list(
-                            _scatter_add_lines(
-                                source_builder,
-                                "out%s" % component,
-                                "ev[%d * VS + %%s] * out_stride" % shape,
-                                "bout%s%d[%%s]" % (component, shape),
-                                "    ",
-                            )
-                        )
-                        + [""]
-                    )
+    _OUTPUT_SCATTER[form_accumulation(form)](
+        lines, form, dim, n_nodes, n_field_components,
+        compact_stream_buffers, work_item, source_builder,
+    )
 
 
 def _append_mesh_operator_compact_buffers(
@@ -5992,11 +6048,52 @@ def _sfem_soa_mesh_objective_steps_function(
     geometry_mode="affine",
     source_builder=None,
 ):
+    """The stepped objective, where the form has one.
+
+    Whether it does is `plans.form_emission.publishes_objective_steps`: a
+    0-form carrying a weak form, because there is nothing to step in a
+    gradient or a Hessian action and the stepping happens on the density
+    before it is contracted.  This used to be a guard returning an empty
+    list five hundred lines above the end of the function it guarded.
+    """
+    return _OBJECTIVE_STEPS_BY_APPLICABILITY[publishes_objective_steps(form)](
+        form,
+        prefix,
+        dim,
+        n_nodes,
+        n_qp,
+        vector_size,
+        local_prefix,
+        array_inputs,
+        quadrature_rule,
+        basis_family,
+        geometry_family,
+        use_shared_weak_local,
+        geometry_mode,
+        source_builder,
+    )
+
+
+def _objective_steps_lines(
+    form,
+    prefix,
+    dim,
+    n_nodes,
+    n_qp,
+    vector_size,
+    local_prefix,
+    array_inputs,
+    quadrature_rule,
+    basis_family,
+    geometry_family,
+    use_shared_weak_local,
+    geometry_mode,
+    source_builder,
+):
+    """The kernel itself, reached only when the plan layer says it exists."""
     n_field_components = form_n_field_components(form, dim)
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
-    if writes_per_shape(form) or form.weak_form is None:
-        return []
     if geometry_mode not in ("affine", "isoparametric"):
         raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
     work_item = _work_item_index(source_builder)
@@ -6530,6 +6627,15 @@ def _sfem_soa_mesh_objective_steps_function(
             )
         )
     return lines
+
+
+#: Whether the form publishes this kernel decides whether there is one.  A
+#: table, as `_KERNEL_BY_APPLICABILITY` is in `inexact_apply_codegen.py`:
+#: emission looks the answer up rather than deciding it again.
+_OBJECTIVE_STEPS_BY_APPLICABILITY = {
+    True: _objective_steps_lines,
+    False: lambda *arguments: [],
+}
 
 
 def _sfem_soa_direct_hessian_current_gradient_lines(

@@ -117,7 +117,24 @@ PLAN_INPUTS = (
 #: two more and the simplex one three.  That was invisible while they were
 #: inline, and it is the measure of how far each body emitter is from being a
 #: step that could be moved.
-BUDGET = 176
+#:
+#: 176 -> 172, and `writes_per_shape` is down to **zero** decision branches from
+#: the sixteen it began with.  The last four: the mesh operator's output scatter
+#: split into the two operations it always was -- a scalar adds its lane into
+#: the element's slot, a per-shape output scatters through the connectivity --
+#: and two pointer arrays became sequences a scalar leaves empty.
+#:
+#: The fourth is the one that had hidden furthest.  A stepped objective exists
+#: only for a 0-form carrying a weak form, and the emitter said so as a guard
+#: returning an empty list five hundred lines above the end of the function it
+#: guarded.  `plans.form_emission.publishes_objective_steps` says it in this
+#: layer's own words -- the body shape and the contraction, both already named
+#: here -- and the emitter looks it up, the way `_KERNEL_BY_APPLICABILITY` does
+#: in `inexact_apply_codegen.py`.
+#:
+#: What remains of `writes_per_shape` in that emitter is a comprehension filter,
+#: one table lookup and three pass-throughs: no branch reads it any more.
+BUDGET = 172
 
 
 def _tested_names(test):
