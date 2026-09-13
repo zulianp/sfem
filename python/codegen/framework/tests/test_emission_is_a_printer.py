@@ -87,6 +87,17 @@ PLAN_INPUTS = (
 #: disagree.  `mesh_output_streams` keeps that behaviour and says so rather than
 #: collapsing it, because collapsing it would change what is emitted.
 #:
+#: Measured afterwards rather than argued: instrumenting that site across a full
+#: regeneration of all eight materials logged eighty-four calls, every one of
+#: them carrying a weak form.  Repeating the probe under this whole suite, which
+#: builds configurations the generators do not, found no disagreement either.
+#: The wider question's second answer was never once computed, so it could only
+#: ever have diverged silently.  The two questions are one question now and the
+#: branch is gone.  The budget does not move for it, because the branch was in
+#: `plans/` rather than in an emitter -- which is the one thing this ratchet
+#: cannot see, and the reason the collapse had to be gated on byte-identity
+#: instead.
+#:
 #: 183 -> 179: the other question `writes_per_shape` conflates.  A 0-form
 #: weights its energy density into one accumulator per element; a 1- or 2-form
 #: forms the loperand and contracts it onto the test functions.  Two body
