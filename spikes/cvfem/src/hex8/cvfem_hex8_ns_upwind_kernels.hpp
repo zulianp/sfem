@@ -959,6 +959,35 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     // node rather than over the two nodes of one edge. That needs a per-node min/max pass,
     // which is a new sweep this file does not have and which the deferred correction's
     // existing nodal-gradient pass could carry.
+    //
+    // AND THE LITERATURE DOES NOT AGREE THAT THIS IS THE REMEDY, checked after the paragraph
+    // above was written. Nalu and Nalu-Wind run the same discretisation -- median-dual CVFEM,
+    // Rhie-Chow, projected nodal gradients -- and their higher-order upwind is this file's
+    // reconstruction to the letter, phi_L + d_L . grad phi_L. Their limiter is van Leer
+    // applied to the extrapolated value on a ONE-DIMENSIONAL stencil of the two adjacent
+    // nodes, not a min/max over a node's neighbours. The canonical way to put a TVD limiter
+    // on an unstructured grid is Darwish and Moukalled (2003): reconstruct a virtual upwind
+    // node phi_U = phi_C - 2 grad phi_C . d, form r = (phi_C - phi_U)/(phi_D - phi_C), and the
+    // whole NVD/TVD family then applies unchanged. That is what the one-dimensional stencil
+    // is, and it needs no extra sweep.
+    //
+    // Two further things that search turned up and that matter more than the choice of
+    // limiter. Nalu does not select between upwind and central at all: it blends them by cell
+    // Peclet number, phi_ip = eta phi_upw + (1 - eta) phi_central. And for VELOCITY its tanh
+    // blend is centred at Peclet 50,000 with width 200, against 2 and 1 for every other
+    // scalar -- so at any Peclet a real flow reaches, eta is zero and the momentum equations
+    // run essentially unstabilised central, with upwinding reserved for scalars. This kernel
+    // applies first-order donor-cell to momentum unconditionally and has no Peclet dependence
+    // anywhere, which is a larger gap than the limiter is.
+    //
+    // For the convergence failure specifically, the named remedy is LIMITER FREEZING:
+    // precompute the limited values from a predictor and hold them fixed through the
+    // iterations. It fits the deferred correction, which already lags per Newton step; it
+    // would freeze per continuation stage instead of recomputing per residual. The same
+    // sources note that a limiter's contribution to an implicit Jacobian cannot readily be
+    // evaluated, which is the reason deferred correction is the right structure here and the
+    // Jacobian stays first-order -- the paragraph above got the consequence of that wrong,
+    // not the structure.
     auto lim = [&](const scalar_t *const u, const scalar_t inc_i, const scalar_t inc_j,
                    scalar_t &oi, scalar_t &oj) {
         oi = inc_i;
