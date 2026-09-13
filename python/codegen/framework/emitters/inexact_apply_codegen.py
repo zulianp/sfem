@@ -30,11 +30,19 @@ simplex the projection loses nothing, so the two must agree to round-off, and
 any difference there is a defect rather than an approximation.
 """
 
+import dataclasses
+import functools
+
 import sympy as sp
 
 from codegen.framework.emitters.cprinter import _sfem_ccode
 from codegen.framework.emitters.kernel_prologue import kernel_constant
-from codegen.framework.emitters.quadrature_codegen import cpp_scalar_initializer_list
+from codegen.framework.emitters.quadrature_codegen import (
+    cpp_scalar_initializer_list,
+    cpp_scalar_literal,
+    quadrature_reference_accessor,
+    reference_include_lines,
+)
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
     render_kernel_ast_lines,
@@ -49,6 +57,10 @@ from codegen.framework.ir.kernel_ast import (
     iteration_range,
     iterator,
     pre_increment,
+)
+from codegen.framework.plans.evaluation_strategy import (
+    EvaluationStrategy,
+    evaluation_strategy,
 )
 from codegen.framework.plans.inexact_apply import (
     action_stages,
@@ -189,12 +201,13 @@ def _inexact_apply_kernel_source(
     # already publishes.  Named only when a packed layout is emitted, so a 2D
     # header does not include something it never calls.
     lines.extend(_PACK_SCRATCH_INCLUDE[_emits_packed(plan)])
+    lines.extend(_REFERENCE_INCLUDES_BY_STRATEGY[evaluation_strategy(element_type)](rule, dim))
     lines.extend(["", "namespace sfem {", "namespace codegen {", ""])
     lines.extend(
         _tangent_lines(
             prefix, dim, n_nodes, component, parameters, used_state,
             used_previous, integrand, gradient_symbols, quadrature_weights,
-            reference, plan,
+            reference, rule, plan,
         )
     )
     # One per layout the plan names, in the order it names them.  Iterated, not
@@ -376,6 +389,33 @@ def _gathered_names(role, component, n_nodes, wanted):
     ]
 
 
+@dataclasses.dataclass(frozen=True)
+class _ReferenceTable:
+    """What `reference_include_lines` asks of a table: its name."""
+
+    name: str
+
+
+def _shared_reference_includes(rule, dim):
+    """The shared headers the quadrature loop forwards into."""
+    references = [_ReferenceTable("grad_ref_%s" % axis) for axis in _REFERENCE_AXES[:dim]]
+    references.append(_ReferenceTable("q_weight"))
+    return list(reference_include_lines(rule, references))
+
+
+def _no_reference_includes(rule, dim):
+    """A kernel that reads no shared table includes none."""
+    return []
+
+
+#: Only the strategy that reads the shared structs includes them.
+_REFERENCE_INCLUDES_BY_STRATEGY = {
+    EvaluationStrategy.QUADRATURE: _shared_reference_includes,
+    EvaluationStrategy.EXPANDED: _no_reference_includes,
+    EvaluationStrategy.SUM_FACTORIZED: _no_reference_includes,
+}
+
+
 def _quadrature_table_lines(name, values, indent="    "):
     """One rule constant per point, as a folded table the loop indexes.
 
@@ -402,21 +442,28 @@ def _quadrature_table_lines(name, values, indent="    "):
 
 def _quadrature_loop_compute(
     integrand, integrand_symbols, gradient_symbols, reference, weights,
-    n_nodes, dim, plan,
+    n_nodes, dim, rule, plan, strategy=None,
 ):
-    """The sum over several points: accumulators, then the loop."""
+    """The sum over several points: accumulators, then the loop.
+
+    Reads the shared reference struct the rule publishes -- the same tables
+    every other kernel on this element reads -- rather than a table of its own.
+    """
     lines = [
         "      s_t tangent%d = s_t(0);" % slot
         for slot in range(plan.tangent_components)
     ]
     lines.append("      for (int q = 0; q < NQ; ++q) {")
     lines.extend(
-        "        const s_t %s = QGRAD[q * %d + %d];"
-        % (gradient_symbols[node][axis], n_nodes * dim, node * dim + axis)
+        "        const s_t %s = %s;"
+        % (
+            gradient_symbols[node][axis],
+            _GRADIENT_READ_BY_STRATEGY[strategy](node, axis, n_nodes, dim),
+        )
         for node in range(n_nodes)
         for axis in range(dim)
     )
-    lines.append("        const s_t qw = QWEIGHT[q];")
+    lines.append("        const s_t qw = %s;" % _WEIGHT_READ_BY_STRATEGY[strategy])
     lines.extend(
         "    %s" % line
         for line in _assignment_lines(
@@ -433,9 +480,14 @@ def _quadrature_loop_compute(
 
 def _single_point_compute(
     integrand, integrand_symbols, gradient_symbols, reference, weights,
-    n_nodes, dim, plan,
+    n_nodes, dim, rule, plan,
 ):
-    """The sum over one point: the term itself, with the gradients folded in."""
+    """An EXPANDED element: no loop, no tables, the gradients folded in.
+
+    `plans.evaluation_strategy` says a lowest-order simplex evaluates in closed
+    form -- "no quadrature loop, no per-point geometry, no reference-basis
+    tables" -- and this is that, for the tangent.
+    """
     substitution = {
         gradient_symbols[node][axis]: reference[0][node][axis]
         for node in range(n_nodes)
@@ -452,7 +504,7 @@ def _single_point_compute(
     ]
 
 
-def _quadrature_tables(reference, weights, n_nodes, dim):
+def _folded_gradient_tables(reference, weights, n_nodes, dim, rule):
     values = [
         reference[point][node][axis]
         for point in range(len(weights))
@@ -466,27 +518,91 @@ def _quadrature_tables(reference, weights, n_nodes, dim):
     )
 
 
-def _no_quadrature_tables(reference, weights, n_nodes, dim):
-    """A one-point rule indexes no table, so it declares none."""
+def _no_quadrature_tables(reference, weights, n_nodes, dim, rule):
+    """An EXPANDED element indexes no table, so it declares none."""
     return []
+
+
+def _shared_reference_tables(reference, weights, n_nodes, dim, rule):
+    """Aliases onto the shared reference struct this rule already publishes.
+
+    `ref_<element>_<rule><s_t>::grad_ref_x()` and `quad_<cell>_<rule>::q_weight()`
+    are what every other kernel on this element reads; a private copy is what
+    `quadrature_reference_accessor` was written to remove.
+    """
+    lines = [kernel_constant("NQ", len(weights), indent="    ")]
+    lines.extend(
+        "    const s_t *const RSTR qgrad_%s = %s;"
+        % (axis, quadrature_reference_accessor(rule, "grad_ref_%s" % axis))
+        for axis in _REFERENCE_AXES[:dim]
+    )
+    lines.append(
+        "    const s_t *const RSTR qweight = %s;"
+        % quadrature_reference_accessor(rule, "q_weight")
+    )
+    # The shared table holds the rule's own weights; `Sbar` is their weighted
+    # average, so the reciprocal of their sum rides beside them as one constant.
+    measure = sum((sp.nsimplify(weight) for weight in rule.weights), sp.Integer(0))
+    lines.append(
+        "    static constexpr s_t QMEASURE = %s;"
+        % cpp_scalar_literal(float(sp.Integer(1) / measure))
+    )
+    return lines
+
+
+#: The reference gradient tables are named by axis, as the shared structs name
+#: them.
+_REFERENCE_AXES = ("x", "y", "z")
 
 
 #: Keyed on whether the rule has a single point, so emission looks the answer up
 #: rather than branching on the rule.
-_QUADRATURE_BY_POINT_COUNT = {
-    False: _quadrature_loop_compute,
-    True: _single_point_compute,
+#: How the tangent's quadrature sum is emitted, per evaluation strategy.  A
+#: table, because the choice belongs to `plans.evaluation_strategy` and emission
+#: only looks up the answer.
+#:
+#: SUM_FACTORIZED is honest rather than correct here: the strategy calls for
+#: contraction through one-dimensional operators and this kernel still walks the
+#: points with the element's full reference gradients, which is why it carries a
+#: folded gradient table instead of reading the shared 1D factors.  That is the
+#: remaining gap, and naming it in this table is what keeps it visible.
+_QUADRATURE_BY_STRATEGY = {
+    EvaluationStrategy.EXPANDED: _single_point_compute,
+    EvaluationStrategy.QUADRATURE: functools.partial(
+        _quadrature_loop_compute, strategy=EvaluationStrategy.QUADRATURE
+    ),
+    EvaluationStrategy.SUM_FACTORIZED: functools.partial(
+        _quadrature_loop_compute, strategy=EvaluationStrategy.SUM_FACTORIZED
+    ),
 }
 
-_QUADRATURE_TABLES_BY_POINT_COUNT = {
-    False: _quadrature_tables,
-    True: _no_quadrature_tables,
+_QUADRATURE_TABLES_BY_STRATEGY = {
+    EvaluationStrategy.EXPANDED: _no_quadrature_tables,
+    EvaluationStrategy.QUADRATURE: _shared_reference_tables,
+    EvaluationStrategy.SUM_FACTORIZED: _folded_gradient_tables,
+}
+
+#: Where one point's reference gradient is read from, per strategy.
+_GRADIENT_READ_BY_STRATEGY = {
+    EvaluationStrategy.QUADRATURE: (
+        lambda node, axis, n_nodes, dim: "qgrad_%s[q * %d + %d]"
+        % (_REFERENCE_AXES[axis], n_nodes, node)
+    ),
+    EvaluationStrategy.SUM_FACTORIZED: (
+        lambda node, axis, n_nodes, dim: "QGRAD[q * %d + %d]"
+        % (n_nodes * dim, node * dim + axis)
+    ),
+}
+
+_WEIGHT_READ_BY_STRATEGY = {
+    EvaluationStrategy.QUADRATURE: "qweight[q] * QMEASURE",
+    EvaluationStrategy.SUM_FACTORIZED: "QWEIGHT[q]",
 }
 
 
 def _tangent_lines(
     prefix, dim, n_nodes, component, parameters, used_state, used_previous,
-    integrand, gradient_symbols, weights, reference, plan,
+    integrand, gradient_symbols, weights, reference, rule, plan,
 ):
     """The partial assembly: `Sbar` accumulated over the quadrature points.
 
@@ -528,9 +644,14 @@ def _tangent_lines(
     # the generator already knows the answer to -- and the affine simplices,
     # where the projection is exact, are all one-point rules.  They get the
     # point's gradients folded in as the literals they are.
-    compute = _QUADRATURE_BY_POINT_COUNT[len(weights) == 1](
+    # How this element is evaluated is `plans.evaluation_strategy`'s answer, not
+    # a property of the rule this file re-derives.  A one-point rule and an
+    # EXPANDED element coincide on the simplices, which is why testing the point
+    # count looked right; it is the element's family that decides.
+    strategy = evaluation_strategy(plan.element_type)
+    compute = _QUADRATURE_BY_STRATEGY[strategy](
         integrand, integrand_symbols, gradient_symbols, reference, weights,
-        n_nodes, dim, plan,
+        n_nodes, dim, rule, plan,
     )
     compute.extend(
         "      %s = tangent_t(tangent%d);" % (_BLOCKED_TANGENT_LANE % slot, slot)
@@ -555,8 +676,8 @@ def _tangent_lines(
             "    tangent_t *const RSTR tangent",
         ]
     )
-    tables = _QUADRATURE_TABLES_BY_POINT_COUNT[len(weights) == 1](
-        reference, weights, n_nodes, dim
+    tables = _QUADRATURE_TABLES_BY_STRATEGY[strategy](
+        reference, weights, n_nodes, dim, rule
     )
     return _blocked_function_lines(
         "%s_inexact_apply_tangent_a_msoa" % prefix,
