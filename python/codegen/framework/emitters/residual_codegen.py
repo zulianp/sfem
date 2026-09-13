@@ -39,7 +39,11 @@ from codegen.framework.plans.generation import (
     local_kernel_plan_for,
     mesh_kernel_plan_for_element,
 )
-from codegen.framework.plans.matrix_formats import CRSAssemblyPlan
+from codegen.framework.plans.matrix_formats import (
+    CRSAssemblyPlan,
+    packed_crs_passes,
+    published_matrix_formats,
+)
 from codegen.framework.ir.kernel_ast import (
     AssignmentNode,
     BlockNode,
@@ -6005,32 +6009,6 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
     return lines
 
 
-def _matrix_format_values(matrix_format_plan):
-    if matrix_format_plan is None or getattr(matrix_format_plan, "is_empty", True):
-        return ()
-    values = []
-    for matrix_format in matrix_format_plan.formats:
-        value = getattr(matrix_format, "value", str(matrix_format)).lower()
-        if value not in values:
-            values.append(value)
-    return tuple(values)
-
-
-def _packed_crs_passes(matrix_format_plan):
-    if matrix_format_plan is None or getattr(matrix_format_plan, "is_empty", True):
-        return ()
-    passes = []
-    for variant in matrix_format_plan.variants:
-        matrix_format = getattr(variant.matrix_format, "value", str(variant.matrix_format)).lower()
-        mesh_layout = getattr(variant.mesh_layout, "value", str(variant.mesh_layout)).lower()
-        if matrix_format != "crs" or mesh_layout != "packed":
-            continue
-        packed_pass = getattr(variant.packed_pass, "value", str(variant.packed_pass)).lower()
-        if packed_pass and packed_pass != "none" and packed_pass not in passes:
-            passes.append(packed_pass)
-    return tuple(passes)
-
-
 def _compatible_matrix_field_indices_from_prefix(prefix, system, element_type):
     fields = tuple(system.fields)
     names = tuple(field.name for field in fields)
@@ -6479,12 +6457,12 @@ def _scalar_crs_matrix_assembly_source(
     geometry_family,
     matrix_format_plan,
 ):
-    matrix_formats = _matrix_format_values(matrix_format_plan)
+    matrix_formats = published_matrix_formats(matrix_format_plan)
     if not {"crs", "bsr"}.intersection(matrix_formats):
         return []
     if not dependencies.direction:
         return []
-    packed_crs_passes = _packed_crs_passes(matrix_format_plan)
+    crs_passes = packed_crs_passes(matrix_format_plan)
 
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -6569,7 +6547,7 @@ def _scalar_crs_matrix_assembly_source(
                 column_streams,
             )
         )
-    if packed_crs_passes:
+    if crs_passes:
         lines.extend(
             _scalar_crs_packed_matrix_helpers(
                 function_base,
@@ -6828,7 +6806,7 @@ def _scalar_crs_matrix_assembly_source(
     # have to exist even when no packed CRS pass was requested.
     packed_discover_impl = packed_fill_impl = None
     packed_params = packed_fill_params = ()
-    if packed_crs_passes:
+    if crs_passes:
         packed_fill_impl = "%s_packed_fill_impl" % function_base
         packed_discover_impl = "%s_packed_discover_impl" % function_base
         packed_params = [
@@ -7206,7 +7184,7 @@ def _scalar_crs_matrix_assembly_source(
         impl,
         lines,
         matrix_formats,
-        packed_crs_passes,
+        crs_passes,
         packed_discover_impl,
         packed_fill_impl,
         packed_fill_params,

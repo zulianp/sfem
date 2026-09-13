@@ -272,6 +272,51 @@ class MatrixFormatPlan:
         }
 
 
+def published_matrix_formats(plan):
+    """The matrix formats this plan publishes, as the ABI spells them.
+
+    `MatrixFormatPlan.formats` answers this in the plan's own enum; what the
+    emitted names, the dispatch tables and the manifest carry is the word.  Both
+    big emitters lowered the one to the other themselves, in functions that were
+    the same code under two names -- `_matrix_formats_from_plan` in
+    `emitters/energy_codegen.py` and `_matrix_format_values` in
+    `emitters/residual_codegen.py`, differing only in what they called the local
+    list.  Two paths to one answer is one more than there should be.
+
+    The lowering they each wrote was `getattr(f, "value", str(f)).lower()`, a
+    fallback for not being sure what emission had been handed.  Here that
+    uncertainty does not exist: `MatrixAssemblyVariantPlan.__post_init__`
+    coerces every field through its enum, so a format is a `MatrixFormat` and
+    its value is already the lowercase word.
+    """
+    if plan is None or plan.is_empty:
+        return ()
+    return tuple(matrix_format.value for matrix_format in plan.formats)
+
+
+def packed_crs_passes(plan):
+    """Which passes the packed CRS assembly this plan asks for is emitted in.
+
+    The other function both emitters had written out twice, this one under the
+    same name in both files and with byte-identical bodies.
+
+    Their version also skipped a variant whose pass was ``none``.  A packed
+    variant cannot have one: `MatrixAssemblyVariantPlan.__post_init__` rejects
+    `PACKED` with `NONE` outright, which is the stronger statement and the one
+    worth keeping.
+    """
+    if plan is None or plan.is_empty:
+        return ()
+    return tuple(
+        dict.fromkeys(
+            variant.packed_pass.value
+            for variant in plan.variants
+            if variant.matrix_format is MatrixFormat.CRS
+            and variant.mesh_layout is MatrixMeshLayout.PACKED
+        )
+    )
+
+
 def matrix_format_plan_from_request(
     formats=(),
     mesh_layouts=("standard",),
