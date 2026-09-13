@@ -183,7 +183,20 @@ PLAN_INPUTS = (
 #: states the mapping once and `local_kernel_stream_plans` reads it too.  What
 #: stays in emission is what an offset into a tile looks like against a pointer
 #: array, which is C.
-BUDGET = 153
+#:
+#: 153 -> 147, and the plan function had named these sites itself.
+#: `form_contraction`'s docstring reads "asked twenty-three times in the energy
+#: emitter as `form.weak_form is None` or `is not None`, eight of them in one
+#: function" -- and six of that eight were still there, in
+#: `_sfem_soa_mesh_operator_function`.
+#:
+#: They are one structure: whether the block call sits inside a quadrature loop.
+#: A pointwise form is contracted at each point, so this file opens the loop,
+#: indents the call and closes the brace, and passes `q` where a deferred-flux
+#: form passes the geometry stride.  Six separate `if`s said that; six tables
+#: keyed on the same plan answer say it now, and the buffer extent cannot
+#: disagree with the loop that indexes it.
+BUDGET = 147
 
 
 def _tested_names(test):
