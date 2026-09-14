@@ -517,10 +517,10 @@
 
   <table class="measures" style="margin:8px 0 12px">
     <tr><th>measure</th><th>that pass</th><th>now</th><th></th></tr>
-    <tr><td><b>Decisions in emission</b></td><td class="n">200</td><td class="n">132</td><td><b>the headline measure, and it moved.</b> Sixty-two of those left in one stretch, every one of them proved by regenerating the tree and finding it byte-identical. <code>energy_codegen.py</code> 98 &rarr; 61 and <code>residual_codegen.py</code> 88 &rarr; 63, which is the first time the two have been level</td></tr>
+    <tr><td><b>Decisions in emission</b></td><td class="n">200</td><td class="n">105</td><td><b>the headline measure, and it moved.</b> <code>energy_codegen.py</code> 98 &rarr; 52 and <code>residual_codegen.py</code> 88 &rarr; 45, and the two have stayed level since they first drew even at 61/63. Every step proved by regenerating the tree and finding it byte-identical &mdash; with one exception, recorded below, where byte-identity said nothing at all</td></tr>
     <tr><td><b>Generated files that ship</b></td><td class="n">313</td><td class="n">389</td><td>the inexact-apply family and the lexicographic twins it delegates to; the exemption list is still 6</td></tr>
-    <tr><td><b>Public C ABI entry points</b></td><td class="n">372</td><td class="n">224</td><td><b>still zero <code>_float</code> on the public surface.</b> Below it the count went 69 &rarr; 26: the inexact family and the last residual matrix assembly converted, and what is left is the boundary operators alone</td></tr>
-    <tr><td><b>emitters/ lines</b></td><td class="n">24,027</td><td class="n">26,227</td><td><b>grew again, and that is the point of the row above it.</b> Naming a decision costs more lines than branching on it &mdash; a plan function, a table and a docstring saying why &mdash; so the two measures move in opposite directions and only one of them is the architecture</td></tr>
+    <tr><td><b>Public C ABI entry points</b></td><td class="n">372</td><td class="n">224</td><td><b>still zero <code>_float</code> on the public surface.</b> Below it the count went 69 &rarr; 42, all of them the boundary operators: the inexact family and the last residual matrix assembly converted, and nothing outside that family publishes a precision twin. The plan that set this target predicted 26, having guessed at how many boundary entry points exist; 42 is what counting them gives</td></tr>
+    <tr><td><b>emitters/ lines</b></td><td class="n">24,027</td><td class="n">26,145</td><td><b>grew again, and that is the point of the row above it.</b> Naming a decision costs more lines than branching on it &mdash; a plan function, a table and a docstring saying why &mdash; so the two measures move in opposite directions and only one of them is the architecture</td></tr>
     <tr><td><b>Passes over the IR</b></td><td class="n">1</td><td class="n">1</td><td><b>still has not moved.</b> <code>VectorizationContractPass</code> remains the only one, and still an analysis</td></tr>
   </table>
 
@@ -1262,15 +1262,55 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
   <p>Two rows still need reading carefully rather than celebrating. The emission layer <b>grew</b>, and has kept growing through work that moved decisions out of it, which is why line count was replaced as the measure by the decision count above it. And the file count fell by a scope decision rather than by the framework getting smaller — <b>the capability is unchanged except for three matrix formats</b>, and it would be a mistake to read 623 → 313 as progress on the architecture.</p>
 
   <p><b>Those figures are that pass's and are left standing.</b> Since then the decision
-  count has gone 200 &rarr; <b>132</b>, the shipped file count 313 &rarr; 389 as the
+  count has gone 200 &rarr; <b>105</b>, the shipped file count 313 &rarr; 389 as the
   inexact-apply family and its lexicographic twins arrived, the public C ABI 372 &rarr; 224
   as the last two families collapsed onto the runtime-typed boundary, and the emission
-  layer 24,027 &rarr; 26,227 lines. The last of those is the row above read correctly: naming
+  layer 24,027 &rarr; 26,145 lines. The last of those is the row above read correctly: naming
   a decision costs more lines than branching on it, so the two measures move apart and only
   one of them is the architecture.</p>
 
+  <p><b>OP 25 is closed, and its last three conversions each found an owner that already
+  existed.</b> The plan behind it named three private spellings in the inexact emitter to be
+  handed to <code>plans/kernel_signature</code>, <code>plans/conventions</code> and a
+  lane-major staging component it said had <i>no owner anywhere</i> and would have to be
+  created. All three assessments were wrong in the same direction, and generously so.
+  <code>kernel_signature</code> already held <code>KernelArgument</code> while
+  <b>eleven</b> sites across all three emitters spelled the packed mesh ABI by hand &mdash;
+  nine agreeing and two differing in both content and argument order, with only one of the
+  two differences ever written down. <code>conventions</code> already held
+  <code>abi_qualifier</code>, which <i>parses</i> the very names thirteen sites were
+  composing by hand. And the lane loop was owned by <code>LoopHeaderNode</code>, whose own
+  docstring reads &ldquo;every use of this node is a body that has not migrated&rdquo; &mdash;
+  all three emitters were already rendering lane loops through it while writing twelve more
+  out by hand. Building the sketched component would have been a fifth spelling competing
+  with the one the printer owns. The lesson the table above already carries &mdash; that
+  reading the plan layer&rsquo;s unfinished business beats designing anything &mdash; is
+  stronger than it was recorded: here it was three for three, including a case where the
+  plan&rsquo;s own claim that nothing owned the decision was mistaken.</p>
+
   <h3>Gates</h3>
   <p>Every change above was verified, and what counts as verification changed once output was allowed to move. That is the single largest difference from the previous pass.</p>
+
+  <p><b>Two things byte-identity does not say, both learned by being caught out.</b> It is the
+  strongest gate here while output is meant to hold still, and the whole stretch that took the
+  decision count to 105 leaned on it. But it is silent in two directions, and neither is
+  obvious from a green run.</p>
+  <p><b>It does not say the code ran.</b> An import into <code>residual_codegen.py</code>
+  silently failed to apply &mdash; the edit targeted a one-line <code>from &hellip; import</code>
+  and that file&rsquo;s was already a parenthesised block &mdash; leaving a
+  <code>NameError</code> in five packed jacobian-action sites. Regeneration reported zero
+  material failures and a byte-identical tree throughout, because it never executes those
+  paths; the test suite found it, at nine new failures. A path the generators do not reach
+  looks exactly like a path that works. Since then each conversion is checked by counting what
+  it emits in the shipped tree, per site rather than per commit, because two sites of one
+  change can emit different text and a single grep will quietly cover only one of them.</p>
+  <p><b>It does not say the number is right.</b> The <code>KernelDiagnostics</code> records
+  are emitted as literal integers, so byte-identity holds them steady &mdash; which is not the
+  same as agreeing with them. Three emitters computed the same two reference-traffic figures
+  three different ways; that they agree where they overlap was established by measuring
+  &mdash; (8, 2) for HEX8, QUAD4 and PROTEUS_HEX8, (18, 3) for HEX27 &mdash; not by reading
+  the code. <code>reproducibility --all</code> would not have caught a wrong one either: it
+  compares kernel answers, and a diagnostics count is not one.</p>
   <div class="tbl-wrap">
   <table>
     <thead><tr><th style="width:26%">Gate</th><th style="width:44%">What it catches</th><th style="width:30%">Status</th></tr></thead>
