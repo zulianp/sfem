@@ -467,15 +467,6 @@ def _scatter_lines(lhs, rhs, indent):
     return list(target.scatter_add_lines(lhs, rhs, indent))
 
 
-def _is_symbol_or_negation(expression):
-    """Whether this is a name for one value: `t` or `-t`, nothing else.
-
-    `-t` is `Mul(-1, t)` to sympy, so the test is that negating it leaves a bare
-    symbol.  Anything with real arithmetic in it keeps its declaration.
-    """
-    return bool(expression.is_Symbol or (-expression).is_Symbol)
-
-
 def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
     """Common subexpressions first, then the named values, as C declarations.
 
@@ -494,13 +485,22 @@ def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
     -- and the last stage, whose names the scatter reads, does not, nor do the
     three other callers here, so they pass nothing and keep their aliases.
 
-    A bare symbol is eliminated, and so is the negation of one.  The negation
-    was kept once, on the reasoning that substituting it would push a minus into
-    each of the three output terms that read it.  That was wrong twice over: a
-    sign flip folds into the multiply it lands on and costs nothing, and holding
-    `-t` under its own name hides `t` from the common-subexpression elimination
-    downstream exactly as the plain aliases did -- the positive and negative uses
-    of one temporary stop looking like uses of one temporary.
+    Only a bare symbol is eliminated.  A negation such as `-reference_product_t10`
+    keeps its declaration, and the reason is measured rather than argued.
+    Substituting it does lower the arithmetic: the positive and negative uses of
+    one value start looking like uses of one value, the stage below shares the
+    products they have in common, and the HEX8 linear-elasticity header falls
+    from 5644 operators to 5269.  It also raises the declarations from 1549 to
+    1765, because every product it now shares has to stay live across both of
+    its uses, and on this kernel that is the binding constraint.  One Grace
+    socket, 72 threads, OMP_PROC_BIND=true, at 206763 / 1167051 / 3472875 dof:
+
+        stored f64    -2.8%  -4.0%  -4.1%
+        stored f32    -2.4%  -4.9%  -5.3%
+        packed st32   -2.9%  -2.0%  -5.4%
+
+    against unchanged control kernels that moved by 0.24% or less over the same
+    runs.  Fewer operations, less throughput, on both layouts and at every size.
     """
     if not assignments:
         return []
@@ -514,7 +514,7 @@ def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
         for symbol, expression in temporaries
     ]
     for symbol, expression in zip(symbols, reduced):
-        if aliases is not None and _is_symbol_or_negation(expression):
+        if aliases is not None and expression.is_Symbol:
             aliases[symbol] = expression
             continue
         lines.append(
