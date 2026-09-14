@@ -22,6 +22,11 @@ from codegen.framework.ir.kernel_ast import (
     ReturnNode,
     ScatterNode,
     SymbolRef,
+    LoopKind,
+    expr_ref,
+    iteration_range,
+    iterator,
+    pre_increment,
 )
 
 
@@ -258,3 +263,48 @@ def render_kernel_ast_lines(name, nodes, printer=None, passes=DEFAULT_PASSES):
     if passes is not None:
         ast, _results = passes.apply(ast)
     return printer.print_ast(ast)
+
+
+def lane_loop_header_lines(pragma, indent="", indent_pragma=True):
+    """The lane loop's pragma and `for`, rendered from the IR.
+
+    The one spelling of `for (int lane = 0; lane < ne; ++lane) {` for the three
+    emitters that build their bodies as lines.  Before this there were four:
+    `energy_codegen.py` spliced `source_builder.simd_lines()`,
+    `residual_codegen.py` spliced `_vectorize_pragma()`,
+    `inexact_apply_codegen.py` had a private `_simd_pragma`, and all three then
+    wrote the `for` out by hand -- while every one of them *also* rendered this
+    same loop through `LoopHeaderNode` somewhere else in the same file.
+
+    `pragma` is the bound target's vectorize pragma or a falsy value; the caller
+    fetches it, because the three reach their target differently and that is a
+    separate question from how the loop is spelled.
+
+    `indent_pragma` is false where a site has always emitted the pragma at
+    column zero.  That is not a preference: `simd_lines()` and
+    `_vectorize_pragma()` return the bare pragma and their call sites spliced it
+    unindented, so 210 of the 2935 `#pragma omp simd` lines in the shipped tree
+    sit at column zero beside an indented loop.  Straightening them moves bytes
+    in generated code and is a decision to take on its own, not a side effect of
+    giving the loop one spelling.
+    """
+    lane = iterator("lane", "int")
+    rendered = render_kernel_ast_lines(
+        "lane_loop_header",
+        (
+            LoopHeaderNode(
+                LoopNode(
+                    LoopKind.SIMD,
+                    lane,
+                    iteration_range(0, expr_ref("ne", "tile_extent")),
+                    pre_increment(lane),
+                    vectorized=bool(pragma),
+                )
+            ),
+        ),
+        printer=CLikeKernelASTPrinter(vectorize_pragma=pragma or ""),
+    )
+    if not pragma:
+        return tuple("%s%s" % (indent, line) for line in rendered)
+    head = rendered[0] if indent_pragma is False else "%s%s" % (indent, rendered[0])
+    return (head,) + tuple("%s%s" % (indent, line) for line in rendered[1:])

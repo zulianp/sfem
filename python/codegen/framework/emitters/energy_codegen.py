@@ -88,6 +88,7 @@ from codegen.framework.ir.kernel_ast import (
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
     PrinterLayout,
+    lane_loop_header_lines,
     render_kernel_ast_lines,
 )
 from codegen.framework.targets import current_target
@@ -256,6 +257,28 @@ def _reference_gradient_offset_lines(
         )
         for row in range(n_field_components)
         for col in range(dim)
+    )
+
+
+def _lane_loop_header_lines(source_builder, indent):
+    """A packed kernel's lane loop: its pragma and its `for`, from the IR.
+
+    Seven sites spliced `*source_builder.simd_lines()` and then wrote the `for`
+    out by hand.  The loop is `LoopHeaderNode` over the same `LoopNode` that
+    `_work_item_loop_lines` below renders, so the two stop being separate
+    spellings of one loop.
+
+    The pragma lands at column zero and the `for` at `indent`, which is what
+    these sites have always emitted -- `simd_lines()` returns the bare pragma
+    and the splice never indented it.  That asymmetry is visible in the shipped
+    tree, where 210 of 2935 `#pragma omp simd` lines sit at column zero.  It is
+    preserved here rather than quietly corrected, because correcting it moves
+    shipped bytes and that is a decision to take deliberately, not a side effect
+    of moving a loop into the IR.
+    """
+    pragma = tuple(source_builder.simd_lines())
+    return lane_loop_header_lines(
+        pragma[0] if pragma else None, indent, indent_pragma=False
     )
 
 
@@ -3807,8 +3830,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             lines.extend(
                 [
                     "          for (int d = 0; d < ND; ++d) {",
-                    *source_builder.simd_lines(),
-                    "            for (int lane = 0; lane < ne; ++lane) {",
+                    *_lane_loop_header_lines(source_builder, "            "),
                     "              const uint16_t %s = %s[evb + lane];"
                     % (
                         coordinate_node,
@@ -3823,8 +3845,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         lines.extend(
             [
                 "          for (int d = 0; d < NC; ++d) {",
-                *source_builder.simd_lines(),
-                "            for (int lane = 0; lane < ne; ++lane) {",
+                *_lane_loop_header_lines(source_builder, "            "),
                 "              const uint16_t packed_node = element_shape[evb + lane];",
                 "              bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];",
                 "              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];",
@@ -3913,22 +3934,19 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "          const s_t alpha = steps[step];",
                 "          for (int shape = 0; shape < NS; ++shape) {",
                 "            for (int d = 0; d < NC; ++d) {",
-                *source_builder.simd_lines(),
-                "              for (int lane = 0; lane < ne; ++lane) {",
+                *_lane_loop_header_lines(source_builder, "              "),
                 "                bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];",
                 "              }",
                 "            }",
                 "          }",
-                *source_builder.simd_lines(),
-                "          for (int lane = 0; lane < ne; ++lane) {",
+                *_lane_loop_header_lines(source_builder, "          "),
                 "            bvalue[lane] = s_t(0);",
                 "          }",
                 "",
                 "          %s<s_t, NQ, NS, VS>(%s);"
                 % (block_name, ", ".join(call_args)),
                 "",
-                *source_builder.simd_lines(),
-                "          for (int lane = 0; lane < ne; ++lane) {",
+                *_lane_loop_header_lines(source_builder, "          "),
                 "            value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];",
                 "          }",
                 "        }",
@@ -5652,8 +5670,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend(
                     [
                         "          for (int d = 0; d < ND; ++d) {",
-                        *source_builder.simd_lines(),
-                        "            for (int lane = 0; lane < ne; ++lane) {",
+                        *_lane_loop_header_lines(source_builder, "            "),
                         "              const uint16_t %s = %s[evb + lane];"
                         % (
                             coordinate_node,
@@ -5670,8 +5687,7 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 [
                     "          for (int d = 0; d < NC; ++d) {",
-                    *source_builder.simd_lines(),
-                    "            for (int lane = 0; lane < ne; ++lane) {",
+                    *_lane_loop_header_lines(source_builder, "            "),
                     "              const uint16_t packed_node = element_shape[evb + lane];",
                 ]
             )
