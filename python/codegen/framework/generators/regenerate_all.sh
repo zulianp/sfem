@@ -96,6 +96,22 @@ if (( status != 0 )); then
     exit "$status"
 fi
 
+# The headers that belong to a target rather than to a material.  The OpenMP set
+# falls out of the material runs above; the CUDA set does not, because CUDA
+# generation is opt-in and also writes an untracked per-material operator tree.
+# Asking the backend for them needs no material, so it runs every time and the
+# `.cuh` files stop being four tracked files that nothing regenerates.
+printf '==> shared headers\n'
+# `set -e` would abort on a bare call, but without naming the step that failed,
+# and this one matters: `codegen_snapshot check-tree` expects these files now,
+# so a failure that is not read as a failure here surfaces later as tree drift
+# somewhere else entirely.  The materials above report themselves by name; so
+# does this.
+if ! "$PYTHON" -m codegen.framework.generators.shared_headers; then
+    printf '==> shared headers FAILED\n'
+    exit 1
+fi
+
 # These two run after the materials because they read what the materials wrote.
 if [[ "${SFEM_GENERATE_CUDA:-0}" == "1" ]]; then
     printf '==> cuda\n'

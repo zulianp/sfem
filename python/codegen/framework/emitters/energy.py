@@ -441,6 +441,21 @@ class OpenMPEnergySoAEmitter:
     supports_op_wrapper: bool = True
     target: object = OpenMPTarget()
 
+    def _source_builder(self):
+        return OpenMPEnergySoASourceBuilder(target=self.target)
+
+    def shared_primitive_files(self):
+        """The headers this target spells, with no material in the question.
+
+        The tensor-product family is asked for by name because these headers
+        belong to the target, not to any one element: whether a *given* element
+        is tensor-product decides whether that element's kernels include the
+        micro-kernels, not whether the tree has them.  Some element always is.
+        """
+        from codegen.framework.emitters.energy_codegen import shared_primitive_files
+
+        return shared_primitive_files(self._source_builder(), "tensor_product")
+
     def emit_plan(self, plan):
         from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
 
@@ -452,7 +467,7 @@ class OpenMPEnergySoAEmitter:
             reference_data_plan=plan.reference_data_plan,
             diagnostics_plan=plan.diagnostics_plan,
             matrix_format_plan=plan.matrix_format_plan,
-            source_builder=OpenMPEnergySoASourceBuilder(target=self.target),
+            source_builder=self._source_builder(),
         )
 
 
@@ -464,6 +479,24 @@ class CUDAEnergySoAEmitter:
     target: object = CUDATarget()
     operator_extension: str = "cu"
 
+    def _source_builder(self):
+        return CUDAEnergySoASourceBuilder(
+            operator_extension=self.operator_extension,
+            target=self.target,
+        )
+
+    def shared_primitive_files(self):
+        """The headers this target spells, with no material in the question.
+
+        The tensor-product family is asked for by name because these headers
+        belong to the target, not to any one element: whether a *given* element
+        is tensor-product decides whether that element's kernels include the
+        micro-kernels, not whether the tree has them.  Some element always is.
+        """
+        from codegen.framework.emitters.energy_codegen import shared_primitive_files
+
+        return shared_primitive_files(self._source_builder(), "tensor_product")
+
     def emit_plan(self, plan):
         from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
 
@@ -474,8 +507,5 @@ class CUDAEnergySoAEmitter:
             emission_plan=plan.emission_plan,
             reference_data_plan=plan.reference_data_plan,
             diagnostics_plan=plan.diagnostics_plan,
-            source_builder=CUDAEnergySoASourceBuilder(
-                operator_extension=self.operator_extension,
-                target=self.target,
-            ),
+            source_builder=self._source_builder(),
         )
