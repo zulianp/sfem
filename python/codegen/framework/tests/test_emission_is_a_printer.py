@@ -385,7 +385,21 @@ PLAN_INPUTS = (
 #: full data.  Collapsing them would have started charging kernels for tables
 #: they do not read, and the numbers feed `tools/flops_audit.py`, which is how
 #: the roofline is generated rather than written.
-BUDGET = 109
+#:
+#: 109 -> 107: the adjugate alias, which had its own answer already in hand.
+#:
+#: Both sites called `plans.geometry_quantities.local_geometry_streams` and
+#: discarded the roles on the very next line -- `for name, _role in ...` --
+#: before re-deriving what those roles had just said, as
+#: `dependencies.uses_adjugate and not uses_cached_affine_metric`.  Whether a
+#: kernel aliases an adjugate *is* whether the plan put an adjugate role in the
+#: sequence: a cached metric carries the adjugate's work and takes its place,
+#: and a form that reads no adjugate never gets one.
+#:
+#: The extent went with it.  It was `dim * dim` and is now the length of the
+#: sequence being aliased, so the array cannot disagree with the streams it
+#: points at.
+BUDGET = 107
 
 
 def _tested_names(test):

@@ -365,6 +365,31 @@ def _work_item_loop_lines(indent):
     return _target().work_item_loop_lines(indent)
 
 
+def _affine_adjugate_alias_lines(geometry_streams, indent):
+    """The `badjugate` alias over a block's affine geometry streams, if it has one.
+
+    Present exactly when `plans.geometry_quantities` put an adjugate in the
+    sequence: a cached metric carries the adjugate's work and takes its place,
+    and a form that reads no adjugate never asks for one.  Two sites re-derived
+    that as `dependencies.uses_adjugate and not uses_cached_affine_metric` --
+    with the roles already in hand from `local_geometry_streams` and thrown
+    away on the line above.
+
+    The extent comes from the sequence rather than from `dim * dim`, so it
+    cannot disagree with the streams it aliases.
+    """
+    components = [name for name, role in geometry_streams if role == "adjugate"]
+    if not components:
+        return []
+    return [
+        "%sconst s_t *badjugate[%d];" % (indent, len(components)),
+        "%sfor (int component = 0; component < %d; ++component) {"
+        % (indent, len(components)),
+        "%s  badjugate[component] = bageom_streams[component];" % indent,
+        "%s}" % indent,
+    ]
+
+
 def _affine_geometry_stream_conversion_lines(streams, indent):
     streams = tuple(streams)
     n_streams = len(streams)
@@ -5749,28 +5774,17 @@ def _mesh_operator_source(
     # `plans.geometry_quantities`: the cached metric, or the adjugate when the
     # form needs one, followed by the determinant.  This site and one more
     # spelled the same three cases as a nested ternary.
-    affine_geometry_streams = tuple(
-        name
-        for name, _role in local_geometry_streams(
-            dependencies,
-            dim,
-            gradient_metric.metric_components if uses_cached_affine_metric else None,
-        )
+    affine_geometry = local_geometry_streams(
+        dependencies,
+        dim,
+        gradient_metric.metric_components if uses_cached_affine_metric else None,
     )
+    affine_geometry_streams = tuple(name for name, _role in affine_geometry)
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
     }
     geometry.extend(_affine_geometry_stream_conversion_lines(affine_geometry_streams, "    "))
-    if dependencies.uses_adjugate and not uses_cached_affine_metric:
-        geometry.extend(
-            [
-                "    const s_t *badjugate[%d];" % (dim * dim),
-                "    for (int component = 0; component < %d; ++component) {"
-                % (dim * dim),
-                "      badjugate[component] = bageom_streams[component];",
-                "    }",
-            ]
-        )
+    geometry.extend(_affine_adjugate_alias_lines(affine_geometry, "    "))
     if uses_cached_affine_metric:
         geometry.append(
             "    const s_t *const bgeom_metric[%d] = {%s};"
@@ -7889,14 +7903,12 @@ def _scalar_packed_affine_jacobian_action_source(
     # `plans.geometry_quantities`: the cached metric, or the adjugate when the
     # form needs one, followed by the determinant.  This site and one more
     # spelled the same three cases as a nested ternary.
-    affine_geometry_streams = tuple(
-        name
-        for name, _role in local_geometry_streams(
-            dependencies,
-            dim,
-            gradient_metric.metric_components if uses_cached_affine_metric else None,
-        )
+    affine_geometry = local_geometry_streams(
+        dependencies,
+        dim,
+        gradient_metric.metric_components if uses_cached_affine_metric else None,
     )
+    affine_geometry_streams = tuple(name for name, _role in affine_geometry)
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
     }
@@ -8050,16 +8062,7 @@ def _scalar_packed_affine_jacobian_action_source(
         ]
     )
     lines.extend(_affine_geometry_stream_conversion_lines(affine_geometry_streams, "        "))
-    if dependencies.uses_adjugate and not uses_cached_affine_metric:
-        lines.extend(
-            [
-                "        const s_t *badjugate[%d];" % (dim * dim),
-                "        for (int component = 0; component < %d; ++component) {"
-                % (dim * dim),
-                "          badjugate[component] = bageom_streams[component];",
-                "        }",
-            ]
-        )
+    lines.extend(_affine_adjugate_alias_lines(affine_geometry, "        "))
     if uses_cached_affine_metric:
         lines.append(
             "        const s_t *const bgeom_metric[%d] = {%s};"
