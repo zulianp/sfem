@@ -56,6 +56,7 @@ from codegen.framework.emitters.quadrature_codegen import (
     tensor_product_q_index_lines,
     tensor_product_quadrature_weight_expr,
 )
+from codegen.framework.plans.conventions import inexact_apply_name
 from codegen.framework.plans.kernel_signature import (
     PACKED_MESH_REDUCE_ONLY_ARGUMENTS,
 )
@@ -296,7 +297,7 @@ def _inexact_apply_kernel_source(
         )
     )
     return (
-        "%s_inexact_apply_tangent_a_msoa" % prefix,
+        inexact_apply_name(prefix, "tangent"),
         "\n".join(lines),
         "\n".join(operator_lines),
     )
@@ -346,7 +347,7 @@ def _diagnostics_lines(
         ("stored", stored_flops, 0, 0, dim * n_nodes),
         ("compressed", compressed_flops, 0, 0, dim * n_nodes),
     ):
-        name = "%s_inexact_apply_%s_a_msoa" % (prefix, suffix)
+        name = inexact_apply_name(prefix, suffix)
         lines.extend(
             diagnostics_record_lines(
                 DiagnosticsRecord(
@@ -1140,7 +1141,7 @@ def _tangent_lines(
         _ACCUMULATOR_BY_LOOP[_NEEDS_QUADRATURE_LOOP[strategy]](plan.tangent_components)
     )
     return _blocked_function_lines(
-        "%s_inexact_apply_tangent_a_msoa" % prefix,
+        inexact_apply_name(prefix, "tangent"),
         ("typename s_t", "typename g_t", "typename tangent_t", "int VS"),
         signature, tables + list(source.scratch), gathers, compute, [], inner=inner,
     )
@@ -1193,7 +1194,7 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body, layout="standar
     signature.extend(_stream_arguments("h", component))
     signature.extend(_output_arguments(component))
     return _STORED_SKELETON_BY_LAYOUT[layout](
-        "%s_inexact_apply_stored%s_a_msoa" % (prefix, _LAYOUT_SUFFIX[layout]),
+        inexact_apply_name(prefix, "stored", _LAYOUT_TRAVERSAL[layout]),
         ("typename s_t", "typename tangent_t", "int VS"),
         signature, scratch, gathers, compute, store, component,
     )
@@ -1237,7 +1238,7 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     signature.extend(_stream_arguments("h", component))
     signature.extend(_output_arguments(component))
     return _function_lines(
-        "%s_inexact_apply_compressed_a_msoa" % prefix,
+        inexact_apply_name(prefix, "compressed"),
         ("typename s_t", "typename tangent_t", "typename scale_t"),
         signature,
         body,
@@ -1719,7 +1720,12 @@ def _function_lines(name, template_params, signature, body):
 
 #: The layout axis, as tables rather than branches.  A layout the plan does not
 #: name is never looked up, which is what keeps emission a printer.
-_LAYOUT_SUFFIX = {"standard": "", "packed_two_pass": "_packed_two_pass"}
+#: Which traversal each layout puts in the qualifier slot, as
+#: `plans/conventions` spells it.  This was `_LAYOUT_SUFFIX`, holding
+#: `"_packed_two_pass"` with the joining underscore baked in, which is what a
+#: name built by string concatenation needs and what a name built by
+#: `conventions.inexact_apply_name` must not be given.
+_LAYOUT_TRAVERSAL = {"standard": "", "packed_two_pass": "packed_two_pass"}
 _CONNECTIVITY_INDEX_TYPE = {"standard": "idx_t", "packed_two_pass": "uint16_t"}
 _STORED_GATHERS_BY_LAYOUT = {
     "standard": lambda gathered, _component: _staged_gathers(gathered),
@@ -1844,9 +1850,9 @@ def _c_abi_entry_points(
     )
     entry_points.append(
         _AbiEntryPoint(
-            name="%s_inexact_apply_tangent_a_msoa" % prefix,
+            name=inexact_apply_name(prefix, "tangent"),
             params=tuple(params),
-            template="%s_inexact_apply_tangent_a_msoa_impl" % template_prefix,
+            template="%s_impl" % inexact_apply_name(template_prefix, "tangent"),
             template_arguments=lambda scalar_type: "%s, geom_t, %s, %d"
             % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
         )
@@ -1863,9 +1869,9 @@ def _c_abi_entry_points(
     params.extend(_abi_stream("out", component, const=""))
     entry_points.append(
         _AbiEntryPoint(
-            name="%s_inexact_apply_stored_a_msoa" % prefix,
+            name=inexact_apply_name(prefix, "stored"),
             params=tuple(params),
-            template="%s_inexact_apply_stored_a_msoa_impl" % template_prefix,
+            template="%s_impl" % inexact_apply_name(template_prefix, "stored"),
             template_arguments=lambda scalar_type: "%s, %s, %d"
             % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
         )
@@ -1876,13 +1882,13 @@ def _c_abi_entry_points(
         params = list(_packed_abi_prologue())
         params.extend(_abi_stream("h", component))
         params.extend(_abi_stream("out", component, const=""))
-        suffix = _LAYOUT_SUFFIX[layout]
+        traversal = _LAYOUT_TRAVERSAL[layout]
         entry_points.append(
             _AbiEntryPoint(
-                name="%s_inexact_apply_stored%s_a_msoa" % (prefix, suffix),
+                name=inexact_apply_name(prefix, "stored", traversal),
                 params=tuple(params),
-                template="%s_inexact_apply_stored%s_a_msoa_impl"
-                % (template_prefix, suffix),
+                template="%s_impl"
+                % inexact_apply_name(template_prefix, "stored", traversal),
                 template_arguments=lambda scalar_type: "%s, %s, %d"
                 % (scalar_type, _ABI_TANGENT_STORE, _ABI_VECTOR_SIZE),
                 element_type="uint16_t",
@@ -1901,9 +1907,9 @@ def _c_abi_entry_points(
     params.extend(_abi_stream("out", component, const=""))
     entry_points.append(
         _AbiEntryPoint(
-            name="%s_inexact_apply_compressed_a_msoa" % prefix,
+            name=inexact_apply_name(prefix, "compressed"),
             params=tuple(params),
-            template="%s_inexact_apply_compressed_a_msoa_impl" % template_prefix,
+            template="%s_impl" % inexact_apply_name(template_prefix, "compressed"),
             template_arguments=lambda scalar_type: "%s, compressed_t, scaling_t"
             % scalar_type,
         )
@@ -2087,5 +2093,12 @@ def _inexact_stem(material, unit, element_type):
 
 
 def _unit_name(material, unit):
-    """What this unit's kernels are called, matching the other emitters."""
+    """What this unit's kernels are called, matching the other emitters.
+
+    `unit` is an emission kernel from `emission_kernels_for_context`, not a
+    material sub-unit, and its name is already the composed output name --
+    `conventions.unit_output_name` has run by the time it gets here.  Composing
+    again doubles the material into `neohookean_ogden_neohookean_ogden_tet4`,
+    which is what happens if this is mistaken for the driver's own spelling.
+    """
     return str(getattr(unit, "name", None) or material.name)

@@ -423,6 +423,59 @@ ABI_VERBS = (
 ABI_INEXACT_MODES = ("tangent", "stored", "compressed")
 
 
+def unit_output_name(material_name, unit_name):
+    """What a material's unit publishes its kernels under.
+
+    A material with one unit publishes under its own name; a material split into
+    units qualifies each with the unit, because two materials can both have an
+    `elastic` unit and the ABI has one namespace.
+
+    This runs once, in `pipeline/driver.py`, as a unit is turned into an
+    emission kernel.  Everything downstream reads the composed name off that
+    kernel rather than composing again -- `_unit_name` in
+    `emitters/inexact_apply_codegen.py` looks like a second spelling of this and
+    is not one, because what it is handed is the result, not the parts.
+    Composing twice yields `neohookean_ogden_neohookean_ogden_tet4`.
+    """
+    if unit_name:
+        return "%s_%s" % (material_name, unit_name)
+    return str(material_name)
+
+
+#: The verb phrase the inexact-apply family publishes under.  Two words, because
+#: the kernel is an apply and `inexact` says which apply it is.
+ABI_INEXACT_VERB_PHRASE = "inexact_apply"
+
+
+def inexact_apply_name(prefix, mode, traversal="", geometry="affine"):
+    """The published name of one inexact-apply kernel.
+
+    Thirteen sites in `emitters/inexact_apply_codegen.py` built this by
+    formatting `"%s_inexact_apply_%s_a_msoa"`, spelling three separate pieces of
+    ABI at each of them -- the verb phrase, the mode, and the mesh-SoA tail --
+    while `abi_qualifier` below parses that same name back out of the shipped
+    tree.  A name written in thirteen places and read in one is a name whose two
+    halves can disagree, and the reader is the half that raises.
+
+    `mode` is one of `ABI_INEXACT_MODES` and `traversal` is the optional second
+    occupant of the qualifier slot, the pair `abi_traversal` splits apart again.
+    Rejecting an unknown mode here is the point: the emitter used to interpolate
+    whatever it was handed, so a typo became a kernel nothing could route to.
+    """
+    if mode not in ABI_INEXACT_MODES:
+        raise ValueError(
+            "%r is not an inexact-apply mode; the family publishes %s"
+            % (mode, ", ".join(ABI_INEXACT_MODES))
+        )
+    qualifier = "%s_%s" % (mode, traversal) if traversal else mode
+    return "%s_%s_%s_%s" % (
+        prefix,
+        ABI_INEXACT_VERB_PHRASE,
+        qualifier,
+        abi_mesh_fragment(geometry),
+    )
+
+
 def abi_qualifier(name):
     """What sits between the verb and the geometry token, or `""` for nothing.
 
