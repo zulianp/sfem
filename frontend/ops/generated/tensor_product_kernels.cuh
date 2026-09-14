@@ -14,15 +14,15 @@
 namespace sfem {
 namespace codegen {
 
-static constexpr int ipow(const int base, const int exponent) {
+static __host__ __device__ __forceinline__ constexpr int ipow(const int base, const int exponent) {
   return exponent == 0 ? 1 : base * ipow(base, exponent - 1);
 }
 
-static constexpr int integer_root_search(const int value, const int exponent, const int candidate) {
+static __host__ __device__ __forceinline__ constexpr int integer_root_search(const int value, const int exponent, const int candidate) {
   return ipow(candidate, exponent) >= value ? candidate : integer_root_search(value, exponent, candidate + 1);
 }
 
-static constexpr int integer_root(const int value, const int exponent) {
+static __host__ __device__ __forceinline__ constexpr int integer_root(const int value, const int exponent) {
   return integer_root_search(value, exponent, 1);
 }
 

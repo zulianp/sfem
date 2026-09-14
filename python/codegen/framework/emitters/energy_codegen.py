@@ -494,6 +494,14 @@ def _work_item_name(source_builder, name, component):
     return "%s_%s%d" % (name, _work_item_index(source_builder), component)
 
 
+def _host_function_qualifier(source_builder):
+    """The bound target's spelling for a function the device never calls."""
+    target = getattr(source_builder, "target", None)
+    if target is not None and hasattr(target, "host_function_qualifier"):
+        return target.host_function_qualifier()
+    return _inline_qualifier(source_builder)
+
+
 def _diagnostic_work_item(source_builder):
     if hasattr(source_builder, "diagnostic_work_item"):
         return source_builder.diagnostic_work_item()
@@ -6616,6 +6624,7 @@ def shared_primitive_files(source_builder, basis_family):
                     header_guard_suffix,
                     _inline_qualifier(source_builder),
                     _defines_sfem_inline(source_builder),
+                    host_qualifier=_host_function_qualifier(source_builder),
                 )
             ),
         ),
@@ -8709,7 +8718,12 @@ def _sfem_soa_diagnostics_header(
     header_guard_suffix="HPP",
     inline_qualifier="SFEM_INLINE",
     define_sfem_inline=True,
+    host_qualifier=None,
 ):
+    # `unsupported_dispatch` reports a dispatch, and dispatch happens on the
+    # host; every caller is an `extern "C"` launcher.  It is the one thing in
+    # this header that must not be compiled for a device.
+    host_qualifier = inline_qualifier if host_qualifier is None else host_qualifier
     struct_name = _sfem_soa_diagnostics_struct_name()
     guard = "SFEM_CODEGEN_KERNEL_DIAGNOSTICS_%s" % header_guard_suffix
     per_qp = "per_qp_%s" % work_item
@@ -8740,7 +8754,7 @@ def _sfem_soa_diagnostics_header(
         "//! One function rather than the five-line `std::fprintf` every",
         "//! dispatch entry point used to carry: there were 248 copies of it,",
         "//! differing only in the name they print.",
-        "static %s int unsupported_dispatch(" % inline_qualifier,
+        "static %s int unsupported_dispatch(" % host_qualifier,
         "    const char *const name,",
         "    const int element_type,",
         "    const int real_type) {",

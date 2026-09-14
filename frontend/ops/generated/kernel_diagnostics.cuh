@@ -24,7 +24,7 @@ namespace codegen {
 //! One function rather than the five-line `std::fprintf` every
 //! dispatch entry point used to carry: there were 248 copies of it,
 //! differing only in the name they print.
-static __host__ __device__ __forceinline__ int unsupported_dispatch(
+static __host__ __forceinline__ int unsupported_dispatch(
     const char *const name,
     const int element_type,
     const int real_type) {

@@ -167,6 +167,34 @@ class TargetPlatform:
         lines.append("%s%s += %s;" % (indent, lhs, rhs))
         return tuple(lines)
 
+    def host_function_qualifier(self):
+        """How to spell a function that runs on the host and nowhere else.
+
+        Most of what a kernel touches has to compile for the device too, and
+        `inline_qualifier()` answers for those.  A few things must not: the
+        dispatch reporter is called from the `extern "C"` launcher and never
+        from a kernel, and its body prints to `stderr`, which device code has no
+        notion of.  Marking it `__host__ __device__` because that is what
+        everything else gets is how it came to be compiled for a device that
+        cannot run it.
+        """
+        return self.inline_qualifier()
+
+    def kernel_callable_qualifier(self):
+        """What a shared helper needs in order to be callable from a kernel here.
+
+        Empty on a CPU target, and that is not an oversight: a host function
+        called from host code needs nothing said about it.  A device kernel can
+        only call a function the compiler was told to compile for the device, so
+        a target that has device kernels answers with its inline qualifier.
+
+        The reference tables are what forced this.  Their accessors carried no
+        qualifier at all -- correct for the only target that had ever read them
+        -- and `__global__` bodies call them, so a CUDA generation produced 36
+        of its 37 nvcc errors from that one omission.
+        """
+        return self.inline_qualifier() if self.supports_device_kernels else ""
+
     @property
     def supports_device_kernels(self):
         return False
@@ -382,6 +410,9 @@ class CUDATarget(TargetPlatform):
             vector_isa="cuda",
             matrix_unit=MatrixUnitKind.CUDA_TENSOR_CORES,
         )
+
+    def host_function_qualifier(self):
+        return "__host__ __forceinline__"
 
     def work_item_name(self, name, component):
         return "%s_value%d" % (str(name), int(component))
