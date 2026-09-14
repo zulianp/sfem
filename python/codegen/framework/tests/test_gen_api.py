@@ -1250,7 +1250,12 @@ extern "C" int demo_tri3_apply_packed_a_msoa(ptrdiff_t n, idx_t **elements) { re
 """,
         }
 
-        files = _dispatch_sources(
+        # `_dispatch_sources` returns the sources and the signatures it declared
+        # while writing them -- the second half arrived with "the wrapper stops
+        # parsing signatures it wrote itself", and this call was not updated, so
+        # `set(files)` was hashing two dicts and raising `TypeError` rather than
+        # testing anything.
+        files, _declared_signatures = _dispatch_sources(
             Material(),
             ("TRI3",),
             "sfem_GeneratedDemo_c_abi.hpp",
