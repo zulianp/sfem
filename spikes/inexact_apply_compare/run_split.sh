@@ -73,9 +73,19 @@ else
     echo "[1/3] kernels already generated, reusing" | tee -a "$LOG"
 fi
 
-# linear elasticity's exact apply takes no state: its tangent is constant.
-TAKES_STATE="-DEXACT_TAKES_STATE"
-if [ "$MATERIAL" = "linear_elasticity" ]; then TAKES_STATE=""; fi
+# Whether the kernels take a state, asked of the generated header rather than
+# listed here: a constant tangent -- linear elasticity's -- gathers nothing, so
+# the generator gives that kernel neither the connectivity nor the state, and a
+# benchmark that passes them does not compile.  The tangent and the exact apply
+# are separate questions the generator answers separately, so they are read
+# separately even though one material decides both today.
+TANGENT_SIGNATURE="$(sed -n "/_inexact_apply_tangent_a_msoa_impl(/,/^) {/p" \
+    "$KGEN/${MATERIAL}_${KLOWER}_inexact_apply_inline.hpp" 2>/dev/null || true)"
+TAKES_STATE=""
+case "$TANGENT_SIGNATURE" in *u_stride*) TAKES_STATE="-DTANGENT_TAKES_STATE";; esac
+if [ "$MATERIAL" != "linear_elasticity" ]; then
+    TAKES_STATE="$TAKES_STATE -DEXACT_TAKES_STATE"
+fi
 
 # HEX8's operator aliases into the PROTEUS_HEX8 translation unit, which pulls
 # in mpi.h, so it needs the MPI compiler wrapper and the extra source.
@@ -111,8 +121,16 @@ if [ -n "$PACKED_REFERENCE" ]; then
         "$KGEN/packed_reference.hpp" "${MATERIAL}_${KLOWER}" 2>&1 | tee -a "$LOG"
 fi
 
-echo "[2/3] compiling with $CXX" | tee -a "$LOG"
+# Extra flags for the compile, chiefly -DSIZES to raise the problem sizes: the
+# built-in ladder tops out at 64000 elements, which does not fill a 72-core
+# Grace socket and so cannot be measured on one.  Read into an array and
+# expanded quoted, because -DSIZES={40,64,96,120} unquoted is brace expansion
+# and arrives as four separate -DSIZES flags.
+read -ra EXTRA_CXXFLAGS <<< "${SFEM_SPIKE_CXXFLAGS:-}"
+
+echo "[2/3] compiling with $CXX ${EXTRA_CXXFLAGS[*]:-}" | tee -a "$LOG"
 $CXX -std=c++17 -O3 -march=native -DNDEBUG $TAKES_STATE $OMPFLAGS \
+    ${EXTRA_CXXFLAGS[@]+"${EXTRA_CXXFLAGS[@]}"} \
     -DELEMENT_${ELEMENT} \
     ${SHAPE_ORDER:+-DKERNEL_SHAPE_ORDER=$SHAPE_ORDER} \
     -DMESH_ORDER="\"$MESH_ORDER\"" \
