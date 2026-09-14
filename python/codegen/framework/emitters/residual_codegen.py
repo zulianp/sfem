@@ -7629,7 +7629,7 @@ def _scalar_packed_jacobian_action_source(
             "          const uint16_t *const RSTR coordinate_shape = %s[shape];" % coordinate_element_array,
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
             "          for (int d = 0; d < ND; ++d) {",
-            *lane_loop_header_lines(_vectorize_pragma(), "            ", indent_pragma=False),
+            *lane_loop_header_lines(_vectorize_pragma(), "            "),
             "              bcoordinates[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[evb + lane]];",
             "            }",
             "          }",
@@ -7638,7 +7638,7 @@ def _scalar_packed_jacobian_action_source(
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.extend(
             [
-                *lane_loop_header_lines(_vectorize_pragma(), "          ", indent_pragma=False),
+                *lane_loop_header_lines(_vectorize_pragma(), "          "),
                 "            b%s[shape][lane] = pk_%s[field_shape[evb + lane]];"
                 % (role.name, role.name),
                 "          }",
@@ -7646,7 +7646,7 @@ def _scalar_packed_jacobian_action_source(
         )
     lines.extend(
         [
-            *lane_loop_header_lines(_vectorize_pragma(), "          ", indent_pragma=False),
+            *lane_loop_header_lines(_vectorize_pragma(), "          "),
             "            bdirection[shape][lane] = pk_direction[field_shape[evb + lane]];",
             "            boutput[shape][lane] = s_t(0);",
             "          }",
@@ -8043,7 +8043,7 @@ def _scalar_packed_affine_jacobian_action_source(
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.extend(
             [
-                *lane_loop_header_lines(_vectorize_pragma(), "          ", indent_pragma=False),
+                *lane_loop_header_lines(_vectorize_pragma(), "          "),
                 "            b%s[shape][lane] = pk_%s[field_shape[evb + lane]];"
                 % (role.name, role.name),
                 "          }",
@@ -8051,7 +8051,7 @@ def _scalar_packed_affine_jacobian_action_source(
         )
     lines.extend(
         [
-            *lane_loop_header_lines(_vectorize_pragma(), "          ", indent_pragma=False),
+            *lane_loop_header_lines(_vectorize_pragma(), "          "),
             "            bdirection[shape][lane] = pk_direction[field_shape[evb + lane]];",
             "            boutput[shape][lane] = s_t(0);",
             "          }",
