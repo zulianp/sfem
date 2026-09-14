@@ -1,3 +1,6 @@
+from codegen.framework.targets import current_target
+
+
 def cpp_scalar_literal(value, scalar_type="s_t"):
     value = float(value)
     if value == 0.0:
@@ -62,12 +65,21 @@ def _reference_header_lines(key, struct_name, tables, includes=()):
 
 
 def _reference_struct_lines(struct_name, tables):
+    """The tables, behind accessors the bound target can call from a kernel.
+
+    The qualifier comes from the target rather than being left off, because a
+    `__global__` body reads these and a device kernel cannot call a host
+    function.  On a CPU target the answer is empty, which is what these
+    accessors have always carried.
+    """
+    qualifier = current_target().kernel_callable_qualifier()
+    declaration = "static %s" % qualifier if qualifier else "static"
     lines = ["", "template <typename s_t>", "struct %s {" % struct_name]
     for table in tables:
         values = tuple(table.values)
         lines.extend(
             [
-                "  static const s_t *%s() {" % table.name,
+                "  %s const s_t *%s() {" % (declaration, table.name),
                 "    static const s_t data[%d] = {%s};"
                 % (len(values), cpp_scalar_initializer_list(values, "s_t")),
                 "    return data;",

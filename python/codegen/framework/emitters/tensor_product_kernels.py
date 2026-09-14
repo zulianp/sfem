@@ -176,6 +176,14 @@ def sfem_tensor_product_kernels_header_source(
         pragma = target.vectorize_pragma()
         simd_lines = () if pragma is None else (pragma,)
     values = {
+        # Empty on a CPU target, so these keep the spelling they have always
+        # had; `__host__ __device__` on a device target, because a kernel calls
+        # them and nvcc otherwise wants --expt-relaxed-constexpr to look away.
+        "kernel_callable": (
+            "%s " % target.kernel_callable_qualifier()
+            if target.kernel_callable_qualifier()
+            else ""
+        ),
         "header_guard_suffix": header_guard_suffix,
         "sfem_inline_block": (
             "%s\n\n" % "\n".join(target.inline_definition_lines(inline_definition))
@@ -566,15 +574,15 @@ _TENSOR_PRODUCT_KERNELS_TEMPLATE = r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNE
 namespace sfem {
 namespace codegen {
 
-static constexpr int ipow(const int base, const int exponent) {
+static %(kernel_callable)sconstexpr int ipow(const int base, const int exponent) {
   return exponent == 0 ? 1 : base * ipow(base, exponent - 1);
 }
 
-static constexpr int integer_root_search(const int value, const int exponent, const int candidate) {
+static %(kernel_callable)sconstexpr int integer_root_search(const int value, const int exponent, const int candidate) {
   return ipow(candidate, exponent) >= value ? candidate : integer_root_search(value, exponent, candidate + 1);
 }
 
-static constexpr int integer_root(const int value, const int exponent) {
+static %(kernel_callable)sconstexpr int integer_root(const int value, const int exponent) {
   return integer_root_search(value, exponent, 1);
 }
 
