@@ -21,6 +21,9 @@ from codegen.framework.fem.reference_basis import (
 from codegen.framework.plans.inexact_apply import (
     _contraction_cost,
     contraction_ordering,
+    kronecker_reference_factors,
+    sum_factorized_action,
+    _ACTION_BY_ORDERING,
     gradient_first_action,
     inexact_apply_plan,
     projection_is_exact,
@@ -343,13 +346,23 @@ class ContractionOrderingTest(unittest.TestCase):
     the answer.
     """
 
-    def test_both_orderings_compute_the_same_action(self):
-        for element in ("TRI3", "TET4", "QUAD4", "HEX8"):
+    def test_every_ordering_computes_the_same_action(self):
+        """Including one that nothing picks today.
+
+        An ordering that is costed but never checked is the trap here: it does
+        not ship, so nothing notices it is wrong, and the day an element makes
+        it the cheaper one it ships unverified.  So every entry in
+        `_ACTION_BY_ORDERING` is checked against the dense action, on the
+        lexicographic elements too, where the sum-factorized one has a lowering.
+        """
+        for element in ("TRI3", "TET4", "QUAD4", "HEX8", "PROTEUS_QUAD4", "PROTEUS_HEX8"):
             plan = _symmetric(inexact_apply_plan(element))
             tangent, increment, names = _symbols(plan)
             dense = plan.action(tangent, increment)
-            for build in (staged_action, gradient_first_action):
+            for build in _ACTION_BY_ORDERING.values():
                 stages = build(plan, tangent, increment, names)
+                if stages is None:
+                    continue
                 substitution = {}
                 for stage in stages[:-1]:
                     for symbol, expression in stage.assignments:
@@ -360,16 +373,36 @@ class ContractionOrderingTest(unittest.TestCase):
                             sp.simplify(sp.expand(staged.subs(substitution)) - reference), 0
                         )
 
-    def test_the_choice_is_the_cheaper_one(self):
-        """Whatever it picks must actually be the cheaper of the two."""
-        for element in ("TET4", "HEX8"):
+    def test_the_choice_is_the_cheapest_one(self):
+        """Whatever it picks must actually be the cheapest with a lowering."""
+        for element in ("TET4", "HEX8", "PROTEUS_HEX8"):
             plan = inexact_apply_plan(element)
             tangent, increment, names = _symbols(plan)
-            staged = _contraction_cost(staged_action(plan, tangent, increment, names))
-            direct = _contraction_cost(gradient_first_action(plan, tangent, increment, names))
-            chosen = contraction_ordering(element)
-            with self.subTest(element=element, staged=staged, gradient_first=direct):
-                self.assertEqual(chosen, "staged" if staged <= direct else "gradient_first")
+            costs = {}
+            for ordering, build in _ACTION_BY_ORDERING.items():
+                stages = build(plan, tangent, increment, names)
+                if stages is not None:
+                    costs[ordering] = _contraction_cost(stages)
+            with self.subTest(element=element, **costs):
+                self.assertEqual(contraction_ordering(element), min(costs, key=costs.get))
+
+    def test_only_a_lexicographic_tensor_product_factors(self):
+        """The Kronecker factorisation is a property of the numbering too.
+
+        A PROTEUS element numbers its nodes lexicographically with x fastest,
+        which is what makes `Wbar` a product of one-dimensional matrices.  Its
+        mesh-ordered twin walks the corners instead, so the same element under
+        the other numbering has no factorisation -- and must say so rather than
+        return factors that do not multiply back.
+        """
+        for element in ("PROTEUS_QUAD4", "PROTEUS_HEX8"):
+            self.assertIsNotNone(
+                kronecker_reference_factors(inexact_apply_plan(element).reference), element
+            )
+        for element in ("QUAD4", "HEX8", "TRI3", "TET4", "TET10"):
+            self.assertIsNone(
+                kronecker_reference_factors(inexact_apply_plan(element).reference), element
+            )
 
     def test_hex8_does_not_use_the_rank_factorisation(self):
         """Pinned, because it is the one that pays for measuring.
