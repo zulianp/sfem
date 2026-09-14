@@ -480,11 +480,12 @@ class WorkItemLoweringRatchetTest(unittest.TestCase):
     #: linear_elasticity 470 -> 72 when `inexact_apply_codegen.py` converted:
     #: its 398 went to zero in one pass and the file left the set entirely,
     #: which is why the set of files is asserted and not just the counts.
+    #: Then 72 -> 0 when `energy_codegen.py` followed, so the energy and inexact
+    #: paths are done and everything that remains is `residual_codegen.py`.
+    #: An empty entry is kept rather than deleted: it is what says this material
+    #: is converted, and it fails loudly if a hand-spelled work item comes back.
     BUDGET = {
-        ("linear_elasticity", "TET4"): {
-            "linear_elasticity_tet4_operator.cpp": 70,
-            "linear_elasticity_d3_simplex_hessian.hpp": 2,
-        },
+        ("linear_elasticity", "TET4"): {},
         ("two_phase_flow", "TRI3"): {
             "two_phase_flow_d2_simplex_local.hpp": 400,
             "two_phase_flow_form_2_p_c_p_c_d2_simplex_local.hpp": 132,
