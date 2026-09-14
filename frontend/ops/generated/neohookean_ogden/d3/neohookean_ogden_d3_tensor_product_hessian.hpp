@@ -62,6 +62,12 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_direct_hessian_tensor
   for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {
     element_matrix[entry] = s_t(0);
   }
+  s_t state_gradient_ref[NC * NQ * ND];
+  for (int component = 0; component < NC; ++component) {
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, VS, 3, NC>(
+        shape_1d, grad_1d, bu_data, component,
+        state_gradient_ref + component * NQ * ND);
+  }
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -80,35 +86,15 @@ static SFEM_INLINE void neohookean_ogden_d3_tensor_product_direct_hessian_tensor
     const s_t adj_lane8 = badj8[goff];
     const s_t det_lane0 = bdet0[goff];
     const s_t idet = s_t(1) / det_lane0;
-    s_t gu_ref0 = s_t(0);
-    s_t gu_ref1 = s_t(0);
-    s_t gu_ref2 = s_t(0);
-    s_t gu_ref3 = s_t(0);
-    s_t gu_ref4 = s_t(0);
-    s_t gu_ref5 = s_t(0);
-    s_t gu_ref6 = s_t(0);
-    s_t gu_ref7 = s_t(0);
-    s_t gu_ref8 = s_t(0);
-    for (int shape = 0; shape < NS; ++shape) {
-      const int state_sx = shape % NS1;
-      const int state_sy = (shape / NS1) % NS1;
-      const int state_sz = shape / (NS1 * NS1);
-      const s_t state_grad_ref0 = grad_1d[qx * NS1 + state_sx] * shape_1d[qy * NS1 + state_sy] * shape_1d[qz * NS1 + state_sz];
-      const s_t state_grad_ref1 = shape_1d[qx * NS1 + state_sx] * grad_1d[qy * NS1 + state_sy] * shape_1d[qz * NS1 + state_sz];
-      const s_t state_grad_ref2 = shape_1d[qx * NS1 + state_sx] * shape_1d[qy * NS1 + state_sy] * grad_1d[qz * NS1 + state_sz];
-      const s_t state_u0 = bu_data[shape * NC][lane];
-      gu_ref0 += state_u0 * state_grad_ref0;
-      gu_ref1 += state_u0 * state_grad_ref1;
-      gu_ref2 += state_u0 * state_grad_ref2;
-      const s_t state_u1 = bu_data[shape * NC + 1][lane];
-      gu_ref3 += state_u1 * state_grad_ref0;
-      gu_ref4 += state_u1 * state_grad_ref1;
-      gu_ref5 += state_u1 * state_grad_ref2;
-      const s_t state_u2 = bu_data[shape * NC + 2][lane];
-      gu_ref6 += state_u2 * state_grad_ref0;
-      gu_ref7 += state_u2 * state_grad_ref1;
-      gu_ref8 += state_u2 * state_grad_ref2;
-    }
+    const s_t gu_ref0 = state_gradient_ref[q * ND];
+    const s_t gu_ref1 = state_gradient_ref[q * ND + 1];
+    const s_t gu_ref2 = state_gradient_ref[q * ND + 2];
+    const s_t gu_ref3 = state_gradient_ref[NQ * ND + q * ND];
+    const s_t gu_ref4 = state_gradient_ref[NQ * ND + q * ND + 1];
+    const s_t gu_ref5 = state_gradient_ref[NQ * ND + q * ND + 2];
+    const s_t gu_ref6 = state_gradient_ref[2 * NQ * ND + q * ND];
+    const s_t gu_ref7 = state_gradient_ref[2 * NQ * ND + q * ND + 1];
+    const s_t gu_ref8 = state_gradient_ref[2 * NQ * ND + q * ND + 2];
     const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
     const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
     const s_t gu2 = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;

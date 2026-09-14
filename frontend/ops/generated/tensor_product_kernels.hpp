@@ -515,6 +515,462 @@ static SFEM_INLINE void tensor_test(
 }
 
 template <typename s_t, int NQ, int NS, int VS, int ND>
+struct TensorProductWeakOpsScalar;
+
+template <typename s_t, int NQ, int NS, int VS>
+struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 2> {
+  template <int NC>
+  static SFEM_INLINE void gradient_impl(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t *const RSTR streams[NC * NS],
+      const int component,
+      s_t *const RSTR gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t value_x[NQ1 * NS1];
+    s_t grad_x[NQ1 * NS1];
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int sy = 0; sy < NS1; ++sy) {
+                {
+          s_t v = s_t(0);
+          s_t gx = s_t(0);
+          for (int sx = 0; sx < NS1; ++sx) {
+            const int shape = sx + NS1 * sy;
+            const s_t u = streams[shape * NC + component][0];
+            v += u * shape_1d[qx * NS1 + sx];
+            gx += u * grad_1d[qx * NS1 + sx];
+          }
+          const int i = (qx * NS1 + sy);
+          value_x[i] = v;
+          grad_x[i] = gx;
+        }
+      }
+    }
+    for (int qy = 0; qy < NQ1; ++qy) {
+      for (int qx = 0; qx < NQ1; ++qx) {
+        const int q = qx + NQ1 * qy;
+        s_t *const RSTR gradient_q0 = &gradient[(q * 2 + 0)];
+        s_t *const RSTR gradient_q1 = &gradient[(q * 2 + 1)];
+                {
+          s_t gx = s_t(0);
+          s_t gy = s_t(0);
+          for (int sy = 0; sy < NS1; ++sy) {
+            const int i = (qx * NS1 + sy);
+            gx += grad_x[i] * shape_1d[qy * NS1 + sy];
+            gy += value_x[i] * grad_1d[qy * NS1 + sy];
+          }
+          gradient_q0[0] = gx;
+          gradient_q1[0] = gy;
+        }
+      }
+    }
+  }
+
+  template <int NC>
+  static SFEM_INLINE void gradient_impl(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t streams[NC * NS][VS],
+      const int component,
+      s_t *const RSTR gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t value_x[NQ1 * NS1];
+    s_t grad_x[NQ1 * NS1];
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int sy = 0; sy < NS1; ++sy) {
+                {
+          s_t v = s_t(0);
+          s_t gx = s_t(0);
+          for (int sx = 0; sx < NS1; ++sx) {
+            const int shape = sx + NS1 * sy;
+            const s_t u = streams[shape * NC + component][0];
+            v += u * shape_1d[qx * NS1 + sx];
+            gx += u * grad_1d[qx * NS1 + sx];
+          }
+          const int i = (qx * NS1 + sy);
+          value_x[i] = v;
+          grad_x[i] = gx;
+        }
+      }
+    }
+    for (int qy = 0; qy < NQ1; ++qy) {
+      for (int qx = 0; qx < NQ1; ++qx) {
+        const int q = qx + NQ1 * qy;
+        s_t *const RSTR gradient_q0 = &gradient[(q * 2 + 0)];
+        s_t *const RSTR gradient_q1 = &gradient[(q * 2 + 1)];
+                {
+          s_t gx = s_t(0);
+          s_t gy = s_t(0);
+          for (int sy = 0; sy < NS1; ++sy) {
+            const int i = (qx * NS1 + sy);
+            gx += grad_x[i] * shape_1d[qy * NS1 + sy];
+            gy += value_x[i] * grad_1d[qy * NS1 + sy];
+          }
+          gradient_q0[0] = gx;
+          gradient_q1[0] = gy;
+        }
+      }
+    }
+  }
+
+  template <int NC>
+  static SFEM_INLINE void gradient(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t *const RSTR streams[NS * NC],
+      const int component,
+      s_t *const RSTR gradient) {
+    gradient_impl<NC>(shape_1d, grad_1d, streams, component, gradient);
+  }
+
+  template <int NC>
+  static SFEM_INLINE void gradient_contiguous(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t streams[NS * NC][VS],
+      const int component,
+      s_t *const RSTR gradient) {
+    gradient_impl<NC>(shape_1d, grad_1d, streams, component, gradient);
+  }
+
+  template <int NC>
+  static SFEM_INLINE void test(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t *const RSTR flux,
+      s_t *const RSTR out_streams[NS * NC],
+      const int component) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t stage_x[NQ1 * NS1];
+    s_t stage_y[NQ1 * NS1];
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int sy = 0; sy < NS1; ++sy) {
+                {
+          s_t tx = s_t(0);
+          s_t ty = s_t(0);
+          for (int qy = 0; qy < NQ1; ++qy) {
+            const int q = qx + NQ1 * qy;
+            tx += flux[(q * 2 + 0)] * shape_1d[qy * NS1 + sy];
+            ty += flux[(q * 2 + 1)] * grad_1d[qy * NS1 + sy];
+          }
+          const int i = (qx * NS1 + sy);
+          stage_x[i] = tx;
+          stage_y[i] = ty;
+        }
+      }
+    }
+    for (int sy = 0; sy < NS1; ++sy) {
+      for (int sx = 0; sx < NS1; ++sx) {
+        const int shape = sx + NS1 * sy;
+                {
+          s_t value = s_t(0);
+          for (int qx = 0; qx < NQ1; ++qx) {
+            const int i = (qx * NS1 + sy);
+            value += stage_x[i] * grad_1d[qx * NS1 + sx]
+                               + stage_y[i] * shape_1d[qx * NS1 + sx];
+          }
+          out_streams[shape * NC + component][0] += value;
+        }
+      }
+    }
+  }
+};
+
+template <typename s_t, int NQ, int NS, int VS>
+struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 3> {
+  template <int NC>
+  static SFEM_INLINE void gradient_impl(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t *const RSTR streams[NC * NS],
+      const int component,
+      s_t *const RSTR gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t value_x[NQ1 * NS1 * NS1];
+    s_t grad_x[NQ1 * NS1 * NS1];
+    s_t value_xy[NQ1 * NQ1 * NS1];
+    s_t grad_x_xy[NQ1 * NQ1 * NS1];
+    s_t grad_y_xy[NQ1 * NQ1 * NS1];
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int sy = 0; sy < NS1; ++sy) {
+        for (int sz = 0; sz < NS1; ++sz) {
+                    {
+            s_t v = s_t(0);
+            s_t gx = s_t(0);
+            for (int sx = 0; sx < NS1; ++sx) {
+              const int shape = sx + NS1 * (sy + NS1 * sz);
+              const s_t u = streams[shape * NC + component][0];
+              v += u * shape_1d[qx * NS1 + sx];
+              gx += u * grad_1d[qx * NS1 + sx];
+            }
+            const int i = ((qx * NS1 + sy) * NS1 + sz);
+            value_x[i] = v;
+            grad_x[i] = gx;
+          }
+        }
+      }
+    }
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int qy = 0; qy < NQ1; ++qy) {
+        for (int sz = 0; sz < NS1; ++sz) {
+                    {
+            s_t v = s_t(0);
+            s_t gx = s_t(0);
+            s_t gy = s_t(0);
+            for (int sy = 0; sy < NS1; ++sy) {
+              const int i = ((qx * NS1 + sy) * NS1 + sz);
+              v += value_x[i] * shape_1d[qy * NS1 + sy];
+              gx += grad_x[i] * shape_1d[qy * NS1 + sy];
+              gy += value_x[i] * grad_1d[qy * NS1 + sy];
+            }
+            const int j = ((qx * NQ1 + qy) * NS1 + sz);
+            value_xy[j] = v;
+            grad_x_xy[j] = gx;
+            grad_y_xy[j] = gy;
+          }
+        }
+      }
+    }
+    for (int qz = 0; qz < NQ1; ++qz) {
+      for (int qy = 0; qy < NQ1; ++qy) {
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int q = qx + NQ1 * (qy + NQ1 * qz);
+          s_t *const RSTR gradient_q0 = &gradient[(q * 3 + 0)];
+          s_t *const RSTR gradient_q1 = &gradient[(q * 3 + 1)];
+          s_t *const RSTR gradient_q2 = &gradient[(q * 3 + 2)];
+                    {
+            s_t gx = s_t(0);
+            s_t gy = s_t(0);
+            s_t gz = s_t(0);
+            for (int sz = 0; sz < NS1; ++sz) {
+              const int j = ((qx * NQ1 + qy) * NS1 + sz);
+              gx += grad_x_xy[j] * shape_1d[qz * NS1 + sz];
+              gy += grad_y_xy[j] * shape_1d[qz * NS1 + sz];
+              gz += value_xy[j] * grad_1d[qz * NS1 + sz];
+            }
+            gradient_q0[0] = gx;
+            gradient_q1[0] = gy;
+            gradient_q2[0] = gz;
+          }
+        }
+      }
+    }
+  }
+
+  template <int NC>
+  static SFEM_INLINE void gradient_impl(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t streams[NC * NS][VS],
+      const int component,
+      s_t *const RSTR gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t value_x[NQ1 * NS1 * NS1];
+    s_t grad_x[NQ1 * NS1 * NS1];
+    s_t value_xy[NQ1 * NQ1 * NS1];
+    s_t grad_x_xy[NQ1 * NQ1 * NS1];
+    s_t grad_y_xy[NQ1 * NQ1 * NS1];
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int sy = 0; sy < NS1; ++sy) {
+        for (int sz = 0; sz < NS1; ++sz) {
+                    {
+            s_t v = s_t(0);
+            s_t gx = s_t(0);
+            for (int sx = 0; sx < NS1; ++sx) {
+              const int shape = sx + NS1 * (sy + NS1 * sz);
+              const s_t u = streams[shape * NC + component][0];
+              v += u * shape_1d[qx * NS1 + sx];
+              gx += u * grad_1d[qx * NS1 + sx];
+            }
+            const int i = ((qx * NS1 + sy) * NS1 + sz);
+            value_x[i] = v;
+            grad_x[i] = gx;
+          }
+        }
+      }
+    }
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int qy = 0; qy < NQ1; ++qy) {
+        for (int sz = 0; sz < NS1; ++sz) {
+                    {
+            s_t v = s_t(0);
+            s_t gx = s_t(0);
+            s_t gy = s_t(0);
+            for (int sy = 0; sy < NS1; ++sy) {
+              const int i = ((qx * NS1 + sy) * NS1 + sz);
+              v += value_x[i] * shape_1d[qy * NS1 + sy];
+              gx += grad_x[i] * shape_1d[qy * NS1 + sy];
+              gy += value_x[i] * grad_1d[qy * NS1 + sy];
+            }
+            const int j = ((qx * NQ1 + qy) * NS1 + sz);
+            value_xy[j] = v;
+            grad_x_xy[j] = gx;
+            grad_y_xy[j] = gy;
+          }
+        }
+      }
+    }
+    for (int qz = 0; qz < NQ1; ++qz) {
+      for (int qy = 0; qy < NQ1; ++qy) {
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int q = qx + NQ1 * (qy + NQ1 * qz);
+          s_t *const RSTR gradient_q0 = &gradient[(q * 3 + 0)];
+          s_t *const RSTR gradient_q1 = &gradient[(q * 3 + 1)];
+          s_t *const RSTR gradient_q2 = &gradient[(q * 3 + 2)];
+                    {
+            s_t gx = s_t(0);
+            s_t gy = s_t(0);
+            s_t gz = s_t(0);
+            for (int sz = 0; sz < NS1; ++sz) {
+              const int j = ((qx * NQ1 + qy) * NS1 + sz);
+              gx += grad_x_xy[j] * shape_1d[qz * NS1 + sz];
+              gy += grad_y_xy[j] * shape_1d[qz * NS1 + sz];
+              gz += value_xy[j] * grad_1d[qz * NS1 + sz];
+            }
+            gradient_q0[0] = gx;
+            gradient_q1[0] = gy;
+            gradient_q2[0] = gz;
+          }
+        }
+      }
+    }
+  }
+
+  template <int NC>
+  static SFEM_INLINE void gradient(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t *const RSTR streams[NS * NC],
+      const int component,
+      s_t *const RSTR gradient) {
+    gradient_impl<NC>(shape_1d, grad_1d, streams, component, gradient);
+  }
+
+  template <int NC>
+  static SFEM_INLINE void gradient_contiguous(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t streams[NS * NC][VS],
+      const int component,
+      s_t *const RSTR gradient) {
+    gradient_impl<NC>(shape_1d, grad_1d, streams, component, gradient);
+  }
+
+  template <int NC>
+  static SFEM_INLINE void test(
+      const s_t *const RSTR shape_1d,
+      const s_t *const RSTR grad_1d,
+      const s_t *const RSTR flux,
+      s_t *const RSTR out_streams[NS * NC],
+      const int component) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t stage_x[NQ1 * NQ1 * NS1];
+    s_t stage_y[NQ1 * NQ1 * NS1];
+    s_t stage_z[NQ1 * NQ1 * NS1];
+    s_t stage_xy_x[NQ1 * NS1 * NS1];
+    s_t stage_xy_y[NQ1 * NS1 * NS1];
+    s_t stage_xy_z[NQ1 * NS1 * NS1];
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int qy = 0; qy < NQ1; ++qy) {
+        for (int sz = 0; sz < NS1; ++sz) {
+                    {
+            s_t tx = s_t(0);
+            s_t ty = s_t(0);
+            s_t tz = s_t(0);
+            for (int qz = 0; qz < NQ1; ++qz) {
+              const int q = qx + NQ1 * (qy + NQ1 * qz);
+              tx += flux[(q * 3 + 0)] * shape_1d[qz * NS1 + sz];
+              ty += flux[(q * 3 + 1)] * shape_1d[qz * NS1 + sz];
+              tz += flux[(q * 3 + 2)] * grad_1d[qz * NS1 + sz];
+            }
+            const int i = ((qx * NQ1 + qy) * NS1 + sz);
+            stage_x[i] = tx;
+            stage_y[i] = ty;
+            stage_z[i] = tz;
+          }
+        }
+      }
+    }
+    for (int qx = 0; qx < NQ1; ++qx) {
+      for (int sy = 0; sy < NS1; ++sy) {
+        for (int sz = 0; sz < NS1; ++sz) {
+                    {
+            s_t tx = s_t(0);
+            s_t ty = s_t(0);
+            s_t tz = s_t(0);
+            for (int qy = 0; qy < NQ1; ++qy) {
+              const int i = ((qx * NQ1 + qy) * NS1 + sz);
+              tx += stage_x[i] * shape_1d[qy * NS1 + sy];
+              ty += stage_y[i] * grad_1d[qy * NS1 + sy];
+              tz += stage_z[i] * shape_1d[qy * NS1 + sy];
+            }
+            const int j = ((qx * NS1 + sy) * NS1 + sz);
+            stage_xy_x[j] = tx;
+            stage_xy_y[j] = ty;
+            stage_xy_z[j] = tz;
+          }
+        }
+      }
+    }
+    for (int sz = 0; sz < NS1; ++sz) {
+      for (int sy = 0; sy < NS1; ++sy) {
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int shape = sx + NS1 * (sy + NS1 * sz);
+                    {
+            s_t value = s_t(0);
+            for (int qx = 0; qx < NQ1; ++qx) {
+              const int j = ((qx * NS1 + sy) * NS1 + sz);
+              value += stage_xy_x[j] * grad_1d[qx * NS1 + sx]
+                                   + (stage_xy_y[j] + stage_xy_z[j]) * shape_1d[qx * NS1 + sx];
+            }
+            out_streams[shape * NC + component][0] += value;
+          }
+        }
+      }
+    }
+  }
+};
+
+template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+static SFEM_INLINE void tensor_gradient_scalar(
+    const s_t *const RSTR shape_1d,
+    const s_t *const RSTR grad_1d,
+    const s_t *const RSTR streams[NS * NC],
+    const int component,
+    s_t *const RSTR gradient) {
+  TensorProductWeakOpsScalar<s_t, NQ, NS, VS, ND>::template gradient<NC>(
+      shape_1d, grad_1d, streams, component, gradient);
+}
+
+template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+static SFEM_INLINE void tensor_gradient_contiguous_scalar(
+    const s_t *const RSTR shape_1d,
+    const s_t *const RSTR grad_1d,
+    const s_t streams[NS * NC][VS],
+    const int component,
+    s_t *const RSTR gradient) {
+  TensorProductWeakOpsScalar<s_t, NQ, NS, VS, ND>::template gradient_contiguous<NC>(
+      shape_1d, grad_1d, streams, component, gradient);
+}
+
+template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+static SFEM_INLINE void tensor_test_scalar(
+    const s_t *const RSTR shape_1d,
+    const s_t *const RSTR grad_1d,
+    const s_t *const RSTR flux,
+    s_t *const RSTR out_streams[NS * NC],
+    const int component) {
+  TensorProductWeakOpsScalar<s_t, NQ, NS, VS, ND>::template test<NC>(
+      shape_1d, grad_1d, flux, out_streams, component);
+}
+
+template <typename s_t, int NQ, int NS, int VS, int ND>
 struct TensorProductResidualOps;
 
 template <typename s_t, int NQ, int NS, int VS>
