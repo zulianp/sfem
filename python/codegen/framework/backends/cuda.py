@@ -38,6 +38,22 @@ class CUDASoABackend:
         _validate_cuda_source_contract(files)
         return CUDASoAEmission(files)
 
+    def _shared_emitter(self):
+        operator_extension = "hip" if isinstance(self.target, HIPTarget) else "cu"
+        return CUDAEnergySoAEmitter(
+            target=self.target, operator_extension=operator_extension
+        )
+
+    def shared_primitive_files(self):
+        """The target's material-independent headers, bound to this target.
+
+        Asked of the backend for the same reason `emit_inexact` is: the target
+        is what decides how they are spelled, and the caller should not have to
+        build an emitter to find out.
+        """
+        with use_target(self.target):
+            return tuple(self._shared_emitter().shared_primitive_files())
+
     def emit_inexact(self, material, unit, context):
         """No device lowering for the inexact-apply family yet.
 

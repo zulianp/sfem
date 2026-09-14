@@ -616,45 +616,7 @@ def generate_sfem_soa_cpp_files(
         forms,
         array_inputs,
     )
-    files = [
-        GeneratedKernelFile(
-            math_name,
-            _sfem_math_header_source(
-                header_guard_suffix,
-                _inline_qualifier(source_builder),
-                _defines_sfem_inline(source_builder),
-            ),
-        ),
-        GeneratedKernelFile(
-            geometry_name,
-            source_builder.geometry_header_source(),
-        ),
-        GeneratedKernelFile(
-            diagnostics_name,
-            "\n".join(
-                _sfem_soa_diagnostics_header(
-                    _diagnostic_work_item(source_builder),
-                    header_guard_suffix,
-                    _inline_qualifier(source_builder),
-                    _defines_sfem_inline(source_builder),
-                )
-            ),
-        ),
-    ]
-    if getattr(source_builder, "operator_extension", "cpp") == "cpp":
-        files.append(
-            GeneratedKernelFile(
-                "packed_thread_scratch.hpp",
-                _sfem_packed_thread_scratch_header_source(),
-            )
-        )
-    if source_builder.emits_tensor_product_header(basis_family):
-        files.append(
-            GeneratedKernelFile(
-                tensor_product_name,
-                source_builder.tensor_product_header_source(),
-            )
-        )
+    files = list(shared_primitive_files(source_builder, basis_family))
     if emits_hessian_header:
         files.append(
             GeneratedKernelFile(
@@ -6613,6 +6575,66 @@ _OBJECTIVE_STEPS_BY_APPLICABILITY = {
     True: _objective_steps_lines,
     False: lambda *arguments: [],
 }
+
+
+def shared_primitive_files(source_builder, basis_family):
+    """The headers that belong to the target rather than to any material.
+
+    Kernel maths, the geometry kernels, the diagnostics record, the packed
+    thread scratch and the sum-factorization micro-kernels.  Not one of them
+    reads a form, an element or a material: they are what the target spells,
+    and a material generation writes them only because it is the thing that
+    happens to run.
+
+    Which is why they are a function and not a list inside the material path.
+    The `.cuh` twins of these five are in the shipped tree without anything
+    regenerating them -- `regenerate_all.sh` does not build for CUDA -- and they
+    had drifted several refactors behind their `.hpp` counterparts, silently,
+    because `codegen_snapshot` exempts what a plain regeneration cannot produce.
+    A generator that can write them without a material is what closes that, and
+    it must be this code writing them rather than a second copy of it.
+    """
+    header_guard_suffix = source_builder.header_guard_suffix()
+    files = [
+        GeneratedKernelFile(
+            source_builder.header_name("kernel_math"),
+            _sfem_math_header_source(
+                header_guard_suffix,
+                _inline_qualifier(source_builder),
+                _defines_sfem_inline(source_builder),
+            ),
+        ),
+        GeneratedKernelFile(
+            source_builder.header_name("geometry_kernels"),
+            source_builder.geometry_header_source(),
+        ),
+        GeneratedKernelFile(
+            source_builder.header_name("kernel_diagnostics"),
+            "\n".join(
+                _sfem_soa_diagnostics_header(
+                    _diagnostic_work_item(source_builder),
+                    header_guard_suffix,
+                    _inline_qualifier(source_builder),
+                    _defines_sfem_inline(source_builder),
+                )
+            ),
+        ),
+    ]
+    if getattr(source_builder, "operator_extension", "cpp") == "cpp":
+        files.append(
+            GeneratedKernelFile(
+                "packed_thread_scratch.hpp",
+                _sfem_packed_thread_scratch_header_source(),
+            )
+        )
+    if source_builder.emits_tensor_product_header(basis_family):
+        files.append(
+            GeneratedKernelFile(
+                source_builder.header_name("tensor_product_kernels"),
+                source_builder.tensor_product_header_source(),
+            )
+        )
+    return tuple(files)
 
 
 def _sfem_soa_direct_hessian_push_forward_lines(weak_form, dim, indent):

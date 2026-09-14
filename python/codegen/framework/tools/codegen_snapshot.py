@@ -78,18 +78,21 @@ MAX_DIFF_LINES = 60
 
 #: Files the shipped tree carries that `regenerate_all.sh` does not write.
 #:
-#: The `.cuh` headers come from `generators.cuda`, which only runs under
-#: `SFEM_GENERATE_CUDA=1`.  The registration unit comes from
-#: `generators.op_registration`, which is manifest-driven and is edited by hand
-#: to disable operators (Stokes is commented out in it today).  Neither is
-#: reproduced by a plain regeneration, so `check-tree` expects them and does not
-#: report them as drift.  Anything else present in the tree and absent from a
-#: fresh generation is drift, which is the whole point of the check.
+#: The registration unit comes from `generators.op_registration`, which is
+#: manifest-driven and is edited by hand to disable operators (Stokes is
+#: commented out in it today), so it is not reproduced by a plain regeneration
+#: and `check-tree` expects it rather than reporting it as drift.  Anything else
+#: present in the tree and absent from a fresh generation is drift, which is the
+#: whole point of the check.
+#:
+#: The four shared `.cuh` headers used to be here too, on the grounds that they
+#: came from `generators.cuda` and that only runs under `SFEM_GENERATE_CUDA=1`.
+#: What the exemption actually bought was four tracked files nothing produced,
+#: nothing included and nothing checked, drifting several refactors behind their
+#: `.hpp` counterparts.  They do not need a material -- they are what the target
+#: spells -- so `generators.shared_headers` writes them on every regeneration
+#: and they are checked like everything else.
 UNGENERATED_TREE_PATHS = (
-    "geometry_kernels.cuh",
-    "kernel_diagnostics.cuh",
-    "kernel_math.cuh",
-    "tensor_product_kernels.cuh",
     "sfem_generated_ops_registration.cpp",
     "sfem_generated_ops_registration.hpp",
 )
@@ -167,6 +170,31 @@ def generate_all(out_dir, materials=MATERIALS, verbose=True):
                 "generator '%s' failed with exit code %d:\n%s\n"
                 % (material, completed.returncode, completed.stdout.decode("utf-8", "replace"))
             )
+    # The headers that belong to a target rather than to a material.  A material
+    # run writes its own target's set beside its kernels, which is where the
+    # `.hpp` ones come from; the `.cuh` ones have no material to ride along with
+    # and are written here, exactly as `regenerate_all.sh` writes them.
+    if verbose:
+        print("==> shared headers", flush=True)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "codegen.framework.generators.shared_headers",
+            "--out-dir",
+            out_dir,
+        ],
+        env=env,
+        cwd=_python_root(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if completed.returncode != 0:
+        failed.append("shared_headers")
+        sys.stderr.write(
+            "generator 'shared_headers' failed with exit code %d:\n%s\n"
+            % (completed.returncode, completed.stdout.decode("utf-8", "replace"))
+        )
     return failed
 
 

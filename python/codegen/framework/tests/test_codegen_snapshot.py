@@ -100,22 +100,25 @@ class DriftIsReportedTest(unittest.TestCase):
 
 class BlindSpotTest(unittest.TestCase):
     def test_the_exempt_list_is_only_what_no_generator_writes(self):
-        """Four CUDA headers and the registration unit, and nothing else.
+        """The registration unit, and nothing else.
 
-        `generators.cuda` runs only under `SFEM_GENERATE_CUDA=1` and
         `generators.op_registration` is manifest-driven and hand-edited, so a
-        plain regeneration produces neither.  Every other path in the tree is
+        plain regeneration does not produce it.  Every other path in the tree is
         checked, and this list must not grow to make a failure go away.
+
+        The four shared `.cuh` headers were on it until `generators.shared_
+        headers` was written.  They were exempt because `generators.cuda` needs
+        `SFEM_GENERATE_CUDA=1`, and the exemption bought four tracked files that
+        nothing produced, nothing included and nothing checked -- by the time it
+        was noticed they were several refactors behind their `.hpp` twins.  They
+        need no material, so they are written on every regeneration now.  This
+        list shrinking is the result to protect; it must not grow back.
         """
         self.assertEqual(
             sorted(UNGENERATED_TREE_PATHS),
             [
-                "geometry_kernels.cuh",
-                "kernel_diagnostics.cuh",
-                "kernel_math.cuh",
                 "sfem_generated_ops_registration.cpp",
                 "sfem_generated_ops_registration.hpp",
-                "tensor_product_kernels.cuh",
             ],
         )
 
