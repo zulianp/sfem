@@ -447,17 +447,8 @@ static SFEM_INLINE int linear_elasticity_tet4_inexact_apply_stored_a_msoa_impl(
       const s_t output_t7 = ((s_t(1) / s_t(6)))*pa_q2_0_1;
       const s_t output_t8 = ((s_t(1) / s_t(6)))*pa_q2_0_2;
       const s_t element_out0_0 = output_t0 + output_t1 + output_t2;
-      const s_t element_out0_1 = -output_t0;
-      const s_t element_out0_2 = -output_t1;
-      const s_t element_out0_3 = -output_t2;
       const s_t element_out1_0 = output_t3 + output_t4 + output_t5;
-      const s_t element_out1_1 = -output_t3;
-      const s_t element_out1_2 = -output_t4;
-      const s_t element_out1_3 = -output_t5;
       const s_t element_out2_0 = output_t6 + output_t7 + output_t8;
-      const s_t element_out2_1 = -output_t6;
-      const s_t element_out2_2 = -output_t7;
-      const s_t element_out2_3 = -output_t8;
       bout0_0[lane] = element_out0_0;
       bout0_1[lane] = element_out0_1;
       bout0_2[lane] = element_out0_2;
@@ -781,17 +772,8 @@ static SFEM_INLINE int linear_elasticity_tet4_inexact_apply_stored_packed_two_pa
           const s_t output_t7 = ((s_t(1) / s_t(6)))*pa_q2_0_1;
           const s_t output_t8 = ((s_t(1) / s_t(6)))*pa_q2_0_2;
           const s_t element_out0_0 = output_t0 + output_t1 + output_t2;
-          const s_t element_out0_1 = -output_t0;
-          const s_t element_out0_2 = -output_t1;
-          const s_t element_out0_3 = -output_t2;
           const s_t element_out1_0 = output_t3 + output_t4 + output_t5;
-          const s_t element_out1_1 = -output_t3;
-          const s_t element_out1_2 = -output_t4;
-          const s_t element_out1_3 = -output_t5;
           const s_t element_out2_0 = output_t6 + output_t7 + output_t8;
-          const s_t element_out2_1 = -output_t6;
-          const s_t element_out2_2 = -output_t7;
-          const s_t element_out2_3 = -output_t8;
           bout0_0[lane] = element_out0_0;
           bout0_1[lane] = element_out0_1;
           bout0_2[lane] = element_out0_2;
@@ -994,17 +976,8 @@ static SFEM_INLINE int linear_elasticity_tet4_inexact_apply_compressed_a_msoa_im
     const s_t output_t7 = ((s_t(1) / s_t(6)))*pa_q2_0_1;
     const s_t output_t8 = ((s_t(1) / s_t(6)))*pa_q2_0_2;
     const s_t element_out0_0 = output_t0 + output_t1 + output_t2;
-    const s_t element_out0_1 = -output_t0;
-    const s_t element_out0_2 = -output_t1;
-    const s_t element_out0_3 = -output_t2;
     const s_t element_out1_0 = output_t3 + output_t4 + output_t5;
-    const s_t element_out1_1 = -output_t3;
-    const s_t element_out1_2 = -output_t4;
-    const s_t element_out1_3 = -output_t5;
     const s_t element_out2_0 = output_t6 + output_t7 + output_t8;
-    const s_t element_out2_1 = -output_t6;
-    const s_t element_out2_2 = -output_t7;
-    const s_t element_out2_3 = -output_t8;
     #pragma omp atomic update
     outx[ev0 * out_stride] += scale * element_out0_0;
     #pragma omp atomic update

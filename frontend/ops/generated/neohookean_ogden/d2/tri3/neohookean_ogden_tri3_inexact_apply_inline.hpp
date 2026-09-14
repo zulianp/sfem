@@ -257,11 +257,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_inexact_apply_stored_a_msoa_impl(
       const s_t output_t2 = ((s_t(1) / s_t(2)))*pa_q1_0_0;
       const s_t output_t3 = ((s_t(1) / s_t(2)))*pa_q1_0_1;
       const s_t element_out0_0 = output_t0 + output_t1;
-      const s_t element_out0_1 = -output_t0;
-      const s_t element_out0_2 = -output_t1;
       const s_t element_out1_0 = output_t2 + output_t3;
-      const s_t element_out1_1 = -output_t2;
-      const s_t element_out1_2 = -output_t3;
       bout0_0[lane] = element_out0_0;
       bout0_1[lane] = element_out0_1;
       bout0_2[lane] = element_out0_2;
@@ -353,11 +349,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_inexact_apply_compressed_a_msoa_imp
     const s_t output_t2 = ((s_t(1) / s_t(2)))*pa_q1_0_0;
     const s_t output_t3 = ((s_t(1) / s_t(2)))*pa_q1_0_1;
     const s_t element_out0_0 = output_t0 + output_t1;
-    const s_t element_out0_1 = -output_t0;
-    const s_t element_out0_2 = -output_t1;
     const s_t element_out1_0 = output_t2 + output_t3;
-    const s_t element_out1_1 = -output_t2;
-    const s_t element_out1_2 = -output_t3;
     #pragma omp atomic update
     outx[ev0 * out_stride] += scale * element_out0_0;
     #pragma omp atomic update
