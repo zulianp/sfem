@@ -232,20 +232,29 @@ def _inexact_apply_kernel_source(
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
     ]
-    stages = action_stages(plan, tangent_symbols, increment, output)
+    stages = tuple(action_stages(plan, tangent_symbols, increment, output))
     action_body = []
     action_body_expressions = []
-    # A stage's names are read by the stages after it and nowhere else, so a
-    # name that CSE reduced to a bare temporary can be substituted into those
-    # rather than declared.  `aliases` carries the mapping forward.
+    # An inner stage's names are read by the stages after it and nowhere else,
+    # so a name that CSE reduced to a bare temporary can be substituted into
+    # those rather than declared.  `aliases` carries the mapping forward.
+    #
+    # The last stage is not like that.  Its names are the kernel's outputs, and
+    # the scatter reads them by name from outside this loop, so dropping one
+    # leaves the scatter naming a value that was never declared.  It passes no
+    # alias dict and keeps every declaration.
     aliases = {}
-    for stage in stages:
+    for position, stage in enumerate(stages):
         assignments = [
             (symbol, expression.xreplace(aliases))
             for symbol, expression in stage.assignments
         ]
         action_body.extend(
-            _assignment_lines(assignments, stage.name, aliases=aliases)
+            _assignment_lines(
+                assignments,
+                stage.name,
+                aliases=None if position == len(stages) - 1 else aliases,
+            )
         )
         action_body_expressions.extend(
             expression for _symbol, expression in assignments
@@ -480,9 +489,10 @@ def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
     inexact-apply headers.
 
     It is opt-in because dropping a declaration is only safe where the caller
-    controls every use of it.  The stage loop does -- a stage's names are read
-    by the stages after it and nowhere else -- and the three other callers here
-    do not, so they pass nothing and keep their aliases.
+    controls every use of it.  The stage loop does for every stage but the last
+    -- an inner stage's names are read by the stages after it and nowhere else
+    -- and the last stage, whose names the scatter reads, does not, nor do the
+    three other callers here, so they pass nothing and keep their aliases.
 
     A bare symbol is eliminated, and so is the negation of one.  The negation
     was kept once, on the reasoning that substituting it would push a minus into
