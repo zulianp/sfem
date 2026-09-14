@@ -101,6 +101,7 @@ from codegen.framework.plans.generation import (
 )
 from codegen.framework.plans.generation import LocalPhase, MeshPhase
 from codegen.framework.plans.residual_structure import (
+    publishes_scalar_jacobian_action,
     jacobian_block_plan,
     residual_local_phase_plans,
     residual_mesh_phase_plans,
@@ -7457,7 +7458,7 @@ def _scalar_packed_jacobian_action_source(
     geometry_family=None,
     two_pass=False,
 ):
-    if len(system.fields) != 1 or not dependencies.direction:
+    if not publishes_scalar_jacobian_action(system, dependencies):
         return []
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -7855,7 +7856,7 @@ def _scalar_packed_affine_jacobian_action_source(
     basis_family=None,
     two_pass=False,
 ):
-    if len(system.fields) != 1 or not dependencies.direction:
+    if not publishes_scalar_jacobian_action(system, dependencies):
         return []
     # Affine packed two-pass is covered by isoparametric packed two-pass emission and
     # hand-written PackedLaplacian; skip incomplete specialized affine two-pass paths.

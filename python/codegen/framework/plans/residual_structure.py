@@ -73,6 +73,45 @@ def block_plans_from_form_collection(collection):
     return tuple(block_plan_from_form_block(block) for block in collection.blocks)
 
 
+def publishes_scalar_jacobian_action(system, dependencies):
+    """Whether this system publishes a packed scalar Jacobian-action kernel.
+
+    Two conditions, and both are about what the kernel *is* rather than how it
+    is spelled: the system carries one field, so the action is scalar, and the
+    form reads a direction, so there is an action to take at all.  A coupled
+    system's blocks are handled by the block kernels instead, and a form with no
+    direction has no Jacobian action to publish.
+
+    `emitters/residual_codegen.py` spelled the pair as `len(system.fields) != 1
+    or not dependencies.direction` at the head of both packed jacobian-action
+    sources, each returning an empty list.  That is `plans.dependencies`'
+    `publishes_kernel` one level up -- a form that contributes nothing publishes
+    no kernel -- and it belongs beside the rest of a residual kernel's structure
+    rather than being restated wherever a kernel begins.
+
+    Note that a third site, `_simplex_metric_scalar_affine_fast_path_body`,
+    looks like a third copy and is not: it pairs the single-field clause with
+    `rule.n_qp != 1`, which is a question about the quadrature rule.  Only the
+    first clause is shared, and sharing one clause is not sharing a question.
+
+    This answers False for everything currently generated.  Instrumenting both
+    call sites across a full regeneration recorded 148 entries and not one True:
+    every residual material still in the tree -- navier_stokes, two_phase_flow,
+    mooney_rivlin_kelvin_voigt_newmark -- reaches this emitter through paths
+    where the field count is not one, and the single-field residuals that would
+    have taken it, laplace among them, are written as energies now and never
+    arrive here at all.
+
+    That is a scope reduction, not a decision against the capability, and the
+    two sources it guards are kept for the same reason: a single-field residual
+    would want them back.  It is recorded because it is the shape OP 26 found in
+    the Laplacian special cases -- a generator left reachable but never reached,
+    where a byte-identical regeneration says nothing about whether its body
+    still works.
+    """
+    return len(system.fields) == 1 and bool(dependencies.direction)
+
+
 def jacobian_block_plan(block):
     """The plan for one Jacobian block of a residual system.
 
