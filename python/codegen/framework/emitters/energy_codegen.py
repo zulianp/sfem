@@ -99,6 +99,7 @@ from codegen.framework.plans.kernel_signature import (
 )
 from codegen.framework.plans.layout import is_tensor_product_family
 from codegen.framework.plans.matrix_formats import (
+    pattern_scattered_formats,
     BSRAssemblyPlan,
     BlockDiagSymAssemblyPlan,
     packed_crs_passes,
@@ -7757,7 +7758,7 @@ def _adjugate_input(dim):
 def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_field_components=None):
     n_field_components = dim if n_field_components is None else n_field_components
     lines = ["namespace sfem {", "namespace codegen {", ""]
-    if "bsr" in formats or "crs" in formats or "patch" in formats:
+    if pattern_scattered_formats(formats):
         find_cols_lines = [
             "static SFEM_INLINE void %s_find_cols(" % function_base,
             "    const idx_t *const RSTR targets,",
@@ -7788,12 +7789,12 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_fiel
             ]
         )
         lines.extend(find_cols_lines)
-    if "bsr" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
-    if "crs" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
-    if "block_diag_sym" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
+    for matrix_format in [f for f in _SCATTER_LINES_BY_FORMAT if f in formats]:
+        lines.extend(
+            _SCATTER_LINES_BY_FORMAT[matrix_format](
+                function_base, dim, n_nodes, n_field_components=n_field_components
+            )
+        )
     return lines
 
 
@@ -8183,6 +8184,18 @@ def _sfem_soa_hessian_scatter_block_diag_sym_lines(
             template_params=("typename s_t",),
         )
     )
+
+
+
+#: What each matrix format's scatter is emitted from.  Iterated in this order
+#: rather than asked for one `if "<fmt>" in formats` per format, so a format the
+#: plan publishes reaches this site by being in the sequence instead of by
+#: someone remembering to add a branch beside the others.
+_SCATTER_LINES_BY_FORMAT = {
+    "bsr": _sfem_soa_hessian_scatter_bsr_lines,
+    "crs": _sfem_soa_hessian_scatter_crs_lines,
+    "block_diag_sym": _sfem_soa_hessian_scatter_block_diag_sym_lines,
+}
 
 
 def _sfem_soa_hessian_matrix_public_wrappers(

@@ -272,6 +272,24 @@ class MatrixFormatPlan:
         }
 
 
+#: The formats whose scatter walks a sparsity pattern, and so must locate its
+#: columns in a row before it can write.  `block_diag_sym` is not one: its block
+#: is dense and indexed directly, so it needs no lookup.
+#:
+#: `emitters/energy_codegen.py` asked this as `"bsr" in formats or "crs" in
+#: formats or "patch" in formats`.  That third disjunct was dead -- the patch
+#: assembly format left with the scope cut and `MatrixFormat` has published only
+#: crs, bsr and block_diag_sym since -- which is the failure mode of spelling a
+#: set membership as a chain: the chain keeps naming a member that no longer
+#: exists and nothing says so.
+PATTERN_SCATTERED_FORMATS = frozenset(("crs", "bsr"))
+
+
+def pattern_scattered_formats(formats):
+    """Those of `formats` whose scatter has to find its columns first."""
+    return tuple(f for f in formats if f in PATTERN_SCATTERED_FORMATS)
+
+
 def published_matrix_formats(plan):
     """The matrix formats this plan publishes, as the ABI spells them.
 
