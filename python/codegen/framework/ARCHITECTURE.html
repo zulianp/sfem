@@ -566,9 +566,39 @@
 
       <p><b>The one that is missing is the ideal kernel form to aim at, and it generalises past Laplace.</b> A uniform material parameter whose common value is the identity &mdash; unit conductivity, unit density, a unit scaling &mdash; costs a multiply per element per component at run time and nothing at all if the kernel is instantiated for it. The specialised generator carried it as a second template parameter and dispatched on the value once, outside the element loop.</p>
 
-      <p>The framework already has the machinery to decide this: <code>plans/loperand.py</code> pattern-matches element-varying parameters into the isolated matrix, and <code>plans/geometry_variants.py</code> decides the cached metric. <b>Which uniform parameters are worth a compile-time instantiation is the same kind of question and belongs beside them</b> &mdash; not in a conjunction on a prefix string. What is not yet measured is what it buys, and that is what this entry waits on: the old kernels are in history immediately before this removal, and the comparison is a <code>UnitKappa</code> instantiation of the current packed apply against the runtime one, on Grace, at 72 threads, both layouts.</p>
+      <p>The framework already has the machinery to decide this: <code>plans/loperand.py</code> pattern-matches element-varying parameters into the isolated matrix, and <code>plans/geometry_variants.py</code> decides the cached metric. <b>Which uniform parameters are worth a compile-time instantiation is the same kind of question and belongs beside them</b> &mdash; not in a conjunction on a prefix string. What it buys was the open question here, and it is now measured.</p>
 
-      <div class="op-facts"><span><i>lines removed</i> 630</span><span><i>decision branches removed</i> 6</span><span><i>generated tree</i> byte-identical</span><span><i>properties already in the general path</i> 5 of 6</span><span><i>missing</i> compile-time specialisation of a unit material constant</span></div>
+      <p><b>It buys 2.5% on the generated packed apply, and nothing measurable anywhere else.</b>
+      A <code>UnitKappa</code> instantiation of the current packed apply against the runtime one,
+      Grace at 72 threads with <code>OMP_PROC_BIND=true</code>, 536,769 dofs over 3,145,728
+      elements, four interleaved rounds of twenty repeats. The two binaries differ in exactly
+      three multiplies in the apply block&rsquo;s inner lane loop &mdash;
+      <code>material[d] = kappa*trial_grad[d]</code> against <code>material[d] = trial_grad[d]</code>
+      &mdash; and because the generated op defaults <code>kappa</code> to 1 they compute the
+      bit-identical answer, so the gap is those multiplies and nothing else.</p>
+      <div class="tbl-wrap">
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>kernel</th><th>runtime &kappa;</th><th>unit &kappa;</th><th>ratio</th><th></th></tr>
+        <tr><td><b>generated packed apply</b></td><td class="n">2035</td><td class="n">2086</td><td class="n"><b>1.025</b></td><td><b>real.</b> The two sets are disjoint &mdash; {1985, 2036, 2035, 2043} against {2106, 2069, 2102, 2066} &mdash; so every unit run beat every runtime run</td></tr>
+        <tr><td>generated packed two-pass apply</td><td class="n">1161</td><td class="n">1177</td><td class="n">1.014</td><td>overlaps; not claimed. The two-pass spends proportionally more of itself in the ghost reduction, so the same three multiplies are a smaller share of it</td></tr>
+        <tr><td>generated apply, standard layout</td><td class="n">459</td><td class="n">491</td><td class="n">&mdash;</td><td><b>not claimed.</b> Looks like +6.9% and is not: the runtime set is {496, 414, 493, 425}, two outliers and an 18% spread</td></tr>
+        <tr><td>packed apply <i>(hand-written)</i></td><td class="n">1147</td><td class="n">1146</td><td class="n">0.999</td><td><b>control.</b> Does not include the edited header</td></tr>
+        <tr><td>baseline apply <i>(hand-written)</i></td><td class="n">471</td><td class="n">474</td><td class="n">1.005</td><td><b>control.</b> Same</td></tr>
+      </table>
+      </div>
+      <p>The controls are what make the rest readable. Both hand-written kernels sit at 1.00
+      because the edit cannot reach them; had the measurement been drifting &mdash; thermal,
+      allocation, ordering &mdash; they would have moved with everything else. The A/B is
+      interleaved rather than sequential for the same reason a 12&ndash;13% assembly claim
+      earlier in this work had to be withdrawn: it was mesh ordering, not the kernel.</p>
+      <p><b>So the property is worth having and is not worth much.</b> 2.5% on the headline
+      kernel is enough to put the decision where <code>plans/loperand.py</code> and
+      <code>plans/geometry_variants.py</code> already answer questions of exactly this kind, and
+      not enough to justify a large mechanism for it. That is the useful form of this answer:
+      the entry no longer waits on a measurement, and whoever builds it knows the size of the
+      prize before starting.</p>
+
+      <div class="op-facts"><span><i>lines removed</i> 630</span><span><i>decision branches removed</i> 6</span><span><i>generated tree</i> byte-identical</span><span><i>properties already in the general path</i> 5 of 6</span><span><i>missing</i> compile-time specialisation of a unit material constant &mdash; <b>measured: 2.5%</b></span></div>
     </div>
   </div>
 
