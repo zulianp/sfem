@@ -364,7 +364,28 @@ PLAN_INPUTS = (
 #: CUDA and HIP source builders that define `emits_tensor_product_header`
 #: separately -- reported the baseline set unchanged.  A family is never absent
 #: on any path either reaches.
-BUDGET = 110
+#:
+#: 110 -> 109: one branch, and the smallest step here so far, but the one worth
+#: reading.  Three emitters computed the two reference-traffic numbers every
+#: `KernelDiagnostics` record carries -- `reference_scalars` and
+#: `quadrature_weight_scalars` -- three different ways: `energy_codegen.py`
+#: branched on the basis family, `residual_codegen.py` split
+#: `sfem_reference_data(rule)` on the `q_weight` prefix, and
+#: `inexact_apply_codegen.py` writes 0 and the point count.
+#:
+#: What was wrong in the first of those is that it asked the *basis family* a
+#: question the *rule* answers about itself: `sfem_reference_data` branches on
+#: `rule.is_tensor_product` internally and returns the 1D tables for exactly
+#: those elements.  That the two agree where they overlap was measured -- (8, 2)
+#: for HEX8, QUAD4 and PROTEUS_HEX8, (18, 3) for HEX27 -- rather than argued.
+#:
+#: The two measures were deliberately *not* merged.  An energy kernel is charged
+#: only for the reference arrays its own signature takes, so one that never
+#: reads `shape` is not billed for it; the residual recipe counts the rule's
+#: full data.  Collapsing them would have started charging kernels for tables
+#: they do not read, and the numbers feed `tools/flops_audit.py`, which is how
+#: the roofline is generated rather than written.
+BUDGET = 109
 
 
 def _tested_names(test):

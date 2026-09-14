@@ -69,6 +69,7 @@ from codegen.framework.plans.diagnostics import (
     jacobian_block_diagnostic_cost,
     residual_diagnostic_cost,
 )
+from codegen.framework.plans.diagnostics import reference_data_traffic
 from codegen.framework.plans.layout import (
     _compatible_matrix_stream_indices,
     _compatible_stream_component_offsets,
@@ -5236,15 +5237,8 @@ def _kernel_diagnostics_lines(
     geometry_streams = system.dim * system.dim + 1
     if reference_data is None:
         reference_data = sfem_reference_data(rule)
-    reference_scalars = sum(
-        len(reference.values)
-        for reference in reference_data
-        if not reference.name.startswith("q_weight")
-    )
-    quadrature_weight_scalars = sum(
-        len(reference.values)
-        for reference in reference_data
-        if reference.name.startswith("q_weight")
+    reference_scalars, quadrature_weight_scalars = reference_data_traffic(
+        reference_data
     )
     variable_name = "%s_diagnostics_data" % public_name
     # What the element costs beyond its material evaluation.  These two were
