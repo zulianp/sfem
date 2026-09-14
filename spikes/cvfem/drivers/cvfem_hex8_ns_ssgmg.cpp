@@ -3463,6 +3463,27 @@ int main(int argc, char **argv) {
     // applied to multigrid cost the step a factor of ten from the start, and on the box and the
     // core 2 nozzle it was the whole of the "multigrid fails at an open outlet" failure.
     if (want_natural_outlet && use_gmg != 1) setenv("SFEM_VANKA_MULT", "0", 0);
+
+    // And inside a V-cycle an open outlet gets the smoother damped to 0.5 by default, because
+    // undamped it can diverge there outright. Measured on the nozzle at macro core 4, level 2
+    // (58,780 dof): the cycle's own Vanka as a stationary iteration contracts for four sweeps and
+    // then grows 2.09x per sweep (additive 3.60x), worst local rate 7.1 on the centreline at x
+    // 0.153, next to the outlet at 0.16 -- while core 2, which multigrid solved, stays at or
+    // below 1. Eight smoothing steps instead of three made the cycle worse (0.997 after 300 its
+    // against 0.83), and neither the element-wise nor the exact Galerkin coarse operator helped,
+    // so it was the smoother and not the coarse space. FGMRES (restart 480) + multigrid, Re 1:
+    //
+    //     nozzle core 2, L 2   15,740 dof   omega 1  5 Newton, 1,167 its  5.7 s   0.5  343 its  1.5 s
+    //     nozzle core 2, L 4  116,212 dof   omega 1  4 Newton, 1,067 its 26.5 s   0.5  502 its 10.9 s
+    //     nozzle core 4, L 2   58,780 dof   omega 1  stalls, 0.964 after 300 its  0.5  5 Newton, 1,203 its
+    //     step, L 2, Re 20      7,060 dof   omega 1  239 its                      0.5  269 its
+    //     box N 2, L 4         10,692 dof   omega 1  51 its                       0.5  66 its
+    //
+    // Same stations wherever both converge. The closed domains keep omega = 1 (see smoother_omega:
+    // 0.5 costs the closed Poiseuille regression a factor of ten), and the standalone Vanka
+    // preconditioner keeps it too, since 0.5 has not been measured there. An explicit
+    // SFEM_VANKA_OMEGA still wins.
+    if (want_natural_outlet && use_gmg == 1) setenv("SFEM_VANKA_OMEGA", "0.5", 0);
     if (want_natural_outlet && outflow_mode == "donothing") {
         // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
         // the pressure gauge -- so the pin must come off with it, or the system is
