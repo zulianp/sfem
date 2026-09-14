@@ -411,7 +411,25 @@ PLAN_INPUTS = (
 #: as a range so emission can iterate rather than branch -- this is that idea
 #: per direction instead of all-or-nothing -- and beside `live_test_coefficients`,
 #: which already handles the per-row case the same way.
-BUDGET = 105
+#:
+#: 105 -> 102: set membership spelled as a chain, and what the chain was hiding.
+#:
+#: The guard was `if "bsr" in formats or "crs" in formats or "patch" in
+#: formats:`, and `patch` does not exist -- the patch assembly format left with
+#: the scope cut and `MatrixFormat` has published only crs, bsr and
+#: block_diag_sym since.  That is the characteristic failure of a disjunction
+#: chain standing in for a set: it goes on naming a member that was deleted, and
+#: nothing fails, because testing for absent membership is always false.
+#: `plans.matrix_formats.pattern_scattered_formats` is the set -- which formats
+#: scatter through a sparsity pattern and so must find their columns first,
+#: which `block_diag_sym` need not, its block being dense and indexed directly.
+#:
+#: The three `if "<fmt>" in formats:` dispatches became `_SCATTER_LINES_BY_FORMAT`
+#: iterated through a comprehension filter, the idiom `live_test_coefficients`
+#: already uses.  Table order preserves the emitted order, and a format the plan
+#: publishes now reaches this site by being in the sequence rather than by
+#: someone remembering to add a branch beside the other two.
+BUDGET = 102
 
 
 def _tested_names(test):
