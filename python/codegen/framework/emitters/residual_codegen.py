@@ -3469,25 +3469,16 @@ def _assemble_local_phases(sections):
 
 
 def _work_item_loop_node(body):
-    """One work-item scope: a lane loop, or a bare block where the lane is a thread.
+    """One work-item scope, asked of the bound target.
 
     The quadrature helper builds exactly one of these; the generic simplex
     body opens five, which is why it is a function rather than inlined.
+
+    The body of this used to live here, and it was the only one of six
+    re-spellings of the work-item loop that read the policy and returned a
+    node.  It now lives on `TargetPlatform`, where the other five can reach it.
     """
-    target = _target()
-    policy = target.loop_lowering_policy()
-    if not policy.emits_lane_loop:
-        return BlockNode(body=tuple(body))
-    lane = iterator(policy.lane_index, policy.lane_index_type)
-    pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
-    return LoopNode(
-        LoopKind.SIMD,
-        lane,
-        iteration_range(0, expr_ref("ne", "tile_extent")),
-        pre_increment(lane),
-        body=tuple(body),
-        vectorized=bool(pragma),
-    )
+    return _target().work_item_scope_node(body)
 
 
 def _shape_loop_node(name, body):
