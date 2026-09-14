@@ -117,6 +117,20 @@ class FieldStreamUsage:
 
     uses_value: bool
     uses_gradient: bool
+    #: Which physical directions of this field's gradient the form reads.
+    #:
+    #: `uses_gradient` is `any()` of this, and the gap between the two is what
+    #: `emitters/residual_codegen.py` was paying for: `_physical_gradient_nodes`
+    #: emitted one chain-rule declaration per direction whenever the gradient
+    #: was read at all, so a form reading one component computed `dim` of them.
+    #: Navier-Stokes is the clearest case -- its pressure form contracts the
+    #: divergence, which needs `u0_grad_0`, `u1_grad_1` and `u2_grad_2` and none
+    #: of the six off-diagonal components, and all six were built and dropped.
+    #:
+    #: The reference components are a separate question and stay whole: physical
+    #: direction `d` is a combination of every reference direction `k`, so
+    #: narrowing the physical loop does not narrow the staging above it.
+    gradient_components: tuple = ()
 
     @property
     def is_read(self):
@@ -163,13 +177,27 @@ def field_stream_usage(dependencies, field, role):
         group = field_stream_group(dependencies, role)
         if group is None:
             return FieldStreamUsage(uses_value=False, uses_gradient=False)
+        gradient_symbols = _ROLE_FIELD_SYMBOLS[role][1]
         return FieldStreamUsage(
-            uses_value=group.uses_value, uses_gradient=group.uses_gradient
+            uses_value=group.uses_value,
+            uses_gradient=group.uses_gradient,
+            # No symbol detail to narrow with, so every direction stands.  Same
+            # asymmetry as the flags above: a direction built and not read costs
+            # arithmetic, one read and not built does not compile.
+            gradient_components=(
+                tuple(range(len(gradient_symbols(field))))
+                if group.uses_gradient
+                else ()
+            ),
         )
     value_symbols, gradient_symbols = _ROLE_FIELD_SYMBOLS[role]
+    components = tuple(
+        d for d, symbol in enumerate(gradient_symbols(field)) if symbol in used
+    )
     return FieldStreamUsage(
         uses_value=any(symbol in used for symbol in value_symbols(field)),
-        uses_gradient=any(symbol in used for symbol in gradient_symbols(field)),
+        uses_gradient=bool(components),
+        gradient_components=components,
     )
 
 

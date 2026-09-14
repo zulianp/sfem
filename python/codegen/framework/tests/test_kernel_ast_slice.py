@@ -168,23 +168,38 @@ class StatementHelpersProduceNodesTest(unittest.TestCase):
     """
 
     def test_physical_gradient_nodes_are_declarations(self):
-        nodes = residual_codegen._physical_gradient_nodes("u", 3)
+        nodes = residual_codegen._physical_gradient_nodes("u", 3, range(3))
         self.assertEqual(len(nodes), 3, "one declaration per physical direction")
         for node in nodes:
             self.assertIsInstance(node, BufferDeclNode)
             self.assertEqual(node.extents, ())
 
+    def test_only_the_directions_asked_for_are_declared(self):
+        """The narrowing that took the dead-assignment count from 66 to 10.
+
+        A form contracting a divergence reads one component of each field's
+        gradient, and used to get `dim` of them; the directions it does read are
+        `plans.streams.FieldStreamUsage.gradient_components`.  The sum inside
+        each declaration stays over every reference direction, because a
+        physical direction is a combination of all of them.
+        """
+        nodes = residual_codegen._physical_gradient_nodes("u", 3, (1,))
+        self.assertEqual([node.name.name for node in nodes], ["u_grad_1"])
+        self.assertIn("u_grad_0_ref", nodes[0].initializer.expression)
+        self.assertIn("u_grad_2_ref", nodes[0].initializer.expression)
+        self.assertEqual(residual_codegen._physical_gradient_nodes("u", 3, ()), [])
+
     def test_physical_gradient_lines_are_those_nodes_printed(self):
-        nodes = residual_codegen._physical_gradient_nodes("u", 3)
+        nodes = residual_codegen._physical_gradient_nodes("u", 3, range(3))
         self.assertEqual(
-            residual_codegen._physical_gradient_lines("u", 3, "    "),
+            residual_codegen._physical_gradient_lines("u", 3, range(3), "    "),
             residual_codegen._print_statement_nodes(nodes, "    "),
         )
 
     def test_the_printed_view_still_matches_the_original_spelling(self):
-        """Byte-identity of the whole tree depends on this exact text."""
+        """The text a form reading every direction gets, unchanged."""
         self.assertEqual(
-            residual_codegen._physical_gradient_lines("u", 2, "  "),
+            residual_codegen._physical_gradient_lines("u", 2, range(2), "  "),
             [
                 "  const s_t u_grad_0 = (u_grad_0_ref * adj0 + u_grad_1_ref * adj2) / det;",
                 "  const s_t u_grad_1 = (u_grad_0_ref * adj1 + u_grad_1_ref * adj3) / det;",

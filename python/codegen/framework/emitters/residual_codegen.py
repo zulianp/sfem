@@ -2513,7 +2513,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                         % (field.name, group.symbol_suffix, k, group.name, field.name, k)
                     )
                 body.extend(
-                    _physical_gradient_lines(field.name + group.symbol_suffix, dim, "      ")
+                    _physical_gradient_lines(field.name + group.symbol_suffix, dim, read.gradient_components, "      ")
                 )
     for row, field in enumerate(system.fields):
         hoisted.append(
@@ -2669,7 +2669,7 @@ def _mixed_local_field_evaluation_lines(
                 lines.append("%s}" % indent)
             if read.uses_gradient:
                 lines.extend(
-                    _physical_gradient_lines(field.name + group.symbol_suffix, dim, indent)
+                    _physical_gradient_lines(field.name + group.symbol_suffix, dim, read.gradient_components, indent)
                 )
     return lines
 
@@ -3106,7 +3106,7 @@ def _simplex_local_body(
                     )
                     for d in range(dim)
                 )
-                transform_values.extend(_physical_gradient_nodes(stem, dim))
+                transform_values.extend(_physical_gradient_nodes(stem, dim, read.gradient_components))
 
     # The geometry is prepended only when something reads it, and the phase
     # is dropped entirely when it has no content: an empty lane scope holding
@@ -3234,16 +3234,19 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
 
     # Asked once, up front, rather than inside the loop: the answer is a
     # property of the plan and the field, not of where emission happens to be.
-    reads_gradient = {
+    # Keep the usage record rather than collapsing it to its `uses_gradient`
+    # flag: the physical gradient below wants the directions, not the `any()`.
+    field_reads = {
         (field.name, group.name): field_stream_usage(
             dependencies, field, group.name
-        ).uses_gradient
+        )
         for field in system.fields
         for group in groups
     }
     for field_index, field in enumerate(system.fields):
         for group in groups:
-            if not reads_gradient[(field.name, group.name)]:
+            read = field_reads[(field.name, group.name)]
+            if not read.uses_gradient:
                 continue
             stem = field.name + group.symbol_suffix
             for d in range(dim):
@@ -3262,7 +3265,7 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
                         expr_ref(value),
                     )
                 )
-            body.extend(_physical_gradient_nodes(stem, dim))
+            body.extend(_physical_gradient_nodes(stem, dim, read.gradient_components))
 
     body.extend(_coefficient_evaluation_nodes(system, coefficients, dependencies))
 
@@ -3932,7 +3935,10 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
             if read.uses_gradient:
                 lines.extend(
                     _physical_gradient_lines(
-                        field.name + group.symbol_suffix, dim, indent
+                        field.name + group.symbol_suffix,
+                        dim,
+                        read.gradient_components,
+                        indent,
                     )
                 )
     return lines
@@ -3949,13 +3955,20 @@ def _print_statement_nodes(nodes, indent):
     return [line for node in nodes for line in printer.print_node(node, indent)]
 
 
-def _physical_gradient_nodes(stem, dim):
+def _physical_gradient_nodes(stem, dim, directions):
     """The chain rule taking a reference gradient to a physical one, as IR.
 
     ``grad_d = (sum_k grad_k_ref * adj[k][d]) / det`` -- one declaration per
-    physical direction.  This is the node-producing form;
+    physical direction the form reads.  This is the node-producing form;
     ``_physical_gradient_lines`` prints exactly these nodes, so the two cannot
     drift apart.
+
+    `directions` is `plans.streams.FieldStreamUsage.gradient_components`.  It
+    used to be `range(dim)` unconditionally, which is why a form contracting the
+    divergence built all nine components of a 3D velocity gradient and read
+    three.  The sum over `k` stays whole: a physical direction is a combination
+    of every reference direction, so narrowing the outer loop does not narrow
+    the staging that feeds it.
     """
     return [
         BufferDeclNode(
@@ -3970,13 +3983,15 @@ def _physical_gradient_nodes(stem, dim):
                 )
             ),
         )
-        for d in range(dim)
+        for d in directions
     ]
 
 
-def _physical_gradient_lines(stem, dim, indent):
+def _physical_gradient_lines(stem, dim, directions, indent):
     """The printed view of :func:`_physical_gradient_nodes`."""
-    return _print_statement_nodes(_physical_gradient_nodes(stem, dim), indent)
+    return _print_statement_nodes(
+        _physical_gradient_nodes(stem, dim, directions), indent
+    )
 
 
 def _tensor_field_alias_nodes(system, dependencies):
@@ -4054,7 +4069,7 @@ def _tensor_field_alias_nodes(system, dependencies):
                     )
                     for k in range(dim)
                 )
-                nodes.extend(_physical_gradient_nodes(stem, dim))
+                nodes.extend(_physical_gradient_nodes(stem, dim, read.gradient_components))
     return tuple(hoisted), tuple(nodes)
 
 
