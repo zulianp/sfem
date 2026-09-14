@@ -209,11 +209,20 @@ int main(int argc, char **argv) {
         std::vector<float>  scale(ecount, 1.0f);
 
         auto assemble = [&] {
+            // A state-independent tangent -- linear elasticity, whose tangent is
+            // constant -- gathers nothing, so the generator gives it neither the
+            // connectivity nor the state.  Passing them anyway does not compile.
             sfem::codegen::TANGENT_KERNEL<double, geom_t, double, LANE_VS>(
-                m.nelements, m.kevp.data(),
+                m.nelements,
+#ifdef TANGENT_TAKES_STATE
+                m.kevp.data(),
+#endif
                 m.adj[0].data(),m.adj[1].data(),m.adj[2].data(),m.adj[3].data(),m.adj[4].data(),
                 m.adj[5].data(),m.adj[6].data(),m.adj[7].data(),m.adj[8].data(), m.det.data(),
-                lmbda, mu, 1, ux.data(), uy.data(), uz.data(),
+                lmbda, mu,
+#ifdef TANGENT_TAKES_STATE
+                1, ux.data(), uy.data(), uz.data(),
+#endif
                 cstride, S64.data());
         };
         assemble();
