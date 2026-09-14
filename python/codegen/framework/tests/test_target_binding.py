@@ -448,67 +448,67 @@ class WorkItemLoweringRatchetTest(unittest.TestCase):
     answer for the work item *is* the literal the emitters write today, so a
     correct conversion moves no byte and byte-identity stays true by
     construction at every step.  That makes it the right regression gate -- it
-    is byte-exact over 387 files and it catches a dropped space in a `%s` splice
-    -- and no kind of progress gate at all.
+    is byte-exact over 387 files and catches the dropped space in a `%s` splice
+    that is the realistic failure mode -- and no kind of progress gate.
 
     So generate twice: once normally, once against a target identical to OpenMP
     but for the name it gives the work item.  A site that asks the target
-    follows the rename; a site that spells `lane` does not.  What survives is
+    follows the rename; a site that writes `lane` does not.  What survives is
     exactly the text that would still say `lane` on a GPU, which is what
     `backends/cuda.py` rejects and what keeps four of five targets from
     shipping.
 
-    Unlike a literal count over the Python source, this cannot be gamed by
-    tidying: rewriting a literal into a prettier literal moves it by zero.  It
-    is also where the work really is.  `inexact_apply_codegen.py` holds 19 of
-    the 124 literal `lane` strings in the emitters but 398 of the 470 surviving
-    tokens here, because its literals sit inside loops over nodes and
-    components.  Ordering the conversion by literal count would have started in
-    the wrong file.
+    Unlike a literal count over the Python sources this cannot be gamed by
+    tidying, and it is also where the work really is:
+    `inexact_apply_codegen.py` held 19 of the 124 literal `lane` strings in the
+    emitters and produced 398 of the tokens, because its literals sit inside
+    loops over nodes and components.
+
+    **Two materials, because one was not enough.**  This started measuring
+    linear elasticity alone, which reaches the energy and inexact emitters and
+    never touches `residual_codegen.py` -- so it reported the defect as 470
+    tokens when the residual path alone carries 1195 more.  A single-material
+    counter is the same mistake as a single-size benchmark: it is not wrong, it
+    is narrow, and it made the largest surface invisible.  TRI3 keeps the
+    residual material cheap; TET4 is the smallest element that exercises the
+    inexact, energy and operator paths at once.
     """
 
-    #: generated file -> work-item tokens that ignore the target.  Only down.
+    #: material -> element -> generated file -> tokens that ignore the target.
+    #: Only ever down.
     #:
-    #: 470 -> 72 when `inexact_apply_codegen.py` converted: its 398 went to zero
-    #: in one pass, because its nineteen literals sit inside loops over nodes and
-    #: components and each one printed many tokens.  The file left the set
-    #: entirely rather than shrinking, which is why the set itself is asserted.
+    #: linear_elasticity 470 -> 72 when `inexact_apply_codegen.py` converted:
+    #: its 398 went to zero in one pass and the file left the set entirely,
+    #: which is why the set of files is asserted and not just the counts.
     BUDGET = {
-        "linear_elasticity_tet4_operator.cpp": 70,
-        "linear_elasticity_d3_simplex_hessian.hpp": 2,
+        ("linear_elasticity", "TET4"): {
+            "linear_elasticity_tet4_operator.cpp": 70,
+            "linear_elasticity_d3_simplex_hessian.hpp": 2,
+        },
+        ("two_phase_flow", "TRI3"): {
+            "two_phase_flow_d2_simplex_local.hpp": 400,
+            "two_phase_flow_form_2_p_c_p_c_d2_simplex_local.hpp": 132,
+            "two_phase_flow_form_2_p_w_p_w_d2_simplex_local.hpp": 132,
+            "two_phase_flow_form_1_p_c_d2_simplex_local.hpp": 124,
+            "two_phase_flow_form_1_p_w_d2_simplex_local.hpp": 124,
+            "two_phase_flow_form_2_p_c_p_w_d2_simplex_local.hpp": 108,
+            "two_phase_flow_form_2_p_w_p_c_d2_simplex_local.hpp": 108,
+            "two_phase_flow_tri3_operator.cpp": 13,
+            "two_phase_flow_form_1_p_c_tri3_operator.cpp": 9,
+            "two_phase_flow_form_1_p_w_tri3_operator.cpp": 9,
+            "two_phase_flow_form_2_p_c_p_c_tri3_operator.cpp": 9,
+            "two_phase_flow_form_2_p_c_p_w_tri3_operator.cpp": 9,
+            "two_phase_flow_form_2_p_w_p_c_tri3_operator.cpp": 9,
+            "two_phase_flow_form_2_p_w_p_w_tri3_operator.cpp": 9,
+        },
     }
 
-    #: What one generation of this material costs, against what it buys.  TET4
-    #: is the cheapest element that exercises the inexact, residual and operator
-    #: paths at once; HEX8 would cover more and cost far more.
-    ELEMENT = "TET4"
-
-    def _generate(self, target=None):
+    def _probe(self, material_name, element):
         import dataclasses
+        import importlib
 
         from sfem import gen
         from codegen.framework.backends.openmp import OpenMPSoABackend
-        from codegen.framework.materials.linear_elasticity import material
-
-        def build():
-            unit = dataclasses.replace(material, inexact_apply=True)
-            user_input = gen.UserInputStage.create(unit, (self.ELEMENT,), 8, None)
-            form_evaluation = gen._evaluate_forms(user_input)
-            plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
-            return gen.CodeGenerationStage(user_input, plan).run()
-
-        if target is None:
-            return build()
-        saved = gen.BACKENDS_BY_TARGET[gen.KernelTarget.OPENMP]
-        gen.BACKENDS_BY_TARGET[gen.KernelTarget.OPENMP] = OpenMPSoABackend(target=target)
-        try:
-            return build()
-        finally:
-            gen.BACKENDS_BY_TARGET[gen.KernelTarget.OPENMP] = saved
-
-    def test_work_item_budget_only_shrinks(self):
-        import dataclasses
-        import re
 
         class LaneProbe(OpenMPTarget):
             """OpenMP in every respect but the name it gives the work item."""
@@ -517,54 +517,70 @@ class WorkItemLoweringRatchetTest(unittest.TestCase):
                 policy = super().loop_lowering_policy()
                 return dataclasses.replace(policy, lane_index="wi")
 
-        probed = self._generate(LaneProbe())
-        word = re.compile(r"\blane\b")
-        found = {}
-        for path, source in probed.items():
-            count = len(word.findall(source))
-            if count:
-                found[os.path.basename(path)] = count
-
-        self.assertEqual(
-            sorted(found),
-            sorted(self.BUDGET),
-            "the set of files with hand-spelled work items changed; update the "
-            "budget and say which file moved",
+        module = importlib.import_module(
+            "codegen.framework.materials.%s" % material_name
         )
-        for name in sorted(self.BUDGET):
-            with self.subTest(generated=name):
-                self.assertLessEqual(
-                    found[name],
-                    self.BUDGET[name],
-                    "%s gained %d work-item tokens that ignore the target; ask "
-                    "the target for the index instead of writing `lane`"
-                    % (name, found[name] - self.BUDGET[name]),
-                )
+        material = module.material
+        if material_name == "linear_elasticity":
+            material = dataclasses.replace(material, inexact_apply=True)
+
+        saved = gen.BACKENDS_BY_TARGET[gen.KernelTarget.OPENMP]
+        gen.BACKENDS_BY_TARGET[gen.KernelTarget.OPENMP] = OpenMPSoABackend(
+            target=LaneProbe()
+        )
+        try:
+            user_input = gen.UserInputStage.create(material, (element,), 8, None)
+            form_evaluation = gen._evaluate_forms(user_input)
+            plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
+            return gen.CodeGenerationStage(user_input, plan).run()
+        finally:
+            gen.BACKENDS_BY_TARGET[gen.KernelTarget.OPENMP] = saved
+
+    def test_work_item_budget_only_shrinks(self):
+        import re
+
+        word = re.compile(r"\blane\b")
+        for (material, element), budget in sorted(self.BUDGET.items()):
+            probed = self._probe(material, element)
+            found = {}
+            for path, source in probed.items():
+                count = len(word.findall(source))
+                if count:
+                    found[os.path.basename(path)] = count
+
+            with self.subTest(material=material, element=element):
                 self.assertEqual(
-                    found[name],
-                    self.BUDGET[name],
-                    "%s is down to %d hand-spelled work items and the budget "
-                    "still says %d -- lower it to lock the improvement in"
-                    % (name, found[name], self.BUDGET[name]),
+                    sorted(found),
+                    sorted(budget),
+                    "the set of files with hand-spelled work items changed for "
+                    "%s; update the budget and say which file moved" % material,
                 )
+                for name in sorted(budget):
+                    self.assertLessEqual(
+                        found[name],
+                        budget[name],
+                        "%s gained %d work-item tokens that ignore the target; "
+                        "ask the target for the index instead of writing `lane`"
+                        % (name, found[name] - budget[name]),
+                    )
+                    self.assertEqual(
+                        found[name],
+                        budget[name],
+                        "%s is down to %d hand-spelled work items and the budget "
+                        "still says %d -- lower it to lock the improvement in"
+                        % (name, found[name], budget[name]),
+                    )
 
     def test_the_probe_would_notice_a_conversion(self):
         """The counter is only meaningful if the rename reaches anything at all.
 
-        Most of the tree already follows the target -- 1216 of 1686 work-item
-        tokens move when the probe renames the index.  Pinning that the probe
-        has an effect is what stops the ratchet above from passing because the
+        Most of the tree already follows the target.  Pinning that the probe has
+        an effect is what stops the budget above from passing because the target
         binding broke rather than because the emitters improved.
         """
-        import dataclasses
         import re
 
-        class LaneProbe(OpenMPTarget):
-            def loop_lowering_policy(self):
-                policy = super().loop_lowering_policy()
-                return dataclasses.replace(policy, lane_index="wi")
-
-        probed = self._generate(LaneProbe())
+        probed = self._probe("linear_elasticity", "TET4")
         renamed = sum(len(re.findall(r"\bwi\b", source)) for source in probed.values())
         self.assertGreater(
             renamed,
