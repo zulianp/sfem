@@ -1,4 +1,4 @@
-"""Capture and verify a byte-exact snapshot of every generated kernel source.
+"""Capture and compare a byte-exact snapshot of every generated kernel source.
 
 This is the refactoring gate for the layering work recorded in
 ``ARCHITECTURE.html``.
@@ -12,16 +12,22 @@ Usage::
 
     python -m codegen.framework.tools.codegen_snapshot capture reference/
     python -m codegen.framework.tools.codegen_snapshot check reference/
-    python -m codegen.framework.tools.codegen_snapshot verify
     python -m codegen.framework.tools.codegen_snapshot check-tree
 
-``capture`` regenerates every maintained material into a reference tree and
-writes a hash manifest beside this module.  ``check`` regenerates into a
-temporary tree and compares against that reference tree, exiting non-zero with a
-unified diff of what moved -- this is the mode to use while working, because it
-shows what changed.  ``verify`` compares only against the committed manifest, so
-it needs no local reference tree and is the mode to use in CI or on a fresh
-clone; it can say which files changed but not how.
+``capture`` regenerates every maintained material into a reference tree.
+``check`` regenerates into a temporary tree and compares against that reference
+tree, exiting non-zero with a unified diff of what moved -- this is the mode to
+use while working, because it shows what changed.
+
+There was a fourth mode, ``verify``, which compared hashes against a manifest
+committed beside this module.  It is retired.  ``check-tree`` asks the strictly
+better question -- whether ``frontend/ops/generated``, the tree CMake compiles
+into libsfem, is what the generator produces today -- where ``verify`` asked
+only whether the generator still agreed with a record of itself.  A record can
+go stale without anything failing, and this one did: its manifest went unwritten
+for sixty-three commits while ``check-tree`` passed on every one of them, so the
+gate was dark and nothing said so.  A gate that can be silently wrong is worse
+than no gate, because it is counted as cover.
 
 The reference tree is roughly 44 MB and is deliberately not committed.  The
 manifest is, so the gate itself is reviewable in the branch history.
@@ -69,7 +75,6 @@ IGNORED_NAMES = ("__pycache__", ".DS_Store")
 MAX_REPORTED_DIFFS = 5
 MAX_DIFF_LINES = 60
 
-DEFAULT_MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "codegen_snapshot.sha256")
 
 #: Files the shipped tree carries that `regenerate_all.sh` does not write.
 #:
@@ -191,31 +196,6 @@ def digests(root):
     return {relative: _file_digest(os.path.join(root, relative)) for relative in _relative_files(root)}
 
 
-def write_manifest(root, manifest_path):
-    """Write a ``sha256␠␠path`` manifest for ``root``, sorted by path."""
-    entries = digests(root)
-    with open(manifest_path, "w", encoding="utf-8") as handle:
-        handle.write("# SHA-256 of every generated kernel source, one line per file.\n")
-        handle.write("# Regenerate with: python -m codegen.framework.tools.codegen_snapshot capture <dir>\n")
-        for relative in sorted(entries):
-            handle.write("%s  %s\n" % (entries[relative], relative))
-    return len(entries)
-
-
-def read_manifest(manifest_path):
-    entries = {}
-    with open(manifest_path, encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            digest, _, relative = line.partition("  ")
-            if not relative:
-                raise ValueError("malformed manifest line: %r" % line)
-            entries[relative] = digest
-    return entries
-
-
 def _unified_diff(reference_path, candidate_path, relative):
     try:
         with open(reference_path, encoding="utf-8") as handle:
@@ -301,49 +281,7 @@ def command_capture(args):
     files = _relative_files(root)
     print("")
     print("captured %d generated files from %d materials into %s" % (len(files), len(MATERIALS), root))
-    if not args.no_manifest:
-        manifest_path = os.path.abspath(args.manifest)
-        count = write_manifest(root, manifest_path)
-        print("wrote manifest of %d hashes to %s" % (count, manifest_path))
     return 0
-
-
-def command_verify(args):
-    manifest_path = os.path.abspath(args.manifest)
-    if not os.path.isfile(manifest_path):
-        sys.stderr.write("no manifest at '%s'; run 'capture' first\n" % manifest_path)
-        return 2
-    expected = read_manifest(manifest_path)
-    candidate_parent = tempfile.mkdtemp(prefix="sfem_codegen_verify_")
-    candidate_dir = snapshot_root(candidate_parent)
-    os.makedirs(candidate_dir)
-    try:
-        failed = generate_all(candidate_dir, verbose=not args.quiet)
-        if failed:
-            sys.stderr.write("verify incomplete; generators failed: %s\n" % ", ".join(failed))
-            return 1
-        actual = digests(candidate_dir)
-        added = sorted(set(actual) - set(expected))
-        removed = sorted(set(expected) - set(actual))
-        changed = sorted(p for p in set(expected) & set(actual) if expected[p] != actual[p])
-        if added or removed or changed:
-            print("")
-            print("generated output does not match the manifest at %s" % manifest_path)
-            for label, paths in (("added", added), ("removed", removed), ("changed", changed)):
-                if not paths:
-                    continue
-                print("")
-                print("%s (%d):" % (label, len(paths)))
-                for path in paths:
-                    print("  %s" % path)
-            print("")
-            print("run 'check <reference-dir>' against a captured tree to see the diffs")
-            return 1
-        print("")
-        print("generated output matches the manifest (%d files)" % len(expected))
-        return 0
-    finally:
-        shutil.rmtree(candidate_parent, ignore_errors=True)
 
 
 def command_check(args):
@@ -387,6 +325,12 @@ def command_check_tree(args):
     CMake actually builds, so the two drifted apart for six weeks without any
     check noticing -- and the drift hid a scalar Laplacian that read past the end
     of its own element matrix.
+
+    `verify` has since been retired for a second reason of the same kind: its
+    manifest went unwritten for sixty-three commits while this check passed on
+    every one of them, so it was dark and nothing said so.  `check` remains,
+    because a reference tree is captured deliberately and compared immediately;
+    it cannot rot in the repository the way a committed record can.
     """
     tree_dir = os.path.abspath(args.tree or shipped_tree())
     if not os.path.isdir(tree_dir):
@@ -427,7 +371,7 @@ def command_check_tree(args):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Capture or verify a byte-exact snapshot of generated kernel sources.",
+        description="Capture or compare a byte-exact snapshot of generated kernel sources.",
     )
     # Shared so that -q is accepted either before or after the subcommand.
     common = argparse.ArgumentParser(add_help=False)
@@ -440,16 +384,6 @@ def main(argv=None):
     )
     capture.add_argument("directory", help="Directory to write the reference snapshot into.")
     capture.add_argument("--force", action="store_true", help="Replace an existing snapshot directory.")
-    capture.add_argument(
-        "--manifest",
-        default=DEFAULT_MANIFEST,
-        help="Path of the hash manifest to write (default: beside this module).",
-    )
-    capture.add_argument(
-        "--no-manifest",
-        action="store_true",
-        help="Capture the reference tree without rewriting the manifest.",
-    )
     capture.set_defaults(handler=command_capture)
 
     check = subparsers.add_parser(
@@ -463,17 +397,6 @@ def main(argv=None):
     )
     check.set_defaults(handler=command_check)
 
-    verify = subparsers.add_parser(
-        "verify",
-        parents=[common],
-        help="Regenerate and compare hashes against the committed manifest (no reference tree needed).",
-    )
-    verify.add_argument(
-        "--manifest",
-        default=DEFAULT_MANIFEST,
-        help="Manifest to verify against (default: the one beside this module).",
-    )
-    verify.set_defaults(handler=command_verify)
 
     check_tree = subparsers.add_parser(
         "check-tree",
