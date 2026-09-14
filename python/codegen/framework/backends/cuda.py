@@ -38,6 +38,19 @@ class CUDASoABackend:
         _validate_cuda_source_contract(files)
         return CUDASoAEmission(files)
 
+    def emit_inexact(self, material, unit, context):
+        """No device lowering for the inexact-apply family yet.
+
+        The backend is asked rather than the driver testing the target, so the
+        answer lives where the target's capabilities do.  It is empty because
+        the family's emitter spells a CPU vector lane -- `bev%d[lane]`,
+        `[lane]` on every staged read -- and `_validate_cuda_source_contract`
+        below rejects exactly that, correctly.  What it needs is the work-item
+        lowering the rest of the tree already goes through, not a suppression
+        here; until that lands there is nothing to hand back.
+        """
+        return ()
+
     def _emit_energy(self, unit, context):
         _validate_energy_plan(unit)
         emitter = self.emitter
