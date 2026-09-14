@@ -2637,7 +2637,14 @@ int main() {
             )
             with open(operator_path, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
-            self.assertIn("__global__ void neohookean_ogden_quad4_objective_a_msoa_impl", operator_source)
+            # Isoparametric, not affine, and by rule rather than by accident:
+            # there are no affine specializations in 2D.
+            # `plans/geometry_variants` says it -- `emits_affine=constant_p1 or
+            # dim == 3` -- so a 2D element publishes an affine variant only when
+            # it is constant-P1, which QUAD4 is not.  The old `_a_msoa` spelling
+            # was pinning a kernel that has never existed on any target, and so
+            # said nothing about the CUDA lowering it was written to check.
+            self.assertIn("__global__ void neohookean_ogden_quad4_objective_i_msoa_impl", operator_source)
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)
@@ -2679,7 +2686,14 @@ int main() {
             with open(operator_path, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
             self.assertIn("#include <hip/hip_runtime.h>", operator_source)
-            self.assertIn("__global__ void neohookean_ogden_quad4_objective_a_msoa_impl", operator_source)
+            # Isoparametric, not affine, and by rule rather than by accident:
+            # there are no affine specializations in 2D.
+            # `plans/geometry_variants` says it -- `emits_affine=constant_p1 or
+            # dim == 3` -- so a 2D element publishes an affine variant only when
+            # it is constant-P1, which QUAD4 is not.  The old `_a_msoa` spelling
+            # was pinning a kernel that has never existed on any target, and so
+            # said nothing about the CUDA lowering it was written to check.
+            self.assertIn("__global__ void neohookean_ogden_quad4_objective_i_msoa_impl", operator_source)
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)

@@ -1324,6 +1324,22 @@ def _all_names(role, component, n_nodes):
     )
 
 
+def _inline_qualifier():
+    """The bound target's inline qualifier, rather than the OpenMP spelling.
+
+    Three sites here wrote `static SFEM_INLINE` as a literal, which is what the
+    CUDA and HIP backends reject in their own output -- the same mistake the
+    element API made, in a second emitter.  `_vectorize_pragma` below already
+    asks the target for its pragma; this asks for its inline qualifier, which is
+    `SFEM_INLINE` under OpenMP and `__host__ __device__ __forceinline__` under
+    CUDA.
+    """
+    target = current_target()
+    if target is None or not hasattr(target, "inline_qualifier"):
+        return "SFEM_INLINE"
+    return target.inline_qualifier()
+
+
 def _vectorize_pragma():
     """The bound target's lane-loop pragma, or `None` where it does not vectorise."""
     target = current_target()
@@ -1613,7 +1629,7 @@ def _packed_function_lines(name, template_params, signature, scratch, gathers, c
             params=tuple(line.strip().rstrip(",") for line in signature),
             body=(RawLinesNode(tuple(lines), reason="packed two-pass body"),),
             return_type="int",
-            qualifier="static SFEM_INLINE",
+            qualifier="static %s" % _inline_qualifier(),
             template_params=tuple(template_params),
         ),
     )
@@ -1691,7 +1707,7 @@ def _blocked_function_lines(name, template_params, signature, scratch, gathers, 
                 RawLinesNode(("", "  return SFEM_SUCCESS;"), reason="status"),
             ),
             return_type="int",
-            qualifier="static SFEM_INLINE",
+            qualifier="static %s" % _inline_qualifier(),
             template_params=tuple(template_params),
         ),
     )
@@ -1744,7 +1760,7 @@ def _function_lines(name, template_params, signature, body):
                 RawLinesNode(("", "  return SFEM_SUCCESS;"), reason="status"),
             ),
             return_type="int",
-            qualifier="static SFEM_INLINE",
+            qualifier="static %s" % _inline_qualifier(),
             template_params=tuple(template_params),
         ),
     )
