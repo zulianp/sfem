@@ -586,6 +586,159 @@ def _contraction_cost(stages):
     return total
 
 
+def kronecker_reference_factors(reference):
+    """`Wbar` as one-dimensional factors per direction, or ``None``.
+
+    On a tensor-product element the basis is a product of one-dimensional
+    functions, so `Wbar[j,m,p,n]`, which integrates `dphi_j/dxi_m` against
+    `dphi_p/dxi_n`, is a product of `dim` one-dimensional matrices -- the mass
+    matrix in the directions neither derivative touches, and a gradient or
+    stiffness matrix in the ones they do.  That is the structure sum
+    factorization needs, and it is the reason the emitted constants are 1/9,
+    1/18 and 1/36 on HEX8: they are products of the one-dimensional 1/3 and
+    1/6.
+
+    Read off rather than derived, and then checked entry by entry against the
+    tensor, because the element's node numbering has to be lexicographic with
+    the first axis fastest for the factors to line up.  A PROTEUS element is;
+    its mesh-ordered twin walks the corners and is not, and gets ``None`` here
+    -- correctly, since the twin forwards to it.
+    """
+    dim, n_nodes = reference.dim, reference.n_nodes
+    n1 = int(round(n_nodes ** (1.0 / dim)))
+    if n1 < 2 or n1 ** dim != n_nodes:
+        return None
+
+    def node(multi):
+        index = 0
+        for axis in reversed(range(dim)):
+            index = index * n1 + multi[axis]
+        return index
+
+    origin = node((0,) * dim)
+    factors = {}
+    for m, n in itertools.product(range(dim), repeat=2):
+        base = sp.Rational(reference.entry(origin, m, origin, n))
+        if base == 0:
+            return None
+        axes = []
+        for axis in range(dim):
+            rows = []
+            for a in range(n1):
+                row = []
+                for b in range(n1):
+                    j = [0] * dim
+                    p = [0] * dim
+                    j[axis], p[axis] = a, b
+                    entry = sp.Rational(reference.entry(node(tuple(j)), m, node(tuple(p)), n))
+                    # Every axis but the first carries the shared scale once, so
+                    # the product of the factors is the tensor and no stage has
+                    # to multiply it back in.
+                    row.append(entry if axis == 0 else entry / base)
+                rows.append(row)
+            axes.append(tuple(tuple(row) for row in rows))
+        for j in itertools.product(range(n1), repeat=dim):
+            for p in itertools.product(range(n1), repeat=dim):
+                predicted = sp.Integer(1)
+                for axis in range(dim):
+                    predicted *= axes[axis][j[axis]][p[axis]]
+                if predicted != sp.Rational(reference.entry(node(j), m, node(p), n)):
+                    return None
+        factors[(m, n)] = tuple(axes)
+    return n1, node, factors
+
+
+def sum_factorized_action(plan, tangent, increment, output_names):
+    """The action with the reference product taken one direction at a time.
+
+        out[i,p] = sum_kmn Sbar[i,k,m,n] G[k,m,p,n]
+
+    as before, but `G` is built by `dim` sweeps against the one-dimensional
+    factors instead of one contraction over every node.  That is `p^4` work
+    against `p^6`, and a sweep whose one-dimensional factor has been seen
+    already is shared rather than repeated -- there are only a handful of
+    distinct factors per direction, not one per `(m,n)`.
+
+    It loses on HEX8, where the element is small enough that eliminating common
+    subexpressions in the dense product finds more than the sweeps save, and it
+    wins from the next order up.  Which is why it is an ordering
+    `contraction_ordering` counts rather than a rule anybody applies:
+    `_contraction_cost` decides, the same way it decides between the other two.
+    """
+    factored = kronecker_reference_factors(plan.reference)
+    if factored is None:
+        return None
+    n1, node, factors = factored
+    dim, n_nodes = plan.dim, plan.n_nodes
+
+    sweeps = [{} for _ in range(dim)]
+    stage_defs = [[] for _ in range(dim)]
+    product = {}
+    for component in range(dim):
+        for m, n in itertools.product(range(dim), repeat=2):
+            axes = factors[(m, n)]
+            key = (component,)
+            table = None
+            for axis in range(dim):
+                key = key + (axes[axis],)
+                if key not in sweeps[axis]:
+                    sweeps[axis][key] = {}
+                    slot = len(sweeps[axis])
+                    for head in itertools.product(range(n1), repeat=axis + 1):
+                        for tail in itertools.product(range(n1), repeat=dim - axis - 1):
+                            expression = sum(
+                                (
+                                    (
+                                        increment[component][node(head[:axis] + (k,) + tail)]
+                                        if axis == 0
+                                        else table[head[:axis] + (k,) + tail]
+                                    )
+                                    * axes[axis][k][head[axis]]
+                                    for k in range(n1)
+                                    if axes[axis][k][head[axis]] != 0
+                                ),
+                                sp.Integer(0),
+                            )
+                            if axis == dim - 1:
+                                symbol = sp.Symbol(
+                                    "pa_g%d_%d_%d_%d" % (component, m, node(head), n)
+                                )
+                            else:
+                                symbol = sp.Symbol(
+                                    "pa_s%d_%d_%d_%s"
+                                    % (axis, component, slot,
+                                       "_".join(str(i) for i in head + tail))
+                                )
+                            sweeps[axis][key][head + tail] = symbol
+                            stage_defs[axis].append((symbol, expression))
+                table = sweeps[axis][key]
+            for head in itertools.product(range(n1), repeat=dim):
+                product[(component, m, node(head), n)] = table[head]
+
+    output_defs = []
+    for row in range(dim):
+        for index in range(n_nodes):
+            output_defs.append(
+                (
+                    output_names[row][index],
+                    sum(
+                        (
+                            tangent[plan.tangent_index(row, other, m, n)]
+                            * product[(other, m, index, n)]
+                            for other, m, n in itertools.product(range(dim), repeat=3)
+                            if (other, m, index, n) in product
+                        ),
+                        sp.Integer(0),
+                    ),
+                )
+            )
+
+    names = ["pa_sweep%d" % axis for axis in range(dim - 1)] + ["reference_product"]
+    return tuple(
+        ActionStage(name, tuple(defs)) for name, defs in zip(names, stage_defs)
+    ) + (ActionStage("output", tuple(output_defs)),)
+
+
 @lru_cache(maxsize=None)
 def contraction_ordering(element_type):
     """Which contraction is cheaper on this element, measured rather than assumed.
@@ -618,15 +771,25 @@ def contraction_ordering(element_type):
         [sp.Symbol("cost_o%d_%d" % (c, j)) for j in range(plan.n_nodes)]
         for c in range(plan.dim)
     ]
-    staged = _contraction_cost(staged_action(plan, tangent, increment, names))
-    direct = _contraction_cost(gradient_first_action(plan, tangent, increment, names))
-    return "staged" if staged <= direct else "gradient_first"
+    costs = {}
+    for ordering, build in _ACTION_BY_ORDERING.items():
+        stages = build(plan, tangent, increment, names)
+        # `sum_factorized` answers None on an element whose reference tensor is
+        # not a Kronecker product -- a simplex, or a tensor-product element
+        # numbered any way but lexicographically.  An ordering with no lowering
+        # here is not an ordering to cost.
+        if stages is not None:
+            costs[ordering] = _contraction_cost(stages)
+    # Ties go to the earlier ordering, which is the order they are written in.
+    return min(costs, key=lambda ordering: (costs[ordering], tuple(_ACTION_BY_ORDERING).index(ordering)))
 
 
-#: The two orderings, looked up by what `contraction_ordering` decided.
+#: The orderings, looked up by what `contraction_ordering` decided.  Written in
+#: preference order, which is what breaks a tie.
 _ACTION_BY_ORDERING = {
     "staged": staged_action,
     "gradient_first": gradient_first_action,
+    "sum_factorized": sum_factorized_action,
 }
 
 
