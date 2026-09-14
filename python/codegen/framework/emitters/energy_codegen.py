@@ -91,6 +91,7 @@ from codegen.framework.emitters.ast_printer import (
     render_kernel_ast_lines,
 )
 from codegen.framework.targets import current_target
+from codegen.framework.plans.diagnostics import energy_reference_data_traffic
 from codegen.framework.plans.layout import is_tensor_product_family
 from codegen.framework.plans.matrix_formats import (
     BSRAssemblyPlan,
@@ -8983,15 +8984,9 @@ def _sfem_soa_diagnostics_lines(
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     geometry_streams = sum(array_input.size for array_input in element_inputs)
-    if is_tensor_product_family(basis_family):
-        reference_scalars = (
-            len(quadrature_rule.tensor_product_shape_values_1d)
-            + len(quadrature_rule.tensor_product_shape_gradients_1d)
-        )
-        quadrature_weight_scalars = len(quadrature_rule.tensor_product_weights_1d)
-    else:
-        reference_scalars = sum(array_input.size for array_input in reference_inputs)
-        quadrature_weight_scalars = n_qp
+    reference_scalars, quadrature_weight_scalars = energy_reference_data_traffic(
+        quadrature_rule, reference_inputs, n_qp
+    )
     output_streams = len(_output_stream_names(form, n_field_components, n_nodes))
     output_reads = output_streams if output_is_accumulated(form) else 0
     output_writes = output_streams

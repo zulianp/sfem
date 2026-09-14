@@ -166,6 +166,61 @@ def kernel_diagnostics_plan_from_plan(
     return KernelDiagnosticsPlan(operator_prefix, kind, tuple(entries))
 
 
+def reference_data_traffic(entries):
+    """Split a kernel's reference arrays into basis scalars and weights.
+
+    Two of the numbers every `KernelDiagnostics` record carries, and the split
+    between them is on the `q_weight` name prefix -- which is ABI, set by
+    `fem.reference.sfem_reference_data`, and so belongs beside the plan that
+    reads it rather than being re-spelled wherever a record is built.
+    """
+    return (
+        sum(len(entry.values) for entry in entries
+            if not entry.name.startswith("q_weight")),
+        sum(len(entry.values) for entry in entries
+            if entry.name.startswith("q_weight")),
+    )
+
+
+def energy_reference_data_traffic(rule, reference_inputs, n_qp):
+    """The same two numbers for an energy kernel, which counts differently.
+
+    An energy kernel reads only the reference arrays its own signature takes,
+    so the non-tensor-product count is over `reference_inputs` -- a kernel that
+    never reads `shape` is not charged for it -- while a tensor-product one
+    reads the 1D tables whole and counts them from the rule.
+
+    Those are two different measures and both are wanted; what was wrong is
+    that `emitters/energy_codegen.py` chose between them by asking the *basis
+    family*, which is a question the rule answers about itself.
+    `sfem_reference_data` branches on `rule.is_tensor_product` internally and
+    returns the 1D tables for exactly these elements.
+
+    That the two agree where they overlap was measured, not assumed: for HEX8,
+    QUAD4, PROTEUS_HEX8 and HEX27 the rule's own split gives the same pair this
+    branch computes -- (8, 2) for the first three and (18, 3) for HEX27.  The
+    non-tensor-product branch is deliberately left counting the kernel's inputs,
+    because it is the more accurate of the two and nothing here should quietly
+    start charging a kernel for a table it does not read.
+
+    `reproducibility --all` would not catch a mistake here -- it compares kernel
+    *answers*, and a diagnostics number is not one -- but byte-identity of the
+    regenerated tree does, because the record is emitted as literal integers
+    into the operator source.  That is a narrower gate than it sounds: it holds
+    a number steady, it does not say the number is right.
+    """
+    if rule.is_tensor_product:
+        return (
+            len(rule.tensor_product_shape_values_1d)
+            + len(rule.tensor_product_shape_gradients_1d),
+            len(rule.tensor_product_weights_1d),
+        )
+    return (
+        sum(array_input.size for array_input in reference_inputs),
+        n_qp,
+    )
+
+
 def validate_diagnostics_plan_names(plan, expected_names):
     if plan is None:
         return None
