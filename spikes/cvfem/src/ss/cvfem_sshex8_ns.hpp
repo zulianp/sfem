@@ -1303,6 +1303,9 @@ struct SSMacroGeom {
     scalar_t rc_num[CVFEM_HEX8_N_SCS];
     scalar_t rc_base[CVFEM_HEX8_N_SCS];
     scalar_t inv_h2[CVFEM_HEX8_N_SCS];
+    // The coefficient's velocity-sensitivity weight, pure geometry and so hoisted with the rest:
+    // g = coeff^3 * rc_duw (cvfem_hex8_rhie_chow_du_weight), one multiply per surface in the sweep.
+    scalar_t rc_duw[CVFEM_HEX8_N_SCS];
     scalar_t dvec[CVFEM_HEX8_N_SCS][3];
 };
 
@@ -1338,6 +1341,7 @@ inline void sscvfem_macro_geom(const scalar_t x[8], const scalar_t y[8], const s
             g.rc_num[s]  = scalar_t(0);
             g.rc_base[s] = scalar_t(1);
             g.inv_h2[s]  = scalar_t(0);
+            g.rc_duw[s]  = scalar_t(0);
             continue;
         }
         const scalar_t ct = scalar_t(2) * tau.inv_dt_a0;
@@ -1345,6 +1349,7 @@ inline void sscvfem_macro_geom(const scalar_t x[8], const scalar_t y[8], const s
         g.rc_num[s]  = rc_scale * (A2 / Adotd);
         g.rc_base[s] = ct * ct + cd * cd;
         g.inv_h2[s]  = tau.u2_scale / h2;
+        g.rc_duw[s]  = cvfem_hex8_rhie_chow_du_weight(rc_scale, A2, Adotd, h2, tau.u2_scale);
     }
 }
 
@@ -1436,8 +1441,13 @@ static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_
                                       half * (qgy[i] + qgy[j]) * g.dvec[s][1] +
                                       half * (qgz[i] + qgz[j]) * g.dvec[s][2])
                                    : scalar_t(0);
+        // The coefficient's own velocity dependence; see cvfem_hex8_rhie_chow_coeff_du.
+        const scalar_t gdu   = cvfem_hex8_rhie_chow_coeff_du(c, g.rc_duw[s]);
         const scalar_t dmdot = rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay + (vz[i] + vz[j]) * az) +
-                               c * (q[i] - q[j]) + c * dcorr;
+                               c * (q[i] - q[j]) + c * dcorr +
+                               gdu * corr *
+                                       (adv_x * half * (vx[i] + vx[j]) + adv_y * half * (vy[i] + vy[j]) +
+                                        adv_z * half * (vz[i] + vz[j]));
         const scalar_t dpos = d_pos * dmdot;
         const scalar_t dneg = d_neg * dmdot;
         const scalar_t qmid = half * (q[i] + q[j]);
@@ -1812,10 +1822,13 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
         // upwind computation -- the Rhie-Chow correction, the mass flux, the sign and the
         // four weights -- is dead. That is most of what makes C cheap to ask for.
         scalar_t mpos = 0, mneg = 0, d_pos = 0, d_neg = 0;
+        // The state's correction: the momentum rows need it for the mass flux, and the velocity
+        // columns for the coefficient's velocity dependence.
+        const scalar_t corr = (mom || pu) ? (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
+                                                             half * (pgy[i] + pgy[j]) * g.dvec[s][1] +
+                                                             half * (pgz[i] + pgz[j]) * g.dvec[s][2])
+                                          : scalar_t(0);
         if constexpr (mom) {
-            const scalar_t corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
-                                                   half * (pgy[i] + pgy[j]) * g.dvec[s][1] +
-                                                   half * (pgz[i] + pgz[j]) * g.dvec[s][2]);
             const scalar_t mdot = rho * (half * (ux[i] + ux[j]) * ax + half * (uy[i] + uy[j]) * ay +
                                          half * (uz[i] + uz[j]) * az) - c * corr;
             scalar_t amdot, sgn;
@@ -1827,8 +1840,13 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
         }
 
         // The two halves of the mass-flux derivative, kept apart so the blocks can be.
+        // Including the Rhie-Chow coefficient's velocity dependence, a velocity-column term, as
+        // sscvfem_action_hoisted carries it; see cvfem_hex8_rhie_chow_coeff_du.
         const scalar_t dmdot_v = (uu || pu) ? rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay +
-                                                            (vz[i] + vz[j]) * az)
+                                                            (vz[i] + vz[j]) * az) +
+                                                      cvfem_hex8_rhie_chow_coeff_du(c, g.rc_duw[s]) * corr *
+                                                              (uax * half * (vx[i] + vx[j]) + uay * half * (vy[i] + vy[j]) +
+                                                               uaz * half * (vz[i] + vz[j]))
                                             : scalar_t(0);
         // Rhie-Chow differentiates through the nodal pressure-gradient reconstruction, and
         // that derivative is a pressure-column term -- it is built from the gradient of the

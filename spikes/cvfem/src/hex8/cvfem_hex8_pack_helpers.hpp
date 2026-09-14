@@ -326,12 +326,11 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
             const scalar_t vay = scalar_t(0.5) * (vy[gi] + vy[gj]);
             const scalar_t vaz = scalar_t(0.5) * (vz[gi] + vz[gj]);
             const scalar_t u2  = u2_scale * (vax * vax + vay * vay + vaz * vaz);
-            d.rc_coeff[s][(size_t)e] = cvfem_hex8_rhie_chow_mdot_coeff(
-                    rho, mu, rc_scale,
-                    scalar_t(px[gj]) - scalar_t(px[gi]),
-                    scalar_t(py[gj]) - scalar_t(py[gi]),
-                    scalar_t(pz[gj]) - scalar_t(pz[gi]),
-                    A[q][0], A[q][1], A[q][2], u2, inv_dt_a0);
+            const scalar_t dx = scalar_t(px[gj]) - scalar_t(px[gi]);
+            const scalar_t dy = scalar_t(py[gj]) - scalar_t(py[gi]);
+            const scalar_t dz = scalar_t(pz[gj]) - scalar_t(pz[gi]);
+            d.rc_coeff[s][(size_t)e] = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc_scale, dx, dy, dz,
+                                                                       A[q][0], A[q][1], A[q][2], u2, inv_dt_a0);
         }
     }
 }
@@ -376,6 +375,7 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
     // The hoisted coefficient, not a fresh evaluation: the face loops read that table and
     // the tangent has to be built from the same numbers they would have used.
     if (with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+    const Hex8RcConfig rc_cfg = cvfem_hex8_rc_config_for(d);
 
     const scalar_t                half = scalar_t(0.5);
     const scalar_t                one  = scalar_t(1);
@@ -425,6 +425,29 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
             out[cvfem_hex8_pa_offset(d.nelements, s, 2) + (size_t)e] = d_pos * uxi + d_neg * uxj;
             out[cvfem_hex8_pa_offset(d.nelements, s, 3) + (size_t)e] = d_pos * uyi + d_neg * uyj;
             out[cvfem_hex8_pa_offset(d.nelements, s, 4) + (size_t)e] = d_pos * uzi + d_neg * uzj;
+            if (with_rc) {
+                // k = g * corr * ubar: the Rhie-Chow coefficient's velocity dependence, which the
+                // face loop dots with the direction's face-average velocity.
+                const scalar_t dx    = scalar_t(px[gj]) - scalar_t(px[gi]);
+                const scalar_t dy    = scalar_t(py[gj]) - scalar_t(py[gi]);
+                const scalar_t dz    = scalar_t(pz[gj]) - scalar_t(pz[gi]);
+                const scalar_t corr  = (d.p[(size_t)gj] - d.p[(size_t)gi]) -
+                                      (half * (d.pgx[(size_t)gi] + d.pgx[(size_t)gj]) * dx +
+                                       half * (d.pgy[(size_t)gi] + d.pgy[(size_t)gj]) * dy +
+                                       half * (d.pgz[(size_t)gi] + d.pgz[(size_t)gj]) * dz);
+                const scalar_t coeff = d.rc_coeff[s][(size_t)e];
+                const scalar_t gk    = coeff != scalar_t(0)
+                                               ? cvfem_hex8_rhie_chow_coeff_du(
+                                                         coeff, cvfem_hex8_rhie_chow_du_weight(
+                                                                        rc_cfg.scale, ax * ax + ay * ay + az * az,
+                                                                        ax * dx + ay * dy + az * dz,
+                                                                        dx * dx + dy * dy + dz * dz, rc_cfg.tau.u2_scale)) *
+                                                         corr
+                                               : scalar_t(0);
+                out[cvfem_hex8_pa_offset(d.nelements, s, 5) + (size_t)e] = gk * half * (uxi + uxj);
+                out[cvfem_hex8_pa_offset(d.nelements, s, 6) + (size_t)e] = gk * half * (uyi + uyj);
+                out[cvfem_hex8_pa_offset(d.nelements, s, 7) + (size_t)e] = gk * half * (uzi + uzj);
+            }
         }
     }
 }
@@ -449,6 +472,10 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const MeshT      &d,
         for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane)
             rc.coeff[s][lane] = lane < nlanes ? src[begin + lane] : scalar_t(0);
     }
+    // What the coefficient table was built with, for its velocity sensitivity in the face loop.
+    const Hex8RcConfig cfg = cvfem_hex8_rc_config_for(d);
+    rc.scale               = cfg.scale;
+    rc.tau                 = cfg.tau;
 }
 
 static SFEM_INLINE void cvfem_hex8_scatter_simd_to_pack(pack_idx_t **const SFEM_RESTRICT elems,

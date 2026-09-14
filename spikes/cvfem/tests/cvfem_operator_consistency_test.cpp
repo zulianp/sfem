@@ -79,6 +79,7 @@
 #include "smesh_mesh.hpp"
 #include "smesh_semistructured.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -533,6 +534,133 @@ namespace {
         }
     }
 
+    // ---- the action against the residual itself ----
+    //
+    // Every check above compares one spelling of the Jacobian with another, so a term missing
+    // from ALL of them passes every one. That is not hypothetical: the Rhie-Chow coefficient's
+    // velocity dependence (cvfem_hex8_rhie_chow_coeff_du) was absent from every form at once,
+    // the forms agreed with each other to round-off, and the FDA nozzle's Newton continuation
+    // stalled at Re 89 because its Jacobian was 2.7e-02 away from a finite difference of its
+    // residual. Only a comparison against the residual can see that, and only at a state where
+    // the term is alive: here the velocity is O(1) and nu = 0.01, so the advective branch of
+    // the time scale dominates. The driver's SFEM_FD_CHECK runs at the initial state, where the
+    // interior velocity is zero and the term vanishes -- which is how it went unnoticed.
+    //
+    // Asserted with the exact Rhie-Chow Jacobian only. The frozen form drops the pressure-
+    // gradient reconstruction's derivative from the continuity rows on purpose, so there the
+    // numbers are reported rather than gated.
+    struct FdRel {
+        scalar_t mom{0}, con{0};
+    };
+
+    template <typename Residual, typename Action>
+    FdRel fd_rel(const std::vector<scalar_t> &x0, const ptrdiff_t ndof, Residual &&residual, Action &&action) {
+        std::vector<scalar_t> v((size_t)ndof), jv((size_t)ndof), rp((size_t)ndof), rm((size_t)ndof), xt((size_t)ndof);
+        uint32_t              seed = 0x9e3779b9u;
+        for (auto &e : v) {
+            seed = seed * 1664525u + 1013904223u;
+            e    = scalar_t((seed >> 8) & 0xffff) / scalar_t(0xffff) - scalar_t(0.5);
+        }
+        action(x0, v, jv);
+        FdRel best{scalar_t(1e300), scalar_t(1e300)};
+        // Best over three steps: a sub-control surface whose mass flux sits within eps of the
+        // upwind switch's corner spoils a central difference at that eps and not at the others.
+        for (const scalar_t eps : {scalar_t(1e-5), scalar_t(1e-6), scalar_t(1e-7)}) {
+            for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = x0[(size_t)i] + eps * v[(size_t)i];
+            residual(xt, rp);
+            for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = x0[(size_t)i] - eps * v[(size_t)i];
+            residual(xt, rm);
+            scalar_t nm = 0, dm = 0, nc = 0, dc = 0;
+            for (ptrdiff_t i = 0; i < ndof; ++i) {
+                const scalar_t fdv = (rp[(size_t)i] - rm[(size_t)i]) / (scalar_t(2) * eps);
+                const scalar_t dd  = fdv - jv[(size_t)i];
+                if (i % N_FIELDS == 3) { nc += dd * dd; dc += fdv * fdv; }
+                else                   { nm += dd * dd; dm += fdv * fdv; }
+            }
+            best.mom = std::min(best.mom, std::sqrt(nm / std::max(dm, scalar_t(1e-300))));
+            best.con = std::min(best.con, std::sqrt(nc / std::max(dc, scalar_t(1e-300))));
+        }
+        return best;
+    }
+
+    void run_fd_variant(sfem::Context &ctx, const bool exact) {
+        const scalar_t rho = 1, mu = 0.01;
+        {
+            std::printf("\n-- flat, action against a finite difference of the residual --\n");
+            MeshData                     d;
+            std::shared_ptr<smesh::Mesh> mesh;
+            make_mesh(d, mesh, ctx);
+            const ptrdiff_t       ndof = d.nnodes * N_FIELDS;
+            std::vector<scalar_t> x0((size_t)ndof);
+            pack_fields(d, x0.data());
+            const std::vector<uint8_t> free_mask((size_t)ndof, 0);
+            const FdRel r = fd_rel(
+                    x0, ndof,
+                    [&](const std::vector<scalar_t> &x, std::vector<scalar_t> &out) {
+                        unpack_fields(d, x.data());
+                        apply_residual(d, rho, mu, GeomKind::Affine);
+                        pack_residual(d, out.data());
+                    },
+                    [&](const std::vector<scalar_t> &x, const std::vector<scalar_t> &dir, std::vector<scalar_t> &out) {
+                        unpack_fields(d, x.data());
+                        assemble_nodal_p_grad(d, GeomKind::Affine);
+                        apply_jacobian_action(d, rho, mu, GeomKind::Affine, free_mask, dir.data(), out.data());
+                    });
+            if (exact) {
+                check_rel(r.mom, scalar_t(1), scalar_t(1e-6), "[F1] flat action == d(residual), momentum rows");
+                check_rel(r.con, scalar_t(1), scalar_t(1e-6), "[F1] flat action == d(residual), continuity rows");
+            } else {
+                report(r.mom, "[F1] flat action vs d(residual), momentum rows");
+                report(r.con, "[F1] flat action vs d(residual), continuity rows");
+            }
+        }
+        {
+            std::printf("\n-- semi-structured, action against a finite difference of the residual --\n");
+            const int level  = 2;
+            auto      coarse = smesh::Mesh::create_hex8_cube(ctx.communicator(), 1, 1, 1, 0, 0, 0, 2, 1, 1);
+            auto      mesh   = smesh::to_semistructured(level, coarse, true, false);
+            if (!mesh) {
+                check(false, "to_semistructured built a mesh");
+                return;
+            }
+            SSMeshData d;
+            sscvfem_init(d, mesh, level);
+            d.rhie_chow_scale    = 1;
+            const auto *const px = d.points[0];
+            const auto *const py = d.points[1];
+            const auto *const pz = d.points[2];
+            const ptrdiff_t       ndof = d.nnodes * N_FIELDS;
+            std::vector<scalar_t> x0((size_t)ndof);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                const scalar_t X = px[i], Y = py[i], Z = pz[i];
+                x0[(size_t)i * 4 + 0] = std::sin(scalar_t(1.7) * X) * std::cos(scalar_t(2.3) * Y) + scalar_t(0.3) * Z;
+                x0[(size_t)i * 4 + 1] = std::cos(scalar_t(1.1) * Y) * (scalar_t(1) + scalar_t(0.2) * X) - scalar_t(0.15) * Z;
+                x0[(size_t)i * 4 + 2] = std::sin(scalar_t(0.9) * Z) * (scalar_t(0.5) + scalar_t(0.1) * Y);
+                x0[(size_t)i * 4 + 3] = scalar_t(0.7) * X - scalar_t(0.4) * Y + scalar_t(0.25) * Z * Z;
+            }
+            const FdRel r = fd_rel(
+                    x0, ndof,
+                    [&](const std::vector<scalar_t> &x, std::vector<scalar_t> &out) {
+                        sscvfem_unpack(d, x.data());
+                        sscvfem_nodal_p_grad(d);
+                        sscvfem_residual(d, rho, mu, out.data());
+                    },
+                    [&](const std::vector<scalar_t> &x, const std::vector<scalar_t> &dir, std::vector<scalar_t> &out) {
+                        sscvfem_unpack(d, x.data());
+                        sscvfem_nodal_p_grad(d);
+                        std::fill(out.begin(), out.end(), scalar_t(0));
+                        sscvfem_apply(d, rho, mu, dir.data(), out.data());
+                    });
+            if (exact) {
+                check_rel(r.mom, scalar_t(1), scalar_t(1e-6), "[F2] SS action == d(residual), momentum rows");
+                check_rel(r.con, scalar_t(1), scalar_t(1e-6), "[F2] SS action == d(residual), continuity rows");
+            } else {
+                report(r.mom, "[F2] SS action vs d(residual), momentum rows");
+                report(r.con, "[F2] SS action vs d(residual), continuity rows");
+            }
+        }
+    }
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -559,6 +687,8 @@ int main(int argc, char **argv) {
 
     run_op_variant(*ctx, "steady", real_t(0), 1, exact, 2);
     run_op_variant(*ctx, "transient BDF2", real_t(0.05), 2, exact, 2);
+
+    run_fd_variant(*ctx, exact);
 
     std::printf("\n%s\n", g_failures ? "operator consistency: FAILED" : "all operator forms agree");
     return g_failures ? EXIT_FAILURE : EXIT_SUCCESS;
