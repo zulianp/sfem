@@ -475,33 +475,22 @@ class WorkItemLoweringRatchetTest(unittest.TestCase):
     """
 
     #: material -> element -> generated file -> tokens that ignore the target.
-    #: Only ever down.
+    #: Only ever down, and it is down to nothing.
     #:
-    #: linear_elasticity 470 -> 72 when `inexact_apply_codegen.py` converted:
-    #: its 398 went to zero in one pass and the file left the set entirely,
-    #: which is why the set of files is asserted and not just the counts.
-    #: Then 72 -> 0 when `energy_codegen.py` followed, so the energy and inexact
-    #: paths are done and everything that remains is `residual_codegen.py`.
-    #: An empty entry is kept rather than deleted: it is what says this material
-    #: is converted, and it fails loudly if a hand-spelled work item comes back.
+    #: 1665 -> 0 over four commits.  linear_elasticity 470 -> 72 when
+    #: `inexact_apply_codegen.py` converted, 72 -> 0 when `energy_codegen.py`
+    #: did; two_phase_flow 1195 -> 0 when `residual_codegen.py` did.  The empty
+    #: entries are kept rather than deleted: an empty budget with the file set
+    #: asserted is what says these materials are converted, and it fails the
+    #: moment a hand-spelled work item comes back.
+    #:
+    #: What is *not* claimed: two materials on two elements is not the whole
+    #: tree.  It is the pair that reaches all three emitters, which is a
+    #: different thing from exhaustive, and adding a material here is cheap if
+    #: one is ever suspected.
     BUDGET = {
         ("linear_elasticity", "TET4"): {},
-        ("two_phase_flow", "TRI3"): {
-            "two_phase_flow_d2_simplex_local.hpp": 400,
-            "two_phase_flow_form_2_p_c_p_c_d2_simplex_local.hpp": 132,
-            "two_phase_flow_form_2_p_w_p_w_d2_simplex_local.hpp": 132,
-            "two_phase_flow_form_1_p_c_d2_simplex_local.hpp": 124,
-            "two_phase_flow_form_1_p_w_d2_simplex_local.hpp": 124,
-            "two_phase_flow_form_2_p_c_p_w_d2_simplex_local.hpp": 108,
-            "two_phase_flow_form_2_p_w_p_c_d2_simplex_local.hpp": 108,
-            "two_phase_flow_tri3_operator.cpp": 13,
-            "two_phase_flow_form_1_p_c_tri3_operator.cpp": 9,
-            "two_phase_flow_form_1_p_w_tri3_operator.cpp": 9,
-            "two_phase_flow_form_2_p_c_p_c_tri3_operator.cpp": 9,
-            "two_phase_flow_form_2_p_c_p_w_tri3_operator.cpp": 9,
-            "two_phase_flow_form_2_p_w_p_c_tri3_operator.cpp": 9,
-            "two_phase_flow_form_2_p_w_p_w_tri3_operator.cpp": 9,
-        },
+        ("two_phase_flow", "TRI3"): {},
     }
 
     def _probe(self, material_name, element):
