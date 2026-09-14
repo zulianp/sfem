@@ -399,7 +399,19 @@ PLAN_INPUTS = (
 #: The extent went with it.  It was `dim * dim` and is now the length of the
 #: sequence being aliased, so the array cannot disagree with the streams it
 #: points at.
-BUDGET = 107
+#:
+#: 107 -> 105: a sequence written as its own complement.  Two sites walked the
+#: full range of spatial directions and skipped the ones with nothing live --
+#: `for d in range(dim)` guarded by `if not any(row[d] for row in
+#: dependencies.gradient_coefficients): continue`.  That is the set of
+#: directions some row's gradient coefficient is live in, stated backwards.
+#:
+#: `plans.dependencies.live_gradient_directions` states it forwards, beside
+#: `contracted_gradient_components`, whose docstring already says it is phrased
+#: as a range so emission can iterate rather than branch -- this is that idea
+#: per direction instead of all-or-nothing -- and beside `live_test_coefficients`,
+#: which already handles the per-row case the same way.
+BUDGET = 105
 
 
 def _tested_names(test):

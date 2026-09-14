@@ -153,6 +153,30 @@ def contracted_test_quantities(dependencies):
     return tuple(quantities)
 
 
+def live_gradient_directions(dependencies, dim):
+    """The spatial directions in which some row's gradient coefficient is live.
+
+    `contracted_gradient_components` above answers the coarser question -- does
+    this form contract test gradients at all -- as a range, and says in its own
+    docstring that it is phrased that way so emission can iterate instead of
+    branching.  This is the same shape one step finer.  A direction in which
+    every row's coefficient is structurally zero contributes nothing: it is
+    neither declared nor contracted, and it should simply not appear in the
+    sequence.
+
+    Two sites in `emitters/residual_codegen.py` spelled that as a range with a
+    skip inside it -- `for d in range(dim)` guarded by `if not any(row[d] for
+    row in dependencies.gradient_coefficients): continue` -- which is the
+    sequence written as its own complement.  `live_test_coefficients` below
+    already handles the per-row case this way.
+    """
+    return tuple(
+        d
+        for d in range(dim)
+        if any(row[d] for row in dependencies.gradient_coefficients)
+    )
+
+
 def staged_test_quantities(dependencies):
     """Which per-field coefficient buffers a tensor-product body stages.
 
