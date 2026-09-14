@@ -56,6 +56,9 @@ from codegen.framework.emitters.quadrature_codegen import (
     tensor_product_q_index_lines,
     tensor_product_quadrature_weight_expr,
 )
+from codegen.framework.plans.kernel_signature import (
+    PACKED_MESH_REDUCE_ONLY_ARGUMENTS,
+)
 from codegen.framework.plans.layout import cartesian_twin, gather_shape_order
 from codegen.framework.plans.streams import (
     component_field_role,
@@ -1435,25 +1438,18 @@ def _packed_scatter(component, n_nodes):
 def _packed_signature(component, n_components):
     """The packed ABI's prologue, in the order every packed kernel takes it.
 
-    `n_shared_nodes` is absent: it exists so a one-pass kernel can tell which
-    owned nodes need an atomic, and a two-pass kernel never scatters atomically
-    at all.
+    The traversal arguments are
+    `plans.kernel_signature.PACKED_MESH_REDUCE_ONLY_ARGUMENTS`, which is where
+    the reasons live for the two the other emitters' packed kernels carry and
+    these do not.  The stored tangent after them is this family's own.
+
+    `component` and `n_components` are unread; they are here because
+    `_STORED_PROLOGUE_BY_LAYOUT` calls both prologues the same way.
     """
     return [
-        "    const ptrdiff_t n_packs,",
-        "    const ptrdiff_t n_elements_per_pack,",
-        "    const ptrdiff_t nelements,",
-        "    const ptrdiff_t max_nodes_per_pack,",
-        "    uint16_t **const RSTR elements,",
-        "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
-        "    const ptrdiff_t n_ghost_entries,",
-        "    const ptrdiff_t n_ghost_reduce_rows,",
-        "    const ptrdiff_t *const RSTR ghost_ptr,",
-        "    const idx_t *const RSTR ghost_idx,",
-        "    const ptrdiff_t *const RSTR ghost_reduce_ptr,",
-        "    const ptrdiff_t *const RSTR ghost_reduce_idx,",
-        "    const idx_t *const RSTR ghost_reduce_dest,",
-        "    s_t *const RSTR ghost_buf,",
+        "    %s," % argument.declaration
+        for argument in PACKED_MESH_REDUCE_ONLY_ARGUMENTS
+    ] + [
         "    const ptrdiff_t tangent_component_stride,",
         "    const tangent_t *const RSTR tangent,",
     ]
@@ -1774,20 +1770,8 @@ def _packed_abi_prologue():
     boundary: the dispatch layer builds its calls out of these names.
     """
     return [
-        "const ptrdiff_t n_packs",
-        "const ptrdiff_t n_elements_per_pack",
-        "const ptrdiff_t nelements",
-        "const ptrdiff_t max_nodes_per_pack",
-        "uint16_t **const RSTR elements",
-        "const ptrdiff_t *const RSTR owned_nodes_ptr",
-        "const ptrdiff_t n_ghost_entries",
-        "const ptrdiff_t n_ghost_reduce_rows",
-        "const ptrdiff_t *const RSTR ghost_ptr",
-        "const idx_t *const RSTR ghost_idx",
-        "const ptrdiff_t *const RSTR ghost_reduce_ptr",
-        "const ptrdiff_t *const RSTR ghost_reduce_idx",
-        "const idx_t *const RSTR ghost_reduce_dest",
-        "s_t *const RSTR ghost_buf",
+        argument.declaration for argument in PACKED_MESH_REDUCE_ONLY_ARGUMENTS
+    ] + [
         "const ptrdiff_t tangent_component_stride",
         "const %s *const RSTR tangent" % _ABI_TANGENT_STORE,
     ]
