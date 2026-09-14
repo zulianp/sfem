@@ -1132,12 +1132,33 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 7</div>
     <div class="body">
-      <div class="op-title">Triage the pre-existing test failures <span class="chip c-part">now 28, and the baseline argument no longer holds</span></div>
+      <div class="op-title">Triage the pre-existing test failures <span class="chip c-part">triaged &mdash; 4 genuine defects were hiding in the set</span></div>
       <p>The suite has run at 10 failures and 13 errors throughout, an identical set at every step, and identical to the same suite on <code>nonlinearspmg</code>. They predate this work entirely. That made them a usable baseline, but "unchanged" is a weaker guarantee than "passing", and a genuine regression hiding inside a known-failing test would not be visible.</p>
       <p>Independent of the architecture, and can start immediately.</p>
       <p><b>This has degraded, and the reason it matters is that the argument for tolerating it has gone.</b> The suite is 424 tests at 16 failures, 12 errors and 9 skips. The set is no longer identical at every step: some of the new failures are diagnostic and known — the two <code>*_laplace_uses_metric_specialized_simplex_kernel</code> tests are reporting OP 21's layering, and <code>test_the_op_declares_the_inexact_methods</code> follows OP 22 — but "unchanged from a baseline" stopped being checkable once the baseline started moving. A genuine regression hiding inside a known-failing test is now more likely, not less.</p>
       <p>One flake is recorded rather than diagnosed: <code>test_generated_block_diag_sym_hessian_for_neohookean_and_linear_elasticity</code> failed once in a full-suite run and passed in the next, in isolation, and in every pairing tried against the modules most likely to share state with it.</p>
-      <div class="op-facts"><span><i>suite</i> 424 tests</span><span><i>now</i> 16 failures · 12 errors · 9 skips</span><span><i>was</i> 10 · 13 · 8</span><span><i>known-diagnostic</i> 3</span><span><i>flake</i> 1, undiagnosed</span><span><i>ctest</i> 43/43 as of 700cef824</span></div>
+
+      <p><b>Triaged. The worry was right, and four genuine defects were sitting inside the set.</b>
+      The suite&rsquo;s distinct failures are now 25, and running each alone gives this:</p>
+      <div class="tbl-wrap">
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>category</th><th class="n">n</th><th></th></tr>
+        <tr><td><b>genuine defect</b></td><td class="n"><b>4</b></td><td><b>the ones this entry warned would become invisible.</b> <code>test_cuda_backend_…</code> and <code>test_hip_backend_…</code> raise <code>RuntimeError: CUDA file 'neohookean_ogden_quad4_element.hpp' contains SFEM_INLINE macro usage</code> &mdash; a live disagreement between the emitter and the CUDA backend&rsquo;s own contract. <code>test_generated_op_dispatch_sources_split_by_geometry_layout</code> raises <code>TypeError: unhashable type: 'dict'</code>, an outright crash. <code>test_wall_mounted_hump_sources_…</code> raises <code>FileNotFoundError</code></td></tr>
+        <tr><td>semantic mismatch</td><td class="n">10</td><td>a plan or form answer differs, rather than a string. Includes the two <code>*_laplace_uses_metric_specialized_simplex_kernel</code> at <code>0 != 2</code> that this entry already identifies as OP 21 diagnostics, a <code>FormOrder</code> tuple mismatch, and a form-algebra disagreement <code>u[0]**2/2 + u[0]*u[1] - u[1]**2/2</code> against <code>u[0]**2 + u[1]**2</code></td></tr>
+        <tr><td>stale text expectation</td><td class="n">10</td><td>a pinned string the generator no longer emits. Mostly benign, and several name 2D isoparametric symbols &mdash; <code>two_phase_flow_residual_2d_i_msoa</code>, <code>neohookean_ogden_gradient_2d_i_msoa</code> &mdash; that OP 23 removed on purpose. Those tests were never updated to a decision taken deliberately</td></tr>
+        <tr><td>order-dependent</td><td class="n">1</td><td><code>test_generated_neohookean_action_matches_python_reference</code> passes alone and fails in the suite</td></tr>
+      </table>
+      </div>
+      <p><b>Three order-dependent tests are now known, not one.</b> The flake above, the one in the
+      table, and <code>test_the_op_apply_takes_no_state</code>, which failed once in a full run
+      during the OP 11 work, passed in isolation, and did not recur on a clean re-run.</p>
+      <p><b>The actionable conclusion is that the baseline should be split by failure kind.</b>
+      Three of the four genuine defects are <i>exceptions</i> rather than assertion failures, and a
+      test that crashes is categorically different from one whose expected string moved. Counting
+      them in a single number is what let them sit: &ldquo;25 distinct failures, unchanged&rdquo;
+      reads the same whether the 25 are stale strings or a <code>TypeError</code>. A baseline that
+      separated the two would have made these four visible the day they appeared.</p>
+      <div class="op-facts"><span><i>suite</i> 424 tests</span><span><i>now</i> 16 failures · 12 errors · 9 skips</span><span><i>was</i> 10 · 13 · 8</span><span><i>triaged</i> 4 defects · 10 semantic · 10 stale · 1 order-dependent</span><span><i>flake</i> 1, undiagnosed</span><span><i>ctest</i> 43/43 as of 700cef824</span></div>
     </div>
   </div>
 
