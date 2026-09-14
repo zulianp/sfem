@@ -224,6 +224,7 @@ from codegen.framework.targets import (
     ARMSVETarget,
     HIPTarget,
 )
+from codegen.framework.plans.conventions import unit_output_name
 from codegen.framework.plans.scheduling import build_expression_graph
 
 
@@ -1090,7 +1091,7 @@ def _energy_codegen_unit(material_name, dim, evaluated):
             )
         )
     return CodeGenerationUnit(
-        name=_unit_output_name_from_parts(material_name, evaluated.name),
+        name=unit_output_name(material_name, evaluated.name),
         kind=CodeGenerationKind.ENERGY_SOA,
         form_collection=evaluated.form_evaluation,
         dim=dim,
@@ -1123,7 +1124,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
     coupling = _kernel_coupling_for_collection(collection)
     if evaluated.form_evaluation.measure == "ds":
         return CodeGenerationUnit(
-            name=_unit_output_name_from_parts(material_name, evaluated.name),
+            name=unit_output_name(material_name, evaluated.name),
             kind=CodeGenerationKind.BOUNDARY_RESIDUAL_SOA,
             form_collection=collection,
             dim=dim,
@@ -1144,7 +1145,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         else ()
     )
     return CodeGenerationUnit(
-        name=_unit_output_name_from_parts(material_name, evaluated.name),
+        name=unit_output_name(material_name, evaluated.name),
         kind=CodeGenerationKind.RESIDUAL_SOA,
         form_collection=collection,
         dim=dim,
@@ -1266,7 +1267,7 @@ def _metadata_blocks(collection, order):
 def _block_codegen_units(material_name, dim, evaluated, blocks):
     return tuple(
         CodeGenerationUnit(
-            name=_unit_output_name_from_parts(
+            name=unit_output_name(
                 material_name,
                 _block_unit_name(evaluated.name, block),
             ),
@@ -1965,13 +1966,7 @@ def _unit_generated_prefix(unit):
 
 
 def _unit_output_name(unit):
-    return _unit_output_name_from_parts(unit.material_name, unit.unit_name)
-
-
-def _unit_output_name_from_parts(material_name, unit_name):
-    if unit_name:
-        return "%s_%s" % (material_name, unit_name)
-    return material_name
+    return unit_output_name(unit.material_name, unit.unit_name)
 
 
 def _energy_form_orders(kernels):
