@@ -54,7 +54,32 @@ def _generated_tree():
 #: 87 -> 66 when the inexact-apply tangent stopped forming the element's full
 #: reference gradients.  It left this list entirely: the 29 it contributed are
 #: gone, and what remains is 58 in the mixed local bodies and 8 elsewhere.
-DEAD_ASSIGNMENT_BUDGET = 66
+#:
+#: 66 -> 10 when the mixed local bodies stopped mapping a physical gradient per
+#: field and started mapping one per component read -- the cause
+#: ARCHITECTURE.html OP 11 named, fixed with the information OP 11 said the
+#: emitter already had and ignored.  `_physical_gradient_nodes` looped
+#: `range(dim)` whenever a field's gradient was read at all, so Navier-Stokes'
+#: pressure form, which contracts the divergence, built all nine components of a
+#: 3D velocity gradient and read three.
+#:
+#: `plans.streams.FieldStreamUsage.gradient_components` is the per-direction
+#: answer, in the same function whose docstring already described this defect
+#: one level coarser -- per system against per field, where this is per field
+#: against per component.  The reference components stay whole: a physical
+#: direction combines every reference direction, so narrowing the outer loop
+#: must not narrow the staging feeding it.
+#:
+#: This is the first step here that broke byte-identity on purpose.  The proof
+#: is that deleting work nothing reads cannot move a number: the diff is 56
+#: deletions and no insertions, and `reproducibility --all` returned all 53
+#: digests and 28 parity pairs unchanged.
+#:
+#: The 10 left are a different defect: 8 are `const ptrdiff_t evb = element;`
+#: and `const int ne = 1;` in the MRKV viscous operators, a single-element path
+#: declaring the block-loop variables it does not use, and 2 are stragglers in
+#: one tensor-product body.
+DEAD_ASSIGNMENT_BUDGET = 10
 
 #: Runs of back-to-back single-statement `#pragma omp simd` lane loops.  A run
 #: longer than one is N loops and N pragmas where one loop with N statements

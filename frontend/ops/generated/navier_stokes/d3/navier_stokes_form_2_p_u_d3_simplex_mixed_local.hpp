@@ -104,8 +104,6 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_simplex_mixed_jacobian_actio
       u0_direction_grad_1_ref += coeff_direction_u0_9 * fgref[1][q * U_NS + 9];
       u0_direction_grad_2_ref += coeff_direction_u0_9 * fgref[2][q * U_NS + 9];
       const s_t u0_direction_grad_0 = (u0_direction_grad_0_ref * adj0 + u0_direction_grad_1_ref * adj3 + u0_direction_grad_2_ref * adj6) / det;
-      const s_t u0_direction_grad_1 = (u0_direction_grad_0_ref * adj1 + u0_direction_grad_1_ref * adj4 + u0_direction_grad_2_ref * adj7) / det;
-      const s_t u0_direction_grad_2 = (u0_direction_grad_0_ref * adj2 + u0_direction_grad_1_ref * adj5 + u0_direction_grad_2_ref * adj8) / det;
       s_t u1_direction_grad_0_ref = s_t(0);
       s_t u1_direction_grad_1_ref = s_t(0);
       s_t u1_direction_grad_2_ref = s_t(0);
@@ -149,9 +147,7 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_simplex_mixed_jacobian_actio
       u1_direction_grad_0_ref += coeff_direction_u1_9 * fgref[0][q * U_NS + 9];
       u1_direction_grad_1_ref += coeff_direction_u1_9 * fgref[1][q * U_NS + 9];
       u1_direction_grad_2_ref += coeff_direction_u1_9 * fgref[2][q * U_NS + 9];
-      const s_t u1_direction_grad_0 = (u1_direction_grad_0_ref * adj0 + u1_direction_grad_1_ref * adj3 + u1_direction_grad_2_ref * adj6) / det;
       const s_t u1_direction_grad_1 = (u1_direction_grad_0_ref * adj1 + u1_direction_grad_1_ref * adj4 + u1_direction_grad_2_ref * adj7) / det;
-      const s_t u1_direction_grad_2 = (u1_direction_grad_0_ref * adj2 + u1_direction_grad_1_ref * adj5 + u1_direction_grad_2_ref * adj8) / det;
       s_t u2_direction_grad_0_ref = s_t(0);
       s_t u2_direction_grad_1_ref = s_t(0);
       s_t u2_direction_grad_2_ref = s_t(0);
@@ -195,8 +191,6 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_simplex_mixed_jacobian_actio
       u2_direction_grad_0_ref += coeff_direction_u2_9 * fgref[0][q * U_NS + 9];
       u2_direction_grad_1_ref += coeff_direction_u2_9 * fgref[1][q * U_NS + 9];
       u2_direction_grad_2_ref += coeff_direction_u2_9 * fgref[2][q * U_NS + 9];
-      const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
-      const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
       const s_t value_coeff3 = u0_direction_grad_0 + u1_direction_grad_1 + u2_direction_grad_2;
       const s_t test_value_p_0 = field_shape[1][q * P_NS];
@@ -283,8 +277,6 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_simplex_mixed_jacobian_actio
       u0_direction_grad_1_ref += coeff_direction_u0_9 * fgref[1][q * U_NS + 9];
       u0_direction_grad_2_ref += coeff_direction_u0_9 * fgref[2][q * U_NS + 9];
       const s_t u0_direction_grad_0 = (u0_direction_grad_0_ref * adj0 + u0_direction_grad_1_ref * adj3 + u0_direction_grad_2_ref * adj6) / det;
-      const s_t u0_direction_grad_1 = (u0_direction_grad_0_ref * adj1 + u0_direction_grad_1_ref * adj4 + u0_direction_grad_2_ref * adj7) / det;
-      const s_t u0_direction_grad_2 = (u0_direction_grad_0_ref * adj2 + u0_direction_grad_1_ref * adj5 + u0_direction_grad_2_ref * adj8) / det;
       s_t u1_direction_grad_0_ref = s_t(0);
       s_t u1_direction_grad_1_ref = s_t(0);
       s_t u1_direction_grad_2_ref = s_t(0);
@@ -328,9 +320,7 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_simplex_mixed_jacobian_actio
       u1_direction_grad_0_ref += coeff_direction_u1_9 * fgref[0][q * U_NS + 9];
       u1_direction_grad_1_ref += coeff_direction_u1_9 * fgref[1][q * U_NS + 9];
       u1_direction_grad_2_ref += coeff_direction_u1_9 * fgref[2][q * U_NS + 9];
-      const s_t u1_direction_grad_0 = (u1_direction_grad_0_ref * adj0 + u1_direction_grad_1_ref * adj3 + u1_direction_grad_2_ref * adj6) / det;
       const s_t u1_direction_grad_1 = (u1_direction_grad_0_ref * adj1 + u1_direction_grad_1_ref * adj4 + u1_direction_grad_2_ref * adj7) / det;
-      const s_t u1_direction_grad_2 = (u1_direction_grad_0_ref * adj2 + u1_direction_grad_1_ref * adj5 + u1_direction_grad_2_ref * adj8) / det;
       s_t u2_direction_grad_0_ref = s_t(0);
       s_t u2_direction_grad_1_ref = s_t(0);
       s_t u2_direction_grad_2_ref = s_t(0);
@@ -374,8 +364,6 @@ static SFEM_INLINE void navier_stokes_form_2_p_u_d3_simplex_mixed_jacobian_actio
       u2_direction_grad_0_ref += coeff_direction_u2_9 * fgref[0][q * U_NS + 9];
       u2_direction_grad_1_ref += coeff_direction_u2_9 * fgref[1][q * U_NS + 9];
       u2_direction_grad_2_ref += coeff_direction_u2_9 * fgref[2][q * U_NS + 9];
-      const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
-      const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
       const s_t value_coeff3 = u0_direction_grad_0 + u1_direction_grad_1 + u2_direction_grad_2;
       const s_t test_value_p_0 = field_shape[1][q * P_NS];

@@ -76,7 +76,6 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
       u0_grad_0_ref += coeff_current_u0_5 * fgref[0][q * U_NS + 5];
       u0_grad_1_ref += coeff_current_u0_5 * fgref[1][q * U_NS + 5];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
-      const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
       s_t u1_grad_0_ref = s_t(0);
       s_t u1_grad_1_ref = s_t(0);
       const s_t coeff_current_u1_0 = current[6][lane];
@@ -97,7 +96,6 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block(
       const s_t coeff_current_u1_5 = current[11][lane];
       u1_grad_0_ref += coeff_current_u1_5 * fgref[0][q * U_NS + 5];
       u1_grad_1_ref += coeff_current_u1_5 * fgref[1][q * U_NS + 5];
-      const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
       const s_t value_coeff2 = u0_grad_0 + u1_grad_1;
       const s_t test_value_p_0 = field_shape[1][q * P_NS];
@@ -154,7 +152,6 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_c
       u0_grad_0_ref += coeff_current_u0_5 * fgref[0][q * U_NS + 5];
       u0_grad_1_ref += coeff_current_u0_5 * fgref[1][q * U_NS + 5];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
-      const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
       s_t u1_grad_0_ref = s_t(0);
       s_t u1_grad_1_ref = s_t(0);
       const s_t coeff_current_u1_0 = current[6][lane];
@@ -175,7 +172,6 @@ static SFEM_INLINE void navier_stokes_form_1_p_d2_simplex_mixed_residual_block_c
       const s_t coeff_current_u1_5 = current[11][lane];
       u1_grad_0_ref += coeff_current_u1_5 * fgref[0][q * U_NS + 5];
       u1_grad_1_ref += coeff_current_u1_5 * fgref[1][q * U_NS + 5];
-      const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
       const s_t value_coeff2 = u0_grad_0 + u1_grad_1;
       const s_t test_value_p_0 = field_shape[1][q * P_NS];
