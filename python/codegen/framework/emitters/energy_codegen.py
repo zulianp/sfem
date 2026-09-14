@@ -92,6 +92,10 @@ from codegen.framework.emitters.ast_printer import (
 )
 from codegen.framework.targets import current_target
 from codegen.framework.plans.diagnostics import energy_reference_data_traffic
+from codegen.framework.plans.kernel_signature import (
+    PACKED_MESH_CORE_ARGUMENTS,
+    packed_mesh_ghost_reduce_arguments,
+)
 from codegen.framework.plans.layout import is_tensor_product_family
 from codegen.framework.plans.matrix_formats import (
     BSRAssemblyPlan,
@@ -3594,16 +3598,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         lines.extend(
             [
                 'extern "C" int %s(' % public_name,
-                "    const ptrdiff_t n_packs,",
-                "    const ptrdiff_t n_elements_per_pack,",
-                "    const ptrdiff_t nelements,",
-                "    const ptrdiff_t nnodes,",
-                "    const ptrdiff_t max_nodes_per_pack,",
-                "    uint16_t **const RSTR elements,",
-                "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
-                "    const ptrdiff_t *const RSTR n_shared_nodes,",
-                "    const ptrdiff_t *const RSTR ghost_ptr,",
-                "    const idx_t *const RSTR ghost_idx,",
+                *["    %s," % argument.declaration
+                  for argument in PACKED_MESH_CORE_ARGUMENTS],
             ]
         )
         if is_affine:
@@ -5353,27 +5349,15 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 [
                     'extern "C" int %s(' % public_name,
-                    "    const ptrdiff_t n_packs,",
-                    "    const ptrdiff_t n_elements_per_pack,",
-                    "    const ptrdiff_t nelements,",
-                    "    const ptrdiff_t nnodes,",
-                    "    const ptrdiff_t max_nodes_per_pack,",
-                    "    uint16_t **const RSTR elements,",
-                    "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
-                    "    const ptrdiff_t *const RSTR n_shared_nodes,",
-                    "    const ptrdiff_t *const RSTR ghost_ptr,",
-                    "    const idx_t *const RSTR ghost_idx,",
+                    *["    %s," % argument.declaration
+                      for argument in PACKED_MESH_CORE_ARGUMENTS],
                 ]
             )
             if two_pass:
                 lines.extend(
                     [
-                        "    const ptrdiff_t n_ghost_entries,",
-                        "    const ptrdiff_t n_ghost_reduce_rows,",
-                        "    const ptrdiff_t *const RSTR ghost_reduce_ptr,",
-                        "    const ptrdiff_t *const RSTR ghost_reduce_idx,",
-                        "    const idx_t *const RSTR ghost_reduce_dest,",
-                        "    %s *const RSTR ghost_buf," % scalar_type,
+                        "    %s," % argument.declaration
+                        for argument in packed_mesh_ghost_reduce_arguments(scalar_type)
                     ]
                 )
             if is_affine:
@@ -6989,16 +6973,7 @@ def _sfem_soa_hessian_packed_crs_passes(
         packed_fill_impl = "%s_packed_fill_impl" % function_base
         packed_discover_impl = "%s_packed_discover_impl" % function_base
         packed_common_params = [
-            "const ptrdiff_t n_packs",
-            "const ptrdiff_t n_elements_per_pack",
-            "const ptrdiff_t nelements",
-            "const ptrdiff_t nnodes",
-            "const ptrdiff_t max_nodes_per_pack",
-            "uint16_t **const RSTR elements",
-            "const ptrdiff_t *const RSTR owned_nodes_ptr",
-            "const ptrdiff_t *const RSTR n_shared_nodes",
-            "const ptrdiff_t *const RSTR ghost_ptr",
-            "const idx_t *const RSTR ghost_idx",
+            argument.declaration for argument in PACKED_MESH_CORE_ARGUMENTS
         ]
         packed_state_params = [
             "const g_t *const *const RSTR points",
@@ -8444,16 +8419,8 @@ def _hessian_packed_crs_public_params(
     two_pass,
 ):
     params = [
-        "const ptrdiff_t n_packs",
-        "const ptrdiff_t n_elements_per_pack",
-        "const ptrdiff_t nelements",
-        "const ptrdiff_t nnodes",
-        "const ptrdiff_t max_nodes_per_pack",
-        "uint16_t **const RSTR elements",
-        "const ptrdiff_t *const RSTR owned_nodes_ptr",
-        "const ptrdiff_t *const RSTR n_shared_nodes",
-        "const ptrdiff_t *const RSTR ghost_ptr",
-        "const idx_t *const RSTR ghost_idx",
+        argument.declaration for argument in PACKED_MESH_CORE_ARGUMENTS
+    ] + [
         "const geom_t *const *const RSTR points",
     ]
     params.extend(
