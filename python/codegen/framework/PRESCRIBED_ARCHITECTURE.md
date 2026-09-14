@@ -126,7 +126,7 @@ Two postures. Pick by whether the output is *meant* to move.
 
 | Output must not move | Output moves on purpose |
 |---|---|
-| `codegen_snapshot verify` — byte-identity of every generated file. Settles correctness and performance at once. | `tools/reproducibility.py` — l1/l2 digest per kernel against a committed baseline, plus geometry-mode parity, asserted rather than assumed. |
+| ~~`codegen_snapshot verify`~~ — retired; `codegen_snapshot check-tree` asks the same question of the tree CMake actually compiles, and the manifest this one read went stale unnoticed for 63 commits. | `tools/reproducibility.py` — l1/l2 digest per kernel against a committed baseline, plus geometry-mode parity, asserted rather than assumed. |
 | | `tools/apply_bench.py` — cross-variant parity (four tolerance classes), answer digest, throughput. |
 
 `codegen_snapshot check-tree` is separate from both and non-negotiable: it compares the

@@ -52,15 +52,13 @@ else
     echo "Optional CUDA checks: skipped because nvcc is unavailable"
 fi
 
-if [[ "${SFEM_CODEGEN_SNAPSHOT:-0}" == "1" ]]; then
-    echo "Generated-source snapshot gate: verifying against the committed manifest"
-    "$PYTHON_BIN" -m codegen.framework.tools.codegen_snapshot verify --quiet
-else
-    echo "Generated-source snapshot gate: skipped; set SFEM_CODEGEN_SNAPSHOT=1 to run it (~3 min)"
-fi
+# The manifest gate that stood here, `codegen_snapshot verify`, is retired.  It
+# asked whether the generator still agreed with a record of itself, and its
+# record went unwritten for sixty-three commits while the tree gate below passed
+# on every one of them: dark, and counted as cover.  The question below is the
+# one worth asking, and CI runs it.
 
-# Not the same question as the manifest gate above.  That one asks whether the
-# generator still agrees with a record of itself; this asks whether
+# This asks whether
 # frontend/ops/generated -- the tree CMake compiles into libsfem -- is what the
 # generator produces today.  CI runs this one.
 if [[ "${SFEM_CODEGEN_TREE:-0}" == "1" ]]; then
