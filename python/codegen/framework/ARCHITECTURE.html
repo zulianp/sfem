@@ -1182,7 +1182,7 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 11</div>
     <div class="body">
-      <div class="op-title">Generated kernels carry dead temporaries and aliases <span class="chip c-part">first cause fixed, 66 &rarr; 10; the aliases are open</span></div>
+      <div class="op-title">Generated kernels carry dead temporaries and aliases <span class="chip c-part">both causes fixed &mdash; dead 66 &rarr; 10, aliases 1421 &rarr; 245</span></div>
       <p>Raised by Patrick, and still true of current generation rather than only the older generator. A scan of the 508 generated sources finds <b>358 declarations that are a pure alias</b> of another name — <code>const scalar_t material1 = weak_mat_tmp4;</code>, with <code>material1</code> and <code>material3</code> aliasing the same temporary — and <b>343 declarations never referenced again</b>.</p>
       <p>Both have identifiable causes. <code>_physical_gradient_nodes</code> emits all <code>dim</code> physical components unconditionally, so a form using a subset gets dead ones: <code>u0_grad_1</code> and <code>u0_grad_2</code> are unread while <code>u0_grad_0</code> is live. The dependency set already records which components are needed as <code>dependencies.gradient_coefficients[row][d]</code>, so the emitter has the information and ignores it. The aliases are a material-slot to CSE-temporary mapping that could be substituted at the use sites instead of named.</p>
       <p>This work is <b>deferred until the residuals have been reproduced</b>, and the reason is the verification posture rather than the difficulty. Every change on this branch had, until recently, been proven by the generated files coming back byte-identical. Removing dead declarations changes that text by design, so byte-identity stops being the proof and becomes the thing that must break. The gate becomes the apply bench — parity across all nine variants and the answer digest, both of which must be <i>unchanged</i>, since deleting code nothing reads cannot move a number — and the snapshot is then re-recorded as a deliberate act. Doing that while results are being reproduced would make an output change and a reproduction run indistinguishable.</p>
@@ -1216,15 +1216,36 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
       components and the liveness analysis would have been wrong &mdash; which is the one outcome
       that would have made this a correctness defect rather than a leanness win.</p>
 
-      <p><b>What is left.</b> The second cause &mdash; the material-slot to CSE-temporary aliasing
-      &mdash; is untouched, and its count went the other way: a scan of the current tree finds far
-      more pure-alias declarations than the 358 recorded here, because the emitters that replaced
-      the old ones name more intermediates. The 10 remaining dead assignments are a third thing
-      again: 8 are <code>const ptrdiff_t evb = element;</code> and <code>const int ne = 1;</code>
-      in the MRKV viscous operators, a single-element path declaring the block-loop variables it
-      does not use, and 2 are stragglers in one tensor-product body.</p>
+      <p><b>The second cause was worse than recorded, and is also fixed.</b> Its count had gone the
+      other way &mdash; 1421 pure-alias declarations against the 358 here &mdash; and the dominant
+      shape was not the <code>material# = weak_mat_tmp#</code> this entry names. It is 1176
+      <code>pa_g#_#_#_#</code> in the inexact-apply kernels, a family that postdates this entry,
+      and in one header <b>540 of those aliases name only 108 distinct temporaries</b>. Five or six
+      names per value meant the stage reading them saw 540 unrelated symbols where there were 108
+      shared ones, so common-subexpression elimination could not factor what was common. The
+      aliases were not redundant text beside the arithmetic; they were suppressing an optimisation
+      over it.</p>
+      <p>Eliminating them &mdash; a named value whose reduced expression is a bare symbol is
+      substituted into the stages that read it rather than declared &mdash; took pure aliases
+      1421 &rarr; 245 and emitted arithmetic operators in the four changed headers 16396 &rarr;
+      13924. All 53 digests and 28 parity pairs held, so the regrouping is equivalent.</p>
+      <p><b>It is a trade, and it was taken deliberately.</b> Grace, 72 threads,
+      <code>OMP_PROC_BIND=true</code>, four interleaved rounds, both layouts, at saturation
+      (206,763 dof): the packed stored apply goes <b>763.69 &rarr; 825.18 MDOF/s (+8.1%)</b> and
+      the standard stored apply <b>571.46 &rarr; 548.02 (&minus;4.1%)</b>, both separated with no
+      overlap between samples, against an untouched hand-written control holding at 0.999. The
+      packed gain holds at every size measured; the standard regression appears from 46,875 dof up.
+      The packed matrix-free throughput is the standing performance-regression gate and the layout
+      that is fast in practice, so the gate kernel moving up carried it. A regression in the packed
+      kernel itself, or a change negative in both, would not have.</p>
+      <p><b>What is left.</b> 245 pure aliases remain, none of them the <code>pa_g</code> shape:
+      128 <code>grad_coeff#_#</code>, 52 <code>grad_coeff#_#_value</code>, the 32
+      <code>material#</code> this entry originally named, and 33 others. The 10 remaining dead
+      assignments are a third thing again: 8 are <code>const ptrdiff_t evb = element;</code> and
+      <code>const int ne = 1;</code> in the MRKV viscous operators, a single-element path declaring
+      the block-loop variables it does not use, and 2 are stragglers in one tensor-product body.</p>
 
-      <div class="op-facts"><span><i>dead assignments</i> 66 &rarr; <b>10</b></span><span><i>diff</i> 56 deletions, 0 insertions</span><span><i>gate</i> digests + parity, unchanged</span><span><i>still open</i> the CSE-temporary aliases</span></div>
+      <div class="op-facts"><span><i>dead assignments</i> 66 &rarr; <b>10</b></span><span><i>diff</i> 56 deletions, 0 insertions</span><span><i>gate</i> digests + parity, unchanged</span><span><i>pure aliases</i> 1421 &rarr; <b>245</b></span><span><i>packed apply</i> <b>+8.1%</b> · standard &minus;4.1%</span></div>
     </div>
   </div>
 
