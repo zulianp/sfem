@@ -6615,6 +6615,50 @@ _OBJECTIVE_STEPS_BY_APPLICABILITY = {
 }
 
 
+def _sfem_soa_direct_hessian_push_forward_lines(weak_form, dim, indent):
+    """Reference gradient to physical, through the adjugate over the determinant."""
+    lines = []
+    for row in range(weak_form.n_field_components):
+        for col in range(dim):
+            terms = [
+                "gu_ref%d * adj_lane%d" % (row * dim + k, k * dim + col)
+                for k in range(dim)
+            ]
+            lines.append(
+                "%sconst s_t gu%d = (%s) * idet;"
+                % (indent, row * dim + col, " + ".join(terms))
+            )
+    return lines
+
+
+def _sfem_soa_direct_hessian_state_gradient_lines(dim, reference_prefix, indent):
+    """The state's reference gradient at every quadrature point, sum-factorized.
+
+    Contracting the state with each shape function's reference gradient inside
+    the quadrature loop costs `NQ * NS` multiply-adds per component, which is
+    `p^6` work for a degree-`p` element.  `tensor_gradient_contiguous_scalar` is
+    the same contraction taken one direction at a time, at `p^4`, and it is the
+    routine the matrix-free apply on this element already uses.  It answers for
+    every quadrature point at once, so the call is hoisted above the loop that
+    reads it.
+
+    The `_scalar` spelling is the one this kernel wants.  Assembly has a single
+    element in hand -- it scatters into a sparse row and has nowhere to put a
+    block of them -- so the lane-blocked micro-kernels would carry a lane loop
+    that runs once and stage buffers with `VS - 1` slots nobody writes.
+    """
+    return [
+        "%ss_t state_gradient_ref[%s];" % (indent, c_product("NC", "NQ", "ND")),
+        "%sfor (int component = 0; component < NC; ++component) {" % indent,
+        "%s  tensor_gradient_contiguous_scalar<s_t, NQ, NS, VS, %d, NC>(" % (indent, dim),
+        "%s      %sshape_1d, %sgrad_1d, bu_data, component,"
+        % (indent, reference_prefix, reference_prefix),
+        "%s      state_gradient_ref + %s);"
+        % (indent, c_product("component", "NQ", "ND")),
+        "%s}" % indent,
+    ]
+
+
 def _sfem_soa_direct_hessian_current_gradient_lines(
     weak_form,
     dim,
@@ -6633,6 +6677,21 @@ def _sfem_soa_direct_hessian_current_gradient_lines(
     adjugate, and hand the result to the same material expression.
     """
     lines = []
+    if use_tensor_product_reference:
+        # Already computed for every quadrature point, above the loop.
+        for row in range(n_field_components):
+            for col in range(dim):
+                lines.append(
+                    "%sconst s_t gu_ref%d = state_gradient_ref[%s];"
+                    % (
+                        indent,
+                        row * dim + col,
+                        c_sum(c_product(row, "NQ", "ND"), c_product("q", "ND"), col),
+                    )
+                )
+        return lines + _sfem_soa_direct_hessian_push_forward_lines(
+            weak_form, dim, indent
+        )
     for idx in range(n_field_components * dim):
         lines.append("%ss_t gu_ref%d = s_t(0);" % (indent, idx))
     lines.append("%sfor (int shape = 0; shape < NS; ++shape) {" % indent)
@@ -6674,17 +6733,7 @@ def _sfem_soa_direct_hessian_current_gradient_lines(
                 % (indent, row * dim + col, row, col)
             )
     lines.append("%s}" % indent)
-    for row in range(weak_form.n_field_components):
-        for col in range(dim):
-            terms = [
-                "gu_ref%d * adj_lane%d" % (row * dim + k, k * dim + col)
-                for k in range(dim)
-            ]
-            lines.append(
-                "%sconst s_t gu%d = (%s) * idet;"
-                % (indent, row * dim + col, " + ".join(terms))
-            )
-    return lines
+    return lines + _sfem_soa_direct_hessian_push_forward_lines(weak_form, dim, indent)
 
 
 def _sfem_soa_direct_hessian_matrix_assembly_lines(
@@ -6725,6 +6774,10 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
                 kernel_constant("NQ1", quadrature_rule.tensor_product_n_qp_1d, indent=indent),
                 kernel_constant("NS1", quadrature_rule.tensor_product_n_shape_1d, indent=indent),
             ]
+        )
+    if uses_current and use_tensor_product_reference:
+        lines.extend(
+            _sfem_soa_direct_hessian_state_gradient_lines(dim, reference_prefix, indent)
         )
     lines.append("%sfor (int q = 0; q < NQ; ++q) {" % indent)
     if use_tensor_product_reference:
