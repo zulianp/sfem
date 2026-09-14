@@ -89,6 +89,7 @@ from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
     PrinterLayout,
     lane_loop_header_lines,
+    work_item_scope_header_lines,
     render_kernel_ast_lines,
 )
 from codegen.framework.targets import current_target
@@ -223,10 +224,34 @@ def _sfem_packed_thread_scratch_header_source():
     )
 
 
+def _element_index(source_builder):
+    """The element this work item holds: `evb + lane`, or `evb` itself."""
+    target = getattr(source_builder, "target", None)
+    if target is not None and hasattr(target, "element_index"):
+        return target.element_index()
+    return "evb + %s" % _work_item_index(source_builder)
+
+
+def _work_item_slot(source_builder):
+    """The bound target's subscript for a staged buffer: `[lane]`, or `[0]`."""
+    target = getattr(source_builder, "target", None)
+    if target is not None and hasattr(target, "work_item_subscript"):
+        return target.work_item_subscript()
+    return "[%s]" % _work_item_index(source_builder)
+
+
 def _work_item_index(source_builder):
+    """The work item's name, from the source builder or from the binding.
+
+    The fallback used to be the literal `"lane"`, which is the CPU answer
+    written down in the layer that must not know the target.  Every source
+    builder defines `work_item_index`, so it was also unreachable -- but an
+    unreachable wrong answer is still the wrong answer for whoever makes it
+    reachable.
+    """
     if hasattr(source_builder, "work_item_index"):
         return source_builder.work_item_index()
-    return "lane"
+    return current_target().work_item_index()
 
 
 def _reference_gradient_offset_lines(
@@ -262,25 +287,13 @@ def _reference_gradient_offset_lines(
 
 
 def _lane_loop_header_lines(source_builder, indent):
-    """A packed kernel's lane loop: its pragma and its `for`, from the IR.
+    """A packed kernel's work-item scope, opened -- the caller closes it.
 
     Seven sites spliced `*source_builder.simd_lines()` and then wrote the `for`
-    out by hand.  The loop is `LoopHeaderNode` over the same `LoopNode` that
-    `_work_item_loop_lines` below renders, so the two stop being separate
-    spellings of one loop.
-
-    The pragma lands at column zero and the `for` at `indent`, which is what
-    these sites have always emitted -- `simd_lines()` returns the bare pragma
-    and the splice never indented it.  That asymmetry is visible in the shipped
-    tree, where 210 of 2935 `#pragma omp simd` lines sit at column zero.  It is
-    preserved here rather than quietly corrected, because correcting it moves
-    shipped bytes and that is a decision to take deliberately, not a side effect
-    of moving a loop into the IR.
+    out by hand.  It now asks the target, like everything else: byte-identical
+    on a CPU target, and a bare block where the work item is a thread.
     """
-    pragma = tuple(source_builder.simd_lines())
-    return lane_loop_header_lines(
-        pragma[0] if pragma else None, indent
-    )
+    return work_item_scope_header_lines(indent)
 
 
 def _work_item_loop_lines(source_builder, indent):
@@ -385,11 +398,11 @@ def _affine_geometry_stream_helper_lines(source_builder):
         "    std::false_type) {",
     ]
     if _emits_vector_lane_loop(source_builder):
-        lines.extend("  %s" % line for line in source_builder.simd_lines())
+        slot = _work_item_slot(source_builder)
+        lines.extend(work_item_scope_header_lines("  "))
         lines.extend(
             [
-                "  for (int lane = 0; lane < ne; ++lane) {",
-                "    converted[lane] = s_t(source[lane]);",
+                "    converted%s = s_t(source%s);" % (slot, slot),
                 "  }",
             ]
         )
@@ -3802,13 +3815,14 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 [
                     "          for (int d = 0; d < ND; ++d) {",
                     *_lane_loop_header_lines(source_builder, "            "),
-                    "              const uint16_t %s = %s[evb + lane];"
+                    "              const uint16_t %s = %s[%s];"
                     % (
                         coordinate_node,
                         "element_shape" if identity_stream_shape_order else "coordinate_shape",
+                        _element_index(source_builder),
                     ),
-                    "              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + %s];"
-                    % coordinate_node,
+                    "              bcoordinate_data[shape * ND + d]%s = pk_coordinates[d * max_nodes_per_pack + %s];"
+                    % (_work_item_slot(source_builder), coordinate_node),
                     "            }",
                     "          }",
                 ]
@@ -3817,9 +3831,12 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             [
                 "          for (int d = 0; d < NC; ++d) {",
                 *_lane_loop_header_lines(source_builder, "            "),
-                "              const uint16_t packed_node = element_shape[evb + lane];",
-                "              bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];",
-                "              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];",
+                "              const uint16_t packed_node = element_shape[%s];"
+                % _element_index(source_builder),
+                "              bu_base_data[shape * NC + d]%s = pk_u_base[d * max_nodes_per_pack + packed_node];"
+                % _work_item_slot(source_builder),
+                "              bh_data[shape * NC + d]%s = pk_h[d * max_nodes_per_pack + packed_node];"
+                % _work_item_slot(source_builder),
                 "            }",
                 "          }",
                 "        }",
@@ -3906,19 +3923,21 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "          for (int shape = 0; shape < NS; ++shape) {",
                 "            for (int d = 0; d < NC; ++d) {",
                 *_lane_loop_header_lines(source_builder, "              "),
-                "                bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];",
+                "                bu_data[shape * NC + d]%s = bu_base_data[shape * NC + d]%s + alpha * bh_data[shape * NC + d]%s;"
+                % ((_work_item_slot(source_builder),) * 3),
                 "              }",
                 "            }",
                 "          }",
                 *_lane_loop_header_lines(source_builder, "          "),
-                "            bvalue[lane] = s_t(0);",
+                "            bvalue%s = s_t(0);" % _work_item_slot(source_builder),
                 "          }",
                 "",
                 "          %s<s_t, NQ, NS, VS>(%s);"
                 % (block_name, ", ".join(call_args)),
                 "",
                 *_lane_loop_header_lines(source_builder, "          "),
-                "            value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];",
+                "            value[(ptrdiff_t)step * nelements + %s] = bvalue%s;"
+                % (_element_index(source_builder), _work_item_slot(source_builder)),
                 "          }",
                 "        }",
                 "      }",
@@ -5642,15 +5661,16 @@ def _sfem_soa_packed_apply_public_wrappers(
                     [
                         "          for (int d = 0; d < ND; ++d) {",
                         *_lane_loop_header_lines(source_builder, "            "),
-                        "              const uint16_t %s = %s[evb + lane];"
+                        "              const uint16_t %s = %s[%s];"
                         % (
                             coordinate_node,
                             "element_shape"
                             if identity_stream_shape_order
                             else "coordinate_shape",
+                            _element_index(source_builder),
                         ),
-                        "              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + %s];"
-                        % coordinate_node,
+                        "              bcoordinate_data[shape * ND + d]%s = pk_coordinates[d * max_nodes_per_pack + %s];"
+                        % (_work_item_slot(source_builder), coordinate_node),
                         "            }",
                         "          }",
                     ]
@@ -5659,20 +5679,24 @@ def _sfem_soa_packed_apply_public_wrappers(
                 [
                     "          for (int d = 0; d < NC; ++d) {",
                     *_lane_loop_header_lines(source_builder, "            "),
-                    "              const uint16_t packed_node = element_shape[evb + lane];",
+                    "              const uint16_t packed_node = element_shape[%s];"
+                    % _element_index(source_builder),
                 ]
             )
             if uses_current:
                 lines.append(
-                    "              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];"
+                    "              bu_data[shape * NC + d]%s = pk_u[d * max_nodes_per_pack + packed_node];"
+                    % _work_item_slot(source_builder)
                 )
             if uses_direction:
                 lines.append(
-                    "              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];"
+                    "              bh_data[shape * NC + d]%s = pk_h[d * max_nodes_per_pack + packed_node];"
+                    % _work_item_slot(source_builder)
                 )
             lines.extend(
                 [
-                    "              bout_data[shape * NC + d][lane] = s_t(0);",
+                    "              bout_data[shape * NC + d]%s = s_t(0);"
+                    % _work_item_slot(source_builder),
                     "            }",
                     "          }",
                     "        }",
@@ -5773,8 +5797,11 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "          const uint16_t *const RSTR element_shape = elements[shape];",
                     "          for (int d = 0; d < NC; ++d) {",
                     "            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
-                    "            for (int lane = 0; lane < ne; ++lane) {",
-                    "              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];",
+                    # Serial on purpose: two work items of one block can land
+                    # on the same packed node, so this scope must not vectorize.
+                    *work_item_scope_header_lines("            ", serial=True),
+                    "              pk_component_out[element_shape[%s]] += bout_data[shape * NC + d]%s;"
+                    % (_element_index(source_builder), _work_item_slot(source_builder)),
                     "            }",
                     "          }",
                     "        }",
@@ -6652,7 +6679,8 @@ def _sfem_soa_direct_hessian_push_forward_lines(weak_form, dim, indent):
     for row in range(weak_form.n_field_components):
         for col in range(dim):
             terms = [
-                "gu_ref%d * adj_lane%d" % (row * dim + k, k * dim + col)
+                "gu_ref%d * %s"
+                % (row * dim + k, current_target().work_item_name("adj", k * dim + col))
                 for k in range(dim)
             ]
             lines.append(
@@ -6755,8 +6783,13 @@ def _sfem_soa_direct_hessian_current_gradient_lines(
         )
     for row in range(n_field_components):
         lines.append(
-            "%s  const s_t state_u%d = bu_data[%s][lane];"
-            % (indent, row, c_sum(c_product("shape", "NC"), row))
+            "%s  const s_t state_u%d = bu_data[%s]%s;"
+            % (
+                indent,
+                row,
+                c_sum(c_product("shape", "NC"), row),
+                current_target().work_item_subscript(),
+            )
         )
         for col in range(dim):
             lines.append(
@@ -6821,21 +6854,25 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
         lines.append("%s  const s_t qw = %sq_weight[q];" % (indent, reference_prefix))
     lines.extend(
         [
-            "%s  const int lane = 0;" % indent,
-            "%s  const ptrdiff_t goff = q * VS + lane;" % indent,
+            *(
+                "%s  %s" % (indent, line)
+                for line in current_target().work_item_prologue_lines()
+            ),
+            "%s  const ptrdiff_t goff = %s;"
+            % (indent, current_target().work_item_offset("q", "VS")),
         ]
     )
     for component in range(dim * dim):
         lines.append(
-            "%s  const s_t adj_lane%d = badj%d[goff];"
-            % (indent, component, component)
+            "%s  const s_t %s = badj%d[goff];"
+            % (indent, current_target().work_item_name("adj", component), component)
         )
     lines.extend(
         [
-            "%s  const s_t det_lane0 = bdet0[goff];"
-            % indent,
-            "%s  const s_t idet = s_t(1) / det_lane0;"
-            % indent,
+            "%s  const s_t %s = bdet0[goff];"
+            % (indent, current_target().work_item_name("det", 0)),
+            "%s  const s_t idet = s_t(1) / %s;"
+            % (indent, current_target().work_item_name("det", 0)),
         ]
     )
     if uses_current:
@@ -6903,8 +6940,11 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     )
     for phys_component in range(dim):
         terms = [
-            "trial_grad_ref%d * adj_lane%d"
-            % (ref_component, ref_component * dim + phys_component)
+            "trial_grad_ref%d * %s"
+            % (
+                ref_component,
+                current_target().work_item_name("adj", ref_component * dim + phys_component),
+            )
             for ref_component in range(dim)
         ]
         lines.append(
@@ -6958,8 +6998,11 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     lines.append("%s          s_t entry = s_t(0);" % indent)
     for ref_component in range(dim):
         terms = [
-            "material[%s] * adj_lane%d"
-            % (c_sum(c_product("test_component", "ND"), k), ref_component * dim + k)
+            "material[%s] * %s"
+            % (
+                c_sum(c_product("test_component", "ND"), k),
+                current_target().work_item_name("adj", ref_component * dim + k),
+            )
             for k in range(dim)
         ]
         lines.append(
@@ -8714,7 +8757,7 @@ def _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
 
 
 def _sfem_soa_diagnostics_header(
-    work_item="lane",
+    work_item=None,
     header_guard_suffix="HPP",
     inline_qualifier="SFEM_INLINE",
     define_sfem_inline=True,
@@ -8724,6 +8767,10 @@ def _sfem_soa_diagnostics_header(
     # host; every caller is an `extern "C"` launcher.  It is the one thing in
     # this header that must not be compiled for a device.
     host_qualifier = inline_qualifier if host_qualifier is None else host_qualifier
+    # Three callers pass nothing.  The per-point field is named after whatever
+    # this target calls a work item, which on a CPU target is `lane` -- the name
+    # this default used to spell out.
+    work_item = current_target().diagnostic_work_item() if work_item is None else work_item
     struct_name = _sfem_soa_diagnostics_struct_name()
     guard = "SFEM_CODEGEN_KERNEL_DIAGNOSTICS_%s" % header_guard_suffix
     per_qp = "per_qp_%s" % work_item
