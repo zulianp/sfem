@@ -29,6 +29,7 @@ from codegen.framework.targets import (
     current_target,
     use_target,
 )
+from codegen.framework.targets.targets import ARMSVETarget, HIPTarget
 
 
 EMITTERS = os.path.join(
@@ -292,6 +293,86 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
                     0,
                     "%s hardcodes a pragma; route it through the target" % name,
                 )
+
+
+class WorkItemAccessorTest(unittest.TestCase):
+    """What each target answers for the work item, spelled out.
+
+    Worth pinning explicitly rather than inferring from generated output,
+    because the generated tree is OpenMP only: every SIMT answer below is
+    otherwise never evaluated by anything, and would first be exercised by
+    whoever eventually runs a CUDA build of the residual or inexact families.
+    """
+
+    def test_cpu_answers_are_the_literals_the_emitters_write_today(self):
+        for target in (OpenMPTarget(), AVX512Target()):
+            with self.subTest(target=target.name):
+                self.assertEqual(target.work_item_index(), "lane")
+                self.assertEqual(target.work_item_subscript(), "[lane]")
+                self.assertEqual(target.work_item_offset("q", "VS"), "q * VS + lane")
+                self.assertEqual(
+                    target.work_item_offset("q", "geometry_stride"),
+                    "q * geometry_stride + lane",
+                )
+                self.assertEqual(target.element_index(), "evb + lane")
+                self.assertEqual(target.work_item_name("adj", 0), "adj_lane0")
+                self.assertEqual(
+                    target.work_item_prologue_lines("  "),
+                    ("  const int lane = 0;",),
+                )
+
+    def test_sve_carries_its_index_type_into_the_prologue(self):
+        """The one policy field that differs on a shipping CPU target."""
+        self.assertEqual(
+            ARMSVETarget().work_item_prologue_lines(),
+            ("const ptrdiff_t lane = 0;",),
+        )
+
+    def test_simt_answers_drop_the_work_item_rather_than_name_it(self):
+        for target in (CUDATarget(), HIPTarget()):
+            with self.subTest(target=target.name):
+                self.assertEqual(target.work_item_index(), "0")
+                self.assertEqual(target.work_item_subscript(), "[0]")
+                # The stride survives; only the `+ lane` term goes.  Four of the
+                # seven offset sites stride by `geometry_stride`, a runtime mesh
+                # parameter, so dropping the stride would be wrong arithmetic.
+                self.assertEqual(target.work_item_offset("q", "VS"), "q * VS")
+                self.assertEqual(
+                    target.work_item_offset("q", "geometry_stride"),
+                    "q * geometry_stride",
+                )
+                self.assertEqual(target.element_index(), "evb")
+                self.assertEqual(target.work_item_prologue_lines("  "), ())
+
+    def test_the_scope_is_a_loop_on_a_lane_target_and_a_block_on_a_thread_one(self):
+        from codegen.framework.ir.kernel_ast import BlockNode, LoopKind, LoopNode
+
+        cpu = OpenMPTarget().work_item_scope_node(())
+        self.assertIsInstance(cpu, LoopNode)
+        self.assertIs(cpu.loop_kind, LoopKind.SIMD)
+        self.assertEqual(cpu.iterator.symbol.name, "lane")
+        self.assertEqual(cpu.iterator.index_type.name, "int")
+        self.assertTrue(cpu.vectorized)
+
+        self.assertIsInstance(CUDATarget().work_item_scope_node(()), BlockNode)
+
+    def test_the_serial_scope_is_never_vectorized(self):
+        """A scatter two work items can collide in must not get a simd pragma.
+
+        The packed scatters are serial on purpose -- two lanes of one block can
+        land on the same node -- so this is the one accessor where getting it
+        wrong produces a data race rather than a diff, and `check-tree` would
+        pass while the answer became nondeterministic.
+        """
+        from codegen.framework.ir.kernel_ast import BlockNode, LoopNode
+
+        for target in (OpenMPTarget(), AVX512Target(), ARMSVETarget()):
+            with self.subTest(target=target.name):
+                node = target.serial_work_item_scope_node(())
+                self.assertIsInstance(node, LoopNode)
+                self.assertFalse(node.vectorized)
+                self.assertTrue(target.work_item_scope_node(()).vectorized)
+        self.assertIsInstance(CUDATarget().serial_work_item_scope_node(()), BlockNode)
 
 
 class WorkItemLoweringRatchetTest(unittest.TestCase):

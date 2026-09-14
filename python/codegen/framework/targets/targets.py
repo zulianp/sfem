@@ -1,5 +1,16 @@
 from dataclasses import dataclass
+from dataclasses import replace as dataclass_replace
 from enum import Enum
+
+from codegen.framework.ir.kernel_ast import (
+    BlockNode,
+    LoopKind,
+    LoopNode,
+    expr_ref,
+    iteration_range,
+    iterator,
+    pre_increment,
+)
 
 
 class TargetLanguage(Enum):
@@ -139,6 +150,90 @@ class TargetPlatform:
 
     def diagnostic_work_item(self):
         return self.work_item_index()
+
+    def work_item_scope_node(self, body=()):
+        """One work-item scope: a lane loop, or a bare block where it is a thread.
+
+        The decision -- loop or block, which index, which type, vectorized or
+        not -- belongs to the target and is made once, here.  It comes back as a
+        node rather than as text because `emitters/ast_printer.py` owns the
+        spelling; `targets` may import `ir` (index 4 over index 3) and may not
+        import `emitters`, which is exactly the split this returns.
+
+        Lifted out of `residual_codegen._work_item_loop_node`, which was the
+        only one of six re-spellings that was both policy-driven and IR-shaped.
+        The other five differed from it by return type, not by decision.
+        """
+        policy = self.loop_lowering_policy()
+        if not policy.emits_lane_loop:
+            return BlockNode(body=tuple(body))
+        index = iterator(policy.lane_index, policy.lane_index_type)
+        pragma = self.vectorize_pragma() if policy.vectorize_lane_loop else None
+        return LoopNode(
+            LoopKind.SIMD,
+            index,
+            iteration_range(0, expr_ref("ne", "tile_extent")),
+            pre_increment(index),
+            body=tuple(body),
+            vectorized=bool(pragma),
+        )
+
+    def serial_work_item_scope_node(self, body=()):
+        """The same scope, never vectorized.
+
+        A scatter that two work items can land on the same node in is serial on
+        purpose -- the packed scatters say so in their own docstrings.  Routing
+        one through `work_item_scope_node` on a target whose policy vectorizes
+        would add a `#pragma omp simd` that is not there today: a data race, and
+        a quiet one, since the answer only changes when two lanes collide.
+        """
+        node = self.work_item_scope_node(body)
+        if isinstance(node, LoopNode):
+            return dataclass_replace(node, vectorized=False)
+        return node
+
+    def work_item_prologue_lines(self, indent=""):
+        """Bind the work-item name where there is no loop to bind it.
+
+        The one-element-in-hand kernels -- matrix assembly, which scatters into
+        a sparse row and has nowhere to put a block -- run the blocked
+        arithmetic with a single work item and declare the name themselves.
+        That declaration is not the work-item *index* and must not be routed
+        through `work_item_index()`: on a CPU target that returns the name, so
+        the site would emit `const int lane = lane;`, and on a SIMT target it
+        returns `0` and the site would emit `const int 0 = 0;`.
+        """
+        policy = self.loop_lowering_policy()
+        if not policy.emits_lane_loop:
+            return ()
+        return (
+            "%sconst %s %s = 0;" % (indent, policy.lane_index_type, policy.lane_index),
+        )
+
+    def work_item_subscript(self):
+        """How a staged buffer is indexed at this work item: `[lane]`, or `[0]`."""
+        return "[%s]" % self.work_item_index()
+
+    def work_item_offset(self, outer, stride):
+        """A flat offset into a per-point, per-work-item stream.
+
+        `q * VS + lane` where the work items are lanes of one block, and
+        `q * VS` where the index is zero.  The `+ lane` term is what vanishes --
+        not the stride, which is often `geometry_stride`, a runtime mesh
+        parameter rather than the block width.
+        """
+        policy = self.loop_lowering_policy()
+        base = "%s * %s" % (outer, stride)
+        if not policy.emits_lane_loop:
+            return base
+        return "%s + %s" % (base, policy.lane_index)
+
+    def element_index(self, block="evb"):
+        """The element this work item holds: `evb + lane`, or `evb` itself."""
+        policy = self.loop_lowering_policy()
+        if not policy.emits_lane_loop:
+            return block
+        return "%s + %s" % (block, policy.lane_index)
 
     def work_item_loop_lines(self, indent):
         policy = self.loop_lowering_policy()
@@ -283,9 +378,6 @@ class OpenMPTarget(TargetPlatform):
             parallel_element_loop=True,
             supports_shared_memory=False,
         )
-
-    def work_item_name(self, name, component):
-        return "%s_lane%d" % (str(name), int(component))
 
 
 @dataclass(frozen=True)
