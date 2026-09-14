@@ -726,21 +726,16 @@ class CodeGenerationStage:
         outputs = {}
         target = _normalize_generation_target(self.target)
         material = self.user_input.material
-        # The inexact-apply family has no backend.  Every other unit is emitted
-        # through `_emit_codegen_unit`, which picks a backend for the target and
-        # lets it bind; this one calls its emitter directly, so it runs under
-        # whatever target is ambient -- OpenMP -- and emits lane-blocked,
-        # `#pragma omp` sources whatever was asked for.  Dropped into a CUDA
-        # tree those cannot compile, and the CUDA backend's own contract check
-        # rejects them.
-        #
-        # So it is emitted for the target it has a lowering for.  That is not a
-        # decision against the capability: the family is unchanged, and giving
-        # it a backend is what would let it follow the target the way the rest
-        # of the tree does.
-        wants_inexact = bool(getattr(material, "inexact_apply", False)) and (
-            target is KernelTarget.OPENMP
-        )
+        # The inexact-apply family goes through a backend like everything else.
+        # It used to call its emitter straight from here, under whatever target
+        # happened to be ambient, and the driver decided which targets got it by
+        # naming one.  A driver that names a target is a driver that has to be
+        # edited every time a target is added, and the one it named was too
+        # narrow: AVX-512, SVE and SME are the same CPU backend and were being
+        # refused a family they can emit.  The backend answers now, because the
+        # backend is what knows whether its target has a lowering.
+        wants_inexact = bool(getattr(material, "inexact_apply", False))
+        backend = _backend_for_target(target)
         for context in self.user_input.element_contexts:
             for unit in self.codegen_plan.emission_kernels_for_context(context):
                 _merge_files(
@@ -757,12 +752,7 @@ class CodeGenerationStage:
                         _layout_codegen_files(
                             unit,
                             context,
-                            tuple(
-                                GeneratedKernelFile(path, source)
-                                for path, source in inexact_apply_files(
-                                    material, unit, context
-                                )
-                            ),
+                            tuple(backend.emit_inexact(material, unit, context)),
                         ),
                     )
         return outputs

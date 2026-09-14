@@ -15,6 +15,8 @@ from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 from codegen.framework.emitters.energy import OpenMPEnergySoAEmitter
 from codegen.framework.plans.reference_data import reference_data_plan_from_emission_plan
 from codegen.framework.emitters.boundary_codegen import generate_boundary_residual_sfem_files
+from codegen.framework.emitters.artifacts import GeneratedKernelFile
+from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
 from codegen.framework.plans.residual_model import (
     diagonal_block_emission_model,
     residual_emission_model,
@@ -69,6 +71,24 @@ class OpenMPSoABackend:
     supports_op_wrapper: bool = True
     target: object = OpenMPTarget()
     emitter: object = None
+
+    def emit_inexact(self, material, unit, context):
+        """The inexact-apply family, through the same boundary as everything else.
+
+        It had no backend.  `_emit_codegen_unit` picks a backend for the target
+        and lets it bind; this family called its emitter directly from the
+        driver, so it ran under whatever target happened to be ambient and
+        emitted the CPU shape whatever was asked for.  Routing it here is what
+        makes the workflow one workflow: the target binds, the emitter asks it,
+        and the backend checks what came out.
+        """
+        if self.target.language is not TargetLanguage.CPP:
+            raise ValueError("OpenMP SoA backend requires a C++ CPU target")
+        with use_target(self.target):
+            return tuple(
+                GeneratedKernelFile(path, source)
+                for path, source in inexact_apply_files(material, unit, context)
+            )
 
     def emit(self, unit, context):
         if self.target.language is not TargetLanguage.CPP:
