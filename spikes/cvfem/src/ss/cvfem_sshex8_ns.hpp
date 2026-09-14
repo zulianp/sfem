@@ -438,6 +438,13 @@ static SFEM_INLINE void sscvfem_cell_corners(const SSMeshData &d, const ptrdiff_
 // c_xy xi eta + c_yz eta zeta + c_xz xi zeta + c_xyz xi eta zeta is affine exactly when the four
 // cross coefficients vanish; the test is relative to the linear ones, at 1e-5, which clears the
 // float32 storage of the coordinates by two orders.
+//
+// The corners are not the whole story once a mesh places its micro nodes on the geometry
+// instead of on the chords between the corners -- smesh::Mesh::warp_semistructured_hex8_nozzle
+// does exactly that. A macro element whose corners happen to be affine can then carry a curved
+// lattice, and hoisting would silently put its micro cells back on the chords. So a macro element
+// is also curved where any lattice node is off the trilinear map of its corners, at the same
+// relative tolerance.
 inline void sscvfem_classify_macros(SSMeshData &d) {
     int ext[8];
     sscvfem_macro_corner_offsets(d.level, ext);
@@ -459,7 +466,30 @@ inline void sscvfem_classify_macros(SSMeshData &d) {
             lin += lx * lx + ly * ly + lz * lz;
             cross += cxy * cxy + cyz * cyz + cxz * cxz + cxyz * cxyz;
         }
-        if (cross > 1e-10 * lin) {
+        bool curved = cross > 1e-10 * lin;
+        if (!curved) {
+            const int L = d.level;
+            double    dev = 0;
+            for (int zi = 0; zi <= L && dev <= 1e-10 * lin; ++zi)
+                for (int yi = 0; yi <= L; ++yi)
+                    for (int xi = 0; xi <= L; ++xi) {
+                        const double          r[3] = {(double)xi / L, (double)yi / L, (double)zi / L};
+                        const smesh::idx_t gn   = d.elems[sscvfem_lidx(L, xi, yi, zi)][e];
+                        for (int k = 0; k < 3; ++k) {
+                            double t = 0;
+                            for (int a = 0; a < 8; ++a) {
+                                double N = 1;
+                                for (int q = 0; q < 3; ++q)
+                                    N *= CVFEM_HEX8_REF_XI[a][q] > 0.5 ? r[q] : 1.0 - r[q];
+                                t += N * c[a][k];
+                            }
+                            const double dd = (double)d.points[k][gn] - t;
+                            dev             = std::max(dev, dd * dd);
+                        }
+                    }
+            curved = dev > 1e-10 * lin;
+        }
+        if (curved) {
             d.macro_curved[(size_t)e] = 1;
             ++n_curved;
         }

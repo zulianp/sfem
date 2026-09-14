@@ -35,6 +35,7 @@
 #include "smesh_mesh_reorder.hpp"
 #include "smesh_semistructured.hpp"
 
+#include <functional>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -2973,6 +2974,9 @@ int main(int argc, char **argv) {
     const real_t step_x = smesh::Env::read<real_t>("SFEM_STEP_X", 1);
     const real_t step_y = smesh::Env::read<real_t>("SFEM_STEP_Y", 1);
     std::shared_ptr<smesh::Mesh> mesh;
+    // Set by the nozzle, for after to_semistructured: the micro nodes go on the nozzle's own map
+    // rather than on the chords between macro corners. See smesh::Mesh::warp_semistructured_hex8_nozzle.
+    std::function<int(const std::shared_ptr<smesh::Mesh> &)> nozzle_warp;
     if (want_nozzle) {
         // The semi-structured operator hoists one Jacobian per macro element -- the macro
         // element's own Jacobian at its centre, scaled to a micro cell -- which is exact for an
@@ -3006,6 +3010,20 @@ int main(int argc, char **argv) {
                  (smesh::geom_t)g.r_throat, (smesh::geom_t)g.r_throat},
                 {(ptrdiff_t)na[0], (ptrdiff_t)na[1], (ptrdiff_t)na[2], (ptrdiff_t)na[3]},
                 3, (smesh::geom_t)g.r_inlet, n_core, n_bore, n_outer);
+        // The same arguments, captured, so the lattice is warped onto exactly this nozzle.
+        {
+            const std::vector<smesh::geom_t> xb = {(smesh::geom_t)g.x_in, (smesh::geom_t)g.x_cone,
+                                                   (smesh::geom_t)g.x_throat, (smesh::geom_t)g.x_expansion,
+                                                   (smesh::geom_t)g.x_out};
+            const std::vector<smesh::geom_t> rb = {(smesh::geom_t)g.r_inlet, (smesh::geom_t)g.r_inlet,
+                                                   (smesh::geom_t)g.r_throat, (smesh::geom_t)g.r_throat,
+                                                   (smesh::geom_t)g.r_throat};
+            const std::vector<ptrdiff_t>     nx = {(ptrdiff_t)na[0], (ptrdiff_t)na[1], (ptrdiff_t)na[2], (ptrdiff_t)na[3]};
+            const smesh::geom_t              rx = (smesh::geom_t)g.r_inlet;
+            nozzle_warp = [xb, rb, nx, rx, n_core, n_bore, n_outer](const std::shared_ptr<smesh::Mesh> &ss) {
+                return smesh::Mesh::warp_semistructured_hex8_nozzle(ss, xb, rb, nx, 3, rx, n_core, n_bore, n_outer);
+            };
+        }
         if (mesh)
             std::printf("nozzle: mesh core %td  bore rings %td  outer rings %td  axial %ld %ld %ld %ld\n",
                         n_core, n_bore, n_outer, na[0], na[1], na[2], na[3]);
@@ -3314,6 +3332,16 @@ int main(int argc, char **argv) {
     const int refine_level = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
     if (refine_level > 1) {
         mesh = smesh::to_semistructured(refine_level, mesh, true, false);
+        // On by default, because the chords are the approximation and the nozzle is the geometry:
+        // macro core 2 at level 4 is then the core-8 nozzle, with the hierarchy depth of core 2.
+        // SFEM_NOZZLE_WARP=0 keeps the chords, for A/B against that.
+        if (mesh && nozzle_warp && smesh::Env::read<int>("SFEM_NOZZLE_WARP", 1)) {
+            if (nozzle_warp(mesh) != SMESH_SUCCESS) {
+                std::fprintf(stderr, "nozzle: warping the level-%d lattice onto the nozzle failed\n", refine_level);
+                return EXIT_FAILURE;
+            }
+            std::printf("nozzle: micro nodes warped onto the nozzle (level %d)\n", refine_level);
+        }
         // to_semistructured builds a new Mesh and does not copy sidesets. The macro elements
         // are the same and (parent, lfi) refers to them, so re-attaching is exact rather than
         // a re-derivation.
