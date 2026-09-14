@@ -235,10 +235,20 @@ def _inexact_apply_kernel_source(
     stages = action_stages(plan, tangent_symbols, increment, output)
     action_body = []
     action_body_expressions = []
+    # A stage's names are read by the stages after it and nowhere else, so a
+    # name that CSE reduced to a bare temporary can be substituted into those
+    # rather than declared.  `aliases` carries the mapping forward.
+    aliases = {}
     for stage in stages:
-        action_body.extend(_assignment_lines(stage.assignments, stage.name))
+        assignments = [
+            (symbol, expression.xreplace(aliases))
+            for symbol, expression in stage.assignments
+        ]
+        action_body.extend(
+            _assignment_lines(assignments, stage.name, aliases=aliases)
+        )
         action_body_expressions.extend(
-            expression for _symbol, expression in stage.assignments
+            expression for _symbol, expression in assignments
         )
 
     parameters = tuple(str(name) for name in parameter_names)
@@ -448,8 +458,28 @@ def _scatter_lines(lhs, rhs, indent):
     return list(target.scatter_add_lines(lhs, rhs, indent))
 
 
-def _assignment_lines(assignments, prefix, indent="    "):
-    """Common subexpressions first, then the named values, as C declarations."""
+def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
+    """Common subexpressions first, then the named values, as C declarations.
+
+    When `aliases` is a dict, a named value whose reduced expression is a bare
+    symbol is not declared at all -- the mapping is recorded there instead, for
+    the caller to substitute into whatever reads it.  CSE hoists a shared
+    subexpression into a temporary and leaves the name that asked for it holding
+    nothing but that temporary, so the declaration is `const s_t pa_g0_0_0_0 =
+    reference_product_t10;` and the only thing it adds is a second name for one
+    value.  There were 540 of those in each of the two PROTEUS_HEX8
+    inexact-apply headers.
+
+    It is opt-in because dropping a declaration is only safe where the caller
+    controls every use of it.  The stage loop does -- a stage's names are read
+    by the stages after it and nowhere else -- and the three other callers here
+    do not, so they pass nothing and keep their aliases.
+
+    Only a bare symbol is eliminated.  A negation such as `-reference_product_t10`
+    is left as its own declaration: substituting it would push the negation into
+    each of the three output terms that read it, which is more arithmetic
+    spelled, not less.
+    """
     if not assignments:
         return []
     symbols = [symbol for symbol, _expression in assignments]
@@ -461,10 +491,13 @@ def _assignment_lines(assignments, prefix, indent="    "):
         "%sconst s_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
         for symbol, expression in temporaries
     ]
-    lines.extend(
-        "%sconst s_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
-        for symbol, expression in zip(symbols, reduced)
-    )
+    for symbol, expression in zip(symbols, reduced):
+        if aliases is not None and expression.is_Symbol:
+            aliases[symbol] = expression
+            continue
+        lines.append(
+            "%sconst s_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
+        )
     return lines
 
 
