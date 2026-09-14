@@ -63,7 +63,7 @@ from codegen.framework.ir.kernel_ast import (
 from codegen.framework.emitters.cprinter import runtime_typed_entry_point
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
-    lane_loop_header_lines,
+    work_item_scope_header_lines,
     render_kernel_ast_lines,
 )
 from codegen.framework.plans.diagnostics import (
@@ -359,6 +359,21 @@ def _atomic_update_pragma():
     return _target().atomic_update_pragma()
 
 
+def _wi():
+    """The bound target's subscript for a staged buffer: `[lane]`, or `[0]`."""
+    return _target().work_item_subscript()
+
+
+def _elem(block="evb"):
+    """The element this work item holds: `evb + lane`, or `evb` itself."""
+    return _target().element_index(block)
+
+
+def _offset(outer, stride):
+    """A flat per-point, per-work-item offset; the `+ lane` term is the target's."""
+    return _target().work_item_offset(outer, stride)
+
+
 def _work_item_index():
     return _target().work_item_index()
 
@@ -457,13 +472,10 @@ def _affine_geometry_stream_helper_lines():
         "    s_t *const RSTR converted,",
         "    std::false_type) {",
     ]
-    pragma = _vectorize_pragma()
-    if pragma:
-        lines.append("  %s" % pragma)
+    lines.extend(work_item_scope_header_lines("  "))
     lines.extend(
         [
-            "  for (int lane = 0; lane < ne; ++lane) {",
-            "    converted[lane] = s_t(source[lane]);",
+            "    converted%s = s_t(source%s);" % (_wi(), _wi()),
             "  }",
             "  return converted;",
             "}",
@@ -954,7 +966,7 @@ def _zero_block_output_lines(name, n_streams, indent):
     return [
         "%sfor (int stream = 0; stream < %d; ++stream) {" % (indent, n_streams),
         *_work_item_loop_lines("%s  " % indent),
-        "%s    %s[stream][lane] = s_t(0);" % (indent, name),
+        "%s    %s[stream]%s = s_t(0);" % (indent, name, _wi()),
         "%s  }" % indent,
         "%s}" % indent,
     ]
@@ -1033,8 +1045,7 @@ def _mesh_block_gather_loop_lines(indent, loop, assignment_lines):
     lines.extend(loop.setup_lines)
     lines.extend(_work_item_loop_lines(loop.lane_indent))
     lines.append(
-        "%s  const idx_t node = element_shape[evb + lane];"
-        % loop.lane_indent
+        "%s  const idx_t node = element_shape[%s];" % (loop.lane_indent, _elem())
     )
     lines.extend(assignment_lines)
     lines.append("%s}" % loop.lane_indent)
@@ -1090,8 +1101,8 @@ def _field_gather_lines(system, dependencies, indent, element_array="elements"):
     # is already in ABI order, so direction still lands last.
     for role in live_field_roles(dependencies):
         assignment_lines.append(
-            "%s      b%s[stream][lane] = %s_components[field][node * %s];"
-            % (indent, role.name, role.name, role.stride)
+            "%s      b%s[stream]%s = %s_components[field][node * %s];"
+            % (indent, role.name, _wi(), role.name, role.stride)
         )
     lines.extend(
         [
@@ -1133,7 +1144,7 @@ def _coordinate_gather_lines(dim, indent, element_array="elements", pointer_type
                 lane_indent="%s    " % indent,
             ),
             [
-                "%s      bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];"
+                ('%s      bcoordinates[shape * ND + d]' + _wi() + ' = coordinate_components[d][node];')
                 % indent
             ],
         ),
@@ -1647,7 +1658,7 @@ def _mixed_field_gather_lines(system, layout, dependencies, indent, field_elemen
         field_lines = []
         for group in dependency_groups:
             field_lines.append(
-                ("%s" + _BLOCK + "%s[stream][lane] = %s[node * %s];")
+                ("%s" + _BLOCK + '%s[stream]' + _wi() + ' = %s[node * %s];')
                 % (
                     indent + "    ",
                     group.name,
@@ -2311,7 +2322,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
     lines = [
         "  for (int q = 0; q < NQ; ++q) {",
         *_work_item_loop_lines("    "),
-        "      const ptrdiff_t goff = q * geometry_stride + lane;",
+        "      const ptrdiff_t goff = %s;" % _offset("q", "geometry_stride"),
         "      const s_t det = determinant[goff];",
     ]
     lines.extend(
@@ -2359,7 +2370,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
             ]
             if terms:
                 lines.append(
-                    "      output[%d][lane] += q_weight[q] * det * (%s);"
+                    ('      output[%d]' + _wi() + ' += q_weight[q] * det * (%s);')
                     % (offset + test, " + ".join(terms))
                 )
     lines.extend(["    }", "  }"])
@@ -2485,9 +2496,9 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         for i in _adjugate_components(dependencies, dim)
     )
     if uses_determinant:
-        body.append("      const s_t det = det_q[lane];")
+        body.append('      const s_t det = det_q' + _wi() + ';')
     body.extend(
-        "      const s_t adj%d = adj_q%d[lane];" % (i, i)
+        ('      const s_t adj%d = adj_q%d' + _wi() + ';') % (i, i)
         for i in _adjugate_components(dependencies, dim)
     )
     for field_index, field in enumerate(system.fields):
@@ -2499,7 +2510,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                     % (group.name, field.name, group.name, field.name)
                 )
                 body.append(
-                    "      const s_t %s%s = %s_%s_value_q[lane];"
+                    ('      const s_t %s%s = %s_%s_value_q' + _wi() + ';')
                     % (field.name, group.symbol_suffix, group.name, field.name)
                 )
             if read.uses_gradient:
@@ -2509,7 +2520,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                         % (group.name, field.name, k, group.name, field.name, k)
                     )
                     body.append(
-                        "      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref_q%d[lane];"
+                        ('      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref_q%d' + _wi() + ';')
                         % (field.name, group.symbol_suffix, k, group.name, field.name, k)
                     )
                 body.extend(
@@ -2546,7 +2557,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             bool(dependencies.value_coefficients[row])
         ](row)
         lines.append(
-            "      %s_value_coeff_q[lane] = %s;" % (field.name, value)
+            ('      %s_value_coeff_q' + _wi() + ' = %s;') % (field.name, value)
         )
         for k in contracted_gradient_components(dependencies, dim):
             terms = [
@@ -2556,7 +2567,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             ]
             value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
             lines.append(
-                "      %s_grad_coeff_ref_q%d[lane] = %s;" % (field.name, k, value)
+                ('      %s_grad_coeff_ref_q%d' + _wi() + ' = %s;') % (field.name, k, value)
             )
     lines.extend(["    }", "  }"])
     for row, field in enumerate(system.fields):
@@ -2613,7 +2624,7 @@ def _mixed_local_field_evaluation_lines(
                 for trial in range(layout.n_shape(field_index)):
                     coeff_name = "coeff_%s_%s_%d" % (group.name, field.name, trial)
                     lines.append(
-                        "%sconst s_t %s = %s[%d][lane];"
+                        ('%sconst s_t %s = %s[%d]' + _wi() + ';')
                         % (indent, coeff_name, group.name, offset + trial)
                     )
                     if read.uses_value:
@@ -2645,7 +2656,7 @@ def _mixed_local_field_evaluation_lines(
             else:
                 lines.append("%sfor (int trial = 0; trial < %s; ++trial) {" % (indent, n_shape_name))
                 lines.append(
-                    "%s  const s_t coeff = %s[%d + trial][lane];"
+                    ('%s  const s_t coeff = %s[%d + trial]' + _wi() + ';')
                     % (indent, group.name, offset)
                 )
                 if read.uses_value:
@@ -3035,10 +3046,10 @@ def _simplex_local_body(
             # component for stores that belong together.
             zeroed = []
             if read.uses_value:
-                zeroed.append("%s_values[lane]" % stem)
+                zeroed.append(('%s_values' + _wi()) % stem)
             if read.uses_gradient:
                 zeroed.extend(
-                    "%s_grad_%d_ref_values[lane]" % (stem, d) for d in range(dim)
+                    ('%s_grad_%d_ref_values' + _wi()) % (stem, d) for d in range(dim)
                 )
             gather.append(
                 _work_item_loop_node(
@@ -3054,7 +3065,7 @@ def _simplex_local_body(
                     "coeff",
                     (),
                     expr_ref(
-                        "%s[%s][lane]"
+                        ('%s[%s]' + _wi())
                         % (group.name, c_sum(c_product("trial", "NC"), field_index))
                     ),
                 )
@@ -3062,7 +3073,7 @@ def _simplex_local_body(
             if read.uses_value:
                 trial_body.append(
                     ScatterNode(
-                        expr_ref("%s_values[lane]" % stem),
+                        expr_ref(('%s_values' + _wi()) % stem),
                         expr_ref("coeff * shape[q * NS + trial]"),
                         "+=",
                     )
@@ -3070,7 +3081,7 @@ def _simplex_local_body(
             if read.uses_gradient:
                 trial_body.extend(
                     ScatterNode(
-                        expr_ref("%s_grad_%d_ref_values[lane]" % (stem, d)),
+                        expr_ref(('%s_grad_%d_ref_values' + _wi()) % (stem, d)),
                         expr_ref(
                             "coeff * %s[q * NS + trial]"
                             % sfem_simplex_grad_ref_name("grad_ref", d)
@@ -3093,7 +3104,7 @@ def _simplex_local_body(
             if read.uses_value:
                 transform_values.append(
                     BufferDeclNode(
-                        "const s_t", stem, (), expr_ref("%s_values[lane]" % stem)
+                        "const s_t", stem, (), expr_ref(('%s_values' + _wi()) % stem)
                     )
                 )
             if read.uses_gradient:
@@ -3102,7 +3113,7 @@ def _simplex_local_body(
                         "const s_t",
                         "%s_grad_%d_ref" % (stem, d),
                         (),
-                        expr_ref("%s_grad_%d_ref_values[lane]" % (stem, d)),
+                        expr_ref(('%s_grad_%d_ref_values' + _wi()) % (stem, d)),
                     )
                     for d in range(dim)
                 )
@@ -3124,7 +3135,7 @@ def _simplex_local_body(
     )
     material.extend(
         AssignmentNode(
-            expr_ref("%s_values[lane]" % name),
+            expr_ref(('%s_values' + _wi()) % name),
             expr_ref(name),
         )
         for row in range(len(system.fields))
@@ -3150,14 +3161,14 @@ def _simplex_local_body(
         )
     for row in range(len(system.fields)):
         terms = [
-            "%s_values[lane] * %s" % (name, _LOCAL_TEST_FACTOR[kind](axis))
+            ('%s_values' + _wi() + ' * %s') % (name, _LOCAL_TEST_FACTOR[kind](axis))
             for kind, axis, name in live_test_coefficients(dependencies, row, dim)
         ]
         if terms:
             test_body.append(
                 ScatterNode(
                     expr_ref(
-                        "output[%s][lane]" % c_sum(c_product("test", "NC"), row)
+                        ('output[%s]' + _wi()) % c_sum(c_product("test", "NC"), row)
                     ),
                     expr_ref("q_weight[q] * det * (%s)" % " + ".join(terms)),
                     "+=",
@@ -3254,7 +3265,7 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
                     reference_gradients,
                     dim + 1,
                     d,
-                    lambda shape, group=group, field_index=field_index: "%s[%d][lane]"
+                    lambda shape, group=group, field_index=field_index: ('%s[%d]' + _wi())
                     % (group.name, shape * n_fields + field_index),
                 )
                 body.append(
@@ -3311,7 +3322,7 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
             if terms:
                 body.append(
                     ScatterNode(
-                        expr_ref("output[%d][lane]" % (test * n_fields + row)),
+                        expr_ref(('output[%d]' + _wi()) % (test * n_fields + row)),
                         expr_ref("q_weight[q] * det * (%s)" % _sum_cpp_terms(terms)),
                         "+=",
                     )
@@ -3410,7 +3421,7 @@ def _geometry_value_nodes(dependencies, dim):
                     "const ptrdiff_t",
                     "goff",
                     (),
-                    expr_ref("q * geometry_stride + lane"),
+                    expr_ref(_offset("q", "geometry_stride")),
                 )
             )
         elif quantity.name == "determinant":
@@ -3563,7 +3574,7 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
         body.append(
             declare(
                 "coeff_%s_%s_%d" % (group.name, field.name, trial),
-                "%s[%d][lane]" % (group.name, trial * len(system.fields) + field_index),
+                ('%s[%d]' + _wi()) % (group.name, trial * len(system.fields) + field_index),
             )
         )
     for d in range(dim):
@@ -3589,7 +3600,7 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
             "const ptrdiff_t",
             "goff",
             (),
-            expr_ref("q * geometry_stride + lane"),
+            expr_ref(_offset("q", "geometry_stride")),
         )
     )
     body.append(
@@ -3640,7 +3651,7 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
             body.append(
                 ScatterNode(
                     expr_ref(
-                        "output[%d][lane]" % (test * len(system.fields) + field_index),
+                        ('output[%d]' + _wi()) % (test * len(system.fields) + field_index),
                         "scatter_target",
                     ),
                     expr_ref(_sum_cpp_terms(terms), "scatter_value"),
@@ -3788,7 +3799,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             )
         )
         lane_body.append(
-            BufferDeclNode("const s_t", "det", (), expr_ref("det_q[lane]"))
+            BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _wi()))
         )
     for i in _adjugate_components(dependencies, dim):
         quadrature_body.append(
@@ -3799,7 +3810,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         )
         lane_body.append(
             BufferDeclNode(
-                "const s_t", "adj%d" % i, (), expr_ref("adj_q%d[lane]" % i)
+                "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
             )
         )
     field_hoists, field_aliases = _tensor_field_alias_nodes(system, dependencies)
@@ -3823,7 +3834,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         )
         lane_body.append(
             AssignmentNode(
-                expr_ref("value_coeff_q%d[lane]" % row), expr_ref(value)
+                expr_ref(('value_coeff_q%d' + _wi()) % row), expr_ref(value)
             )
         )
         # `contracted_gradient_components` is this question phrased as a range,
@@ -3852,7 +3863,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             )
             lane_body.append(
                 AssignmentNode(
-                    expr_ref("grad_coeff_ref_q%d_%d[lane]" % (row, k)),
+                    expr_ref(('grad_coeff_ref_q%d_%d' + _wi()) % (row, k)),
                     expr_ref(value),
                 )
             )
@@ -3902,7 +3913,7 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
                     )
             lines.append("%sfor (int trial = 0; trial < NS; ++trial) {" % indent)
             lines.append(
-                "%s  const s_t coeff = %s[%s][lane];"
+                ('%s  const s_t coeff = %s[%s]' + _wi() + ';')
                 % (indent, group.name, c_sum(c_product("trial", "NC"), field_index))
             )
             if read.uses_value:
@@ -4022,7 +4033,7 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "const s_t",
                         stem,
                         (),
-                        expr_ref("%s_value_q%d[lane]" % (group.name, field_index)),
+                        expr_ref(('%s_value_q%d' + _wi()) % (group.name, field_index)),
                     )
                 )
             if read.uses_gradient:
@@ -4055,7 +4066,7 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "%s_grad_%d_ref" % (stem, k),
                         (),
                         expr_ref(
-                            "%s_grad_ref_q%d_%d[lane]" % (group.name, field_index, k)
+                            ('%s_grad_ref_q%d_%d' + _wi()) % (group.name, field_index, k)
                         ),
                     )
                     for k in range(dim)
@@ -4328,7 +4339,7 @@ def _operator_source(
                         ),
                         "  for (int q = 0; q < NQ; ++q) {",
                         *_work_item_loop_lines("    "),
-                        "      const ptrdiff_t goff = q * geometry_stride + lane;",
+                        "      const ptrdiff_t goff = %s;" % _offset("q", "geometry_stride"),
                     ]
                 )
                 pre_call_lines.extend(
@@ -4336,7 +4347,7 @@ def _operator_source(
                         dim,
                         "determinant[goff]",
                         lambda component: "adjugate[%d][goff]" % component,
-                        lambda component: "geom_metric_data[%d][q * VS + lane]"
+                        lambda component: "geom_metric_data[%d][" + _offset("q", "VS") + "]"
                         % component,
                         "      ",
                         "metric",
@@ -4998,7 +5009,7 @@ def _mixed_isoparametric_function(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "bcoordinates[%d][lane] * %s_cell_grad_ref_%d[%s]"
+                    ('bcoordinates[%d]' + _wi() + ' * %s_cell_grad_ref_%d[%s]')
                     % (
                         shape * dim + i,
                         reference_stage,
@@ -5813,11 +5824,11 @@ def _mesh_operator_source(
         geometry.extend(
             _geometry_metric_grouping_lines(
                 dim,
-                "bageom_streams[%d][lane]"
+                ('bageom_streams[%d]' + _wi())
                 % affine_geometry_stream_indices["det0"],
-                lambda component: "bageom_streams[%d][lane]"
+                lambda component: ('bageom_streams[%d]' + _wi())
                 % affine_geometry_stream_indices["adj%d" % component],
-                lambda component: "bgeom_metric_data[%d][lane]" % component,
+                lambda component: ('bgeom_metric_data[%d]' + _wi()) % component,
                 "      ",
                 "metric",
             )
@@ -6685,13 +6696,13 @@ def _scalar_crs_matrix_assembly_source(
                     for component in range(dim * dim)
                 ),
                 "    for (int q = 0; q < NQ; ++q) {",
-                "      const int lane = 0;",
+                *_target().work_item_prologue_lines("      "),
             ]
         )
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "bcoordinates[%d][lane] * %s[q * NS + %d]"
+                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
@@ -7053,13 +7064,13 @@ def _scalar_crs_matrix_assembly_source(
                         for component in range(dim * dim)
                     ),
                     "      for (int q = 0; q < NQ; ++q) {",
-                    "        const int lane = 0;",
+                    *_target().work_item_prologue_lines("        "),
                 ]
             )
             for i in range(dim):
                 for j in range(dim):
                     terms = [
-                        "bcoordinates[%d][lane] * %s[q * NS + %d]"
+                        ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
                         % (
                             shape * dim + i,
                             _mesh_reference_name(
@@ -7342,7 +7353,7 @@ def _isoparametric_mesh_operator_source(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "bcoordinates[%d][lane] * %s[q * NS + %d]"
+                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
@@ -7365,7 +7376,7 @@ def _isoparametric_mesh_operator_source(
                 "",
                 *quadrature_scope_lines(rule.element_type, "    "),
                 *_work_item_loop_lines("      "),
-                "        const ptrdiff_t goff = q * VS + lane;",
+                "        const ptrdiff_t goff = %s;" % _offset("q", "VS"),
             ]
         )
         lines.extend(
@@ -7636,8 +7647,8 @@ def _scalar_packed_jacobian_action_source(
             "          const uint16_t *const RSTR coordinate_shape = %s[shape];" % coordinate_element_array,
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
             "          for (int d = 0; d < ND; ++d) {",
-            *lane_loop_header_lines(_vectorize_pragma(), "            "),
-            "              bcoordinates[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[evb + lane]];",
+            *work_item_scope_header_lines("            "),
+            '              bcoordinates[shape * ND + d]' + _wi() + ' = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[' + _elem() + ']];',
             "            }",
             "          }",
         ]
@@ -7645,17 +7656,17 @@ def _scalar_packed_jacobian_action_source(
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.extend(
             [
-                *lane_loop_header_lines(_vectorize_pragma(), "          "),
-                "            b%s[shape][lane] = pk_%s[field_shape[evb + lane]];"
+                *work_item_scope_header_lines("          "),
+                ('            b%s[shape]' + _wi() + ' = pk_%s[field_shape[' + _elem() + ']];')
                 % (role.name, role.name),
                 "          }",
             ]
         )
     lines.extend(
         [
-            *lane_loop_header_lines(_vectorize_pragma(), "          "),
-            "            bdirection[shape][lane] = pk_direction[field_shape[evb + lane]];",
-            "            boutput[shape][lane] = s_t(0);",
+            *work_item_scope_header_lines("          "),
+            '            bdirection[shape]' + _wi() + ' = pk_direction[field_shape[' + _elem() + ']];',
+            '            boutput[shape]' + _wi() + ' = s_t(0);',
             "          }",
             "        }",
         ]
@@ -7699,7 +7710,7 @@ def _scalar_packed_jacobian_action_source(
         for i in range(dim):
             for j in range(dim):
                 terms = [
-                    "bcoordinates[%d][lane] * %s[q * NS + %d]"
+                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
@@ -7739,8 +7750,10 @@ def _scalar_packed_jacobian_action_source(
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR field_shape = %s[shape];"
             % field_element_array,
-            "          for (int lane = 0; lane < ne; ++lane) {",
-            "            pk_out[field_shape[evb + lane]] += boutput[shape][lane];",
+            # Serial on purpose: two work items of one block can land on the
+            # same packed node, so this scope must not vectorize.
+            *work_item_scope_header_lines("          ", serial=True),
+            '            pk_out[field_shape[' + _elem() + ']] += boutput[shape]' + _wi() + ';',
             "          }",
             "        }",
             "      }",
@@ -8050,17 +8063,17 @@ def _scalar_packed_affine_jacobian_action_source(
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.extend(
             [
-                *lane_loop_header_lines(_vectorize_pragma(), "          "),
-                "            b%s[shape][lane] = pk_%s[field_shape[evb + lane]];"
+                *work_item_scope_header_lines("          "),
+                ('            b%s[shape]' + _wi() + ' = pk_%s[field_shape[' + _elem() + ']];')
                 % (role.name, role.name),
                 "          }",
             ]
         )
     lines.extend(
         [
-            *lane_loop_header_lines(_vectorize_pragma(), "          "),
-            "            bdirection[shape][lane] = pk_direction[field_shape[evb + lane]];",
-            "            boutput[shape][lane] = s_t(0);",
+            *work_item_scope_header_lines("          "),
+            '            bdirection[shape]' + _wi() + ' = pk_direction[field_shape[' + _elem() + ']];',
+            '            boutput[shape]' + _wi() + ' = s_t(0);',
             "          }",
             "        }",
         ]
@@ -8095,11 +8108,11 @@ def _scalar_packed_affine_jacobian_action_source(
         lines.extend(
             _geometry_metric_grouping_lines(
                 dim,
-                "bageom_streams[%d][lane]"
+                ('bageom_streams[%d]' + _wi())
                 % affine_geometry_stream_indices["det0"],
-                lambda component: "bageom_streams[%d][lane]"
+                lambda component: ('bageom_streams[%d]' + _wi())
                 % affine_geometry_stream_indices["adj%d" % component],
-                lambda component: "bgeom_metric_data[%d][lane]" % component,
+                lambda component: ('bgeom_metric_data[%d]' + _wi()) % component,
                 "          ",
                 "metric",
             )
@@ -8138,8 +8151,10 @@ def _scalar_packed_affine_jacobian_action_source(
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
-            "          for (int lane = 0; lane < ne; ++lane) {",
-            "            pk_out[field_shape[evb + lane]] += boutput[shape][lane];",
+            # Serial on purpose: two work items of one block can land on the
+            # same packed node, so this scope must not vectorize.
+            *work_item_scope_header_lines("          ", serial=True),
+            '            pk_out[field_shape[' + _elem() + ']] += boutput[shape]' + _wi() + ';',
             "          }",
             "        }",
             "      }",
@@ -8213,7 +8228,7 @@ def _isoparametric_geometry_assignment_lines(dim, indent):
     return isoparametric_adjugate_call_lines(
         dim=dim,
         indent=indent,
-        index="q * VS + lane",
+        index=_offset("q", "VS"),
         stream_array_name="badjugate_streams",
         determinant_stream="bdeterminant",
     )
