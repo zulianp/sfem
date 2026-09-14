@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from codegen.framework.ir.passes import VectorizationContractPass
+from codegen.framework.targets import current_target
 
 from codegen.framework.ir.kernel_ast import (
     AssignmentNode,
@@ -263,6 +264,37 @@ def render_kernel_ast_lines(name, nodes, printer=None, passes=DEFAULT_PASSES):
     if passes is not None:
         ast, _results = passes.apply(ast)
     return printer.print_ast(ast)
+
+
+def work_item_scope_header_lines(indent="", serial=False):
+    """The bound target's work-item scope, opened -- the caller closes it.
+
+    The one text spelling of the scope, rendered from the node
+    `TargetPlatform.work_item_scope_node` decides.  `lane_loop_header_lines`
+    below is the same thing with the decision hardcoded, and the callers that
+    still use it are the ones that have not moved.
+
+    `serial` asks for the scope a scatter needs: two work items of one block can
+    land on the same node, so the loop must not be vectorized.  That is a
+    different question from how the loop is spelled, which is why the target
+    answers it and this only prints the answer.
+    """
+    target = current_target()
+    node = (
+        target.serial_work_item_scope_node(())
+        if serial
+        else target.work_item_scope_node(())
+    )
+    if isinstance(node, BlockNode):
+        return ("%s{" % indent,)
+    pragma = target.vectorize_pragma() if node.vectorized else None
+    printer = CLikeKernelASTPrinter(vectorize_pragma=pragma or "")
+    return tuple(
+        "%s%s" % (indent, line)
+        for line in render_kernel_ast_lines(
+            "work_item_scope", (LoopHeaderNode(node),), printer=printer
+        )
+    )
 
 
 def lane_loop_header_lines(pragma, indent=""):

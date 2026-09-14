@@ -67,7 +67,7 @@ from codegen.framework.plans.streams import (
 )
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
-    lane_loop_header_lines,
+    work_item_scope_header_lines,
     render_kernel_ast_lines,
 )
 from codegen.framework.ir.kernel_ast import (
@@ -117,8 +117,23 @@ _TANGENT_ADDRESS = "element + %d * tangent_component_stride"
 #: what makes this a base pointer and nothing more: the component is contiguous
 #: across the lanes, so it needs no staging and the lane indexes it directly.
 _BLOCKED_TANGENT_BASE = "evb + %d * tangent_component_stride"
-#: How the lane addresses it once the base pointer is in hand.
-_BLOCKED_TANGENT_LANE = "btangent%d[lane]"
+def _work_item():
+    """The bound target's subscript for a staged buffer: `[lane]`, or `[0]`."""
+    return current_target().work_item_subscript()
+
+
+def _element_index():
+    """The element this work item holds: `evb + lane`, or `evb` itself."""
+    return current_target().element_index()
+
+
+def _blocked_tangent_slot(slot):
+    """How the work item addresses the tangent once the base pointer is in hand.
+
+    A function rather than the module constant it used to be: the answer is the
+    bound target's, and at import time there is no binding to ask.
+    """
+    return "btangent%d%s" % (slot, _work_item())
 
 
 def inexact_apply_kernel_source(
@@ -775,7 +790,7 @@ def _explicit_gradient_source(
     scratch = _CONNECTIVITY_BY_USE[bool(gathered)](n_nodes)
     scratch.extend("    s_t b%s[VS];" % value for value, _s, _n, _r in gathered)
     lane_lines = [
-        "      const s_t %s = b%s[lane];" % (value, value)
+        "      const s_t %s = b%s%s;" % (value, value, _work_item())
         for value, _s, _n, _r in gathered
     ]
     lane_lines.extend(basis_reads)
@@ -895,13 +910,15 @@ def _sum_factorized_gradient_source(
         gathers.extend(
             _lane_loop(
                 [
-                    "      b%s_data[%d][lane] = %s%s[bev%d[lane] * %s_stride];"
+                    "      b%s_data[%d]%s = %s%s[bev%d%s * %s_stride];"
                     % (
                         role.name,
                         shape * dim + field,
+                        _work_item(),
                         role.name,
                         component[field],
                         shape_order[shape],
+                        _work_item(),
                         role.name,
                     )
                     for shape in range(n_nodes)
@@ -922,8 +939,8 @@ def _sum_factorized_gradient_source(
             for axis in range(dim)
         )
         lane_lines.extend(
-            "      const s_t %s = g%s_ref%d[lane];"
-            % (role.reference[field][axis], role.name, field * dim + axis)
+            "      const s_t %s = g%s_ref%d%s;"
+            % (role.reference[field][axis], role.name, field * dim + axis, _work_item())
             for field in range(dim)
             for axis in range(dim)
         )
@@ -1035,7 +1052,7 @@ def _expanded_tangent_body(
         )
     )
     compute.extend(
-        "      %s = tangent_t(tangent%d);" % (_BLOCKED_TANGENT_LANE % slot, slot)
+        "      %s = tangent_t(tangent%d);" % (_blocked_tangent_slot(slot), slot)
         for slot in range(plan.tangent_components)
     )
     return compute, None
@@ -1062,7 +1079,7 @@ def _quadrature_point_lines(integrand, integrand_symbols, source, lane_prologue)
         )
     )
     lines.extend(
-        "        btangent_acc[%d][lane] += qw * integrand%d;" % (slot, slot)
+        "        btangent_acc[%d]%s += qw * integrand%d;" % (slot, _work_item(), slot)
         for slot in range(len(integrand_symbols))
     )
     return lines
@@ -1083,7 +1100,10 @@ def _quadrature_tangent_body(
     pragma = target.vectorize_pragma() if hasattr(target, "vectorize_pragma") else None
     slots = plan.tangent_components
     zero = _lane_loop_node(
-        ["        btangent_acc[%d][lane] = s_t(0);" % slot for slot in range(slots)],
+        [
+            "        btangent_acc[%d]%s = s_t(0);" % (slot, _work_item())
+            for slot in range(slots)
+        ],
         pragma,
     )
     point = _lane_loop_node(
@@ -1105,8 +1125,8 @@ def _quadrature_tangent_body(
     )
     write_out = _lane_loop_node(
         [
-            "        %s = tangent_t(btangent_acc[%d][lane]);"
-            % (_BLOCKED_TANGENT_LANE % slot, slot)
+            "        %s = tangent_t(btangent_acc[%d]%s);"
+            % (_blocked_tangent_slot(slot), slot, _work_item())
             for slot in range(slots)
         ],
         pragma,
@@ -1232,16 +1252,16 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body, layout="standar
     gathers = _STORED_GATHERS_BY_LAYOUT[layout](gathered, component)
     gathers.extend(_blocked_tangent_bases(plan.tangent_components, "const "))
     compute = [
-        "      const s_t %s = b%s[lane];" % (value, value)
+        "      const s_t %s = b%s%s;" % (value, value, _work_item())
         for value, _s, _n, _r in gathered
     ]
     compute.extend(
-        "      const s_t tangent%d = s_t(%s);" % (slot, _BLOCKED_TANGENT_LANE % slot)
+        "      const s_t tangent%d = s_t(%s);" % (slot, _blocked_tangent_slot(slot))
         for slot in range(plan.tangent_components)
     )
     compute.extend("  %s" % line for line in action_body)
     compute.extend(
-        "      bout%d_%d[lane] = element_out%d_%d;" % (index, node, index, node)
+        "      bout%d_%d%s = element_out%d_%d;" % (index, node, _work_item(), index, node)
         for index in range(len(component))
         for node in range(n_nodes)
     )
@@ -1380,7 +1400,7 @@ def _lane_loop(body, indent="    "):
     way, so this stops being a fourth spelling of one loop and becomes a second
     caller of the one the printer owns.
     """
-    header = lane_loop_header_lines(_vectorize_pragma(), indent)
+    header = work_item_scope_header_lines(indent)
     return list(header) + list(body) + ["%s}" % indent]
 
 
@@ -1399,7 +1419,8 @@ def _connectivity_scratch(n_nodes, index_type="idx_t"):
     scratch.extend(
         _lane_loop(
             [
-                "      bev%d[lane] = elements[%d][evb + lane];" % (node, node)
+                "      bev%d%s = elements[%d][%s];"
+                % (node, _work_item(), node, _element_index())
                 for node in range(n_nodes)
             ]
         )
@@ -1428,7 +1449,7 @@ def _blocked_geometry_bases(dim):
 def _blocked_geometry_lines(dim, indent="      "):
     """The lane's geometry, by the local name the arithmetic is written in."""
     return [
-        "%sconst s_t %s = s_t(b%s[lane]);" % (indent, local, name)
+        "%sconst s_t %s = s_t(b%s%s);" % (indent, local, name, _work_item())
         for local, name in zip(
             ["adjugate%d" % index for index in range(dim * dim)] + ["determinant"],
             geometry_argument_names(dim),
@@ -1453,8 +1474,8 @@ def _staged_gathers(gathered):
     """The block's indirect reads, staged lane-major in one pass."""
     return _lane_loop(
         [
-            "      b%s[lane] = %s[bev%d[lane] * %s_stride];"
-            % (value, source, node, role)
+            "      b%s%s = %s[bev%d%s * %s_stride];"
+            % (value, _work_item(), source, node, _work_item(), role)
             for value, source, node, role in gathered
         ]
     )
@@ -1484,8 +1505,8 @@ def _packed_staged_gathers(gathered, component):
     """
     return _lane_loop(
         [
-            "      b%s[lane] = pk_h[%d * max_nodes_per_pack + bev%d[lane]];"
-            % (value, component.index(source[-1]), node)
+            "      b%s%s = pk_h[%d * max_nodes_per_pack + bev%d%s];"
+            % (value, _work_item(), component.index(source[-1]), node, _work_item())
             for value, source, node, _role in gathered
         ]
     )
@@ -1502,10 +1523,10 @@ def _packed_scatter(component, n_nodes):
     lines = []
     for index, _name in enumerate(component):
         for node in range(n_nodes):
-            lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+            lines.extend(work_item_scope_header_lines("    ", serial=True))
             lines.append(
-                "      pk_out[%d * max_nodes_per_pack + bev%d[lane]] += bout%d_%d[lane];"
-                % (index, node, index, node)
+                "      pk_out[%d * max_nodes_per_pack + bev%d%s] += bout%d_%d%s;"
+                % (index, node, _work_item(), index, node, _work_item())
             )
             lines.append("    }")
     return lines
@@ -1666,14 +1687,8 @@ def _lane_loop_node(body_lines, pragma):
     exists to catch, and a quadrature loop nested in a lane loop is the shape it
     caught here.
     """
-    lane = iterator("lane", "int")
-    return LoopNode(
-        LoopKind.SIMD,
-        lane,
-        iteration_range(0, expr_ref("ne", "tile_extent")),
-        pre_increment(lane),
-        body=(RawLinesNode(tuple(body_lines), reason="kernel arithmetic"),),
-        vectorized=bool(pragma),
+    return current_target().work_item_scope_node(
+        (RawLinesNode(tuple(body_lines), reason="kernel arithmetic"),)
     )
 
 
@@ -1746,11 +1761,11 @@ def _blocked_scatter(component, n_nodes, scale=""):
     lines = []
     for index, name in enumerate(component):
         for node in range(n_nodes):
-            lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+            lines.extend(work_item_scope_header_lines("    ", serial=True))
             lines.extend(
                 _scatter_lines(
-                    "out%s[bev%d[lane] * out_stride]" % (name, node),
-                    "%sbout%d_%d[lane]" % (scale, index, node),
+                    "out%s[bev%d%s * out_stride]" % (name, node, _work_item()),
+                    "%sbout%d_%d%s" % (scale, index, node, _work_item()),
                     "      ",
                 )
             )

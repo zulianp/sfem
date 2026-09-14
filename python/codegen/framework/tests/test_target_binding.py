@@ -375,6 +375,71 @@ class WorkItemAccessorTest(unittest.TestCase):
         self.assertIsInstance(CUDATarget().serial_work_item_scope_node(()), BlockNode)
 
 
+class InexactFamilyUnderACudaTargetTest(unittest.TestCase):
+    """The narrow, true claim about CUDA -- and it is worth stating narrowly.
+
+    `backends/cuda.py` refuses an emitted file that contains the substring
+    `lane`, and `CUDASoABackend.emit_inexact` returned nothing because of it.
+    That rule is what this conversion is about, so it is what gets asserted:
+    emitted under a bound `CUDATarget`, the inexact family no longer spells a
+    work item or an OpenMP pragma.
+
+    It does *not* assert that the backend accepts the family, and it should not.
+    `_validate_cuda_source_contract` also wants a file whose name ends
+    `_operator.cu` containing `__global__ void`, and this emitter writes
+    `%s_operator.cpp` with host `extern "C"` functions around an OpenMP mesh
+    loop.  Reaching that needs the mesh-loop lowering -- `.cu` naming, a
+    grid-stride kernel, a host launcher, atomic scatters -- which the energy
+    family already has and this one does not.
+
+    This is also the only thing in the repository that evaluates the SIMT arm of
+    the work-item accessors through a real emitter rather than in isolation.
+    """
+
+    def test_it_spells_no_work_item_and_no_openmp_pragma(self):
+        import dataclasses
+
+        from sfem import gen
+        from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
+        from codegen.framework.materials.linear_elasticity import material
+
+        unit_material = dataclasses.replace(material, inexact_apply=True)
+        user_input = gen.UserInputStage.create(unit_material, ("TET4",), 8, None)
+        form_evaluation = gen._evaluate_forms(user_input)
+        plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
+        context = user_input.element_contexts[0]
+        unit = list(plan.emission_kernels_for_context(context))[0]
+
+        with use_target(CUDATarget()):
+            emitted = dict(inexact_apply_files(unit_material, unit, context))
+
+        self.assertTrue(emitted)
+        for path, source in sorted(emitted.items()):
+            with self.subTest(generated=os.path.basename(path)):
+                self.assertNotIn("lane", source)
+                self.assertNotIn("#pragma omp", source)
+
+    def test_the_same_emitter_still_spells_lanes_for_a_cpu_target(self):
+        """The conversion is a lowering, not a deletion."""
+        import dataclasses
+
+        from sfem import gen
+        from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
+        from codegen.framework.materials.linear_elasticity import material
+
+        unit_material = dataclasses.replace(material, inexact_apply=True)
+        user_input = gen.UserInputStage.create(unit_material, ("TET4",), 8, None)
+        form_evaluation = gen._evaluate_forms(user_input)
+        plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
+        context = user_input.element_contexts[0]
+        unit = list(plan.emission_kernels_for_context(context))[0]
+
+        with use_target(OpenMPTarget()):
+            emitted = dict(inexact_apply_files(unit_material, unit, context))
+
+        self.assertTrue(any("lane" in source for source in emitted.values()))
+
+
 class WorkItemLoweringRatchetTest(unittest.TestCase):
     """How much of the emitted text still spells the work item by hand.
 
@@ -403,8 +468,12 @@ class WorkItemLoweringRatchetTest(unittest.TestCase):
     """
 
     #: generated file -> work-item tokens that ignore the target.  Only down.
+    #:
+    #: 470 -> 72 when `inexact_apply_codegen.py` converted: its 398 went to zero
+    #: in one pass, because its nineteen literals sit inside loops over nodes and
+    #: components and each one printed many tokens.  The file left the set
+    #: entirely rather than shrinking, which is why the set itself is asserted.
     BUDGET = {
-        "linear_elasticity_tet4_inexact_apply_inline.hpp": 398,
         "linear_elasticity_tet4_operator.cpp": 70,
         "linear_elasticity_d3_simplex_hessian.hpp": 2,
     }
