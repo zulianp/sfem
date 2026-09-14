@@ -458,6 +458,15 @@ def _scatter_lines(lhs, rhs, indent):
     return list(target.scatter_add_lines(lhs, rhs, indent))
 
 
+def _is_symbol_or_negation(expression):
+    """Whether this is a name for one value: `t` or `-t`, nothing else.
+
+    `-t` is `Mul(-1, t)` to sympy, so the test is that negating it leaves a bare
+    symbol.  Anything with real arithmetic in it keeps its declaration.
+    """
+    return bool(expression.is_Symbol or (-expression).is_Symbol)
+
+
 def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
     """Common subexpressions first, then the named values, as C declarations.
 
@@ -475,10 +484,13 @@ def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
     by the stages after it and nowhere else -- and the three other callers here
     do not, so they pass nothing and keep their aliases.
 
-    Only a bare symbol is eliminated.  A negation such as `-reference_product_t10`
-    is left as its own declaration: substituting it would push the negation into
-    each of the three output terms that read it, which is more arithmetic
-    spelled, not less.
+    A bare symbol is eliminated, and so is the negation of one.  The negation
+    was kept once, on the reasoning that substituting it would push a minus into
+    each of the three output terms that read it.  That was wrong twice over: a
+    sign flip folds into the multiply it lands on and costs nothing, and holding
+    `-t` under its own name hides `t` from the common-subexpression elimination
+    downstream exactly as the plain aliases did -- the positive and negative uses
+    of one temporary stop looking like uses of one temporary.
     """
     if not assignments:
         return []
@@ -492,7 +504,7 @@ def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
         for symbol, expression in temporaries
     ]
     for symbol, expression in zip(symbols, reduced):
-        if aliases is not None and expression.is_Symbol:
+        if aliases is not None and _is_symbol_or_negation(expression):
             aliases[symbol] = expression
             continue
         lines.append(
