@@ -67,10 +67,12 @@ from codegen.framework.plans.streams import (
 )
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
+    lane_loop_header_lines,
     render_kernel_ast_lines,
 )
 from codegen.framework.ir.kernel_ast import (
     FunctionDefNode,
+    LoopHeaderNode,
     LoopKind,
     LoopNode,
     RawLinesNode,
@@ -1289,24 +1291,26 @@ def _all_names(role, component, n_nodes):
     )
 
 
-def _simd_pragma(indent):
-    """The lane loop's vectorize pragma, from the bound target.
-
-    Spelled by the target rather than here, like the element loop above it: a
-    backend that does not vectorise this way returns nothing and the loop is
-    emitted plain.
-    """
+def _vectorize_pragma():
+    """The bound target's lane-loop pragma, or `None` where it does not vectorise."""
     target = current_target()
     if target is None or not hasattr(target, "vectorize_pragma"):
-        return []
-    pragma = target.vectorize_pragma()
-    return ["%s%s" % (indent, pragma)] if pragma else []
+        return None
+    return target.vectorize_pragma()
 
 
 def _lane_loop(body, indent="    "):
-    return _simd_pragma(indent) + [
-        "%sfor (int lane = 0; lane < ne; ++lane) {" % indent, *body, "%s}" % indent,
-    ]
+    """The lane loop, from the IR rather than from this emitter's own text.
+
+    `LoopHeaderNode` exists for exactly this: a site whose body is still lines
+    can take its header -- the vectorize pragma and the `for` -- from the same
+    `LoopNode` a fully migrated site would print, and close the brace itself.
+    `_work_item_loop_lines` in `emitters/energy_codegen.py` already does it this
+    way, so this stops being a fourth spelling of one loop and becomes a second
+    caller of the one the printer owns.
+    """
+    header = lane_loop_header_lines(_vectorize_pragma(), indent)
+    return list(header) + list(body) + ["%s}" % indent]
 
 
 def _connectivity_scratch(n_nodes, index_type="idx_t"):
@@ -1524,10 +1528,7 @@ def _packed_function_lines(name, template_params, signature, scratch, gathers, c
     )
     for block in (scratch, gathers):
         lines.extend("    %s" % line for line in block)
-    lines.extend(_simd_pragma("        "))
-    lines.append("        for (int lane = 0; lane < ne; ++lane) {")
-    lines.extend("    %s" % line for line in compute)
-    lines.append("        }")
+    lines.extend(_lane_loop(["    %s" % line for line in compute], "        "))
     lines.extend("    %s" % line for line in store)
     lines.append("      }")
     lines.extend(
