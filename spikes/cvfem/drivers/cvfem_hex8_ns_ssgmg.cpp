@@ -2751,6 +2751,23 @@ private:
 };
 
 int main(int argc, char **argv) {
+    // LINE-BUFFER STDOUT, before anything is written to it.
+    //
+    // stdout is block-buffered when it is a file or a pipe and stderr never is, so a message
+    // written to stderr overtakes whatever stdout is still holding and lands in the MIDDLE of
+    // a half-flushed line. The result is not a cosmetic jumble, it is a corrupted record: the
+    // verification matrix's own parser reads "u_linf: ... p_linf: ..." off one line, and on
+    // run 4658898 the failure message split that line in two, so p_linf was not where the
+    // parser looked and the report generator died with a KeyError after 47 runs and nineteen
+    // minutes of Grace time had already succeeded. The same run's data was fine; only the
+    // transcript was torn.
+    //
+    // Fixed here rather than by a stdbuf in each job script, for the reason a default exists
+    // at all: a convention every caller has to remember is one some caller will not. It also
+    // serves the standing requirement that a long run's diagnostics be observable WHILE it
+    // runs -- block buffering is what makes a working job look like a hung one.
+    std::setvbuf(stdout, nullptr, _IOLBF, 0);
+
     auto ctx = sfem::initialize(argc, argv);
 
     if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
@@ -3423,7 +3440,29 @@ int main(int argc, char **argv) {
     // geometry rather than offered as a tuning knob.
     //
     // An explicit SFEM_VANKA_MULT still wins: setenv's overwrite flag is 0.
-    if (want_natural_outlet) setenv("SFEM_VANKA_MULT", "0", 0);
+    //
+    // Measured again as a PRECONDITIONER, which is how the sweep is used, the gate belongs to
+    // the standalone Vanka preconditioner only. Inside a V-cycle the open outlet keeps the
+    // multiplicative sweep like every other case. FGMRES (restart 480), semi-structured, same
+    // build for both sweeps:
+    //
+    //     step      7,060 dof, L 2, Re 20, 24 of 45 outlet nodes reversed
+    //                 multigrid  mult    239 its   1.64 s     add  2,621 its  16.7 s
+    //                 Vanka      mult  1,055 its   0.94 s     add  1,551 its   1.07 s
+    //     box      10,692 dof, do-nothing outlet, N 2 L 4
+    //                 multigrid  mult  35/8/8 per Newton step   add  1000 (cap) every step, no convergence
+    //     nozzle   Re 1, macro core 2
+    //                 multigrid  L 2  15,740 dof  mult  5 Newton, 1,167 its    add  line search failed
+    //                 multigrid  L 4 116,212 dof  mult  4 Newton, 1,067 its    add  stalled
+    //                 Vanka      L 2  15,740 dof  mult 14 Newton, 13,253 its   add  5 Newton, 3,518 its
+    //                 Vanka      macro core 4, L 2, 116,212 dof: mult line search failed, add converged
+    //
+    // So the localised rate above is real for the sweep on its own, and a V-cycle's coarse
+    // correction removes what it leaves. A build from before the block apply got its boundary
+    // masks gives the same 239 on the step, so this was not something the masks fixed: the gate
+    // applied to multigrid cost the step a factor of ten from the start, and on the box and the
+    // core 2 nozzle it was the whole of the "multigrid fails at an open outlet" failure.
+    if (want_natural_outlet && use_gmg != 1) setenv("SFEM_VANKA_MULT", "0", 0);
     if (want_natural_outlet && outflow_mode == "donothing") {
         // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
         // the pressure gauge -- so the pin must come off with it, or the system is

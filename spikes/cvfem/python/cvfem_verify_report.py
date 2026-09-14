@@ -425,7 +425,28 @@ def section_boundary(runs, checks):
 
     nat = next((r for r in runs if r["group"] == "bc" and r.get("label") == "natural"), None)
     tr0 = next((r for r in runs if r["group"] == "bc" and r.get("label") == "traction0"), None)
-    if nat and tr0 and "u_linf" in nat and "u_linf" in tr0:
+    # BOTH fields, from both runs. The check reads u_linf and p_linf off one line of the
+    # driver's output, and an unflushed stdout torn by a stderr message can leave one of them
+    # parsed and the other not. That happened on run 4658898 and this function raised KeyError
+    # after 47 good runs, destroying a report the data fully supported. The driver now
+    # line-buffers stdout so the tear cannot recur, but a missing field must say which field
+    # is missing from which run rather than surface as a traceback.
+    _need = ("u_linf", "p_linf")
+    _torn = [(lbl, f) for lbl, r in (("natural", nat), ("traction0", tr0)) if r
+             for f in _need if f not in r]
+    if _torn:
+        body += ["### Traction generalises the do-nothing outflow", "",
+                 "**Not checked**: the run log is missing " +
+                 ", ".join("`%s` for `%s`" % (f, lbl) for lbl, f in _torn) +
+                 ". This is a torn transcript rather than a failed identity -- rerun the `bc` "
+                 "group.", ""]
+        # REGISTERED, not omitted. A check that quietly disappears from the list is the
+        # failure this report exists to prevent: earlier in this work a verification group
+        # silently never ran while the matrix reported "8 of 8 pass", and the arithmetic was
+        # what caught it. n/a is neither pass nor fail and is counted as neither.
+        checks.append(("Traction t=0 equals the do-nothing outflow",
+                       "not checked -- torn run log", None))
+    if nat and tr0 and not _torn:
         du = abs(nat["u_linf"] - tr0["u_linf"])
         dp = abs(nat["p_linf"] - tr0["p_linf"])
         ok = du <= 1e-12 and dp <= 1e-12
@@ -834,9 +855,14 @@ def build_report(manifest, rundir):
                          "inviting a reader to judge a plot."), "",
             "## Summary", ""]
     n_fail = sum(1 for _, _, ok in checks if ok is False)
-    head.append("**%d of %d checks pass.**%s\n" % (
-        len(checks) - n_fail, len(checks),
-        "" if n_fail == 0 else "  %d FAILING -- see the sections below." % n_fail))
+    # n/a is neither. Counting it as a pass -- which "len(checks) - n_fail" did -- turns a
+    # check that could not be evaluated into one that was evaluated and succeeded, which is
+    # the most expensive kind of wrong a verification report can be.
+    n_na   = sum(1 for _, _, ok in checks if ok is None)
+    head.append("**%d of %d checks pass.**%s%s\n" % (
+        len(checks) - n_fail - n_na, len(checks),
+        "" if n_fail == 0 else "  %d FAILING -- see the sections below." % n_fail,
+        "" if n_na == 0 else "  %d NOT CHECKED -- see the sections below." % n_na))
     head.append(table(["check", "evidence", "status"],
                       [[c, e, status(ok)] for c, e, ok in checks]) if checks else
                 "_No checks were produced; the run directory has no recognised logs._\n")
