@@ -9351,6 +9351,7 @@ def _sfem_soa_element_api_alias_header(
                     n_qp,
                     vector_size,
                     n_field_components=n_field_components,
+                    source_builder=source_builder,
                 )
             )
             lines.append("")
@@ -9372,6 +9373,7 @@ def _sfem_soa_element_api_alias_header(
                     n_qp,
                     vector_size,
                     n_field_components=n_field_components,
+                    source_builder=source_builder,
                 )
             )
             lines.append("")
@@ -9389,11 +9391,14 @@ def _sfem_soa_element_api_alias_function_lines(
     n_qp,
     vector_size,
     n_field_components=None,
+    source_builder=None,
 ):
     n_field_components = dim if n_field_components is None else n_field_components
+    if source_builder is None:
+        source_builder = _default_openmp_energy_source_builder()
     lines = [
         "template <typename s_t, int VS>",
-        "static SFEM_INLINE int %s(" % name,
+        "static %s int %s(" % (_inline_qualifier(source_builder), name),
     ]
     lines.extend(parameter_list_lines(params))
     lines.extend(
@@ -9573,7 +9578,25 @@ def _sfem_soa_element_api_block_call(
     )
 
 
-def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
+def _element_api_lane_loop(source_builder, indent):
+    """The element API's work-item scope, as its target lowers it.
+
+    Six sites here wrote `#pragma omp simd` as a literal beside a hand-written
+    lane `for`, which is why the CUDA and HIP backends rejected their own
+    output.  Two contract violations came from that -- an OpenMP pragma in a
+    CUDA file, and vector-lane lowering in one -- and both are the same mistake:
+    asserting the CPU shape instead of asking the target for its own.
+
+    `_work_item_loop_lines` already answers this.  A target whose policy says
+    `emits_lane_loop` gets the pragma and the loop; one that maps a lane to a
+    thread gets a bare scope, because on a GPU the lane is the thread and there
+    is nothing to iterate.  The caller closes the brace either way.
+    """
+    return list(_work_item_loop_lines(source_builder, indent))
+
+
+def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, source_builder):
+    item = _work_item_index(source_builder)
     lines = [
         "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
     ]
@@ -9589,23 +9612,22 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
         lines.append("    }")
     if output_kind == "value":
         lines.append("    s_t *const bvalue = values + evb;")
-        lines.append("    #pragma omp simd")
-        lines.append("    for (int lane = 0; lane < ne; ++lane) {")
-        lines.append("      bvalue[lane] = s_t(0);")
+        lines.extend(_element_api_lane_loop(source_builder, "    "))
+        lines.append("      bvalue[%s] = s_t(0);" % item)
         lines.append("    }")
     elif output_kind == "vector":
         lines.append("    s_t *bout_streams[NDOFS];")
         lines.append("    for (int stream = 0; stream < NDOFS; ++stream) {")
         lines.append("      bout_streams[stream] = out_streams[stream] + evb;")
-        lines.append("      #pragma omp simd")
-        lines.append("      for (int lane = 0; lane < ne; ++lane) {")
-        lines.append("        bout_streams[stream][lane] = s_t(0);")
+        lines.extend(_element_api_lane_loop(source_builder, "      "))
+        lines.append("        bout_streams[stream][%s] = s_t(0);" % item)
         lines.append("      }")
         lines.append("    }")
     return lines
 
 
-def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
+def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_builder):
+    item = _work_item_index(source_builder)
     lines = []
     for component in range(dim * dim):
         lines.append("    s_t badj%d[NQ * VS];" % component)
@@ -9628,13 +9650,12 @@ def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
         )
     lines.append("      s_t *const RSTR bdet0_q = &bdet0[q * VS];")
     lines.append("      const s_t *const RSTR det_q = det + q * nelements + evb;")
-    lines.append("      #pragma omp simd")
-    lines.append("      for (int lane = 0; lane < ne; ++lane) {")
+    lines.extend(_element_api_lane_loop(source_builder, "      "))
     for component in range(dim * dim):
         lines.append(
-            "        badj%d_q[lane] = adj%d_q[lane];" % (component, component)
+            "        badj%d_q[%s] = adj%d_q[%s];" % (component, item, component, item)
         )
-    lines.append("        bdet0_q[lane] = det_q[lane];")
+    lines.append("        bdet0_q[%s] = det_q[%s];" % (item, item))
     lines.append("      }")
     lines.append("    }")
     return lines
@@ -9653,9 +9674,9 @@ def _sfem_soa_element_api_coords_tile_lines(
     lines = [
         "    s_t bcoordinate_data[NDOFS][VS];",
         "    for (int stream = 0; stream < NDOFS; ++stream) {",
-        "      #pragma omp simd",
-        "      for (int lane = 0; lane < ne; ++lane) {",
-        "        bcoordinate_data[stream][lane] = coords[stream][evb + lane];",
+        *_element_api_lane_loop(source_builder, "      "),
+        "        bcoordinate_data[stream][%s] = coords[stream][evb + %s];"
+        % (_work_item_index(source_builder), _work_item_index(source_builder)),
         "      }",
         "    }",
     ]
@@ -9752,7 +9773,7 @@ def _sfem_soa_element_api_operation_lines(
         lines.extend(
             [
                 "template <typename s_t, int VS>",
-                "static SFEM_INLINE int %s(" % name,
+                "static %s int %s(" % (_inline_qualifier(source_builder), name),
             ]
         )
         lines.extend(parameter_list_lines(params))
@@ -9768,7 +9789,7 @@ def _sfem_soa_element_api_operation_lines(
                 "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
             ]
         )
-        lines.extend(_sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind))
+        lines.extend(_sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, source_builder))
         if include_coords:
             lines.extend(
                 _sfem_soa_element_api_coords_tile_lines(
@@ -9783,7 +9804,7 @@ def _sfem_soa_element_api_operation_lines(
                 )
             )
         else:
-            lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule))
+            lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_builder))
         lines.append(
             "    %s"
             % _sfem_soa_element_api_block_call(
@@ -9827,7 +9848,7 @@ def _sfem_soa_element_api_hessian_lines(
         lines.extend(
             [
                 "template <typename s_t, int VS>",
-                "static SFEM_INLINE int %s(" % name,
+                "static %s int %s(" % (_inline_qualifier(source_builder), name),
             ]
         )
         lines.extend(parameter_list_lines(params))
@@ -9867,7 +9888,7 @@ def _sfem_soa_element_api_hessian_lines(
                 )
             )
         else:
-            lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule))
+            lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_builder))
         lines.extend(
             [
                 "    s_t bh_data[NDOFS][VS];",
@@ -9880,10 +9901,10 @@ def _sfem_soa_element_api_hessian_lines(
                 "    }",
                 "    for (int col = 0; col < NDOFS; ++col) {",
                 "      for (int stream = 0; stream < NDOFS; ++stream) {",
-                "        #pragma omp simd",
-                "        for (int lane = 0; lane < ne; ++lane) {",
-                "          bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);",
-                "          bout_data[stream][lane] = s_t(0);",
+                *_element_api_lane_loop(source_builder, "        "),
+                "          bh_data[stream][%s] = stream == col ? s_t(1) : s_t(0);"
+                % _work_item_index(source_builder),
+                "          bout_data[stream][%s] = s_t(0);" % _work_item_index(source_builder),
                 "        }",
                 "      }",
                 "      %s" % _sfem_soa_element_api_block_call(
@@ -9900,9 +9921,9 @@ def _sfem_soa_element_api_hessian_lines(
                 ),
                 "      for (int row = 0; row < NDOFS; ++row) {",
                 "        s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;",
-                "        #pragma omp simd",
-                "        for (int lane = 0; lane < ne; ++lane) {",
-                "          matrix_stream[lane] = bout_data[row][lane];",
+                *_element_api_lane_loop(source_builder, "        "),
+                "          matrix_stream[%s] = bout_data[row][%s];"
+                % (_work_item_index(source_builder), _work_item_index(source_builder)),
                 "        }",
                 "      }",
                 "    }",
