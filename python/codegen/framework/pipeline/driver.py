@@ -726,7 +726,21 @@ class CodeGenerationStage:
         outputs = {}
         target = _normalize_generation_target(self.target)
         material = self.user_input.material
-        wants_inexact = bool(getattr(material, "inexact_apply", False))
+        # The inexact-apply family has no backend.  Every other unit is emitted
+        # through `_emit_codegen_unit`, which picks a backend for the target and
+        # lets it bind; this one calls its emitter directly, so it runs under
+        # whatever target is ambient -- OpenMP -- and emits lane-blocked,
+        # `#pragma omp` sources whatever was asked for.  Dropped into a CUDA
+        # tree those cannot compile, and the CUDA backend's own contract check
+        # rejects them.
+        #
+        # So it is emitted for the target it has a lowering for.  That is not a
+        # decision against the capability: the family is unchanged, and giving
+        # it a backend is what would let it follow the target the way the rest
+        # of the tree does.
+        wants_inexact = bool(getattr(material, "inexact_apply", False)) and (
+            target is KernelTarget.OPENMP
+        )
         for context in self.user_input.element_contexts:
             for unit in self.codegen_plan.emission_kernels_for_context(context):
                 _merge_files(
