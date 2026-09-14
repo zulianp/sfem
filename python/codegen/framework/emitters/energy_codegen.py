@@ -278,7 +278,7 @@ def _lane_loop_header_lines(source_builder, indent):
     """
     pragma = tuple(source_builder.simd_lines())
     return lane_loop_header_lines(
-        pragma[0] if pragma else None, indent, indent_pragma=False
+        pragma[0] if pragma else None, indent
     )
 
 

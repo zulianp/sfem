@@ -350,7 +350,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_a_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
@@ -394,20 +394,20 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_a_msoa_impl(
           const s_t alpha = steps[step];
           for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+              #pragma omp simd
               for (int lane = 0; lane < ne; ++lane) {
                 bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
               }
             }
           }
-#pragma omp simd
+          #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             bvalue[lane] = s_t(0);
           }
 
           laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, kappa, bu_streams, bvalue);
 
-#pragma omp simd
+          #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
           }
@@ -734,14 +734,14 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_i_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
@@ -769,20 +769,20 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_i_msoa_impl(
           const s_t alpha = steps[step];
           for (int shape = 0; shape < NS; ++shape) {
             for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+              #pragma omp simd
               for (int lane = 0; lane < ne; ++lane) {
                 bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
               }
             }
           }
-#pragma omp simd
+          #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             bvalue[lane] = s_t(0);
           }
 
           laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bvalue);
 
-#pragma omp simd
+          #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
           }
@@ -1138,7 +1138,7 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_packed_a_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
@@ -1347,7 +1347,7 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa_impl
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
@@ -1742,14 +1742,14 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_packed_i_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
@@ -1946,14 +1946,14 @@ static SFEM_INLINE int laplace_proteus_hex8_gradient_packed_two_pass_i_msoa_impl
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
@@ -2372,7 +2372,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_a_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -2581,7 +2581,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -2976,14 +2976,14 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_i_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
@@ -3180,14 +3180,14 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
-#pragma omp simd
+            #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
               bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
