@@ -26,6 +26,7 @@ from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
     contracted_gradient_components,
+    live_gradient_directions,
     contracted_test_quantities,
     staged_test_quantities,
     live_test_coefficients,
@@ -3132,9 +3133,7 @@ def _simplex_local_body(
     # Contract the staged coefficients against each test function.
     test_body = list(_geometry_value_nodes(dependencies, dim))
     test_body.extend(_test_value_nodes(dependencies))
-    for d in range(dim):
-        if not any(row[d] for row in dependencies.gradient_coefficients):
-            continue
+    for d in live_gradient_directions(dependencies, dim):
         terms = " + ".join(
             "%s[q * NS + test] * adj%d"
             % (sfem_simplex_grad_ref_name("grad_ref", k), k * dim + d)
@@ -3280,9 +3279,7 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
 
     test_grad_names = {}
     for test in range(dim + 1):
-        for d in range(dim):
-            if not any(row[d] for row in dependencies.gradient_coefficients):
-                continue
+        for d in live_gradient_directions(dependencies, dim):
             test_name = "test%d_grad%d" % (test, d)
             test_grad_names[(test, d)] = test_name
             terms = []
