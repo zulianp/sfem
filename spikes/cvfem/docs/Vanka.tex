@@ -10,6 +10,8 @@
 \usepackage{tcolorbox}
 \usepackage{enumitem}
 \usepackage{titlesec}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 \titleformat{\section}{\normalfont\Large\bfseries\color{blue!45!black}}{\thesection}{1em}{}
 \titleformat{\subsection}{\normalfont\large\bfseries\color{blue!30!black}}{\thesubsection}{1em}{}
@@ -79,7 +81,7 @@ The inverted object $\mathcal{A}_k = R_k \mathcal{A} R_k^{\mathsf T}$ is the tru
 restricted to the patch, \emph{including} the velocity--pressure coupling. That is the whole
 difference from block-Jacobi, and it is why the local solve can enforce the constraint.
 
-\begin{tcolorbox}[colback=blue!4,colframe=blue!50!black,title=\bfseries Published rates (Stokes, LFA)]
+\begin{tcolorbox}[colback=blue!4,colframe=blue!50!black,title={\bfseries Published rates (Stokes, LFA)}]
 \begin{center}
 \begin{tabular}{@{}lcc@{}}
 \toprule
@@ -167,7 +169,7 @@ full Vanka, $32\times32$ & 113.25\,MFLOP \\
 \end{tabular}
 \end{center}
 
-\begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=\bfseries The trade, stated plainly]
+\begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title={\bfseries The trade, stated plainly}]
 The local solve is a small part of a sweep --- the sweep is dominated by the residual
 evaluation, which is unchanged. Diagonal Vanka should raise sweep cost by tens of percent, not
 multiples. Against that, moving $\rho$ from 0.98 to even 0.3 is a factor of $\sim$50 in
@@ -249,6 +251,301 @@ Vanka variant that does not comfortably beat that, at $\Rey \ge 100$, is not wor
 and a rate near or above 1 must be treated as disqualifying however good it looks over the
 first few sweeps, because the rate can fall for twenty sweeps and then climb through unity.
 \end{tcolorbox}
+
+\section{The smoother as implemented: set-up and apply}
+\label{sec:implemented}
+
+The plan above is implemented in \code{src/ss/cvfem\_ss\_vanka.hpp}: diagonal Vanka on the
+micro-element patch, multiplicative inside a macro-element and additive between
+macro-elements, used on every smoothed multigrid level. It differs from the plan in two ways.
+First, the patch operator is read from the \emph{assembled} operator, not from one
+micro-cell's contribution. Second, the coarse levels run the same code on the Galerkin
+operators the hierarchy already builds. This section gives the set-up and the apply at the
+level of detail needed to reason about their cost or to reimplement them.
+
+\subsection{Notation and data}
+
+\paragraph{Lattice.} There are $n_M$ macro-elements at level $L$. Each has $(L+1)^3$ lattice
+nodes and $L^3$ micro-cells. Lattice node $(x,y,z)$ has local index
+$\ell(x,y,z) = x + (L+1)\,\big(y + (L+1)\,z\big)$, and $g_e(\ell)$ is its global node in
+macro-element $e$. The eight corners of micro-cell $(x,y,z)$ are $\ell(x,y,z) + o_a$ with
+\begin{equation}
+o = \big(0,\; 1,\; L{+}2,\; L{+}1,\; (L{+}1)^2,\; (L{+}1)^2{+}1,\; (L{+}1)^2{+}L{+}2,\;
+(L{+}1)^2{+}L{+}1\big).
+\end{equation}
+
+\paragraph{Operator.} $A$ is stored in BSR with $4\times4$ blocks, sorted column indices, and
+at most 27 blocks per row. Fields are ordered $(u_x,u_y,u_z,p)$ and each block is row-major.
+For nodes $i,j$ the block splits as
+\begin{equation}
+A_{ij} = \begin{pmatrix} F_{ij} & G_{ij} \\ D_{ij} & A^{pp}_{ij} \end{pmatrix},
+\qquad F_{ij}\in\mathbb{R}^{3\times3},\; G_{ij}\in\mathbb{R}^{3},\; D_{ij}\in\mathbb{R}^{1\times3},
+\; A^{pp}_{ij} = -C_{ij}.
+\end{equation}
+$G$ is the pressure gradient ($B^{\mathsf T}$ above) and $D$ the divergence ($B$). The patch
+operator of cell $k$, with corner nodes $n_1,\dots,n_8$, is the $32\times32$ matrix of blocks
+$A_{n_a n_b}$. On the fine level, $A$ comes from the element-wise Galerkin assembly at
+ratio $q=1$. There the prolongation is the identity and $P^{\mathsf T}AP = A$, and that path
+matches the matrix-free apply to $1.54\times10^{-16}$. On a coarse level, $A$ is that level's
+Galerkin coarse operator. Each level passes its own mask of constrained degrees of freedom.
+
+\paragraph{Why the assembled operator.} A node inside a macro-element lies in eight
+micro-cells, so a single cell's element matrix carries about an eighth of the true patch
+entries. A smoother built on it diverged at a rate of 18. Taking only the diagonal from the
+assembled matrix and the off-diagonal entries from the cell made the patch system internally
+inconsistent, and that version diverged at 7.8.
+
+\paragraph{Per-cell record.} Set-up stores the following per micro-cell, in lattice order
+$(e, z, y, x)$, so the sweep streams the records contiguously. $T$ is the storage type
+(\S\ref{sec:precision}).
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Field & Shape & Contents & Used for \\
+\midrule
+$\hat D$ & $8\times24$ & $D_{n_a n_i}[t] / F_{n_i n_i}[t,t]$ & pressure right-hand side \\
+$\hat G$ & $24\times8$ & $G_{n_i n_b}[t] / F_{n_i n_i}[t,t]$ & velocity back-substitution \\
+$d^{-1}$ & $24$ & $1 / F_{n_i n_i}[t,t]$ (floored) & velocity back-substitution \\
+$S$, $\pi$ & $8\times8$, $8$ & LU factors and pivots of the Schur complement & pressure solve \\
+\bottomrule
+\end{tabular}
+\end{center}
+That is 472 values of type $T$ plus 8 integers: 1\,920\,B in single precision and
+3\,808\,B in double. At $L=8$ with 420 macro-elements there are 215\,040 cells, which is
+394\,MiB in single precision and 781\,MiB in double.
+
+\subsection{Set-up}
+
+Set-up runs once per Newton step, because the patch operators depend on the linearisation.
+This is the same lifetime as the Galerkin coarse operators.
+
+\begin{algorithm}[H]
+\caption{Vanka set-up, \code{vanka\_setup}}\label{alg:setup}
+\begin{algorithmic}[1]
+\Require assembled BSR operator $A$; constraint mask; tolerances $\tau_d = \tau_S = 10^{-14}$
+\State $w_i \gets 1/\#\{\text{micro-cells containing node } i\}$
+  \Comment{additive form}
+\State $w^{E}_i \gets 1/\#\{\text{macro-elements containing node } i\}$
+  \Comment{multiplicative form}
+\ForAll{macro-elements $e$ \textbf{in parallel}}
+  \ForAll{micro-cells $k=(x,y,z)$ of $e$}
+    \State $n_a \gets g_e(\ell(x,y,z) + o_a)$, \quad $a = 1,\dots,8$
+    \For{$a, b = 1,\dots,8$} \Comment{64 blocks, double precision}
+      \State $\mathcal{A}[a][b] \gets A_{n_a n_b}$, found by binary search in row $n_a$
+        (zero if absent)
+    \EndFor
+    \State $s \gets \max_{a,t} |F_{n_a n_a}[t,t]|$ \Comment{the patch's own velocity scale}
+    \For{$a = 1,\dots,8$, $t = 1,2,3$}
+      \State $\delta \gets F_{n_a n_a}[t,t]$
+      \State $d^{-1}_{a,t} \gets 1/\delta$ \textbf{if} $|\delta| > \tau_d\, s$ \textbf{else} $0$
+    \EndFor
+    \State $\hat D_{a,(i,t)} \gets D_{n_a n_i}[t]\; d^{-1}_{i,t}$, \quad
+           $\hat G_{(i,t),b} \gets G_{n_i n_b}[t]\; d^{-1}_{i,t}$
+    \State $S_{ab} \gets A^{pp}_{n_a n_b}
+           - \sum_{i=1}^{8}\sum_{t=1}^{3} D_{n_a n_i}[t]\; d^{-1}_{i,t}\; G_{n_i n_b}[t]$
+    \State factor $S = P^{\mathsf T} L U$ with partial pivoting; reject pivot
+           $\le \tau_S \max_{ab}|S_{ab}|$
+    \If{factorisation rejected}
+      \State $S \gets I$, \; $\pi \gets \mathrm{id}$ \Comment{withhold this patch's pressure update}
+    \EndIf
+    \State narrow $\hat D, \hat G, d^{-1}, S$ to $T$ and store in the record of $k$
+  \EndFor
+\EndFor
+\If{$T$ is narrower than the assembled values}
+  \State allocate $\tilde A$ uninitialised and fill $\tilde A \gets (T)\,A$ \textbf{in parallel}
+    \Comment{first touch by the sweeping threads}
+\Else
+  \State $\tilde A \gets A$ \Comment{alias, no copy}
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{The safeguards.} Each one records a failure that was observed:
+\begin{itemize}[leftmargin=*]
+\item \emph{The velocity-diagonal floor is relative.} An absolute floor of $10^{-300}$ let a
+diagonal of $3.6\times10^{-17}$ through at a do-nothing outflow node, where the mass flux
+across the face is near zero. The resulting $d^{-1} = 2.8\times10^{16}$ was exactly the
+per-sweep amplification of the unstable smoother, and it was independent of $\omega$. The
+floor is far below any legitimate value: at $10^{-11}$ it zeroed healthy diagonals and took
+Poiseuille flow from 178 to 1\,119 linear iterations. The optional
+\code{SFEM\_VANKA\_ROW\_FRAC} bounds $|\delta|$ below by a fraction of the row's $\ell^1$ norm
+over the patch velocities. It is off by default and bit-identical when off.
+\item \emph{The pivot tolerance is relative.} It is measured against the Schur complement's
+own largest entry, for the same reason. A pivot of $10^{-20}$ in a complement of scale
+$10^{-3}$ once returned values of about $10^{17}$ from the preconditioner.
+\item \emph{A rejected patch falls back to the identity.} This makes the smoother weaker for
+that patch rather than explosive.
+\item \emph{Arithmetic is in double.} Every product and the factorisation are computed in
+double precision, and results are narrowed to $T$ only when stored.
+\end{itemize}
+
+\paragraph{Cost.} Each cell does 64 binary searches over at most 27 columns, forms the Schur
+complement with $8\cdot8\cdot24 = 1\,536$ triple products, and factors an $8\times8$
+($\approx 170$ multiply-adds). The loop has no shared writes and is parallel over
+macro-elements. On the FDA nozzle at 893\,924 dof ($L=8$, 215\,040 cells, 72 Grace cores),
+the fine-level set-up takes 5.1\,s over 28 Newton steps, which is 0.18\,s per step and 8\,\%
+of the run.
+
+\subsection{The patch solve}
+
+The additive and multiplicative applies share one local solve. Given the patch residual
+$r_u \in \mathbb{R}^{24}$ and $r_p \in \mathbb{R}^{8}$, eliminating the velocities through
+$\mathrm{diag}(F_k)$ gives
+\begin{equation}
+S\,\delta p = r_p - \hat D\, r_u, \qquad
+\delta u = d^{-1} \odot r_u - \hat G\, \delta p .
+\label{eq:patchsolve}
+\end{equation}
+
+\begin{algorithm}[H]
+\caption{Patch solve}\label{alg:patch}
+\begin{algorithmic}[1]
+\Require cell record $(\hat D, \hat G, d^{-1}, S, \pi)$; $r_u$, $r_p$ in double
+\State $\delta p_a \gets r_{p,a} - \sum_{j=1}^{24} \hat D_{a j}\, r_{u,j}$
+  \Comment{192 multiply-adds}
+\State apply $\pi$ to $\delta p$; forward-substitute with $L$; back-substitute with $U$
+  \Comment{64}
+\State $\delta u_j \gets d^{-1}_j\, r_{u,j} - \sum_{b=1}^{8} \hat G_{j b}\, \delta p_b$
+  \Comment{216}
+\end{algorithmic}
+\end{algorithm}
+The stored values are promoted to double as they are read, so the local arithmetic is
+double whatever $T$ is.
+
+\subsection{Additive apply}
+
+\begin{algorithm}[H]
+\caption{Additive Vanka, \code{vanka\_apply}: $y \gets y + \omega\, W \sum_k R_k^{\mathsf T}
+\hat{\mathcal A}_k^{-1} R_k\, r$}\label{alg:add}
+\begin{algorithmic}[1]
+\State $z \gets 0$
+\ForAll{macro-elements $e$ \textbf{in parallel}}
+  \State gather $r_\ell \gets r_{g_e(\ell)}$ for all $(L+1)^3$ lattice nodes; $z^{e} \gets 0$
+  \ForAll{micro-cells $k$ of $e$}
+    \State restrict $r^e$ to the 8 corners $\to (r_u, r_p)$
+    \State $(\delta u, \delta p) \gets$ Algorithm~\ref{alg:patch}
+    \State $z^e_{\ell + o_a} \mathrel{+}= (\delta u_a, \delta p_a)$ for $a = 1,\dots,8$
+  \EndFor
+  \State two-pass scatter, pass 1: write $z^e$ to nodes owned by $e$ alone; stage shared nodes
+\EndFor
+\State two-pass scatter, pass 2: sum staged contributions per shared node in a fixed order
+\ForAll{nodes $i$, fields $t$, not constrained}
+  \State $y_{i,t} \mathrel{+}= \omega\, w_i\, z_{i,t}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+Every patch reads the same residual, so the cells are independent. The weight $w_i$ averages
+over the patches containing a node. Without it, a node inside a macro-element would receive
+eight times the correction of a lattice corner.
+
+\subsection{Multiplicative apply}
+
+This is the default (\code{SFEM\_VANKA\_MULT=1}). Standalone at $\Rey = 1$ it measures
+$\rho = 0.63$ at $\omega = 1$, against 0.883 for the additive form.
+
+\begin{algorithm}[H]
+\caption{Multiplicative Vanka, \code{vanka\_apply\_mult}}\label{alg:mult}
+\begin{algorithmic}[1]
+\State $z \gets 0$
+\ForAll{macro-elements $e$ \textbf{in parallel}} \Comment{thread-private $\lambda$, initially $-1$}
+  \For{$\ell = 1,\dots,(L+1)^3$}
+    \State $\lambda(g_e(\ell)) \gets \ell$; \; $r^e_\ell \gets r_{g_e(\ell)}$
+  \EndFor
+  \State $z^e \gets 0$
+  \For{colour $c = 0,\dots,7$} \Comment{$c = c_x + 2c_y + 4c_z$}
+    \ForAll{micro-cells $k = (x,y,z)$ with $(x,y,z) \equiv (c_x,c_y,c_z) \pmod 2$}
+      \For{$a = 1,\dots,8$} \Comment{local residual from the current local iterate}
+        \State $\ell_a \gets \ell(x,y,z) + o_a$, \; $\rho \gets r^e_{\ell_a}$
+        \ForAll{blocks $(j, \tilde A_{g_e(\ell_a) j})$ in BSR row $g_e(\ell_a)$}
+          \If{$\lambda(j) \ge 0$}
+            \State $\rho \gets \rho - \tilde A_{g_e(\ell_a) j}\; z^e_{\lambda(j)}$
+          \EndIf \Comment{columns outside $e$ are skipped}
+        \EndFor
+        \State $(r_{u,a}, r_{p,a}) \gets \rho$
+      \EndFor
+      \State $(\delta u, \delta p) \gets$ Algorithm~\ref{alg:patch}
+      \State $z^e_{\ell_a} \mathrel{+}= \omega\,(\delta u_a, \delta p_a)$ for $a = 1,\dots,8$
+    \EndFor
+  \EndFor
+  \State two-pass scatter, pass 1 of $z^e$
+  \For{$\ell = 1,\dots,(L+1)^3$}
+    \State $\lambda(g_e(\ell)) \gets -1$ \Comment{reset costs $(L+1)^3$, not $n_\text{nodes}$}
+  \EndFor
+\EndFor
+\State two-pass scatter, pass 2
+\ForAll{nodes $i$, fields $t$, not constrained}
+  \State $y_{i,t} \mathrel{+}= w^{E}_i\, z_{i,t}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Why multiplicative only inside a macro-element.} The eight-colour argument holds
+inside one macro-element: two micro-cells there share a node exactly when their indices
+differ by at most one on every axis. It fails across macro-elements, where same-coloured
+cells share face nodes. A sweep that ran colours globally in parallel over macro-elements
+raced on those nodes, and the determinism gate caught it: 36 linear iterations on one thread
+against 156 on eight. Each macro-element therefore sweeps its own cells in Gauss--Seidel
+order on a private vector. Its update reads only its own nodes, because the map $\lambda$
+drops every column outside $e$. The corrections are then combined additively through the
+two-pass scatter and averaged with $w^{E}$. There are no atomics, and the result is
+bit-identical on any thread count.
+
+\paragraph{Cost, and why it is memory bound.} The patch solve is about 470 multiply-adds per
+cell. The local residual walks 8 BSR rows of up to 27 blocks, which is up to
+$8\cdot27\cdot16 = 3\,456$ multiply-adds and 216 indirect lookups per cell, reading 64 bytes
+per block in single precision. The row walk is therefore the larger cost, and it reads memory
+in a pattern the prefetcher does not follow. On the nozzle at 893\,924 dof the fine-level
+sweep was 72\,\% of the socket's cycles, and 72\,\% of those were stalled in the back end.
+The bytes streamed, not the flop count, set the speed of the sweep.
+
+\subsection{How the multigrid cycle calls it}
+
+Each smoothed level wraps the smoother $P$ (Algorithm~\ref{alg:mult}, or \ref{alg:add}) in a
+stationary iteration with $\nu = 2$ sweeps (\code{SFEM\_GMG\_SMOOTH}), before and after the
+coarse correction. The coarsest level is solved by dense LU. Because $P$ accumulates into its
+output,
+\begin{equation}
+x^{(m+1)} = x^{(m)} + P\big(b - A\,x^{(m)}\big), \qquad m = 0,\dots,\nu-1 .
+\end{equation}
+The first pre-smoothing sweep of a cycle always starts from $x^{(0)} = 0$: FGMRES passes a
+zero vector to the preconditioner, and coarse levels start from zero by construction. In that
+case the iteration is told so (\code{set\_initial\_guess\_zero}) and takes $x^{(1)} = P\,b$
+directly. This saves one operator application per level per cycle and gives the same bits.
+
+The defaults are $\omega = 1$ (\code{SFEM\_VANKA\_OMEGA}) with the multiplicative form. An open
+do-nothing outlet changes this: inside the cycle it sets $\omega = 0.5$, and without multigrid
+it selects the additive form. An explicitly set variable always takes precedence. On the
+fine level, the set-up assembles $A$ through the Galerkin path at $q = 1$
+(\code{make\_diagonal\_vanka}). On a coarse level it reads the Galerkin BSR that level already
+holds (\code{make\_diagonal\_vanka\_from\_bsr}).
+
+\subsection{Storage precision}
+\label{sec:precision}
+
+The storage type $T$ of the cell records and of the row walk's values $\tilde A$ is set by
+the environment variable \code{SFEM\_VANKA\_PRECISION}. It is either \code{single}
+(the default, $T$ = \code{float}) or \code{double}. Both compute in double, and both are the same templated code. Single is the default because it
+measures faster. Measured on the warped FDA nozzle at throat $\Rey = 500$, FGMRES with the
+geometric multigrid, 72 Grace cores. Every run had the same Newton and linear iterations, flux
+and station velocities:
+\begin{center}
+\begin{tabular}{@{}rlrr@{}}
+\toprule
+dof & storage & fine-level smoothing & run \\
+\midrule
+116\,212 & single & 1.98\,s & 7.23\,s \\
+116\,212 & double & 2.40\,s & 7.82\,s \\
+893\,924 & single & 40.2\,s & 65.8\,s \\
+893\,924 & double & 70.1\,s & 96.6\,s \\
+\bottomrule
+\end{tabular}
+\end{center}
+At 893\,924 dof one fine-level smoothing step costs 17.4\,ms in single precision and 30.4\,ms
+in double. A step is two sweeps plus the operator application between them, and that operator
+application does not change with $T$. The factor of 1.75 over the whole step is therefore a
+lower bound for the sweeps alone. It is close to the factor of two in bytes streamed, which is
+further evidence that the sweep is memory bound. A smoother only has to reduce the error, and FGMRES
+absorbs the difference.
 
 \section{Is Vanka a Navier--Stokes smoother, or only a Stokes one?}
 
