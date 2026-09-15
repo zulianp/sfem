@@ -103,6 +103,18 @@ int laplace_quad4_gradient_i_msoa(const int, const ptrdiff_t, const ptrdiff_t, i
     const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
 int laplace_hex8_gradient_i_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
+int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa(
+    const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void *);
+int neumann_tet4_trishell3_boundary_residual_soa(
+    const ptrdiff_t, const ptrdiff_t, idx_t **, const geom_t *const *,
+    const real_t, const real_t, const real_t, const int,
+    real_t *, real_t *, real_t *);
 }
 
 static double seconds() {
@@ -312,6 +324,101 @@ static void agree_linear_elasticity_tet4() {
   record("linear_elasticity_tet4_gradient_a_msoa_aos_unit_z", rz);
 }
 
+// The viscous Mooney-Rivlin residual: the residual family, which reached CUDA
+// only when the mesh-kernel lowering moved onto the target.  It reads a current
+// and a previous state, so both are supplied.
+static void agree_residual_tet4() {
+  const ptrdiff_t nelements = 4096, nnodes = 1024;
+  reseed();
+  idx_t **elements = shared_element_table(4, nelements, nnodes);
+
+  std::vector<geom_t> adj[9], det(nelements);
+  for (int c = 0; c < 9; ++c) adj[c].resize(nelements);
+  for (ptrdiff_t e = 0; e < nelements; ++e) {
+    double J[3][3];
+    for (int i = 0; i < 3; ++i)
+      for (int j = 0; j < 3; ++j) J[i][j] = (i == j ? 1.0 : 0.0) + 0.25 * (2.0 * rnd() - 1.0);
+    det[e] = J[0][0] * (J[1][1] * J[2][2] - J[1][2] * J[2][1]) -
+             J[0][1] * (J[1][0] * J[2][2] - J[1][2] * J[2][0]) +
+             J[0][2] * (J[1][0] * J[2][1] - J[1][1] * J[2][0]);
+    adj[0][e] =  (J[1][1] * J[2][2] - J[1][2] * J[2][1]);
+    adj[1][e] = -(J[0][1] * J[2][2] - J[0][2] * J[2][1]);
+    adj[2][e] =  (J[0][1] * J[1][2] - J[0][2] * J[1][1]);
+    adj[3][e] = -(J[1][0] * J[2][2] - J[1][2] * J[2][0]);
+    adj[4][e] =  (J[0][0] * J[2][2] - J[0][2] * J[2][0]);
+    adj[5][e] = -(J[0][0] * J[1][2] - J[0][2] * J[1][0]);
+    adj[6][e] =  (J[1][0] * J[2][1] - J[1][1] * J[2][0]);
+    adj[7][e] = -(J[0][0] * J[2][1] - J[0][1] * J[2][0]);
+    adj[8][e] =  (J[0][0] * J[1][1] - J[0][1] * J[1][0]);
+  }
+  geom_t *g_adj[9];
+  for (int c = 0; c < 9; ++c) g_adj[c] = upload(adj[c]);
+  geom_t *g_det = upload(det);
+
+  real_t *u[3], *u_old[3], *out[3];
+  const std::vector<real_t> zero(nnodes, 0.0);
+  for (int c = 0; c < 3; ++c) {
+    u[c] = upload(random_field(nnodes));
+    u_old[c] = upload(random_field(nnodes));
+    out[c] = upload(zero);
+  }
+  mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa(
+      (int)sizeof(real_t), nelements, nnodes, elements,
+      g_adj[0], g_adj[1], g_adj[2], g_adj[3], g_adj[4], g_adj[5], g_adj[6], g_adj[7], g_adj[8],
+      g_det, 0.41, 0.73, 0.6,
+      1, u[0], u[1], u[2], 1, u_old[0], u_old[1], u_old[2],
+      1, out[0], out[1], out[2]);
+  sync();
+  std::vector<real_t> result(nnodes);
+  char name[128];
+  for (int c = 0; c < 3; ++c) {
+    download(result, out[c]);
+    std::snprintf(name, sizeof(name),
+                  "mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa_%c", "xyz"[c]);
+    record(name, result);
+  }
+}
+
+// The Neumann traction on a triangle shell: the boundary-residual family, whose
+// emitter wrote its loop, signature, scatter, return and launch inline.  It
+// takes points, so it gets a lattice's surface rather than random connectivity.
+static void agree_boundary_tet4() {
+  reseed();
+  const Lattice lattice(12, 2);
+  const ptrdiff_t nfaces = 2 * lattice.ncells;
+  std::vector<std::vector<idx_t>> connectivity(3, std::vector<idx_t>(nfaces));
+  for (ptrdiff_t cell = 0; cell < lattice.ncells; ++cell) {
+    ptrdiff_t base[3] = {0, 0, 0};
+    lattice.cell_base(cell, 2, base);
+    // the two triangles of each quad, both counter-clockwise
+    static const int TRIANGLES[2][3] = {{0, 1, 3}, {0, 3, 2}};
+    for (int t = 0; t < 2; ++t)
+      for (int shape = 0; shape < 3; ++shape)
+        connectivity[shape][2 * cell + t] = lattice.corner(base, TRIANGLES[t][shape], 2);
+  }
+  idx_t **elements = upload_table(connectivity);
+  // a flat shell in 3D: the lattice's two coordinates, and zero for the third
+  std::vector<std::vector<geom_t>> point_columns = {
+      lattice.px[0], lattice.px[1], std::vector<geom_t>(lattice.nnodes, 0.0)};
+  geom_t **points = upload_table(point_columns);
+
+  real_t *out[3];
+  const std::vector<real_t> zero(lattice.nnodes, 0.0);
+  for (int c = 0; c < 3; ++c) out[c] = upload(zero);
+  neumann_tet4_trishell3_boundary_residual_soa(
+      nfaces, lattice.nnodes, elements, points, 0.3, -0.7, 1.1, 1,
+      out[0], out[1], out[2]);
+  sync();
+  std::vector<real_t> result(lattice.nnodes);
+  char name[128];
+  for (int c = 0; c < 3; ++c) {
+    download(result, out[c]);
+    std::snprintf(name, sizeof(name),
+                  "neumann_tet4_trishell3_boundary_residual_soa_%c", "xyz"[c]);
+    record(name, result);
+  }
+}
+
 // These two take points rather than a metric, so they get a lattice: random
 // coordinates would give inverted or degenerate cells.
 static void agree_mesh_order_tensor_product(int dim) {
@@ -433,6 +540,8 @@ int main(int argc, char **argv) {
     agree_simplex_metric(2);
     agree_simplex_metric(3);
     agree_linear_elasticity_tet4();
+    agree_residual_tet4();
+    agree_boundary_tet4();
     agree_mesh_order_tensor_product(2);
     agree_mesh_order_tensor_product(3);
   }
