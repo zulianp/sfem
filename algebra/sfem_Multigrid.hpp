@@ -110,6 +110,11 @@ namespace sfem {
 
         void set_atol(const T val) { atol_ = val; }
 
+        // The caller promises that x is zero when apply is called, as it is for a
+        // preconditioner inside a Krylov method. Coarse levels need no promise: the cycle
+        // zeroes their solution before descending.
+        void set_initial_guess_zero(const bool val) { initial_guess_zero_ = val; }
+
         int test_interp() {
             ensure_init();
 
@@ -190,10 +195,17 @@ namespace sfem {
         std::vector<std::shared_ptr<Memory>> memory_;
         bool                                 wrap_input_{true};
 
-        int max_it_{10};
-        int iterations_{0};
-        int cycle_type_{V_CYCLE};
-        T   atol_{1e-10};
+        int  max_it_{10};
+        int  iterations_{0};
+        int  cycle_type_{V_CYCLE};
+        T    atol_{1e-10};
+        bool initial_guess_zero_{false};
+
+        // Tell a smoother whether its solution is zero on entry. Only a MatrixFreeLinearSolver
+        // can use the hint; any other operator is applied unchanged.
+        static void hint_zero_guess(const std::shared_ptr<Operator<T>>& smoother, const bool zero) {
+            if (auto s = std::dynamic_pointer_cast<MatrixFreeLinearSolver<T>>(smoother)) s->set_initial_guess_zero(zero);
+        }
 
         T norm_residual_0{1};
         T norm_residual_previous{1};
@@ -302,7 +314,15 @@ namespace sfem {
             auto mem_coarse   = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
+                // Pre-smoothing starts from zero on a coarse level's first pass (the parent
+                // zeroed it) and on the finest level's first pass of the first cycle when the
+                // caller said so; nowhere else. Cleared again before post-smoothing, which
+                // always starts from the corrected, non-zero solution.
+                const bool zero_guess =
+                        k == 0 && (level != finest_level() || (initial_guess_zero_ && iterations_ == 0));
+                hint_zero_guess(smoother, zero_guess);
                 smoother->apply(mem->rhs->data(), mem->solution->data());
+                hint_zero_guess(smoother, false);
 
                 {
                     // Compute residual

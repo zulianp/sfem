@@ -102,6 +102,11 @@ namespace sfem {
             configure_sizes_from_op();
         }
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override { this->preconditioner = op; }
+        // A zero initial guess makes the first residual the right-hand side itself, which is
+        // what use_arg_as_first_residual does: the preconditioner is applied to b and the
+        // operator application on a zero vector is skipped. The result is the same bits --
+        // b - A 0 is b. Multigrid pre-smoothing is the caller, since it always starts from zero.
+        void set_initial_guess_zero(const bool val) override { use_arg_as_first_residual = val; }
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
