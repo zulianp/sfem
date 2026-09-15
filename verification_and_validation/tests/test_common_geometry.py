@@ -15,6 +15,7 @@ from common.geometry import (  # noqa: E402
     cylindrical_sector_mesh,
     rectangle_mesh,
     spherical_shell_mesh,
+    spherical_shell_octant_mesh,
 )
 from common.mesh import Mesh  # noqa: E402
 from common.sets import (  # noqa: E402
@@ -64,6 +65,17 @@ class GeometryTests(unittest.TestCase):
         mesh = spherical_shell_mesh(2.0, 3.0, 2, 2)
         radii = np.linalg.norm(mesh.points, axis=1)
         np.testing.assert_allclose(np.unique(np.round(radii, 12)), (2.0, 2.5, 3.0))
+
+    def test_spherical_octants_are_deterministic_and_outward(self):
+        for element_type in ("TET4", "HEX8"):
+            with self.subTest(element_type=element_type):
+                first = spherical_shell_octant_mesh(1.0, 2.0, 2, 4, element_type)
+                second = spherical_shell_octant_mesh(1.0, 2.0, 2, 4, element_type)
+                np.testing.assert_array_equal(first.points, second.points)
+                np.testing.assert_array_equal(first.elements, second.elements)
+                self.assertTrue(np.all(first.points >= -1.0e-13))
+                self.assertGreater(validate_sideset_orientation(first, boundary_sides(first))[
+                    "minimum_orientation_cosine"], 0.0)
 
 
 class SidesetTests(unittest.TestCase):

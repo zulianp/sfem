@@ -78,21 +78,7 @@ def error_check(name, observed, tolerance, units, oracle):
     }
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Compare pressure-vessel stresses with published analytical curves")
-    parser.add_argument("--case", required=True, type=Path)
-    parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--report", required=True, type=Path)
-    args = parser.parse_args()
-
-    case_path = args.case.resolve()
-    case_dir = case_path.parent
-    config = yaml.safe_load(case_path.read_text(encoding="utf-8"))
-    tolerances = config["verification"]["tolerances"]
-    oracle = config["oracle"]
-    mesh = args.output / "mesh"
-    solution = args.output / "solution"
-
+def evaluate_level(mesh, solution, nr, ntheta, c1, c2, kappa):
     points = np.column_stack(
         [
             np.fromfile(mesh / "x.float32", dtype=np.float32).astype(np.float64),
@@ -102,16 +88,12 @@ def main() -> int:
     elements = np.column_stack(
         [np.fromfile(mesh / f"i{local_node}.int32", dtype=np.int32) for local_node in range(4)]
     )
+    if elements.shape != (nr * ntheta, 4):
+        raise ValueError(f"invalid {nr} x {ntheta} pressure-vessel connectivity")
     displacement = np.column_stack([final_component(solution, 0), final_component(solution, 1)])
     if displacement.shape != points.shape:
         raise ValueError(f"displacement shape {displacement.shape} does not match mesh {points.shape}")
     current = points + displacement
-
-    nr = int(config["mesh"]["command"][config["mesh"]["command"].index("--nr") + 1])
-    ntheta = int(config["mesh"]["command"][config["mesh"]["command"].index("--ntheta") + 1])
-    c1 = float(config["driver"]["environment"]["SFEM_C1"])
-    c2 = float(config["driver"]["environment"]["SFEM_C2"])
-    kappa = float(config["driver"]["environment"]["SFEM_KAPPA"])
 
     radial_profile = []
     ray = ntheta // 2
@@ -137,18 +119,91 @@ def main() -> int:
                 _, f2 = deformation(points[nodes], current[nodes], xi, eta)
                 all_jacobians.append(np.linalg.det(f2))
     all_jacobians = np.asarray(all_jacobians)
+    return radial_profile, all_jacobians
+
+
+def profile_error(profile, oracle_profile, column):
+    radii = profile[:, 0]
+    mask = (radii >= oracle_profile[0, 0]) & (radii <= oracle_profile[-1, 0])
+    if np.count_nonzero(mask) < 2:
+        raise ValueError("profile has insufficient samples inside the published oracle support")
+    expected = np.interp(radii[mask], oracle_profile[:, 0], oracle_profile[:, 1])
+    differences = profile[mask, column] - expected
+    return float(np.linalg.norm(differences) / np.linalg.norm(expected)), float(np.max(np.abs(differences)))
+
+
+def common_grid_errors(profiles, radial_oracle, hoop_oracle):
+    lower = max(
+        *(profile[0, 0] for profile in profiles.values()),
+        radial_oracle[0, 0],
+        hoop_oracle[0, 0],
+    )
+    upper = min(
+        *(profile[-1, 0] for profile in profiles.values()),
+        radial_oracle[-1, 0],
+        hoop_oracle[-1, 0],
+    )
+    if not upper > lower:
+        raise ValueError("refinement profiles have no common published-radius support")
+    radii = np.linspace(lower, upper, 32)
+    errors = {}
+    for column, oracle_profile, label in ((1, radial_oracle, "radial"), (2, hoop_oracle, "hoop")):
+        expected = np.interp(radii, oracle_profile[:, 0], oracle_profile[:, 1])
+        denominator = np.linalg.norm(expected)
+        errors[label] = {
+            level_id: float(
+                np.linalg.norm(np.interp(radii, profile[:, 0], profile[:, column]) - expected) / denominator
+            )
+            for level_id, profile in profiles.items()
+        }
+    return radii, errors
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Compare pressure-vessel stresses with published analytical curves")
+    parser.add_argument("--case", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--report", required=True, type=Path)
+    args = parser.parse_args()
+
+    case_path = args.case.resolve()
+    case_dir = case_path.parent
+    config = yaml.safe_load(case_path.read_text(encoding="utf-8"))
+    tolerances = config["verification"]["tolerances"]
+    oracle = config["oracle"]
+    c1 = float(config["driver"]["environment"]["SFEM_C1"])
+    c2 = float(config["driver"]["environment"]["SFEM_C2"])
+    kappa = float(config["driver"]["environment"]["SFEM_KAPPA"])
 
     radial_oracle = np.loadtxt(case_dir / oracle["radial_stress"], delimiter=",", comments="#")
     hoop_oracle = np.loadtxt(case_dir / oracle["hoop_stress"], delimiter=",", comments="#")
-    radii = radial_profile[:, 0]
-    radial_mask = (radii >= radial_oracle[0, 0]) & (radii <= radial_oracle[-1, 0])
-    hoop_mask = (radii >= hoop_oracle[0, 0]) & (radii <= hoop_oracle[-1, 0])
-    expected_radial = np.interp(radii[radial_mask], radial_oracle[:, 0], radial_oracle[:, 1])
-    expected_hoop = np.interp(radii[hoop_mask], hoop_oracle[:, 0], hoop_oracle[:, 1])
-    radial_error = radial_profile[radial_mask, 1] - expected_radial
-    hoop_error = radial_profile[hoop_mask, 2] - expected_hoop
-    radial_relative_l2 = np.linalg.norm(radial_error) / np.linalg.norm(expected_radial)
-    hoop_relative_l2 = np.linalg.norm(hoop_error) / np.linalg.norm(expected_hoop)
+    for table in (radial_oracle, hoop_oracle):
+        if table.ndim != 2 or table.shape[1] != 2 or not np.all(np.isfinite(table)):
+            raise ValueError("published oracle tables must contain finite radius/stress pairs")
+        if np.any(np.diff(table[:, 0]) <= 0):
+            raise ValueError("published oracle radii must be strictly increasing")
+
+    profiles = {}
+    jacobians = {}
+    for level in config["refinements"]:
+        level_id = level["id"]
+        cells = int(level["cells"])
+        profiles[level_id], jacobians[level_id] = evaluate_level(
+            args.output / "mesh" / level_id,
+            args.output / "solution" / level_id,
+            cells,
+            cells,
+            c1,
+            c2,
+            kappa,
+        )
+
+    canonical_id = next(level["id"] for level in config["refinements"] if level["role"] == "canonical")
+    radial_profile = profiles[canonical_id]
+    radial_relative_l2, radial_max_abs = profile_error(radial_profile, radial_oracle, 1)
+    hoop_relative_l2, hoop_max_abs = profile_error(radial_profile, hoop_oracle, 2)
+    common_radii, common_errors = common_grid_errors(profiles, radial_oracle, hoop_oracle)
+    ordered_ids = [level["id"] for level in config["refinements"]]
 
     analytical_source = {
         "type": "published_analytical_profile",
@@ -164,7 +219,7 @@ def main() -> int:
         ),
         error_check(
             "radial_stress_max_abs_mpa",
-            np.max(np.abs(radial_error)),
+            radial_max_abs,
             tolerances["radial_stress_max_abs_mpa"],
             "MPa",
             analytical_source,
@@ -178,35 +233,87 @@ def main() -> int:
         ),
         error_check(
             "hoop_stress_max_abs_mpa",
-            np.max(np.abs(hoop_error)),
+            hoop_max_abs,
             tolerances["hoop_stress_max_abs_mpa"],
             "MPa",
             analytical_source,
         ),
     ]
 
-    expected_radial_all = np.interp(radii, radial_oracle[:, 0], radial_oracle[:, 1])
-    expected_hoop_all = np.interp(radii, hoop_oracle[:, 0], hoop_oracle[:, 1])
-    profile = np.column_stack(
-        [radii, radial_profile[:, 1], expected_radial_all, radial_profile[:, 2], expected_hoop_all, radial_profile[:, 3]]
-    )
-    np.savetxt(
-        args.output / "stress_profile.csv",
-        profile,
-        delimiter=",",
-        header="radius,sfem_radial_mpa,oracle_radial_mpa,sfem_hoop_mpa,oracle_hoop_mpa,jacobian",
-        comments="",
-    )
+    for label in ("radial", "hoop"):
+        level_errors = common_errors[label]
+        deficit = max(
+            0.0,
+            *(level_errors[ordered_ids[i + 1]] - level_errors[ordered_ids[i]]
+              for i in range(len(ordered_ids) - 1)),
+        )
+        checks.append(
+            error_check(
+                f"{label}_refinement_monotonic_deficit",
+                deficit,
+                tolerances[f"{label}_refinement_monotonic_deficit"],
+                "1",
+                analytical_source,
+            )
+        )
+
+    minimum_jacobian = min(float(np.min(values)) for values in jacobians.values())
+    jacobian_deficit = max(0.0, np.finfo(np.float64).eps - minimum_jacobian)
+    checks.append({
+        "name": "minimum_deformation_jacobian_deficit",
+        "oracle": {"type": "analytical", "reference": "positive material volume"},
+        "observed": minimum_jacobian,
+        "expected": 0.0,
+        "error": jacobian_deficit,
+        "tolerance": float(tolerances["minimum_deformation_jacobian_deficit"]),
+        "units": "1",
+        "passed": bool(jacobian_deficit <= tolerances["minimum_deformation_jacobian_deficit"]),
+    })
+
+    profile_artifacts = {}
+    for level_id, level_profile in profiles.items():
+        radii = level_profile[:, 0]
+        profile = np.column_stack(
+            [
+                radii,
+                level_profile[:, 1],
+                np.interp(radii, radial_oracle[:, 0], radial_oracle[:, 1]),
+                level_profile[:, 2],
+                np.interp(radii, hoop_oracle[:, 0], hoop_oracle[:, 1]),
+                level_profile[:, 3],
+            ]
+        )
+        path = args.output / ("stress_profile.csv" if level_id == canonical_id else f"stress_profile_{level_id}.csv")
+        np.savetxt(
+            path,
+            profile,
+            delimiter=",",
+            header="radius,sfem_radial_mpa,oracle_radial_mpa,sfem_hoop_mpa,oracle_hoop_mpa,jacobian",
+            comments="",
+        )
+        profile_artifacts[f"stress_profile_{level_id}"] = str(path)
+
     report = {
         "schema_version": 1,
         "case": config["id"],
         "passed": all(check["passed"] for check in checks),
         "checks": checks,
         "diagnostics": {
-            "deformation_jacobian_gauss_point_min": float(np.min(all_jacobians)),
-            "deformation_jacobian_gauss_point_max": float(np.max(all_jacobians)),
+            "canonical_level": canonical_id,
+            "common_radius_grid_m": [float(value) for value in common_radii],
+            "common_grid_relative_l2": common_errors,
+            "deformation_jacobian_gauss_point_min": minimum_jacobian,
+            "deformation_jacobian_gauss_point_max": max(float(np.max(values)) for values in jacobians.values()),
+            "levels": {
+                level_id: {
+                    "radial_stress_relative_l2_at_native_radii": profile_error(level_profile, radial_oracle, 1)[0],
+                    "hoop_stress_relative_l2_at_native_radii": profile_error(level_profile, hoop_oracle, 2)[0],
+                    "minimum_deformation_jacobian": float(np.min(jacobians[level_id])),
+                }
+                for level_id, level_profile in profiles.items()
+            },
         },
-        "artifacts": {"stress_profile": str(args.output / "stress_profile.csv")},
+        "artifacts": profile_artifacts,
     }
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     for check in checks:

@@ -1114,6 +1114,13 @@ namespace sfem {
                     c.surface      = it->second.second;
                 }
             }
+            if (c.follower_pressure && space->mesh_ptr()->spatial_dimension() == 3) {
+                if (c.element_type == smesh::TRISHELL3) {
+                    c.element_type = smesh::TRI3;
+                } else if (c.element_type == smesh::QUADSHELL4) {
+                    c.element_type = smesh::QUAD4;
+                }
+            }
         }
 
         return nc;

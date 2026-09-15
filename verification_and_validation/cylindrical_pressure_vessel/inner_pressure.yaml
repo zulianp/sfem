@@ -1,5 +1,5 @@
 neumann_conditions:
   - type: pressure
     format: file
-    path: "{mesh}/surface/sidesets/inner"
+    path: "{mesh}/n20/surface/sidesets/inner"
     value: 100

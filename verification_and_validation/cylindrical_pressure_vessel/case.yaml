@@ -13,21 +13,26 @@ resolution:
 source:
   description: Published analytical radial and hoop Cauchy stress profiles
   tutorial: https://www.solids4foam.com/tutorials/more-tutorials/solid-mechanics/hyperelasticity/cylindricalPressureVessel.html
+  revision: 6917f439243d7d782d42aacf1227b12b2300d5b2
   data: https://github.com/solids4foam/solids4foam-tutorials-benchmark-data/tree/6917f439243d7d782d42aacf1227b12b2300d5b2/tutorials/solids/hyperelasticity/cylindricalPressureVessel/fe41
+  provenance: oracle/PROVENANCE.md
+
+geometry:
+  inner_radius_m: 7.0
+  outer_radius_m: 18.625
+
+refinements:
+  - {id: n10, cells: 10, role: diagnostic}
+  - {id: n20, cells: 20, role: canonical}
+  - {id: n40, cells: 40, role: diagnostic}
 
 mesh:
   command:
     - "{python}"
-    - "{case_dir}/generate_mesh.py"
+    - "{case_dir}/generate_refinements.py"
     - "{mesh}"
-    - --nr
-    - "20"
-    - --ntheta
-    - "20"
-    - --ri
-    - "7"
-    - --ro
-    - "18.625"
+    - --case
+    - "{case}"
 
 inputs:
   - template: symmetry.yaml
@@ -36,11 +41,18 @@ inputs:
     output: "{output}/inner_pressure.yaml"
 
 driver:
-  executable: "{build_dir}/hyperelasticity_bdf2"
+  executable: "{python}"
   arguments:
+    - "{case_dir}/run_refinements.py"
+    - --case
+    - "{case}"
+    - --driver
+    - "{build_dir}/hyperelasticity_bdf2"
+    - --mesh
     - "{mesh}"
-    - "{output}/symmetry.yaml"
-    - "{output}/inner_pressure.yaml"
+    - --input-dir
+    - "{output}"
+    - --output
     - "{output}/solution"
   environment:
     OMP_NUM_THREADS: "1"
@@ -76,12 +88,17 @@ verification:
     - "(max iterations)"
   required_output:
     - pattern: "(converged)"
-      count: 20
+      count: 60
+    - pattern: SFEM_REFINEMENT_COMPLETE
+      count: 3
   tolerances:
     radial_stress_relative_l2: 0.04
     radial_stress_max_abs_mpa: 5.0
     hoop_stress_relative_l2: 0.04
     hoop_stress_max_abs_mpa: 5.0
+    radial_refinement_monotonic_deficit: 0.0
+    hoop_refinement_monotonic_deficit: 0.0
+    minimum_deformation_jacobian_deficit: 0.0
 
 oracle:
   type: published_analytical_profile

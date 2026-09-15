@@ -103,6 +103,15 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual({"mu": 2.0, "lambda": 3.0}, variant["material"])
         self.assertEqual("lmbda", variant["material_parameter_map"]["lambda"])
 
+    def test_loading_and_geometry_scalars_are_available_to_yaml_templates(self):
+        case = valid_v2_case()
+        case["geometry"] = {"inner_radius_m": 1.0, "mesh_levels": [8, 16]}
+        case["loading"] = {"inner_pressure_mpa": 0.1, "enabled": True}
+        self.assertEqual(
+            {"geometry_inner_radius_m": "1.0", "loading_inner_pressure_mpa": "0.1"},
+            run_all._case_scalar_variables(case),
+        )
+
     def test_material_parameter_map_rejects_non_identifier_values(self):
         case = valid_v2_case()
         case["variants"][0]["material_parameter_map"] = {"lambda": "not a key"}
