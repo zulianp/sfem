@@ -37,6 +37,21 @@
 
 #include <functional>
 #include <algorithm>
+#include <cstddef>
+
+// LAPACK and BLAS by their Fortran names: the same symbols in OpenBLAS and Accelerate, with no
+// header whose spelling differs between the two. The trailing size_t arguments are gfortran's
+// hidden string lengths; an implementation written in C ignores them. Declared at global scope
+// because the dense coarse solve that calls them lives in an anonymous namespace, where a
+// C-linkage declaration would not name the library's symbol.
+extern "C" {
+void dgetrf_(const int *m, const int *n, double *a, const int *lda, int *ipiv, int *info);
+void sgetrf_(const int *m, const int *n, float *a, const int *lda, int *ipiv, int *info);
+void dtrsv_(const char *uplo, const char *trans, const char *diag, const int *n, const double *a,
+            const int *lda, double *x, const int *incx, std::size_t, std::size_t, std::size_t);
+void strsv_(const char *uplo, const char *trans, const char *diag, const int *n, const float *a,
+            const int *lda, float *x, const int *incx, std::size_t, std::size_t, std::size_t);
+}
 #include <array>
 #include <cmath>
 #include <filesystem>
@@ -1558,59 +1573,76 @@ private:
     // the right thing for a multigrid coarse solve, since a null direction of A_H carries no
     // information about the fine residual. The dropped count is printed rather than swallowed;
     // a coarse operator that suddenly loses rank is a defect worth seeing.
+    //
+    // The factorisation is LAPACK's getrf, partial pivoting like the loop it replaced, on the
+    // matrix stored COLUMN-major (a_[j * n + i] is A(i, j)); both builders below write it that
+    // way. The hand-written unblocked loop was ~1 s per Newton step on the FDA nozzle's
+    // 2,320-dof coarsest level, the same at 116,212 and 893,924 dof -- 28 of the 45 s of the
+    // smaller run -- and threading its row update reached only 1.7x on 72 cores.
+    //
+    // The null-direction treatment is kept: a pivot at or below the relative tolerance is
+    // recorded, its U row is reduced to a unit diagonal, and the solve zeroes that component
+    // between the two triangular sweeps, which is y = 0 there exactly as before. getrf, unlike
+    // the loop, still eliminates below such a pivot; that is harmless when the near-null pivots
+    // are the last ones factored -- where partial pivoting puts a rank deficiency of the
+    // trailing Schur complement -- and a dropped pivot anywhere else is reported.
     class DenseLU final : public sfem::Operator<real_t> {
+        static void getrf(const int n, double *a, int *ipiv, int *info) { dgetrf_(&n, &n, a, &n, ipiv, info); }
+        static void getrf(const int n, float *a, int *ipiv, int *info) { sgetrf_(&n, &n, a, &n, ipiv, info); }
+        static void trsv(const char uplo, const char diag, const int n, const double *a, double *x) {
+            const int one = 1;
+            dtrsv_(&uplo, "N", &diag, &n, a, &n, x, &one, 1, 1, 1);
+        }
+        static void trsv(const char uplo, const char diag, const int n, const float *a, float *x) {
+            const int one = 1;
+            strsv_(&uplo, "N", &diag, &n, a, &n, x, &one, 1, 1, 1);
+        }
+
     public:
-        DenseLU(const ptrdiff_t n, std::vector<real_t> a) : n_(n), a_(std::move(a)), piv_((size_t)n) {
-            for (ptrdiff_t i = 0; i < n_; ++i) piv_[(size_t)i] = i;
+        DenseLU(const ptrdiff_t n, std::vector<real_t> a) : n_(n), a_(std::move(a)), piv_((size_t)n), y_((size_t)n) {
             real_t amax = 0;
             for (const real_t v : a_) amax = std::max(amax, std::fabs(v));
             const real_t ptol =
                     amax * (real_t)smesh::Env::read<double>("SFEM_COARSE_LU_TOL", 1e-14);
-            for (ptrdiff_t k = 0; k < n_; ++k) {
-                ptrdiff_t p = k;
-                real_t    m = std::fabs(a_[(size_t)k * n_ + k]);
-                for (ptrdiff_t i = k + 1; i < n_; ++i) {
-                    const real_t v = std::fabs(a_[(size_t)i * n_ + k]);
-                    if (v > m) { m = v; p = i; }
-                }
-                if (p != k) {
-                    for (ptrdiff_t j = 0; j < n_; ++j)
-                        std::swap(a_[(size_t)k * n_ + j], a_[(size_t)p * n_ + j]);
-                    std::swap(piv_[(size_t)k], piv_[(size_t)p]);
-                }
-                real_t d = a_[(size_t)k * n_ + k];
-                if (std::fabs(d) <= ptol) {
-                    // Rank-deficient column: record it, zero the pivot so back-substitution
-                    // takes y = 0 here, and leave the rest of the column alone.
-                    a_[(size_t)k * n_ + k] = 0;
-                    if (dropped_.size() < 32) dropped_.push_back(piv_[(size_t)k]);
-                    ++n_dropped_;
-                    continue;
-                }
-                for (ptrdiff_t i = k + 1; i < n_; ++i) {
-                    const real_t f = a_[(size_t)i * n_ + k] / d;
-                    a_[(size_t)i * n_ + k] = f;
-                    if (f == real_t(0)) continue;
-                    for (ptrdiff_t j = k + 1; j < n_; ++j)
-                        a_[(size_t)i * n_ + j] -= f * a_[(size_t)k * n_ + j];
-                }
+
+            std::vector<int> ipiv((size_t)n_);
+            int              info = 0;
+            const double     t_getrf = smesh::time_seconds();
+            getrf((int)n_, a_.data(), ipiv.data(), &info);
+            // Inside coarse_factor, so the factorisation can be told apart from densifying.
+            phase_add("coarse_getrf", smesh::time_seconds() - t_getrf);
+            if (info < 0) {
+                std::fprintf(stderr, "DenseLU: getrf rejected argument %d\n", -info);
+                std::abort();
             }
+            // getrf's interchanges, applied in order, give the original row at each position.
+            for (ptrdiff_t i = 0; i < n_; ++i) piv_[(size_t)i] = i;
+            for (ptrdiff_t k = 0; k < n_; ++k) std::swap(piv_[(size_t)k], piv_[(size_t)ipiv[(size_t)k] - 1]);
+
+            ptrdiff_t first_null = n_;
+            for (ptrdiff_t k = 0; k < n_; ++k) {
+                if (!(std::fabs(a_[(size_t)k * n_ + k]) <= ptol)) continue;
+                // Rank-deficient column: record it, and make back-substitution take y = 0 here.
+                a_[(size_t)k * n_ + k] = real_t(1);
+                for (ptrdiff_t j = k + 1; j < n_; ++j) a_[(size_t)j * n_ + k] = real_t(0);
+                null_.push_back((int)k);
+                if (dropped_.size() < 32) dropped_.push_back(piv_[(size_t)k]);
+                ++n_dropped_;
+                first_null = std::min(first_null, k);
+            }
+            if (n_dropped_ && first_null < n_ - n_dropped_)
+                std::printf("coarse LU: a null pivot at position %td of %td, before the trailing block -- "
+                            "getrf eliminated below it, so the factors past it are not trustworthy\n",
+                            first_null, n_);
         }
 
         int apply(const real_t *const b, real_t *const x) override {
-            std::vector<real_t> y((size_t)n_);
-            for (ptrdiff_t i = 0; i < n_; ++i) {
-                real_t s = b[piv_[(size_t)i]];
-                for (ptrdiff_t j = 0; j < i; ++j) s -= a_[(size_t)i * n_ + j] * y[(size_t)j];
-                y[(size_t)i] = s;
-            }
-            for (ptrdiff_t i = n_ - 1; i >= 0; --i) {
-                real_t s = y[(size_t)i];
-                for (ptrdiff_t j = i + 1; j < n_; ++j) s -= a_[(size_t)i * n_ + j] * y[(size_t)j];
-                const real_t d = a_[(size_t)i * n_ + i];
-                y[(size_t)i] = (d != real_t(0)) ? s / d : real_t(0);
-            }
-            for (ptrdiff_t i = 0; i < n_; ++i) x[i] += y[(size_t)i];
+            const real_t *const y = y_.data();
+            for (ptrdiff_t i = 0; i < n_; ++i) y_[(size_t)i] = b[piv_[(size_t)i]];
+            trsv('L', 'U', (int)n_, a_.data(), y_.data());
+            for (const int k : null_) y_[(size_t)k] = real_t(0);
+            trsv('U', 'N', (int)n_, a_.data(), y_.data());
+            for (ptrdiff_t i = 0; i < n_; ++i) x[i] += y[i];
             return SFEM_SUCCESS;
         }
 
@@ -1626,6 +1658,8 @@ private:
         ptrdiff_t              n_;
         std::vector<real_t>    a_;
         std::vector<ptrdiff_t> piv_;
+        std::vector<real_t>    y_;
+        std::vector<int>       null_;
         ptrdiff_t              n_dropped_{0};
         std::vector<ptrdiff_t> dropped_;
     };
@@ -1652,7 +1686,7 @@ private:
                 const ptrdiff_t c = (ptrdiff_t)ci[k];
                 for (int i = 0; i < N_FIELDS; ++i)
                     for (int j = 0; j < N_FIELDS; ++j)
-                        dense[(size_t)(r * N_FIELDS + i) * (size_t)n + (size_t)(c * N_FIELDS + j)] =
+                        dense[(size_t)(c * N_FIELDS + j) * (size_t)n + (size_t)(r * N_FIELDS + i)] =  // column-major
                                 vd[(size_t)k * 16 + (size_t)(i * N_FIELDS + j)];
             }
         return std::make_shared<DenseLU>(n, std::move(dense));
@@ -1687,7 +1721,7 @@ private:
             std::fill(col.begin(), col.end(), real_t(0));
             e[(size_t)j] = real_t(1);
             op->apply(e.data(), col.data());
-            for (ptrdiff_t i = 0; i < n; ++i) a[(size_t)i * n + j] = col[(size_t)i];
+            for (ptrdiff_t i = 0; i < n; ++i) a[(size_t)j * n + i] = col[(size_t)i];  // column-major
         }
         return std::make_shared<DenseLU>(n, std::move(a));
     }
@@ -2596,8 +2630,10 @@ private:
                 if (nd_coarse <= lu_max) {
                     // Prefer the assembled matrix when there is one; fall back to probing
                     // only for a level that has no matrix form.
+                    const double t_lu = smesh::time_seconds();
                     auto lu = g.Amat[(size_t)i] ? make_dense_lu_from_bsr(g.Amat[(size_t)i], nd_coarse)
                                                 : make_dense_lu(lop, nd_coarse);
+                    phase_add("coarse_factor", smesh::time_seconds() - t_lu);
                     {
                         const std::string dpath =
                                 smesh::Env::read_string("SFEM_GMG_DUMP_COARSE", std::string());
