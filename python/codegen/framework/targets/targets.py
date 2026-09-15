@@ -4,8 +4,11 @@ from enum import Enum
 
 from codegen.framework.ir.kernel_ast import (
     BlockNode,
+    BufferDeclNode,
+    LoopHeaderNode,
     LoopKind,
     LoopNode,
+    add_assign_increment,
     expr_ref,
     iteration_range,
     iterator,
@@ -254,11 +257,93 @@ class TargetPlatform:
         pragma = self.parallel_for_pragma(schedule, reduction)
         return () if pragma is None else (pragma,)
 
-    def scatter_add_lines(self, lhs, rhs, indent):
+    def mesh_loop_nodes(self):
+        """The blocked pass over the mesh: `VS` elements per iteration.
+
+        Beside `work_item_scope_node`, which opens the scope *inside* one
+        block.  This opens the block loop itself and declares how many elements
+        it actually holds, which is `VS` except at the tail.
+
+        It belongs to the target for the same reason the work item does:
+        whether a mesh is walked by a host loop or by a grid of threads is a
+        target fact, and an emitter that writes the loop itself produces, on a
+        device target, a `__global__` kernel in which every thread walks every
+        element.  Nodes rather than text, because `targets` is index 4 and `ir`
+        is index 3: a target may build a node and may not spell one.
+        `emitters/ast_printer.mesh_loop_lines` spells it.
+        """
+        tile_iterator = iterator("evb", "ptrdiff_t")
+        return (
+            LoopHeaderNode(
+                LoopNode(
+                    LoopKind.TILE,
+                    tile_iterator,
+                    iteration_range(
+                        expr_ref("0", "first_element"),
+                        expr_ref("nelements", "element_count"),
+                    ),
+                    add_assign_increment(tile_iterator, expr_ref("VS", "vector_width")),
+                )
+            ),
+            BufferDeclNode(
+                "const int", "ne", (), "(int)MIN((ptrdiff_t)VS, nelements - evb)"
+            ),
+        )
+
+    def element_loop_nodes(self):
+        """The scalar pass over the mesh: one element per iteration.
+
+        The other shape is `mesh_loop_nodes`.  A constant-P1 simplex takes this
+        one -- its staging is the whole of its cost, so it works an element at a
+        time rather than blocking.
+        """
+        element_iterator = iterator("element", "ptrdiff_t")
+        return (
+            LoopHeaderNode(
+                LoopNode(
+                    LoopKind.KERNEL,
+                    element_iterator,
+                    iteration_range(
+                        expr_ref("0", "first_element"),
+                        expr_ref("nelements", "element_count"),
+                    ),
+                    pre_increment(element_iterator),
+                )
+            ),
+        )
+
+    def mesh_function_line(self, implementation_name):
+        """How the mesh kernel itself is declared."""
+        return "%s int %s(" % (self.function_qualifier(), implementation_name)
+
+    def success_return_lines(self, indent="  "):
+        """The mesh kernel's status return, where it has one to give."""
+        return ("%sreturn SFEM_SUCCESS;" % indent,)
+
+    def mesh_launch_lines(self, implementation_name, template_args, arguments, indent="  "):
+        """How the `extern \"C\"` entry point reaches the mesh kernel."""
+        return (
+            "%sreturn sfem::codegen::%s<%s>(%s);"
+            % (indent, implementation_name, template_args, ", ".join(arguments)),
+        )
+
+    def scatter_add_lines(self, lhs, rhs, indent, pragma_indent=None):
+        """One accumulation into a node several elements may share.
+
+        The pragma and the `+=` are one decision: a target without an atomic
+        pragma does not want the pragma dropped and the `+=` kept.
+
+        `pragma_indent` exists only because the tracked tree spells this pragma
+        at column 0 in the matrix-scatter sites and at the statement's own
+        indent everywhere else.  It reproduces an inconsistency faithfully
+        rather than deciding it.
+        """
         pragma = self.atomic_update_pragma()
         lines = []
         if pragma:
-            lines.append("%s%s" % (indent, pragma))
+            lines.append(
+                "%s%s" % (indent if pragma_indent is None else pragma_indent, pragma)
+            )
         lines.append("%s%s += %s;" % (indent, lhs, rhs))
         return tuple(lines)
 
@@ -512,8 +597,61 @@ class CUDATarget(TargetPlatform):
     def diagnostic_work_item(self):
         return "scalar"
 
-    def scatter_add_lines(self, lhs, rhs, indent):
+    def scatter_add_lines(self, lhs, rhs, indent, pragma_indent=None):
+        """`pragma_indent` is accepted and ignored: there is no pragma to place."""
         return ("%satomicAdd(&(%s), %s);" % (indent, lhs, rhs),)
+
+    def mesh_loop_nodes(self):
+        """A grid-stride pass over the mesh, one element per thread.
+
+        `ne` is 1 rather than the block's tail count: here the block is one
+        thread, and the work-item scope below it opens no loop at all.
+        """
+        return self._grid_stride_nodes(
+            "evb", (BufferDeclNode("const int", "ne", (), "1"),)
+        )
+
+    def element_loop_nodes(self):
+        return self._grid_stride_nodes("element", ())
+
+    def _grid_stride_nodes(self, index, trailing):
+        kernel_iterator = iterator(index, "ptrdiff_t")
+        return (
+            LoopHeaderNode(
+                LoopNode(
+                    LoopKind.KERNEL,
+                    kernel_iterator,
+                    iteration_range(
+                        expr_ref(
+                            "(ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x",
+                            "cuda_thread_start",
+                        ),
+                        expr_ref("nelements", "element_count"),
+                    ),
+                    add_assign_increment(
+                        kernel_iterator,
+                        expr_ref("(ptrdiff_t)blockDim.x * gridDim.x", "cuda_grid_stride"),
+                    ),
+                )
+            ),
+            *trailing,
+        )
+
+    def mesh_function_line(self, implementation_name):
+        return "__global__ void %s(" % implementation_name
+
+    def success_return_lines(self, indent="  "):
+        """Nothing: a `__global__` kernel returns void."""
+        return ()
+
+    def mesh_launch_lines(self, implementation_name, template_args, arguments, indent="  "):
+        return (
+            "%sconst int block_size = 256;" % indent,
+            "%sconst int grid_size = (int)((nelements + block_size - 1) / block_size);" % indent,
+            "%ssfem::codegen::%s<%s><<<grid_size, block_size>>>(%s);"
+            % (indent, implementation_name, template_args, ", ".join(arguments)),
+            "%sreturn SFEM_SUCCESS;" % indent,
+        )
 
     @property
     def supports_device_kernels(self):

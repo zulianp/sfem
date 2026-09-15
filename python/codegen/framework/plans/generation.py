@@ -63,6 +63,16 @@ class KernelTarget(Enum):
     HIP = "hip"
 
 
+#: What a mesh kernel's translation unit is called for each target.  It is a
+#: fact about the target and it belongs beside the target, but `plans` is index
+#: 2 and `targets` is index 4, so the plan layer reads it off the enum it
+#: already holds rather than importing the platform to ask.
+MESH_SOURCE_EXTENSION = {
+    KernelTarget.CUDA: "cu",
+    KernelTarget.HIP: "hip",
+}
+
+
 class KernelScope(Enum):
     MONOLITHIC = "monolithic"
     BLOCK = "block"
@@ -127,6 +137,7 @@ class LocalKernelPlan:
 class MeshKernelPlan:
     prefix: str
     element_label: str
+    source_extension: str = "cpp"
 
     def __post_init__(self):
         prefix = str(self.prefix)
@@ -144,7 +155,7 @@ class MeshKernelPlan:
 
     @property
     def source(self):
-        return "%s_operator.cpp" % self.name
+        return "%s_operator.%s" % (self.name, self.source_extension)
 
     def to_dict(self):
         return {
@@ -187,7 +198,11 @@ def mesh_kernel_plan_for_element(prefix, element_type):
 
 def mesh_kernel_plan_from_context(unit, context, prefix, *, element_label=None):
     label = _mesh_kernel_element_label(unit, context, element_label)
-    return MeshKernelPlan(prefix, label)
+    return MeshKernelPlan(
+        prefix,
+        label,
+        MESH_SOURCE_EXTENSION.get(getattr(unit, "target", None), "cpp"),
+    )
 
 
 def _mesh_kernel_element_label(unit, context, element_label=None):

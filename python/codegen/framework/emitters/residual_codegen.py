@@ -64,6 +64,8 @@ from codegen.framework.ir.kernel_ast import (
 from codegen.framework.emitters.cprinter import runtime_typed_entry_point
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
+    element_loop_lines,
+    mesh_loop_lines,
     work_item_scope_header_lines,
     render_kernel_ast_lines,
 )
@@ -367,8 +369,36 @@ def _parallel_for_pragma(schedule=None):
     return _target().parallel_for_pragma(schedule)
 
 
+def _mesh_loop_lines():
+    """The pass over the mesh, opened by the bound target.
+
+    The four sites that write this wrote the pragma and the `for` themselves,
+    which on a device target produced a `None` line followed by a serial walk
+    of every element inside what would have been a `__global__` kernel.  The
+    pragma comes back as a tuple rather than a string for the same reason:
+    a target without one contributes no line instead of a `None`.
+    """
+    target = _target()
+    return (
+        *target.parallel_element_loop_lines("static"),
+        *mesh_loop_lines(target),
+    )
+
+
 def _atomic_update_pragma():
     return _target().atomic_update_pragma()
+
+
+def _scatter_add_lines(lhs, rhs, indent="", pragma_indent=None):
+    """One accumulation into a shared node, spelled by the bound target.
+
+    The pragma and the `+=` are one decision, not two: a target with no atomic
+    pragma does not want the pragma line dropped and the `+=` kept, it wants
+    `atomicAdd`.  Writing them separately is what put a bare `None` in the line
+    list on a device target, and would have put a racing `+=` there if the
+    pragma had been an empty string instead.
+    """
+    return _target().scatter_add_lines(lhs, rhs, indent, pragma_indent)
 
 
 def _wi():
@@ -511,9 +541,11 @@ def _direct_atomic_scatter_lines(pointer, node_expr, value_expr, indent):
     lines = [
         "%s{" % indent,
         "%s  for (int scatter = 0; scatter < ne; ++scatter) {" % indent,
-        "%s    %s" % (indent, _atomic_update_pragma()),
-        "%s    %s[%s] += %s;"
-        % (indent, pointer, node_expr % "scatter", value_expr % "scatter"),
+        *_scatter_add_lines(
+            "%s[%s]" % (pointer, node_expr % "scatter"),
+            value_expr % "scatter",
+            "%s    " % indent,
+        ),
         "%s  }" % indent,
         "%s}" % indent,
     ]
@@ -599,14 +631,15 @@ def _simplex_metric_scalar_affine_loop_lines(
             "%s  element_vector[1] = -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;" % indent,
             "%s  element_vector[2] = fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;" % indent,
             "%s  element_vector[3] = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;" % indent,
-            "%s    %s" % (indent, _atomic_update_pragma()),
-            "%s    %s[ev0] += element_vector[0];" % (indent, output_name),
-            "%s    %s" % (indent, _atomic_update_pragma()),
-            "%s    %s[ev1] += element_vector[1];" % (indent, output_name),
-            "%s    %s" % (indent, _atomic_update_pragma()),
-            "%s    %s[ev2] += element_vector[2];" % (indent, output_name),
-            "%s    %s" % (indent, _atomic_update_pragma()),
-            "%s    %s[ev3] += element_vector[3];" % (indent, output_name),
+            *(
+                line
+                for shape in range(4)
+                for line in _scatter_add_lines(
+                    "%s[ev%d]" % (output_name, shape),
+                    "element_vector[%d]" % shape,
+                    "%s    " % indent,
+                )
+            ),
             "%s}" % indent,
         ]
         return lines
@@ -651,8 +684,11 @@ def _simplex_metric_scalar_affine_loop_lines(
         index = "ev%d" % shape if unit_stride else "ev%d * out_stride" % shape
         lines.extend(
             [
-                "%s  %s" % (indent, _atomic_update_pragma()),
-                "%s  %s[%s] += e%d;" % (indent, output_name, index, shape),
+                *_scatter_add_lines(
+                    "%s[%s]" % (output_name, index),
+                    "e%d" % shape,
+                    "%s  " % indent,
+                ),
             ]
         )
     lines.append("%s}" % indent)
@@ -1066,7 +1102,7 @@ def _mesh_block_gather_loop_lines(indent, loop, assignment_lines):
     return lines
 
 
-def _mesh_block_scatter_loop_lines(indent, loop, accumulation_line):
+def _mesh_block_scatter_loop_lines(indent, loop, accumulation):
     element_index = loop.shape_var if loop.element_index is None else loop.element_index
     lines = [
         "%sfor (int %s = 0; %s < %s; ++%s) {"
@@ -1079,8 +1115,9 @@ def _mesh_block_scatter_loop_lines(indent, loop, accumulation_line):
         [
             "%sfor (int scatter = 0; scatter < ne; ++scatter) {"
             % loop.scatter_indent,
-            "%s  %s" % (loop.scatter_indent, _atomic_update_pragma()),
-            accumulation_line,
+            *_scatter_add_lines(
+                accumulation[0], accumulation[1], "%s  " % loop.scatter_indent
+            ),
             "%s}" % loop.scatter_indent,
         ]
     )
@@ -1181,8 +1218,7 @@ def _field_atomic_scatter_lines(system, indent, element_array="elements"):
                 close_lines=("%s  }" % indent,),
                 scatter_indent="%s    " % indent,
             ),
-            "%s      out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];"
-            % indent,
+            ("out[element_shape[evb + scatter] * out_stride]", "boutput[stream][scatter]"),
         ),
     ]
 
@@ -1722,8 +1758,7 @@ def _mixed_field_atomic_scatter_lines(system, layout, indent, field_element_arra
                         ),
                         scatter_indent="%s    " % indent,
                     ),
-                    "%s      out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];"
-                    % indent,
+                    ("out[element_shape[evb + scatter] * out_stride]", "boutput[stream][scatter]"),
                 ),
                 "%s}" % indent,
             ]
@@ -5778,7 +5813,7 @@ def _mixed_affine_function(
         "namespace codegen {",
         "",
         "template <typename s_t, typename g_t>",
-        "%s int %s(" % (_function_qualifier(), impl),
+        _target().mesh_function_line(impl),
     ]
     for index, param in enumerate(params):
         lines.append("    %s%s" % (param, "," if index + 1 < len(params) else ""))
@@ -5818,9 +5853,7 @@ def _mixed_affine_function(
     lines.extend(
         [
             "",
-            _parallel_for_pragma("static"),
-            "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-            "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+            *_mesh_loop_lines(),
         ]
     )
     for role in live_field_roles(dependencies):
@@ -5895,7 +5928,7 @@ def _mixed_affine_function(
     lines.extend(
         [
             "  }",
-            "  return SFEM_SUCCESS;",
+            *_target().success_return_lines(),
             "}",
             "",
             "} // namespace codegen",
@@ -5916,10 +5949,9 @@ def _mixed_affine_function(
             function,
             params,
             call_args,
-            lambda scalar_type, arguments: [
-                "  return sfem::codegen::%s<%s, geom_t>(%s);"
-                % (impl, scalar_type, ", ".join(arguments)),
-            ],
+            lambda scalar_type, arguments: list(
+                _target().mesh_launch_lines(impl, "%s, geom_t" % scalar_type, arguments)
+            ),
         )
     )
     return lines
@@ -5966,7 +5998,7 @@ def _mixed_isoparametric_function(
         "namespace codegen {",
         "",
         "template <typename s_t>",
-        "%s int %s(" % (_function_qualifier(), impl),
+        _target().mesh_function_line(impl),
     ]
     for index, param in enumerate(params):
         lines.append("    %s%s" % (param, "," if index + 1 < len(params) else ""))
@@ -6012,9 +6044,7 @@ def _mixed_isoparametric_function(
     lines.extend(coordinate_element_lines)
     lines.extend(
         [
-            _parallel_for_pragma("static"),
-            "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-            "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+            *_mesh_loop_lines(),
             "    s_t bcoordinates[ND * CELL_NS][VS];",
             "    s_t badjugate_data[ND * ND][NQ * VS];",
             "    s_t bdeterminant[NQ * VS];",
@@ -6143,7 +6173,7 @@ def _mixed_isoparametric_function(
     lines.extend(
         [
             "  }",
-            "  return SFEM_SUCCESS;",
+            *_target().success_return_lines(),
             "}",
             "",
             "} // namespace codegen",
@@ -6162,10 +6192,9 @@ def _mixed_isoparametric_function(
             function,
             params,
             call_args,
-            lambda scalar_type, arguments: [
-                "  return sfem::codegen::%s<%s>(%s);"
-                % (impl, scalar_type, ", ".join(arguments)),
-            ],
+            lambda scalar_type, arguments: list(
+                _target().mesh_launch_lines(impl, scalar_type, arguments)
+            ),
         )
     )
     return lines
@@ -6679,7 +6708,7 @@ def _mesh_operator_source(
         "namespace codegen {",
         "",
         "template <typename s_t, typename g_t>",
-        "%s int %s(" % (_function_qualifier(), impl),
+        _target().mesh_function_line(impl),
     ]
     params = [
         "const ptrdiff_t nelements",
@@ -6815,9 +6844,7 @@ def _mesh_operator_source(
     lines.extend(
         [
             "",
-            _parallel_for_pragma("static"),
-            "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-            "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+            *_mesh_loop_lines(),
         ]
     )
     for role in live_field_roles(dependencies):
@@ -6948,7 +6975,7 @@ def _mesh_operator_source(
         [
             "  }",
             "",
-            "  return SFEM_SUCCESS;",
+            *_target().success_return_lines(),
             "}",
             "",
             "} // namespace codegen",
@@ -6974,10 +7001,9 @@ def _mesh_operator_source(
             function,
             params,
             call_args,
-            lambda scalar_type, arguments: [
-                "  return sfem::codegen::%s<%s, geom_t>(%s);"
-                % (impl, scalar_type, ", ".join(arguments)),
-            ],
+            lambda scalar_type, arguments: list(
+                _target().mesh_launch_lines(impl, "%s, geom_t" % scalar_type, arguments)
+            ),
         )
     )
     for _packed_form in packed_kernel_forms(form):
@@ -7167,14 +7193,14 @@ def _crs_find_cols_lines(function_base, n_shape):
     return lines
 
 
-def _crs_reduction_pragma(reduction_policy):
+def _crs_reduction_lines(reduction_policy, lhs, rhs, indent, pragma_indent=None):
     """How the plan's reduction policy is spelled for this target."""
     if str(reduction_policy) != "atomic_add":
         raise ValueError(
             "unsupported CRS reduction policy '%s'; the emitter can spell "
             "atomic_add only" % reduction_policy
         )
-    return _atomic_update_pragma()
+    return _scatter_add_lines(lhs, rhs, indent, pragma_indent)
 
 
 def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
@@ -7196,7 +7222,13 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
     row_pointer = assembly.row_pointer
     column_index = assembly.column_index
     value_stream = assembly.value_stream
-    reduction = _crs_reduction_pragma(assembly.reduction_policy)
+    reduction = _crs_reduction_lines(
+        assembly.reduction_policy,
+        "%s[entries[i * NS + j]]" % value_stream,
+        "element_matrix[i * NS + j]",
+        "      ",
+        "",
+    )
     return _crs_find_cols_lines(function_base, n_shape) + [
         "template <typename s_t>",
         "static SFEM_INLINE void %s_scatter_crs(" % function_base,
@@ -7219,8 +7251,7 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
         "  }",
         "  for (int i = 0; i < NS; ++i) {",
         "    for (int j = 0; j < NS; ++j) {",
-        reduction,
-        "      %s[entries[i * NS + j]] += element_matrix[i * NS + j];" % value_stream,
+        *reduction,
         "    }",
         "  }",
         "}",
@@ -7281,8 +7312,12 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
         "      const int col_shape = COL_SHAPE[col_stream];",
         "      const int bj = COL_COMPONENT[col_stream];",
         "      s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];",
-        _atomic_update_pragma(),
-        "      block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];",
+        *_scatter_add_lines(
+            "block[bi * NC + bj]",
+            "element_matrix[row_stream * N_COL_STREAMS + col_stream]",
+            "      ",
+            "",
+        ),
         "    }",
         "  }",
         "}",
@@ -7333,8 +7368,12 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
                 kernel_constant("NS", n_shape, indent="  "),
                 "  for (int i = 0; i < NS; ++i) {",
                 "    for (int j = 0; j < NS; ++j) {",
-                _atomic_update_pragma(),
-                "      values[entries[i * NS + j]] += element_matrix[i * NS + j];",
+                *_scatter_add_lines(
+                    "values[entries[i * NS + j]]",
+                    "element_matrix[i * NS + j]",
+                    "      ",
+                    "",
+                ),
                 "    }",
                 "  }",
                 "}",
@@ -7383,8 +7422,12 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
             "      const int col_shape = COL_SHAPE[col_stream];",
             "      const int bj = COL_COMPONENT[col_stream];",
             "      s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];",
-            _atomic_update_pragma(),
-            "      block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];",
+            *_scatter_add_lines(
+                "block[bi * NC + bj]",
+                "element_matrix[row_stream * N_COL_STREAMS + col_stream]",
+                "      ",
+                "",
+            ),
             "    }",
             "  }",
             "}",
@@ -7855,8 +7898,7 @@ def _scalar_crs_matrix_assembly_source(
     lines.extend(
         [
             "",
-            "#pragma omp parallel for schedule(static)",
-            "  for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            *element_loop_lines(_target()),
             "    const ptrdiff_t evb = element;",
             "    const int ne = 1;",
             "    idx_t ev[NS];",
@@ -8487,7 +8529,7 @@ def _isoparametric_mesh_operator_source(
         "namespace codegen {",
         "",
         "template <typename s_t>",
-        "%s int %s(" % (_function_qualifier(), impl),
+        _target().mesh_function_line(impl),
     ]
     for index, param in enumerate(params):
         lines.append(
@@ -8526,9 +8568,7 @@ def _isoparametric_mesh_operator_source(
     lines.extend(
         [
             "",
-            _parallel_for_pragma("static"),
-            "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-            "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+            *_mesh_loop_lines(),
             "    s_t bcoordinates[%d * NS][VS];"
             % dim,
             "    s_t badjugate_data[%d][NQ * VS];"
@@ -8679,7 +8719,7 @@ def _isoparametric_mesh_operator_source(
         [
             "  }",
             "",
-            "  return SFEM_SUCCESS;",
+            *_target().success_return_lines(),
             "}",
             "",
             "} // namespace codegen",
@@ -8696,10 +8736,9 @@ def _isoparametric_mesh_operator_source(
             function,
             params,
             call_args,
-            lambda scalar_type, arguments: [
-                "  return sfem::codegen::%s<%s>(%s);"
-                % (impl, scalar_type, ", ".join(arguments)),
-            ],
+            lambda scalar_type, arguments: list(
+                _target().mesh_launch_lines(impl, scalar_type, arguments)
+            ),
         )
     )
     return lines
@@ -9043,13 +9082,21 @@ def _scalar_packed_jacobian_action_source(
                 "        pk_out[k] = s_t(0);",
                 "      }",
                 "      for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-                _atomic_update_pragma(),
-                "        %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field.name,
+                *_scatter_add_lines(
+                    "%s_out[(owned_nodes_ptr[pack] + k) * out_stride]" % field.name,
+                    "pk_out[k]",
+                    "        ",
+                    "",
+                ),
                 "        pk_out[k] = s_t(0);",
                 "      }",
                 "      for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                _atomic_update_pragma(),
-                "        %s_out[ghosts[k] * out_stride] += pk_out[n_contiguous + k];" % field.name,
+                *_scatter_add_lines(
+                    "%s_out[ghosts[k] * out_stride]" % field.name,
+                    "pk_out[n_contiguous + k]",
+                    "        ",
+                    "",
+                ),
                 "        pk_out[n_contiguous + k] = s_t(0);",
                 "      }",
                 "    }",
@@ -9405,13 +9452,21 @@ def _scalar_packed_affine_jacobian_action_source(
             "        pk_out[k] = s_t(0);",
             "      }",
             "      for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-            _atomic_update_pragma(),
-            "        %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_out[k];" % field.name,
+            *_scatter_add_lines(
+                "%s_out[(owned_nodes_ptr[pack] + k) * out_stride]" % field.name,
+                "pk_out[k]",
+                "        ",
+                "",
+            ),
             "        pk_out[k] = s_t(0);",
             "      }",
             "      for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            _atomic_update_pragma(),
-            "        %s_out[ghosts[k] * out_stride] += pk_out[n_contiguous + k];" % field.name,
+            *_scatter_add_lines(
+                "%s_out[ghosts[k] * out_stride]" % field.name,
+                "pk_out[n_contiguous + k]",
+                "        ",
+                "",
+            ),
             "        pk_out[n_contiguous + k] = s_t(0);",
             "      }",
             "    }",

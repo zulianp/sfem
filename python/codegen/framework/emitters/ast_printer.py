@@ -337,3 +337,40 @@ def lane_loop_header_lines(pragma, indent=""):
         printer=CLikeKernelASTPrinter(vectorize_pragma=pragma or ""),
     )
     return tuple("%s%s" % (indent, line) for line in rendered)
+
+
+def mesh_loop_lines(target, indent="  "):
+    """The target's pass over the mesh, spelled.
+
+    The decision -- blocked over `VS` with a tail count, or grid-strided with
+    one element per thread -- is `TargetPlatform.mesh_loop_nodes`; this is the
+    only place it becomes text.  The split is the one `work_item_scope_node`
+    already uses: `targets` is index 4 and `ir` is index 3, so a target may
+    build a node and may not spell one.
+
+    Each successive line is one level deeper: the loop header, then whatever it
+    declares inside.
+    """
+    return _indented_nodes(target.mesh_loop_nodes(), "mesh_loop", indent)
+
+
+def element_loop_lines(target, pragma_indent="", indent="  ", reduction=None):
+    """The target's scalar pass over the mesh, spelled.
+
+    `pragma_indent` exists only because the tracked tree spells the parallel-for
+    pragma at column 0 in one caller and at column 2 in another.  It reproduces
+    an inconsistency faithfully rather than deciding it; settling on one column
+    is a deliberate whitespace diff of its own.
+    """
+    return (
+        *(
+            "%s%s" % (pragma_indent, pragma)
+            for pragma in target.parallel_element_loop_lines("static", reduction)
+        ),
+        *_indented_nodes(target.element_loop_nodes(), "element_loop", indent),
+    )
+
+
+def _indented_nodes(nodes, reason, indent):
+    rendered = render_kernel_ast_lines(reason, nodes)
+    return tuple("%s%s" % (indent * (1 + i), line) for i, line in enumerate(rendered))
