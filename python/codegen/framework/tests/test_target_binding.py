@@ -30,6 +30,11 @@ from codegen.framework.targets import (
     use_target,
 )
 from codegen.framework.targets.targets import ARMSVETarget, HIPTarget
+from codegen.framework.emitters.ast_printer import element_loop_lines, mesh_loop_lines
+from codegen.framework.emitters.energy import (
+    CUDAEnergySoASourceBuilder,
+    OpenMPEnergySoASourceBuilder,
+)
 
 
 EMITTERS = os.path.join(
@@ -249,8 +254,13 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     #: path that bypassed the target binding is the cheapest way to improve this
     #: budget, and the least informative -- the six that left were never going
     #: to be ported, they were going to be deleted.
+    #: 9 -> 8 in the residual emitter when the mesh-kernel lowering moved onto
+    #: `TargetPlatform`.  The one that left was the element loop the matrix
+    #: assembly opens; the remaining eight are the pack loop, the ghost-reduce
+    #: loop, the parallel-region pairs and the three non-BSR matrix scatters
+    #: described above.
     BUDGET = {
-        "residual_codegen.py": 9,
+        "residual_codegen.py": 8,
         "energy_codegen.py": 9,
     }
 
@@ -292,6 +302,98 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
                     self._literal_pragmas(name),
                     0,
                     "%s hardcodes a pragma; route it through the target" % name,
+                )
+
+
+class MeshLoweringAccessorTest(unittest.TestCase):
+    """What each target answers for the pass over the mesh, spelled out.
+
+    Beside `WorkItemAccessorTest`, which does the same for the scope *inside*
+    one block.  These five answers are what an emitter used to write by hand,
+    and writing them by hand is how a `__global__` kernel came to contain
+    `#pragma omp parallel for` (which vanishes, leaving a serial walk of every
+    element) and `return SFEM_SUCCESS;` (which does not compile, and is the
+    only reason the first case was ever noticed).
+
+    The loops come back as IR and `emitters/ast_printer` spells them, because
+    `targets` is index 4 and `ir` is index 3: a target may build a node and may
+    not spell one.
+    """
+
+    def test_openmp_walks_the_mesh_in_blocks_on_the_host(self):
+        target = OpenMPTarget()
+        loop, extent = mesh_loop_lines(target)
+        self.assertEqual(loop, "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {")
+        self.assertEqual(
+            extent, "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);"
+        )
+        self.assertEqual(target.mesh_function_line("k"), "static SFEM_INLINE int k(")
+        self.assertEqual(target.success_return_lines(), ("  return SFEM_SUCCESS;",))
+        self.assertEqual(
+            target.mesh_launch_lines("k", "double, geom_t", ("a", "b")),
+            ("  return sfem::codegen::k<double, geom_t>(a, b);",),
+        )
+
+    def test_cuda_walks_the_mesh_with_a_grid_of_threads(self):
+        target = CUDATarget()
+        loop, extent = mesh_loop_lines(target)
+        self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", loop)
+        self.assertIn("evb += (ptrdiff_t)blockDim.x * gridDim.x", loop)
+        # one element per thread, so the block's tail count is not a count
+        self.assertEqual(extent, "    const int ne = 1;")
+        self.assertEqual(target.mesh_function_line("k"), "__global__ void k(")
+        # a `__global__` kernel returns void, so there is no status to give
+        self.assertEqual(target.success_return_lines(), ())
+        launch = target.mesh_launch_lines("k", "double", ("a",))
+        self.assertIn("<<<grid_size, block_size>>>", launch[2])
+        self.assertEqual(launch[-1], "  return SFEM_SUCCESS;")
+
+    def test_the_scalar_pass_follows_the_same_split(self):
+        openmp = element_loop_lines(OpenMPTarget())
+        self.assertEqual(openmp[0], "#pragma omp parallel for schedule(static)")
+        self.assertEqual(
+            openmp[1], "  for (ptrdiff_t element = 0; element < nelements; ++element) {"
+        )
+        cuda = element_loop_lines(CUDATarget())
+        # no pragma to drop, and the loop itself is the grid stride
+        self.assertEqual(len(cuda), 1)
+        self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", cuda[0])
+
+    def test_the_scatter_is_one_decision_not_two(self):
+        # a target without an atomic pragma does not want the pragma dropped
+        # and the `+=` kept; it wants `atomicAdd`
+        self.assertEqual(
+            OpenMPTarget().scatter_add_lines("out[i]", "e", "    "),
+            ("    #pragma omp atomic update", "    out[i] += e;"),
+        )
+        self.assertEqual(
+            CUDATarget().scatter_add_lines("out[i]", "e", "    "),
+            ("    atomicAdd(&(out[i]), e);",),
+        )
+
+    def test_the_energy_source_builders_forward_rather_than_repeat(self):
+        """The builders answer exactly what their target does.
+
+        They each held their own copy of these five before, which is how the
+        constant-P1 simplex paths came to have a third spelling written inline
+        in `energy_codegen`.
+        """
+        for builder, target in (
+            (OpenMPEnergySoASourceBuilder(), OpenMPTarget()),
+            (CUDAEnergySoASourceBuilder(), CUDATarget()),
+        ):
+            with self.subTest(target=target.name):
+                self.assertEqual(builder.mesh_loop_lines(), mesh_loop_lines(target))
+                self.assertEqual(builder.element_loop_lines(), element_loop_lines(target))
+                self.assertEqual(
+                    builder.mesh_function_line("k"), target.mesh_function_line("k")
+                )
+                self.assertEqual(
+                    builder.success_return_lines(), target.success_return_lines()
+                )
+                self.assertEqual(
+                    builder.wrapper_call_lines("k", "double", ", geom_t", ("a",)),
+                    target.mesh_launch_lines("k", "double, geom_t", ("a",)),
                 )
 
 
