@@ -1115,19 +1115,36 @@ def _sfem_soa_direct_hessian_element_matrix_function(
                 % quadrature_rule.dim,
             ]
         )
-    lines.extend(
-        _sfem_soa_direct_hessian_matrix_assembly_lines(
-            form,
-            dim,
-            quadrature_rule,
-            reference_inputs,
-            use_tensor_product_reference,
-            use_reference_gradient_vectors,
-            "",
-            "  ",
-            emit_tensor_product_static_constants=False,
+    # Which shape this element's matrix is built in is its evaluation
+    # strategy's answer, the same table the apply reads.  A tensor-product
+    # element contracts its test functions dimension by dimension; anything else
+    # does it point by point.
+    if use_tensor_product_reference:
+        lines.extend(
+            _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
+                form,
+                dim,
+                quadrature_rule,
+                reference_inputs,
+                "",
+                "  ",
+                emit_tensor_product_static_constants=False,
+            )
         )
-    )
+    else:
+        lines.extend(
+            _sfem_soa_direct_hessian_matrix_assembly_lines(
+                form,
+                dim,
+                quadrature_rule,
+                reference_inputs,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                "",
+                "  ",
+                emit_tensor_product_static_constants=False,
+            )
+        )
     lines.append("}")
     # The signature is a tree; the body is not yet.  Splitting the
     # finished list at its opening brace is deliberately the least
@@ -6811,6 +6828,269 @@ def _sfem_soa_direct_hessian_current_gradient_lines(
             )
     lines.append("%s}" % indent)
     return lines + _sfem_soa_direct_hessian_push_forward_lines(weak_form, dim, indent)
+
+
+def _sfem_soa_direct_hessian_point_geometry_lines(dim, indent):
+    """The adjugate, the determinant and its reciprocal at one quadrature point.
+
+    Shared by the two assembly shapes: they disagree about which loop is
+    outermost, not about what the geometry at a point is.
+    """
+    lines = [
+        *("%s%s" % (indent, line) for line in current_target().work_item_prologue_lines()),
+        "%sconst ptrdiff_t goff = %s;"
+        % (indent, current_target().work_item_offset("q", "VS")),
+    ]
+    lines.extend(
+        "%sconst s_t %s = badj%d[goff];"
+        % (indent, current_target().work_item_name("adj", component), component)
+        for component in range(dim * dim)
+    )
+    lines.extend(
+        [
+            "%sconst s_t %s = bdet0[goff];"
+            % (indent, current_target().work_item_name("det", 0)),
+            "%sconst s_t idet = s_t(1) / %s;"
+            % (indent, current_target().work_item_name("det", 0)),
+        ]
+    )
+    return lines
+
+
+def _sfem_soa_direct_hessian_trial_gradient_lines(
+    dim,
+    reference_gradient_expr,
+    indent,
+):
+    """The trial basis function's physical gradient, staged for the material.
+
+    `trial_grad` is the field gradient a *single* trial degree of freedom
+    produces: zero everywhere but the component it belongs to, which is what
+    makes the material evaluated against it that degree of freedom's column.
+    `reference_gradient_expr(k)` is however the caller's element spells the
+    reference gradient -- a one-dimensional product on a tensor-product element,
+    a table lookup elsewhere.
+
+    A field gradient has one row per field component and one column per spatial
+    direction, so it is `NC * ND` entries strided by `ND`.  Both used to be
+    spelled `NC`, which is right only for a displacement: a scalar field in two
+    dimensions then declared `trial_grad[1]` and wrote index 1, which the
+    compiler will tell you about under `-Warray-bounds` and which no material
+    reached until laplace was written as an energy.
+    """
+    lines = [
+        "%sconst s_t trial_grad_ref%d = %s;" % (indent, k, reference_gradient_expr(k))
+        for k in range(dim)
+    ]
+    lines.extend(
+        [
+            "%ss_t trial_grad[NC * ND];" % indent,
+            "%sfor (int i = 0; i < NC * ND; ++i) {" % indent,
+            "%s  trial_grad[i] = s_t(0);" % indent,
+            "%s}" % indent,
+        ]
+    )
+    for phys_component in range(dim):
+        terms = [
+            "trial_grad_ref%d * %s"
+            % (
+                ref_component,
+                current_target().work_item_name("adj", ref_component * dim + phys_component),
+            )
+            for ref_component in range(dim)
+        ]
+        lines.append(
+            "%strial_grad[trial_component * ND + %d] = (%s) * idet;"
+            % (indent, phys_component, " + ".join(terms))
+        )
+    return lines
+
+
+def _sfem_soa_direct_hessian_material_lines(material, dim, indent):
+    """The material's response to that trial gradient, eliminated once."""
+    lines = ["%ss_t material[NC * ND];" % indent]
+    body = []
+    _append_cse_array_assignments(
+        body,
+        tuple(material),
+        ["material[%d] =" % i for i in range(dim * dim)],
+        "weak_hess_tmp",
+    )
+    lines.extend("%s%s" % (indent, line.strip()) for line in body)
+    return lines
+
+
+def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
+    form,
+    dim,
+    quadrature_rule,
+    reference_inputs,
+    reference_prefix,
+    indent,
+    emit_tensor_product_static_constants=True,
+):
+    """The element matrix of a tensor-product element, a column at a time.
+
+    The shape this element's evaluation strategy asks for, and the reason it is
+    not the quadrature shape is complexity.  Contracting the test functions
+    point by point costs `NQ * NDOFS` per column, which is `p^6` for a degree-`p`
+    element in three dimensions and `p^9` for the whole matrix.
+    `tensor_test_scalar` is the same contraction taken one dimension at a time,
+    at `p^4` a column and `p^7` in all, and it is the routine the matrix-free
+    apply on this element already calls.  The state is evaluated the same way,
+    once, by `tensor_gradient_contiguous_scalar`.
+
+    The `_scalar` micro-kernels are the ones this kernel wants.  Assembly has a
+    single element in hand -- it scatters into a sparse row and has nowhere to
+    put a block of them -- so the lane-blocked ones would carry a lane loop that
+    runs once and stage buffers with `VS - 1` slots nobody writes.
+
+    The loop order is the other half of the change.  Quadrature was outermost
+    and the trial degree of freedom inside it; the factorised contraction wants
+    every quadrature point of one column in hand at once, so the column is
+    outermost now and `flux` spans the rule.
+    """
+    n_field_components = form_n_field_components(form, dim)
+    uses_current = form_reads_current(form, default=True)
+    weak_form = form.weak_form
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        _weak_form_deformation_gradient_substitutions(
+            weak_form,
+            "gu",
+            scalar_temporaries=True,
+        ),
+        tuple(
+            sp.symbols("trial_grad[%d]" % i)
+            for i in range(weak_form.n_field_components * dim)
+        ),
+    )
+    lines = [
+        "%sfor (int entry = 0; entry < NDOFS * NDOFS; ++entry) {" % indent,
+        "%s  element_matrix[entry] = s_t(0);" % indent,
+        "%s}" % indent,
+    ]
+    if emit_tensor_product_static_constants:
+        lines.extend(
+            [
+                kernel_constant("NQ1", quadrature_rule.tensor_product_n_qp_1d, indent=indent),
+                kernel_constant("NS1", quadrature_rule.tensor_product_n_shape_1d, indent=indent),
+            ]
+        )
+    if uses_current:
+        lines.extend(
+            _sfem_soa_direct_hessian_state_gradient_lines(dim, reference_prefix, indent)
+        )
+    lines.extend(
+        [
+            # One column's reference flux at every quadrature point, which is
+            # what the factorised contraction consumes.
+            "%ss_t flux[NC * NQ * ND];" % indent,
+            # Where the column lands.  `tensor_test_scalar` accumulates through
+            # a stream per degree of freedom, so pointing those streams straight
+            # into the matrix writes the column with no scratch vector and no
+            # copy after it.
+            "%ss_t *column[NC * NS];" % indent,
+            "%sfor (int trial_component = 0; trial_component < NC; ++trial_component) {"
+            % indent,
+            "%s  for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {" % indent,
+        ]
+    )
+    lines.extend(
+        _tensor_product_shape_coordinate_lines(dim, "trial_shape", "trial", "%s    " % indent)
+    )
+    lines.append("%s    for (int q = 0; q < NQ; ++q) {" % indent)
+    lines.extend(tensor_product_q_index_lines(dim, "%s      " % indent))
+    lines.append(
+        "%s      const s_t qw = %s;"
+        % (indent, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+    )
+    lines.extend(
+        _sfem_soa_direct_hessian_point_geometry_lines(dim, "%s      " % indent)
+    )
+    if uses_current:
+        lines.extend(
+            _sfem_soa_direct_hessian_current_gradient_lines(
+                weak_form,
+                dim,
+                n_field_components,
+                reference_inputs,
+                True,
+                False,
+                reference_prefix,
+                "%s      " % indent,
+            )
+        )
+    lines.extend(
+        _sfem_soa_direct_hessian_trial_gradient_lines(
+            dim,
+            lambda k: _sfem_soa_reference_gradient_expr_for_shape(
+                dim,
+                k,
+                True,
+                False,
+                reference_inputs,
+                "trial_shape",
+                coord_prefix="trial",
+                reference_prefix=reference_prefix,
+            ),
+            "%s      " % indent,
+        )
+    )
+    lines.extend(
+        _sfem_soa_direct_hessian_material_lines(material, dim, "%s      " % indent)
+    )
+    # Back to the reference element, weighted: this is what the contraction
+    # integrates, and it is the same expression the point-by-point shape
+    # multiplied a test gradient by, with the test function taken out of it.
+    for row in range(n_field_components):
+        for k in range(dim):
+            terms = [
+                "material[%s] * %s"
+                % (
+                    c_sum(c_product(row, "ND"), d),
+                    current_target().work_item_name("adj", k * dim + d),
+                )
+                for d in range(dim)
+            ]
+            lines.append(
+                "%s      flux[%s] = qw * (%s);"
+                % (
+                    indent,
+                    c_sum(c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"), k),
+                    " + ".join(terms),
+                )
+            )
+    lines.append("%s    }" % indent)
+    lines.extend(
+        [
+            "%s    for (int out_shape = 0; out_shape < NS; ++out_shape) {" % indent,
+            *(
+                "%s      column[out_shape * NC + %d] = "
+                "&element_matrix[(%d * NS + out_shape) * NDOFS "
+                "+ trial_component * NS + trial_shape];" % (indent, row, row)
+                for row in range(n_field_components)
+            ),
+            "%s    }" % indent,
+        ]
+    )
+    for row in range(n_field_components):
+        lines.extend(
+            [
+                "%s    tensor_test_scalar<s_t, NQ, NS, VS, %d, NC>(" % (indent, dim),
+                "%s        %sshape_1d, %sgrad_1d, flux + %s, column, %d);"
+                % (
+                    indent,
+                    reference_prefix,
+                    reference_prefix,
+                    c_product(row, "NQ", "ND"),
+                    row,
+                ),
+            ]
+        )
+    lines.extend(["%s  }" % indent, "%s}" % indent])
+    return lines
 
 
 def _sfem_soa_direct_hessian_matrix_assembly_lines(

@@ -60,29 +60,31 @@ static SFEM_INLINE void laplace_d3_tensor_product_direct_hessian_tensor_product_
   for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {
     element_matrix[entry] = s_t(0);
   }
-  for (int q = 0; q < NQ; ++q) {
-    const int qx = q % NQ1;
-    const int qy = (q / NQ1) % NQ1;
-    const int qz = q / (NQ1 * NQ1);
-    const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-    const int lane = 0;
-    const ptrdiff_t goff = q * VS + lane;
-    const s_t adj_lane0 = badj0[goff];
-    const s_t adj_lane1 = badj1[goff];
-    const s_t adj_lane2 = badj2[goff];
-    const s_t adj_lane3 = badj3[goff];
-    const s_t adj_lane4 = badj4[goff];
-    const s_t adj_lane5 = badj5[goff];
-    const s_t adj_lane6 = badj6[goff];
-    const s_t adj_lane7 = badj7[goff];
-    const s_t adj_lane8 = badj8[goff];
-    const s_t det_lane0 = bdet0[goff];
-    const s_t idet = s_t(1) / det_lane0;
-    for (int trial_component = 0; trial_component < NC; ++trial_component) {
-      for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
-        const int trial_sx = trial_shape % NS1;
-        const int trial_sy = (trial_shape / NS1) % NS1;
-        const int trial_sz = trial_shape / (NS1 * NS1);
+  s_t flux[NC * NQ * ND];
+  s_t *column[NC * NS];
+  for (int trial_component = 0; trial_component < NC; ++trial_component) {
+    for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
+      const int trial_sx = trial_shape % NS1;
+      const int trial_sy = (trial_shape / NS1) % NS1;
+      const int trial_sz = trial_shape / (NS1 * NS1);
+      for (int q = 0; q < NQ; ++q) {
+        const int qx = q % NQ1;
+        const int qy = (q / NQ1) % NQ1;
+        const int qz = q / (NQ1 * NQ1);
+        const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
+        const int lane = 0;
+        const ptrdiff_t goff = q * VS + lane;
+        const s_t adj_lane0 = badj0[goff];
+        const s_t adj_lane1 = badj1[goff];
+        const s_t adj_lane2 = badj2[goff];
+        const s_t adj_lane3 = badj3[goff];
+        const s_t adj_lane4 = badj4[goff];
+        const s_t adj_lane5 = badj5[goff];
+        const s_t adj_lane6 = badj6[goff];
+        const s_t adj_lane7 = badj7[goff];
+        const s_t adj_lane8 = badj8[goff];
+        const s_t det_lane0 = bdet0[goff];
+        const s_t idet = s_t(1) / det_lane0;
         const s_t trial_grad_ref0 = grad_1d[qx * NS1 + trial_sx] * shape_1d[qy * NS1 + trial_sy] * shape_1d[qz * NS1 + trial_sz];
         const s_t trial_grad_ref1 = shape_1d[qx * NS1 + trial_sx] * grad_1d[qy * NS1 + trial_sy] * shape_1d[qz * NS1 + trial_sz];
         const s_t trial_grad_ref2 = shape_1d[qx * NS1 + trial_sx] * shape_1d[qy * NS1 + trial_sy] * grad_1d[qz * NS1 + trial_sz];
@@ -97,24 +99,15 @@ static SFEM_INLINE void laplace_d3_tensor_product_direct_hessian_tensor_product_
         material[0] = kappa*trial_grad[0];
         material[1] = kappa*trial_grad[1];
         material[2] = kappa*trial_grad[2];
-        for (int test_component = 0; test_component < NC; ++test_component) {
-          for (int test_shape = 0; test_shape < NS; ++test_shape) {
-            const int test_sx = test_shape % NS1;
-            const int test_sy = (test_shape / NS1) % NS1;
-            const int test_sz = test_shape / (NS1 * NS1);
-            const s_t test_grad_ref0 = grad_1d[qx * NS1 + test_sx] * shape_1d[qy * NS1 + test_sy] * shape_1d[qz * NS1 + test_sz];
-            const s_t test_grad_ref1 = shape_1d[qx * NS1 + test_sx] * grad_1d[qy * NS1 + test_sy] * shape_1d[qz * NS1 + test_sz];
-            const s_t test_grad_ref2 = shape_1d[qx * NS1 + test_sx] * shape_1d[qy * NS1 + test_sy] * grad_1d[qz * NS1 + test_sz];
-            s_t entry = s_t(0);
-            entry += test_grad_ref0 * qw * (material[test_component * ND] * adj_lane0 + material[test_component * ND + 1] * adj_lane1 + material[test_component * ND + 2] * adj_lane2);
-            entry += test_grad_ref1 * qw * (material[test_component * ND] * adj_lane3 + material[test_component * ND + 1] * adj_lane4 + material[test_component * ND + 2] * adj_lane5);
-            entry += test_grad_ref2 * qw * (material[test_component * ND] * adj_lane6 + material[test_component * ND + 1] * adj_lane7 + material[test_component * ND + 2] * adj_lane8);
-            const int row = test_component * NS + test_shape;
-            const int col = trial_component * NS + trial_shape;
-            element_matrix[row * NDOFS + col] += entry;
-          }
-        }
+        flux[q * ND] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1 + material[2] * adj_lane2);
+        flux[q * ND + 1] = qw * (material[0] * adj_lane3 + material[1] * adj_lane4 + material[2] * adj_lane5);
+        flux[q * ND + 2] = qw * (material[0] * adj_lane6 + material[1] * adj_lane7 + material[2] * adj_lane8);
       }
+      for (int out_shape = 0; out_shape < NS; ++out_shape) {
+        column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * NDOFS + trial_component * NS + trial_shape];
+      }
+      tensor_test_scalar<s_t, NQ, NS, VS, 3, NC>(
+          shape_1d, grad_1d, flux + 0, column, 0);
     }
   }
 }
