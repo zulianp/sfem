@@ -3645,10 +3645,11 @@ static SFEM_INLINE void hex8_linear_elasticity_objective_at_qp(const scalar_t *c
     scalar_t disp_grad[9];
     hex8_displacement_gradient(adjugate, jacobian_determinant, qx, qy, qz, dispx, dispy, dispz, disp_grad);
 
-    v[0] = scalar_t(1.0 / 2.0) * jacobian_determinant * qw *
-           (lmbda * POW2(disp_grad[0] + disp_grad[4] + disp_grad[8]) +
-            mu * (2 * POW2(disp_grad[0]) + 2 * POW2(disp_grad[4]) + 2 * POW2(disp_grad[8]) + POW2(disp_grad[1] + disp_grad[3]) +
-                  POW2(disp_grad[2] + disp_grad[6]) + POW2(disp_grad[5] + disp_grad[7])));
+    v[0] += scalar_t(1.0 / 2.0) * jacobian_determinant * qw *
+            (lmbda * POW2(disp_grad[0] + disp_grad[4] + disp_grad[8]) +
+             mu * (2 * POW2(disp_grad[0]) + 2 * POW2(disp_grad[4]) + 2 * POW2(disp_grad[8]) +
+                   POW2(disp_grad[1] + disp_grad[3]) + POW2(disp_grad[2] + disp_grad[6]) +
+                   POW2(disp_grad[5] + disp_grad[7])));
 }
 
 static SFEM_INLINE void hex8_linear_elasticity_objective_integral(const scalar_t *const SFEM_RESTRICT lx,

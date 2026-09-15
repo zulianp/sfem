@@ -36,7 +36,7 @@ static SFEM_INLINE void tet4_neohookean_ogden_objective_integral(const scalar_t 
                                                                  const scalar_t *const SFEM_RESTRICT dispy,
                                                                  const scalar_t *const SFEM_RESTRICT dispz,
                                                                  scalar_t *const SFEM_RESTRICT       v) {
-    tet4_neohookean_ogden_objective_elemental(adjugate, jacobian_determinant, mu, lmbda, dispx, dispy, dispz, v);
+    tet4_neohookean_ogden_objective_elemental(adjugate, jacobian_determinant, lmbda, mu, dispx, dispy, dispz, v);
 }
 
 static SFEM_INLINE void tet4_neohookean_ogden_objective_steps_integral(const scalar_t *const SFEM_RESTRICT adjugate,

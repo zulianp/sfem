@@ -1,0 +1,208 @@
+schema_version: 2
+id: hyperelastic_modes_3d
+name: Three-dimensional homogeneous hyperelastic modes
+kind: verification
+family: hyperelastic
+dimension: 3
+tier: fast
+
+source:
+  description: Closed-form homogeneous strain energy and first Piola stress
+  reference: README.md
+
+oracle:
+  type: analytical
+  implementation: oracle.py
+
+material:
+  mu: 2.0
+  lambda: 3.0
+  c1: 1.25
+  c2: 0.75
+  kappa: 5.0
+
+modes:
+  - uniaxial_extension
+  - simple_shear
+  - isotropic_dilation
+  - combined_nonsymmetric
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - "{mesh}"
+    - --element
+    - "{element}"
+    - --nx
+    - "{resolution_nx}"
+    - --ny
+    - "{resolution_ny}"
+    - --nz
+    - "{resolution_nz}"
+    - --transform
+    - "{resolution_transform}"
+
+inputs:
+  - {template: operator.yaml, output: "{output}/operator.yaml"}
+  - {template: dirichlet_uniaxial_extension.yaml, output: "{output}/dirichlet_uniaxial_extension.yaml"}
+  - {template: dirichlet_simple_shear.yaml, output: "{output}/dirichlet_simple_shear.yaml"}
+  - {template: dirichlet_isotropic_dilation.yaml, output: "{output}/dirichlet_isotropic_dilation.yaml"}
+  - {template: dirichlet_combined_nonsymmetric.yaml, output: "{output}/dirichlet_combined_nonsymmetric.yaml"}
+
+verification:
+  command:
+    - "{python}"
+    - "{case_dir}/verify.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{output}"
+    - --report
+    - "{output}/verification.json"
+  report: "{output}/verification.json"
+  tolerances:
+    uniaxial_extension_displacement_relative_l2: 1.0e-9
+    uniaxial_extension_free_residual_normalized: 1.0e-9
+    uniaxial_extension_energy_relative: 1.0e-8
+    uniaxial_extension_reaction_relative_l2: 1.0e-8
+    uniaxial_extension_minimum_jacobian_deficit: 0.0
+    simple_shear_displacement_relative_l2: 1.0e-9
+    simple_shear_free_residual_normalized: 1.0e-9
+    simple_shear_energy_relative: 1.0e-8
+    simple_shear_reaction_relative_l2: 1.0e-8
+    simple_shear_minimum_jacobian_deficit: 0.0
+    isotropic_dilation_displacement_relative_l2: 1.0e-9
+    isotropic_dilation_free_residual_normalized: 1.0e-9
+    isotropic_dilation_energy_relative: 1.0e-8
+    isotropic_dilation_reaction_relative_l2: 1.0e-8
+    isotropic_dilation_minimum_jacobian_deficit: 0.0
+    combined_nonsymmetric_displacement_relative_l2: 1.0e-9
+    combined_nonsymmetric_free_residual_normalized: 1.0e-9
+    combined_nonsymmetric_energy_relative: 1.0e-8
+    combined_nonsymmetric_reaction_relative_l2: 1.0e-8
+    combined_nonsymmetric_minimum_jacobian_deficit: 0.0
+
+variants:
+  - id: generated_neohookean_tet4
+    operator: GeneratedNeoHookeanOgden
+    element: TET4
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
+    driver: &generated_driver
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --kind
+        - hyperelastic
+        - --driver
+        - "{build_dir}/hyperelasticy"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - uniaxial_extension
+        - simple_shear
+        - isotropic_dilation
+        - combined_nonsymmetric
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_OPERATOR_CONFIG: "{output}/operator.yaml"
+        SFEM_VERBOSE: 0
+        SFEM_NL_TOL: 1.0e-11
+        SFEM_NL_MAX_IT: 30
+        SFEM_LSOLVE_RTOL: 1.0e-12
+        SFEM_ENABLE_LINE_SEARCH: 0
+    expected_output: &expected_output
+      required:
+        - {pattern: SFEM_AFFINE_MODE_COMPLETE, count: 4}
+      forbidden:
+        - Newton did not converge
+        - No progress made
+        - "(max iterations)"
+    tolerances: &variant_tolerances
+      uniaxial_extension_displacement_relative_l2: 1.0e-9
+
+  - id: generated_neohookean_hex8
+    operator: GeneratedNeoHookeanOgden
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
+    driver: *generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_modified_mooney_rivlin_tet4
+    operator: GeneratedModifiedMooneyRivlin
+    element: TET4
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
+    driver: *generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_modified_mooney_rivlin_hex8
+    operator: GeneratedModifiedMooneyRivlin
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
+    driver: *generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_saint_venant_kirchhoff_tet4
+    operator: GeneratedSaintVenantKirchhoff
+    element: TET4
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
+    driver: *generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_saint_venant_kirchhoff_hex8
+    operator: GeneratedSaintVenantKirchhoff
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
+    driver: *generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: legacy_neohookean_tet4
+    operator: NeoHookeanOgden
+    element: TET4
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
+    driver: &legacy_driver
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --kind
+        - hyperelastic
+        - --driver
+        - "{build_dir}/hyperelasticy"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - uniaxial_extension
+        - simple_shear
+        - isotropic_dilation
+        - combined_nonsymmetric
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_OPERATOR: NeoHookeanOgden
+        SFEM_SHEAR_MODULUS: "{material_mu}"
+        SFEM_FIRST_LAME_PARAMETER: "{material_lambda}"
+        SFEM_VERBOSE: 0
+        SFEM_NL_TOL: 1.0e-11
+        SFEM_NL_MAX_IT: 30
+        SFEM_LSOLVE_RTOL: 1.0e-12
+        SFEM_ENABLE_LINE_SEARCH: 0
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: legacy_neohookean_hex8
+    operator: NeoHookeanOgden
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
+    driver: *legacy_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances

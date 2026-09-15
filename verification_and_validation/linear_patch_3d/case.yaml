@@ -1,0 +1,137 @@
+schema_version: 2
+id: linear_patch_3d
+name: Three-dimensional linear-elastic affine patch
+kind: verification
+family: elastic
+dimension: 3
+tier: fast
+
+source:
+  description: Closed-form affine displacement, stress, energy, and reactions
+  reference: README.md
+
+oracle:
+  type: analytical
+  implementation: oracle.py
+
+material:
+  mu: 2.0
+  lambda: 3.0
+
+modes:
+  - deviatoric_extension
+  - simple_shear
+  - triaxial_dilation
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - "{mesh}"
+    - --element
+    - "{element}"
+    - --nx
+    - "{resolution_nx}"
+    - --ny
+    - "{resolution_ny}"
+    - --nz
+    - "{resolution_nz}"
+    - --transform
+    - "{resolution_transform}"
+
+inputs:
+  - {template: operator.yaml, output: "{output}/operator.yaml"}
+  - {template: dirichlet_deviatoric_extension.yaml, output: "{output}/dirichlet_deviatoric_extension.yaml"}
+  - {template: dirichlet_simple_shear.yaml, output: "{output}/dirichlet_simple_shear.yaml"}
+  - {template: dirichlet_triaxial_dilation.yaml, output: "{output}/dirichlet_triaxial_dilation.yaml"}
+
+verification:
+  command:
+    - "{python}"
+    - "{case_dir}/verify.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{output}"
+    - --report
+    - "{output}/verification.json"
+  report: "{output}/verification.json"
+  tolerances:
+    deviatoric_extension_displacement_relative_l2: 1.0e-10
+    deviatoric_extension_free_residual_normalized: 1.0e-10
+    deviatoric_extension_energy_relative: 1.0e-9
+    deviatoric_extension_reaction_relative_l2: 1.0e-9
+    simple_shear_displacement_relative_l2: 1.0e-10
+    simple_shear_free_residual_normalized: 1.0e-10
+    simple_shear_energy_relative: 1.0e-9
+    simple_shear_reaction_relative_l2: 1.0e-9
+    triaxial_dilation_displacement_relative_l2: 1.0e-10
+    triaxial_dilation_free_residual_normalized: 1.0e-10
+    triaxial_dilation_energy_relative: 1.0e-9
+    triaxial_dilation_reaction_relative_l2: 1.0e-9
+
+variants:
+  - id: legacy_tet4
+    operator: LinearElasticity
+    element: TET4
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
+    material_parameter_map: {mu: mu, lambda: lambda}
+    driver: &driver
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --kind
+        - linear
+        - --driver
+        - "{build_dir}/linear_elasticity"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - deviatoric_extension
+        - simple_shear
+        - triaxial_dilation
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_REORDER: 0
+        SFEM_USE_PACKED_MESH: 0
+        SFEM_VERBOSE: 0
+        SFEM_RTOL: 1.0e-13
+        SFEM_MAX_IT: 20000
+    expected_output: &expected_output
+      required:
+        - {pattern: SFEM_AFFINE_MODE_COMPLETE, count: 3}
+      forbidden:
+        - No progress made
+        - "(max iterations)"
+    tolerances: &variant_tolerances
+      deviatoric_extension_displacement_relative_l2: 1.0e-10
+
+  - id: generated_tet4
+    operator: GeneratedLinearElasticity
+    element: TET4
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: legacy_hex8
+    operator: LinearElasticity
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
+    material_parameter_map: {mu: mu, lambda: lambda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_hex8
+    operator: GeneratedLinearElasticity
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances

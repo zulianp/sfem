@@ -1,0 +1,11 @@
+dirichlet_conditions:
+  - type: nodeset
+    format: file
+    path: {mesh}/sets/boundary.int32.raw
+    value: {path: {mesh}/boundary_values/uniaxial_extension.0.float64.raw}
+    component: 0
+  - type: nodeset
+    format: file
+    path: {mesh}/sets/boundary.int32.raw
+    value: {path: {mesh}/boundary_values/uniaxial_extension.1.float64.raw}
+    component: 1

@@ -2,8 +2,8 @@
 
 The modules in this directory support self-contained verification and
 validation cases. They depend only on NumPy and PyYAML from the repository
-virtual environment. They do not call SFEM operators, so constitutive oracle
-equations remain independent and visible inside each case.
+virtual environment. They do not call SFEM operators. Shared oracle equations
+are explicitly named and remain independent from SFEM's generated kernels.
 
 ## Modules
 
@@ -18,6 +18,8 @@ equations remain independent and visible inside each case.
 | `metrics.py` | Absolute, relative, weighted, maximum, and interpolated curve errors with explicit norm floors. |
 | `convergence.py` | Spatial and temporal log-log convergence fits. |
 | `reporting.py` | Strict construction, serialization, and validation of per-variant `verification.json`. |
+| `affine.py` | Affine mesh, boundary-field, result-reading, and physical-check helpers. |
+| `hyperelastic.py` | Independent closed-form hyperelastic energy and first-Piola oracles. |
 
 ## Conventions
 

@@ -1,0 +1,126 @@
+schema_version: 2
+id: linear_patch_2d
+name: Two-dimensional linear-elastic affine patch
+kind: verification
+family: elastic
+dimension: 2
+tier: fast
+
+source:
+  description: Closed-form affine plane-strain displacement, stress, energy, and reactions
+  reference: README.md
+
+oracle:
+  type: analytical
+  implementation: oracle.py
+
+material:
+  mu: 2.0
+  lambda: 3.0
+
+modes:
+  - deviatoric_extension
+  - simple_shear
+  - mixed_volumetric
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - "{mesh}"
+    - --element
+    - "{element}"
+    - --nx
+    - "{resolution_nx}"
+    - --ny
+    - "{resolution_ny}"
+    - --transform
+    - "{resolution_transform}"
+
+inputs:
+  - {template: operator.yaml, output: "{output}/operator.yaml"}
+  - {template: dirichlet_deviatoric_extension.yaml, output: "{output}/dirichlet_deviatoric_extension.yaml"}
+  - {template: dirichlet_simple_shear.yaml, output: "{output}/dirichlet_simple_shear.yaml"}
+  - {template: dirichlet_mixed_volumetric.yaml, output: "{output}/dirichlet_mixed_volumetric.yaml"}
+
+verification:
+  command:
+    - "{python}"
+    - "{case_dir}/verify.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{output}"
+    - --report
+    - "{output}/verification.json"
+  report: "{output}/verification.json"
+  tolerances:
+    deviatoric_extension_displacement_relative_l2: 1.0e-10
+    deviatoric_extension_free_residual_normalized: 1.0e-10
+    deviatoric_extension_energy_relative: 1.0e-9
+    deviatoric_extension_reaction_relative_l2: 1.0e-9
+    simple_shear_displacement_relative_l2: 1.0e-10
+    simple_shear_free_residual_normalized: 1.0e-10
+    simple_shear_energy_relative: 1.0e-9
+    simple_shear_reaction_relative_l2: 1.0e-9
+    mixed_volumetric_displacement_relative_l2: 1.0e-10
+    mixed_volumetric_free_residual_normalized: 1.0e-10
+    mixed_volumetric_energy_relative: 1.0e-9
+    mixed_volumetric_reaction_relative_l2: 1.0e-9
+
+variants:
+  - id: legacy_tri3
+    operator: LinearElasticity
+    element: TRI3
+    resolution: {nx: 4, ny: 4, transform: skewed}
+    material_parameter_map: {mu: mu, lambda: lambda}
+    driver: &driver
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --kind
+        - linear
+        - --driver
+        - "{build_dir}/linear_elasticity"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - deviatoric_extension
+        - simple_shear
+        - mixed_volumetric
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_REORDER: 0
+        SFEM_USE_PACKED_MESH: 0
+        SFEM_VERBOSE: 0
+        SFEM_RTOL: 1.0e-13
+        SFEM_MAX_IT: 20000
+    expected_output: &expected_output
+      required:
+        - {pattern: SFEM_AFFINE_MODE_COMPLETE, count: 3}
+      forbidden:
+        - No progress made
+        - "(max iterations)"
+    tolerances: &variant_tolerances
+      deviatoric_extension_displacement_relative_l2: 1.0e-10
+
+  - id: generated_tri3
+    operator: GeneratedLinearElasticity
+    element: TRI3
+    resolution: {nx: 4, ny: 4, transform: skewed}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_quad4
+    operator: GeneratedLinearElasticity
+    element: QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances

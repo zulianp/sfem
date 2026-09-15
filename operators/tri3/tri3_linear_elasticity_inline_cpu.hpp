@@ -15,26 +15,27 @@ static SFEM_INLINE void tri3_linear_elasticity_value_points(const scalar_t mu,
                                                             const scalar_t *const SFEM_RESTRICT uy,
                                                             accumulator_t *const SFEM_RESTRICT
                                                                     element_scalar) {
-    const scalar_t x0 = -px0 + px1;
-    const scalar_t x1 = -py0 + py2;
-    const scalar_t x2 = px0 - px2;
-    const scalar_t x3 = py0 - py1;
-    const scalar_t x4 = x0 * x1 - x2 * x3;
-    const scalar_t x5 = 1.0 / x4;
-    const scalar_t x6 = ux[0] * x2 * x5 + uy[3] * x0 * x5;
-    const scalar_t x7 = ux[2] * x2 * x5 + uy[5] * x0 * x5 - x6;
-    const scalar_t x8 = pow(x7, 2);
-    const scalar_t x9 = (1.0 / 4.0) * lambda;
-    const scalar_t x10 = ux[0] * x1 * x5 + uy[3] * x3 * x5;
-    const scalar_t x11 = ux[1] * x1 * x5 + uy[4] * x3 * x5 - x10;
-    const scalar_t x12 = pow(x11, 2);
-    const scalar_t x13 = ux[1] * x2 * x5 + uy[4] * x0 * x5 - x6;
-    const scalar_t x14 = (1.0 / 4.0) * mu;
-    const scalar_t x15 = (1.0 / 2.0) * mu;
-    const scalar_t x16 = ux[2] * x1 * x5 + uy[5] * x3 * x5 - x10;
-    element_scalar[0] =
-            x4 * ((1.0 / 2.0) * lambda * x11 * x7 + x12 * x15 + x12 * x9 + pow(x13, 2) * x14 +
-                  x13 * x15 * x16 + x14 * pow(x16, 2) + x15 * x8 + x8 * x9);
+    const scalar_t dx10   = px1 - px0;
+    const scalar_t dy10   = py1 - py0;
+    const scalar_t dx20   = px2 - px0;
+    const scalar_t dy20   = py2 - py0;
+    const scalar_t det    = dx10 * dy20 - dx20 * dy10;
+    const scalar_t invdet = 1.0 / det;
+
+    const scalar_t grad_x_1 = dy20 * invdet;
+    const scalar_t grad_x_2 = -dy10 * invdet;
+    const scalar_t grad_x_0 = -grad_x_1 - grad_x_2;
+    const scalar_t grad_y_1 = -dx20 * invdet;
+    const scalar_t grad_y_2 = dx10 * invdet;
+    const scalar_t grad_y_0 = -grad_y_1 - grad_y_2;
+
+    const scalar_t exx = ux[0] * grad_x_0 + ux[1] * grad_x_1 + ux[2] * grad_x_2;
+    const scalar_t eyy = uy[0] * grad_y_0 + uy[1] * grad_y_1 + uy[2] * grad_y_2;
+    const scalar_t gxy = ux[0] * grad_y_0 + ux[1] * grad_y_1 + ux[2] * grad_y_2 +
+                         uy[0] * grad_x_0 + uy[1] * grad_x_1 + uy[2] * grad_x_2;
+    const scalar_t tr = exx + eyy;
+
+    element_scalar[0] = 0.5 * det * (mu * (exx * exx + eyy * eyy + 0.5 * gxy * gxy) + 0.5 * lambda * tr * tr);
 }
 
 static SFEM_INLINE void tri3_linear_elasticity_apply_points(const scalar_t mu,
@@ -66,11 +67,11 @@ static SFEM_INLINE void tri3_linear_elasticity_apply_points(const scalar_t mu,
     const scalar_t x13 = x2 * x5;
     const scalar_t x14 = x0 * x5;
     const scalar_t x15 = -x13 - x14;
-    const scalar_t x16 = uy[3] * x15 + uy[4] * x13 + uy[5] * x14;
+    const scalar_t x16 = uy[0] * x15 + uy[1] * x13 + uy[2] * x14;
     const scalar_t x17 = ux[0] * x15 + ux[1] * x13 + ux[2] * x14;
     const scalar_t x18 = (1.0 / 2.0) * mu;
     const scalar_t x19 = x13 * x18;
-    const scalar_t x20 = uy[3] * x8 + uy[4] * x6 + uy[5] * x7;
+    const scalar_t x20 = uy[0] * x8 + uy[1] * x6 + uy[2] * x7;
     const scalar_t x21 = x10 * x6 + x12 * x16 + x12 * x9 + x17 * x19 + x19 * x20;
     const scalar_t x22 = x11 * x7;
     const scalar_t x23 = x14 * x18;

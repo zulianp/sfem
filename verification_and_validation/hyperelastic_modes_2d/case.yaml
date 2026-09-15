@@ -1,0 +1,155 @@
+schema_version: 2
+id: hyperelastic_modes_2d
+name: Two-dimensional homogeneous hyperelastic modes
+kind: verification
+family: hyperelastic
+dimension: 2
+tier: fast
+
+source:
+  description: Closed-form homogeneous strain energy and first Piola stress
+  reference: README.md
+
+oracle:
+  type: analytical
+  implementation: oracle.py
+
+material:
+  mu: 2.0
+  lambda: 3.0
+  c1: 1.25
+  c2: 0.75
+  kappa: 5.0
+
+modes:
+  - uniaxial_extension
+  - simple_shear
+  - uniform_dilation
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - "{mesh}"
+    - --element
+    - "{element}"
+    - --nx
+    - "{resolution_nx}"
+    - --ny
+    - "{resolution_ny}"
+    - --transform
+    - "{resolution_transform}"
+
+inputs:
+  - {template: operator.yaml, output: "{output}/operator.yaml"}
+  - {template: dirichlet_uniaxial_extension.yaml, output: "{output}/dirichlet_uniaxial_extension.yaml"}
+  - {template: dirichlet_simple_shear.yaml, output: "{output}/dirichlet_simple_shear.yaml"}
+  - {template: dirichlet_uniform_dilation.yaml, output: "{output}/dirichlet_uniform_dilation.yaml"}
+
+verification:
+  command:
+    - "{python}"
+    - "{case_dir}/verify.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{output}"
+    - --report
+    - "{output}/verification.json"
+  report: "{output}/verification.json"
+  tolerances:
+    uniaxial_extension_displacement_relative_l2: 1.0e-9
+    uniaxial_extension_free_residual_normalized: 1.0e-9
+    uniaxial_extension_energy_relative: 1.0e-8
+    uniaxial_extension_reaction_relative_l2: 1.0e-8
+    uniaxial_extension_minimum_jacobian_deficit: 0.0
+    simple_shear_displacement_relative_l2: 1.0e-9
+    simple_shear_free_residual_normalized: 1.0e-9
+    simple_shear_energy_relative: 1.0e-8
+    simple_shear_reaction_relative_l2: 1.0e-8
+    simple_shear_minimum_jacobian_deficit: 0.0
+    uniform_dilation_displacement_relative_l2: 1.0e-9
+    uniform_dilation_free_residual_normalized: 1.0e-9
+    uniform_dilation_energy_relative: 1.0e-8
+    uniform_dilation_reaction_relative_l2: 1.0e-8
+    uniform_dilation_minimum_jacobian_deficit: 0.0
+
+variants:
+  - id: generated_neohookean_tri3
+    operator: GeneratedNeoHookeanOgden
+    element: TRI3
+    resolution: {nx: 4, ny: 4, transform: skewed}
+    driver: &driver
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --kind
+        - hyperelastic
+        - --driver
+        - "{build_dir}/hyperelasticy"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - uniaxial_extension
+        - simple_shear
+        - uniform_dilation
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_OPERATOR_CONFIG: "{output}/operator.yaml"
+        SFEM_VERBOSE: 0
+        SFEM_NL_TOL: 1.0e-11
+        SFEM_NL_MAX_IT: 30
+        SFEM_LSOLVE_RTOL: 1.0e-12
+        SFEM_ENABLE_LINE_SEARCH: 0
+    expected_output: &expected_output
+      required:
+        - {pattern: SFEM_AFFINE_MODE_COMPLETE, count: 3}
+      forbidden:
+        - Newton did not converge
+        - No progress made
+        - "(max iterations)"
+    tolerances: &variant_tolerances
+      uniaxial_extension_displacement_relative_l2: 1.0e-9
+
+  - id: generated_neohookean_quad4
+    operator: GeneratedNeoHookeanOgden
+    element: QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_modified_mooney_rivlin_tri3
+    operator: GeneratedModifiedMooneyRivlin
+    element: TRI3
+    resolution: {nx: 4, ny: 4, transform: skewed}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_modified_mooney_rivlin_quad4
+    operator: GeneratedModifiedMooneyRivlin
+    element: QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_saint_venant_kirchhoff_tri3
+    operator: GeneratedSaintVenantKirchhoff
+    element: TRI3
+    resolution: {nx: 4, ny: 4, transform: skewed}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_saint_venant_kirchhoff_quad4
+    operator: GeneratedSaintVenantKirchhoff
+    element: QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
