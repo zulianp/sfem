@@ -3582,6 +3582,794 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
   }
 }
 
+template <typename s_t, int NQ, int NS, int VS>
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_hessian_block(
+    const int ne,
+    const ptrdiff_t geometry_stride,
+    const s_t *const RSTR determinant,
+    const s_t *const RSTR adjugate[9],
+    const s_t *const RSTR grad_ref_x,
+    const s_t *const RSTR grad_ref_y,
+    const s_t *const RSTR grad_ref_z,
+    const s_t *const RSTR q_weight,
+    const s_t current[3 * NS][VS],
+    const s_t previous[3 * NS][VS],
+    const s_t eta_b,
+    const s_t eta_s,
+    const s_t newmark_velocity_alpha,
+    s_t *const RSTR element_matrix
+) {
+  static constexpr int NC = 3;
+  for (int entry = 0; entry < 3 * NS * 3 * NS; ++entry) {
+    element_matrix[entry] = s_t(0);
+  }
+  s_t u0_grad_0_ref_values[VS];
+  s_t u0_grad_1_ref_values[VS];
+  s_t u0_grad_2_ref_values[VS];
+  s_t u0_old_grad_0_ref_values[VS];
+  s_t u0_old_grad_1_ref_values[VS];
+  s_t u0_old_grad_2_ref_values[VS];
+  s_t u1_grad_0_ref_values[VS];
+  s_t u1_grad_1_ref_values[VS];
+  s_t u1_grad_2_ref_values[VS];
+  s_t u1_old_grad_0_ref_values[VS];
+  s_t u1_old_grad_1_ref_values[VS];
+  s_t u1_old_grad_2_ref_values[VS];
+  s_t u2_grad_0_ref_values[VS];
+  s_t u2_grad_1_ref_values[VS];
+  s_t u2_grad_2_ref_values[VS];
+  s_t u2_old_grad_0_ref_values[VS];
+  s_t u2_old_grad_1_ref_values[VS];
+  s_t u2_old_grad_2_ref_values[VS];
+  s_t grad_coeff0_0_values[VS];
+  s_t grad_coeff0_1_values[VS];
+  s_t grad_coeff0_2_values[VS];
+  s_t grad_coeff1_0_values[VS];
+  s_t grad_coeff1_1_values[VS];
+  s_t grad_coeff1_2_values[VS];
+  s_t grad_coeff2_0_values[VS];
+  s_t grad_coeff2_1_values[VS];
+  s_t grad_coeff2_2_values[VS];
+  for (int q = 0; q < NQ; ++q) {
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      u0_grad_0_ref_values[lane] = s_t(0);
+      u0_grad_1_ref_values[lane] = s_t(0);
+      u0_grad_2_ref_values[lane] = s_t(0);
+    }
+    for (int trial = 0; trial < NS; ++trial) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t coeff = current[trial * NC][lane];
+        u0_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
+        u0_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      }
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      u0_old_grad_0_ref_values[lane] = s_t(0);
+      u0_old_grad_1_ref_values[lane] = s_t(0);
+      u0_old_grad_2_ref_values[lane] = s_t(0);
+    }
+    for (int trial = 0; trial < NS; ++trial) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t coeff = previous[trial * NC][lane];
+        u0_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
+        u0_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      }
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      u1_grad_0_ref_values[lane] = s_t(0);
+      u1_grad_1_ref_values[lane] = s_t(0);
+      u1_grad_2_ref_values[lane] = s_t(0);
+    }
+    for (int trial = 0; trial < NS; ++trial) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t coeff = current[trial * NC + 1][lane];
+        u1_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
+        u1_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      }
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      u1_old_grad_0_ref_values[lane] = s_t(0);
+      u1_old_grad_1_ref_values[lane] = s_t(0);
+      u1_old_grad_2_ref_values[lane] = s_t(0);
+    }
+    for (int trial = 0; trial < NS; ++trial) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t coeff = previous[trial * NC + 1][lane];
+        u1_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
+        u1_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      }
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      u2_grad_0_ref_values[lane] = s_t(0);
+      u2_grad_1_ref_values[lane] = s_t(0);
+      u2_grad_2_ref_values[lane] = s_t(0);
+    }
+    for (int trial = 0; trial < NS; ++trial) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t coeff = current[trial * NC + 2][lane];
+        u2_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
+        u2_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
+        u2_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      }
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      u2_old_grad_0_ref_values[lane] = s_t(0);
+      u2_old_grad_1_ref_values[lane] = s_t(0);
+      u2_old_grad_2_ref_values[lane] = s_t(0);
+    }
+    for (int trial = 0; trial < NS; ++trial) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t coeff = previous[trial * NC + 2][lane];
+        u2_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
+        u2_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
+        u2_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      }
+    }
+    for (int trial = 0; trial < NS; ++trial) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const ptrdiff_t goff = q * geometry_stride + lane;
+        const s_t det = determinant[goff];
+        const s_t adj0 = adjugate[0][goff];
+        const s_t adj1 = adjugate[1][goff];
+        const s_t adj2 = adjugate[2][goff];
+        const s_t adj3 = adjugate[3][goff];
+        const s_t adj4 = adjugate[4][goff];
+        const s_t adj5 = adjugate[5][goff];
+        const s_t adj6 = adjugate[6][goff];
+        const s_t adj7 = adjugate[7][goff];
+        const s_t adj8 = adjugate[8][goff];
+        const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
+        const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
+        const s_t u0_grad_2_ref = u0_grad_2_ref_values[lane];
+        const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
+        const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
+        const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
+        const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
+        const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
+        const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[lane];
+        const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
+        const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
+        const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
+        const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
+        const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
+        const s_t u1_grad_2_ref = u1_grad_2_ref_values[lane];
+        const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
+        const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
+        const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
+        const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
+        const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
+        const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[lane];
+        const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
+        const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
+        const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
+        const s_t u2_grad_0_ref = u2_grad_0_ref_values[lane];
+        const s_t u2_grad_1_ref = u2_grad_1_ref_values[lane];
+        const s_t u2_grad_2_ref = u2_grad_2_ref_values[lane];
+        const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
+        const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
+        const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
+        const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[lane];
+        const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[lane];
+        const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[lane];
+        const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
+        const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
+        const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
+        const s_t trial_grad0 = (grad_ref_x[q * NS + trial] * adj0 + grad_ref_y[q * NS + trial] * adj3 + grad_ref_z[q * NS + trial] * adj6) / det;
+        const s_t trial_grad1 = (grad_ref_x[q * NS + trial] * adj1 + grad_ref_y[q * NS + trial] * adj4 + grad_ref_z[q * NS + trial] * adj7) / det;
+        const s_t trial_grad2 = (grad_ref_x[q * NS + trial] * adj2 + grad_ref_y[q * NS + trial] * adj5 + grad_ref_z[q * NS + trial] * adj8) / det;
+        const s_t residual_tmp0 = u0_grad_0*u1_grad_1;
+        const s_t residual_tmp1 = u0_grad_1*u1_grad_2;
+        const s_t residual_tmp2 = u0_grad_2*u2_grad_1;
+        const s_t residual_tmp3 = u1_grad_2*u2_grad_1;
+        const s_t residual_tmp4 = u0_grad_1*u1_grad_0;
+        const s_t residual_tmp5 = u0_grad_2*u2_grad_0;
+        const s_t residual_tmp6 = u2_grad_2 + s_t(1);
+        const s_t residual_tmp7 = -residual_tmp3 + residual_tmp6 + u1_grad_1*u2_grad_2 + u1_grad_1;
+        const s_t residual_tmp8 = -residual_tmp5 + u0_grad_0*u2_grad_2 + u0_grad_0;
+        const s_t residual_tmp9 = residual_tmp0 - residual_tmp4;
+        const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
+        const s_t residual_tmp11 = pow_m1(residual_tmp10);
+        const s_t residual_tmp12 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
+        const s_t residual_tmp13 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+        const s_t residual_tmp14 = u1_grad_1 + s_t(1);
+        const s_t residual_tmp15 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
+        const s_t residual_tmp16 = newmark_velocity_alpha*residual_tmp12 + residual_tmp13*u1_grad_2 - residual_tmp14*residual_tmp15;
+        const s_t residual_tmp17 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
+        const s_t residual_tmp18 = newmark_velocity_alpha*residual_tmp17 - residual_tmp13*residual_tmp6 + residual_tmp15*u2_grad_1;
+        const s_t residual_tmp19 = newmark_velocity_alpha*residual_tmp7;
+        const s_t residual_tmp20 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+        const s_t residual_tmp21 = residual_tmp14*residual_tmp20;
+        const s_t residual_tmp22 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+        const s_t residual_tmp23 = residual_tmp22*u1_grad_2;
+        const s_t residual_tmp24 = residual_tmp19 + residual_tmp21 - residual_tmp23;
+        const s_t residual_tmp25 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+        const s_t residual_tmp26 = residual_tmp25*residual_tmp6;
+        const s_t residual_tmp27 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+        const s_t residual_tmp28 = residual_tmp27*u2_grad_1;
+        const s_t residual_tmp29 = residual_tmp26 - residual_tmp28;
+        const s_t residual_tmp30 = s_t(3)*eta_b;
+        const s_t residual_tmp31 = residual_tmp30*(-residual_tmp24 - residual_tmp29);
+        const s_t residual_tmp32 = s_t(2)*eta_s;
+        const s_t residual_tmp33 = residual_tmp31 + residual_tmp32*(-s_t(2)*residual_tmp19 + residual_tmp21 - residual_tmp23 + residual_tmp26 - residual_tmp28);
+        const s_t residual_tmp34 = ((s_t(1) / s_t(3)))*residual_tmp7;
+        const s_t residual_tmp35 = -residual_tmp7;
+        const s_t residual_tmp36 = pow_m2(residual_tmp10);
+        const s_t residual_tmp37 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+        const s_t residual_tmp38 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
+        const s_t residual_tmp39 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
+        const s_t residual_tmp40 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
+        const s_t residual_tmp41 = residual_tmp14 + residual_tmp9 + u0_grad_0;
+        const s_t residual_tmp42 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+        const s_t residual_tmp43 = residual_tmp12*residual_tmp37 + residual_tmp13*residual_tmp38 - residual_tmp15*residual_tmp41 + residual_tmp20*residual_tmp40 + residual_tmp22*residual_tmp39 - residual_tmp42*residual_tmp7;
+        const s_t residual_tmp44 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
+        const s_t residual_tmp45 = residual_tmp6 + residual_tmp8;
+        const s_t residual_tmp46 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+        const s_t residual_tmp47 = -residual_tmp13*residual_tmp45 + residual_tmp15*residual_tmp44 + residual_tmp17*residual_tmp37 + residual_tmp25*residual_tmp39 + residual_tmp27*residual_tmp40 - residual_tmp46*residual_tmp7;
+        const s_t residual_tmp48 = residual_tmp17*residual_tmp46;
+        const s_t residual_tmp49 = residual_tmp27*residual_tmp44;
+        const s_t residual_tmp50 = residual_tmp12*residual_tmp42;
+        const s_t residual_tmp51 = residual_tmp22*residual_tmp38;
+        const s_t residual_tmp52 = residual_tmp25*residual_tmp45;
+        const s_t residual_tmp53 = -residual_tmp52;
+        const s_t residual_tmp54 = residual_tmp20*residual_tmp41;
+        const s_t residual_tmp55 = -residual_tmp54;
+        const s_t residual_tmp56 = residual_tmp48 + residual_tmp49 + residual_tmp50 + residual_tmp51 + residual_tmp53 + residual_tmp55;
+        const s_t residual_tmp57 = residual_tmp37*residual_tmp7;
+        const s_t residual_tmp58 = residual_tmp13*residual_tmp39 + residual_tmp15*residual_tmp40 - residual_tmp57;
+        const s_t residual_tmp59 = residual_tmp30*(residual_tmp56 + residual_tmp58);
+        const s_t residual_tmp60 = residual_tmp32*(s_t(2)*residual_tmp13*residual_tmp39 + s_t(2)*residual_tmp15*residual_tmp40 - residual_tmp56 - s_t(2)*residual_tmp57) + residual_tmp59;
+        const s_t residual_tmp61 = residual_tmp36*(eta_s*(residual_tmp12*residual_tmp43 + residual_tmp17*residual_tmp47) - residual_tmp34*residual_tmp60);
+        const s_t residual_tmp62 = newmark_velocity_alpha*residual_tmp39;
+        const s_t residual_tmp63 = residual_tmp20*u1_grad_0;
+        const s_t residual_tmp64 = residual_tmp42*u1_grad_2;
+        const s_t residual_tmp65 = residual_tmp62 + residual_tmp63 - residual_tmp64;
+        const s_t residual_tmp66 = residual_tmp46*residual_tmp6;
+        const s_t residual_tmp67 = residual_tmp27*u2_grad_0;
+        const s_t residual_tmp68 = residual_tmp66 - residual_tmp67;
+        const s_t residual_tmp69 = residual_tmp30*(residual_tmp65 + residual_tmp68);
+        const s_t residual_tmp70 = residual_tmp32*(s_t(2)*residual_tmp62 - residual_tmp63 + residual_tmp64 - residual_tmp66 + residual_tmp67) + residual_tmp69;
+        const s_t residual_tmp71 = newmark_velocity_alpha*residual_tmp38 + residual_tmp15*u1_grad_0 - residual_tmp37*u1_grad_2;
+        const s_t residual_tmp72 = -newmark_velocity_alpha*residual_tmp45 - residual_tmp15*u2_grad_0 + residual_tmp37*residual_tmp6;
+        const s_t residual_tmp73 = residual_tmp43*u1_grad_2;
+        const s_t residual_tmp74 = newmark_velocity_alpha*residual_tmp40;
+        const s_t residual_tmp75 = residual_tmp14*residual_tmp42;
+        const s_t residual_tmp76 = residual_tmp22*u1_grad_0;
+        const s_t residual_tmp77 = residual_tmp74 + residual_tmp75 - residual_tmp76;
+        const s_t residual_tmp78 = residual_tmp25*u2_grad_0;
+        const s_t residual_tmp79 = residual_tmp46*u2_grad_1;
+        const s_t residual_tmp80 = residual_tmp78 - residual_tmp79;
+        const s_t residual_tmp81 = residual_tmp30*(residual_tmp77 + residual_tmp80);
+        const s_t residual_tmp82 = residual_tmp32*(s_t(2)*residual_tmp74 - residual_tmp75 + residual_tmp76 - residual_tmp78 + residual_tmp79) + residual_tmp81;
+        const s_t residual_tmp83 = newmark_velocity_alpha*residual_tmp44 + residual_tmp13*u2_grad_0 - residual_tmp37*u2_grad_1;
+        const s_t residual_tmp84 = -newmark_velocity_alpha*residual_tmp41 - residual_tmp13*u1_grad_0 + residual_tmp14*residual_tmp37;
+        const s_t residual_tmp85 = residual_tmp47*u2_grad_1;
+        const s_t residual_tmp86 = residual_tmp36*(-eta_s*(-residual_tmp38*residual_tmp43 + residual_tmp45*residual_tmp47) + ((s_t(1) / s_t(3)))*residual_tmp39*residual_tmp60);
+        const s_t residual_tmp87 = residual_tmp43*u1_grad_0 - residual_tmp47*u2_grad_0;
+        const s_t residual_tmp88 = residual_tmp36*(-eta_s*(residual_tmp41*residual_tmp43 - residual_tmp44*residual_tmp47) + ((s_t(1) / s_t(3)))*residual_tmp40*residual_tmp60);
+        const s_t residual_tmp89 = -residual_tmp14*residual_tmp27 + residual_tmp20*u2_grad_1 - residual_tmp22*residual_tmp6 + residual_tmp25*u1_grad_2;
+        const s_t residual_tmp90 = residual_tmp31 + residual_tmp32*(residual_tmp24 - s_t(2)*residual_tmp26 + s_t(2)*residual_tmp28);
+        const s_t residual_tmp91 = residual_tmp12*residual_tmp46 + residual_tmp17*residual_tmp42 + residual_tmp20*residual_tmp44 - residual_tmp22*residual_tmp45 + residual_tmp25*residual_tmp38 - residual_tmp27*residual_tmp41;
+        const s_t residual_tmp92 = residual_tmp32*(s_t(2)*residual_tmp17*residual_tmp46 + s_t(2)*residual_tmp27*residual_tmp44 - residual_tmp50 - residual_tmp51 - s_t(2)*residual_tmp52 - residual_tmp55 - residual_tmp58) + residual_tmp59;
+        const s_t residual_tmp93 = residual_tmp36*(-eta_s*(-residual_tmp12*residual_tmp91 + residual_tmp47*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp17*residual_tmp92);
+        const s_t residual_tmp94 = residual_tmp32*(s_t(2)*residual_tmp25*u2_grad_0 - residual_tmp77 - s_t(2)*residual_tmp79) + residual_tmp81;
+        const s_t residual_tmp95 = residual_tmp14*residual_tmp46 + residual_tmp22*u2_grad_0 - residual_tmp25*u1_grad_0 - residual_tmp42*u2_grad_1;
+        const s_t residual_tmp96 = residual_tmp14*residual_tmp91;
+        const s_t residual_tmp97 = ((s_t(1) / s_t(3)))*residual_tmp92;
+        const s_t residual_tmp98 = residual_tmp97*u2_grad_1;
+        const s_t residual_tmp99 = residual_tmp32*(s_t(2)*residual_tmp46*residual_tmp6 - residual_tmp65 - s_t(2)*residual_tmp67) + residual_tmp69;
+        const s_t residual_tmp100 = -residual_tmp20*u2_grad_0 + residual_tmp27*u1_grad_0 + residual_tmp42*residual_tmp6 - residual_tmp46*u1_grad_2;
+        const s_t residual_tmp101 = residual_tmp91*u1_grad_2;
+        const s_t residual_tmp102 = ((s_t(1) / s_t(3)))*residual_tmp45;
+        const s_t residual_tmp103 = -(s_t(1) / s_t(3))*residual_tmp92;
+        const s_t residual_tmp104 = residual_tmp36*(eta_s*(residual_tmp38*residual_tmp91 + residual_tmp39*residual_tmp47) + residual_tmp103*residual_tmp45);
+        const s_t residual_tmp105 = residual_tmp91*u1_grad_0;
+        const s_t residual_tmp106 = residual_tmp36*(-eta_s*(-residual_tmp40*residual_tmp47 + residual_tmp41*residual_tmp91) + ((s_t(1) / s_t(3)))*residual_tmp44*residual_tmp92);
+        const s_t residual_tmp107 = residual_tmp31 + residual_tmp32*(residual_tmp19 - s_t(2)*residual_tmp21 + s_t(2)*residual_tmp23 + residual_tmp29);
+        const s_t residual_tmp108 = residual_tmp32*(s_t(2)*residual_tmp12*residual_tmp42 + s_t(2)*residual_tmp22*residual_tmp38 - residual_tmp48 - residual_tmp49 - residual_tmp53 - s_t(2)*residual_tmp54 - residual_tmp58) + residual_tmp59;
+        const s_t residual_tmp109 = residual_tmp36*(-eta_s*(-residual_tmp17*residual_tmp91 + residual_tmp43*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp108*residual_tmp12);
+        const s_t residual_tmp110 = residual_tmp32*(s_t(2)*residual_tmp20*u1_grad_0 - residual_tmp62 - s_t(2)*residual_tmp64 - residual_tmp68) + residual_tmp69;
+        const s_t residual_tmp111 = residual_tmp6*residual_tmp91;
+        const s_t residual_tmp112 = ((s_t(1) / s_t(3)))*residual_tmp108;
+        const s_t residual_tmp113 = residual_tmp112*u1_grad_2;
+        const s_t residual_tmp114 = residual_tmp32*(s_t(2)*residual_tmp14*residual_tmp42 - residual_tmp74 - s_t(2)*residual_tmp76 - residual_tmp80) + residual_tmp81;
+        const s_t residual_tmp115 = residual_tmp91*u2_grad_1;
+        const s_t residual_tmp116 = residual_tmp36*(-eta_s*(-residual_tmp39*residual_tmp43 + residual_tmp45*residual_tmp91) + ((s_t(1) / s_t(3)))*residual_tmp108*residual_tmp38);
+        const s_t residual_tmp117 = residual_tmp91*u2_grad_0;
+        const s_t residual_tmp118 = ((s_t(1) / s_t(3)))*residual_tmp41;
+        const s_t residual_tmp119 = -(s_t(1) / s_t(3))*residual_tmp108;
+        const s_t residual_tmp120 = residual_tmp36*(eta_s*(residual_tmp40*residual_tmp43 + residual_tmp44*residual_tmp91) + residual_tmp119*residual_tmp41);
+        const s_t grad_coeff0_0 = trial_grad0*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp16 + residual_tmp17*residual_tmp18) - residual_tmp33*residual_tmp34) + residual_tmp35*residual_tmp61) + trial_grad1*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp71 + residual_tmp17*residual_tmp72 + residual_tmp47*residual_tmp6 - residual_tmp73) - residual_tmp34*residual_tmp70) + residual_tmp39*residual_tmp61) + trial_grad2*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp84 + residual_tmp14*residual_tmp43 + residual_tmp17*residual_tmp83 - residual_tmp85) - residual_tmp34*residual_tmp82) + residual_tmp40*residual_tmp61);
+        const s_t grad_coeff0_1 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp16*residual_tmp38 + residual_tmp18*residual_tmp45 + residual_tmp47*residual_tmp6 - residual_tmp73) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp39) + residual_tmp35*residual_tmp86) + trial_grad1*(residual_tmp11*(-eta_s*(-residual_tmp38*residual_tmp71 + residual_tmp45*residual_tmp72) + ((s_t(1) / s_t(3)))*residual_tmp39*residual_tmp70) + residual_tmp39*residual_tmp86) + trial_grad2*(residual_tmp11*(-eta_s*(-residual_tmp38*residual_tmp84 + residual_tmp45*residual_tmp83 + residual_tmp87) + ((s_t(1) / s_t(3)))*residual_tmp39*residual_tmp82) + residual_tmp40*residual_tmp86);
+        const s_t grad_coeff0_2 = trial_grad0*(residual_tmp11*(-eta_s*(residual_tmp14*residual_tmp43 + residual_tmp16*residual_tmp41 - residual_tmp18*residual_tmp44 - residual_tmp85) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp40) + residual_tmp35*residual_tmp88) + trial_grad1*(residual_tmp11*(-eta_s*(residual_tmp41*residual_tmp71 - residual_tmp44*residual_tmp72 - residual_tmp87) + ((s_t(1) / s_t(3)))*residual_tmp40*residual_tmp70) + residual_tmp39*residual_tmp88) + trial_grad2*(residual_tmp11*(-eta_s*(residual_tmp41*residual_tmp84 - residual_tmp44*residual_tmp83) + ((s_t(1) / s_t(3)))*residual_tmp40*residual_tmp82) + residual_tmp40*residual_tmp88);
+        const s_t grad_coeff1_0 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp12*residual_tmp89 + residual_tmp18*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp17*residual_tmp90) + residual_tmp35*residual_tmp93) + trial_grad1*(residual_tmp11*(-eta_s*(-residual_tmp100*residual_tmp12 + residual_tmp101 + residual_tmp7*residual_tmp72) + ((s_t(1) / s_t(3)))*residual_tmp17*residual_tmp99 + residual_tmp6*residual_tmp97) + residual_tmp39*residual_tmp93) + trial_grad2*(residual_tmp11*(-eta_s*(-residual_tmp12*residual_tmp95 + residual_tmp7*residual_tmp83 - residual_tmp96) + ((s_t(1) / s_t(3)))*residual_tmp17*residual_tmp94 - residual_tmp98) + residual_tmp40*residual_tmp93);
+        const s_t grad_coeff1_1 = trial_grad0*(residual_tmp104*residual_tmp35 + residual_tmp11*(eta_s*(residual_tmp101 + residual_tmp18*residual_tmp39 + residual_tmp38*residual_tmp89) - residual_tmp102*residual_tmp90 + residual_tmp103*residual_tmp6)) + trial_grad1*(residual_tmp104*residual_tmp39 + residual_tmp11*(eta_s*(residual_tmp100*residual_tmp38 + residual_tmp39*residual_tmp72) - residual_tmp102*residual_tmp99)) + trial_grad2*(residual_tmp104*residual_tmp40 + residual_tmp11*(eta_s*(-residual_tmp105 + residual_tmp38*residual_tmp95 + residual_tmp39*residual_tmp83) - residual_tmp102*residual_tmp94 - residual_tmp103*u2_grad_0));
+        const s_t grad_coeff1_2 = trial_grad0*(residual_tmp106*residual_tmp35 + residual_tmp11*(-eta_s*(-residual_tmp18*residual_tmp40 + residual_tmp41*residual_tmp89 + residual_tmp96) + ((s_t(1) / s_t(3)))*residual_tmp44*residual_tmp90 + residual_tmp98)) + trial_grad1*(residual_tmp106*residual_tmp39 + residual_tmp11*(-eta_s*(residual_tmp100*residual_tmp41 - residual_tmp105 - residual_tmp40*residual_tmp72) + ((s_t(1) / s_t(3)))*residual_tmp44*residual_tmp99 - residual_tmp97*u2_grad_0)) + trial_grad2*(residual_tmp106*residual_tmp40 + residual_tmp11*(-eta_s*(-residual_tmp40*residual_tmp83 + residual_tmp41*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp44*residual_tmp94));
+        const s_t grad_coeff2_0 = trial_grad0*(residual_tmp109*residual_tmp35 + residual_tmp11*(-eta_s*(residual_tmp16*residual_tmp7 - residual_tmp17*residual_tmp89) + ((s_t(1) / s_t(3)))*residual_tmp107*residual_tmp12)) + trial_grad1*(residual_tmp109*residual_tmp39 + residual_tmp11*(-eta_s*(-residual_tmp100*residual_tmp17 - residual_tmp111 + residual_tmp7*residual_tmp71) + ((s_t(1) / s_t(3)))*residual_tmp110*residual_tmp12 - residual_tmp113)) + trial_grad2*(residual_tmp109*residual_tmp40 + residual_tmp11*(-eta_s*(residual_tmp115 - residual_tmp17*residual_tmp95 + residual_tmp7*residual_tmp84) + residual_tmp112*residual_tmp14 + ((s_t(1) / s_t(3)))*residual_tmp114*residual_tmp12));
+        const s_t grad_coeff2_1 = trial_grad0*(residual_tmp11*(-eta_s*(residual_tmp111 - residual_tmp16*residual_tmp39 + residual_tmp45*residual_tmp89) + ((s_t(1) / s_t(3)))*residual_tmp107*residual_tmp38 + residual_tmp113) + residual_tmp116*residual_tmp35) + trial_grad1*(residual_tmp11*(-eta_s*(residual_tmp100*residual_tmp45 - residual_tmp39*residual_tmp71) + ((s_t(1) / s_t(3)))*residual_tmp110*residual_tmp38) + residual_tmp116*residual_tmp39) + trial_grad2*(residual_tmp11*(-eta_s*(-residual_tmp117 - residual_tmp39*residual_tmp84 + residual_tmp45*residual_tmp95) - residual_tmp112*u1_grad_0 + ((s_t(1) / s_t(3)))*residual_tmp114*residual_tmp38) + residual_tmp116*residual_tmp40);
+        const s_t grad_coeff2_2 = trial_grad0*(residual_tmp11*(eta_s*(residual_tmp115 + residual_tmp16*residual_tmp40 + residual_tmp44*residual_tmp89) - residual_tmp107*residual_tmp118 + residual_tmp119*residual_tmp14) + residual_tmp120*residual_tmp35) + trial_grad1*(residual_tmp11*(eta_s*(residual_tmp100*residual_tmp44 - residual_tmp117 + residual_tmp40*residual_tmp71) - residual_tmp110*residual_tmp118 - residual_tmp119*u1_grad_0) + residual_tmp120*residual_tmp39) + trial_grad2*(residual_tmp11*(eta_s*(residual_tmp40*residual_tmp84 + residual_tmp44*residual_tmp95) - residual_tmp114*residual_tmp118) + residual_tmp120*residual_tmp40);
+        grad_coeff0_0_values[lane] = grad_coeff0_0;
+        grad_coeff0_1_values[lane] = grad_coeff0_1;
+        grad_coeff0_2_values[lane] = grad_coeff0_2;
+        grad_coeff1_0_values[lane] = grad_coeff1_0;
+        grad_coeff1_1_values[lane] = grad_coeff1_1;
+        grad_coeff1_2_values[lane] = grad_coeff1_2;
+        grad_coeff2_0_values[lane] = grad_coeff2_0;
+        grad_coeff2_1_values[lane] = grad_coeff2_1;
+        grad_coeff2_2_values[lane] = grad_coeff2_2;
+      }
+      for (int test = 0; test < NS; ++test) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det = determinant[goff];
+          const s_t adj0 = adjugate[0][goff];
+          const s_t adj1 = adjugate[1][goff];
+          const s_t adj2 = adjugate[2][goff];
+          const s_t adj3 = adjugate[3][goff];
+          const s_t adj4 = adjugate[4][goff];
+          const s_t adj5 = adjugate[5][goff];
+          const s_t adj6 = adjugate[6][goff];
+          const s_t adj7 = adjugate[7][goff];
+          const s_t adj8 = adjugate[8][goff];
+          const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
+          const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
+          const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
+          element_matrix[(0 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
+          element_matrix[(1 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
+          element_matrix[(2 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+        }
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const ptrdiff_t goff = q * geometry_stride + lane;
+        const s_t det = determinant[goff];
+        const s_t adj0 = adjugate[0][goff];
+        const s_t adj1 = adjugate[1][goff];
+        const s_t adj2 = adjugate[2][goff];
+        const s_t adj3 = adjugate[3][goff];
+        const s_t adj4 = adjugate[4][goff];
+        const s_t adj5 = adjugate[5][goff];
+        const s_t adj6 = adjugate[6][goff];
+        const s_t adj7 = adjugate[7][goff];
+        const s_t adj8 = adjugate[8][goff];
+        const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
+        const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
+        const s_t u0_grad_2_ref = u0_grad_2_ref_values[lane];
+        const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
+        const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
+        const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
+        const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
+        const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
+        const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[lane];
+        const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
+        const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
+        const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
+        const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
+        const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
+        const s_t u1_grad_2_ref = u1_grad_2_ref_values[lane];
+        const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
+        const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
+        const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
+        const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
+        const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
+        const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[lane];
+        const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
+        const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
+        const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
+        const s_t u2_grad_0_ref = u2_grad_0_ref_values[lane];
+        const s_t u2_grad_1_ref = u2_grad_1_ref_values[lane];
+        const s_t u2_grad_2_ref = u2_grad_2_ref_values[lane];
+        const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
+        const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
+        const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
+        const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[lane];
+        const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[lane];
+        const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[lane];
+        const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
+        const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
+        const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
+        const s_t trial_grad0 = (grad_ref_x[q * NS + trial] * adj0 + grad_ref_y[q * NS + trial] * adj3 + grad_ref_z[q * NS + trial] * adj6) / det;
+        const s_t trial_grad1 = (grad_ref_x[q * NS + trial] * adj1 + grad_ref_y[q * NS + trial] * adj4 + grad_ref_z[q * NS + trial] * adj7) / det;
+        const s_t trial_grad2 = (grad_ref_x[q * NS + trial] * adj2 + grad_ref_y[q * NS + trial] * adj5 + grad_ref_z[q * NS + trial] * adj8) / det;
+        const s_t residual_tmp0 = u0_grad_0*u1_grad_1;
+        const s_t residual_tmp1 = u0_grad_1*u1_grad_2;
+        const s_t residual_tmp2 = u0_grad_2*u2_grad_1;
+        const s_t residual_tmp3 = u1_grad_2*u2_grad_1;
+        const s_t residual_tmp4 = u0_grad_1*u1_grad_0;
+        const s_t residual_tmp5 = u0_grad_2*u2_grad_0;
+        const s_t residual_tmp6 = u2_grad_2 + s_t(1);
+        const s_t residual_tmp7 = -residual_tmp3 + residual_tmp6 + u1_grad_1*u2_grad_2 + u1_grad_1;
+        const s_t residual_tmp8 = -residual_tmp5 + u0_grad_0*u2_grad_2 + u0_grad_0;
+        const s_t residual_tmp9 = residual_tmp0 - residual_tmp4;
+        const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
+        const s_t residual_tmp11 = pow_m1(residual_tmp10);
+        const s_t residual_tmp12 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
+        const s_t residual_tmp13 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+        const s_t residual_tmp14 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+        const s_t residual_tmp15 = -newmark_velocity_alpha*residual_tmp7 - residual_tmp13*u2_grad_1 + residual_tmp14*residual_tmp6;
+        const s_t residual_tmp16 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
+        const s_t residual_tmp17 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
+        const s_t residual_tmp18 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+        const s_t residual_tmp19 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+        const s_t residual_tmp20 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+        const s_t residual_tmp21 = residual_tmp17*u0_grad_1 - residual_tmp18*u0_grad_2 - residual_tmp19*u2_grad_1 + residual_tmp20*residual_tmp6;
+        const s_t residual_tmp22 = newmark_velocity_alpha*residual_tmp12;
+        const s_t residual_tmp23 = residual_tmp19*u0_grad_1;
+        const s_t residual_tmp24 = residual_tmp20*u0_grad_2;
+        const s_t residual_tmp25 = residual_tmp22 + residual_tmp23 - residual_tmp24;
+        const s_t residual_tmp26 = residual_tmp18*residual_tmp6;
+        const s_t residual_tmp27 = residual_tmp17*u2_grad_1;
+        const s_t residual_tmp28 = residual_tmp26 - residual_tmp27;
+        const s_t residual_tmp29 = s_t(3)*eta_b;
+        const s_t residual_tmp30 = residual_tmp29*(residual_tmp25 + residual_tmp28);
+        const s_t residual_tmp31 = s_t(2)*eta_s;
+        const s_t residual_tmp32 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp18*residual_tmp6 - residual_tmp25 - s_t(2)*residual_tmp27);
+        const s_t residual_tmp33 = ((s_t(1) / s_t(3)))*residual_tmp7;
+        const s_t residual_tmp34 = pow_m2(residual_tmp10);
+        const s_t residual_tmp35 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+        const s_t residual_tmp36 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
+        const s_t residual_tmp37 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
+        const s_t residual_tmp38 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
+        const s_t residual_tmp39 = u0_grad_0 + s_t(1);
+        const s_t residual_tmp40 = residual_tmp39 + residual_tmp9 + u1_grad_1;
+        const s_t residual_tmp41 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+        const s_t residual_tmp42 = residual_tmp16*residual_tmp35 - residual_tmp17*residual_tmp40 + residual_tmp18*residual_tmp36 + residual_tmp19*residual_tmp38 + residual_tmp20*residual_tmp37 - residual_tmp41*residual_tmp7;
+        const s_t residual_tmp43 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
+        const s_t residual_tmp44 = residual_tmp6 + residual_tmp8;
+        const s_t residual_tmp45 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+        const s_t residual_tmp46 = residual_tmp12*residual_tmp35 + residual_tmp13*residual_tmp38 + residual_tmp14*residual_tmp37 + residual_tmp17*residual_tmp43 - residual_tmp18*residual_tmp44 - residual_tmp45*residual_tmp7;
+        const s_t residual_tmp47 = residual_tmp12*residual_tmp45;
+        const s_t residual_tmp48 = residual_tmp13*residual_tmp43;
+        const s_t residual_tmp49 = residual_tmp16*residual_tmp41;
+        const s_t residual_tmp50 = residual_tmp20*residual_tmp36;
+        const s_t residual_tmp51 = residual_tmp14*residual_tmp44;
+        const s_t residual_tmp52 = -residual_tmp51;
+        const s_t residual_tmp53 = residual_tmp19*residual_tmp40;
+        const s_t residual_tmp54 = -residual_tmp53;
+        const s_t residual_tmp55 = residual_tmp47 + residual_tmp48 + residual_tmp49 + residual_tmp50 + residual_tmp52 + residual_tmp54;
+        const s_t residual_tmp56 = residual_tmp35*residual_tmp7;
+        const s_t residual_tmp57 = residual_tmp17*residual_tmp38 + residual_tmp18*residual_tmp37 - residual_tmp56;
+        const s_t residual_tmp58 = residual_tmp29*(residual_tmp55 + residual_tmp57);
+        const s_t residual_tmp59 = residual_tmp31*(s_t(2)*residual_tmp17*residual_tmp38 + s_t(2)*residual_tmp18*residual_tmp37 - residual_tmp55 - s_t(2)*residual_tmp56) + residual_tmp58;
+        const s_t residual_tmp60 = -residual_tmp59;
+        const s_t residual_tmp61 = residual_tmp34*(eta_s*(residual_tmp12*residual_tmp46 + residual_tmp16*residual_tmp42) + residual_tmp33*residual_tmp60);
+        const s_t residual_tmp62 = newmark_velocity_alpha*residual_tmp43;
+        const s_t residual_tmp63 = residual_tmp20*residual_tmp39;
+        const s_t residual_tmp64 = residual_tmp41*u0_grad_1;
+        const s_t residual_tmp65 = residual_tmp62 + residual_tmp63 - residual_tmp64;
+        const s_t residual_tmp66 = residual_tmp35*u2_grad_1;
+        const s_t residual_tmp67 = residual_tmp18*u2_grad_0;
+        const s_t residual_tmp68 = residual_tmp66 - residual_tmp67;
+        const s_t residual_tmp69 = residual_tmp29*(residual_tmp65 + residual_tmp68);
+        const s_t residual_tmp70 = residual_tmp31*(s_t(2)*residual_tmp35*u2_grad_1 - residual_tmp65 - s_t(2)*residual_tmp67) + residual_tmp69;
+        const s_t residual_tmp71 = newmark_velocity_alpha*residual_tmp38 - residual_tmp14*u2_grad_0 + residual_tmp45*u2_grad_1;
+        const s_t residual_tmp72 = residual_tmp18*residual_tmp39 - residual_tmp20*u2_grad_0 - residual_tmp35*u0_grad_1 + residual_tmp41*u2_grad_1;
+        const s_t residual_tmp73 = residual_tmp42*u0_grad_1;
+        const s_t residual_tmp74 = ((s_t(1) / s_t(3)))*residual_tmp60;
+        const s_t residual_tmp75 = -residual_tmp44;
+        const s_t residual_tmp76 = newmark_velocity_alpha*residual_tmp44;
+        const s_t residual_tmp77 = residual_tmp19*residual_tmp39;
+        const s_t residual_tmp78 = residual_tmp41*u0_grad_2;
+        const s_t residual_tmp79 = residual_tmp76 + residual_tmp77 - residual_tmp78;
+        const s_t residual_tmp80 = residual_tmp35*residual_tmp6;
+        const s_t residual_tmp81 = residual_tmp17*u2_grad_0;
+        const s_t residual_tmp82 = residual_tmp80 - residual_tmp81;
+        const s_t residual_tmp83 = residual_tmp29*(-residual_tmp79 - residual_tmp82);
+        const s_t residual_tmp84 = residual_tmp31*(residual_tmp79 - s_t(2)*residual_tmp80 + s_t(2)*residual_tmp81) + residual_tmp83;
+        const s_t residual_tmp85 = newmark_velocity_alpha*residual_tmp37 + residual_tmp13*u2_grad_0 - residual_tmp45*residual_tmp6;
+        const s_t residual_tmp86 = -residual_tmp17*residual_tmp39 + residual_tmp19*u2_grad_0 + residual_tmp35*u0_grad_2 - residual_tmp41*residual_tmp6;
+        const s_t residual_tmp87 = residual_tmp42*u0_grad_2;
+        const s_t residual_tmp88 = residual_tmp34*(-eta_s*(-residual_tmp36*residual_tmp42 + residual_tmp44*residual_tmp46) + ((s_t(1) / s_t(3)))*residual_tmp37*residual_tmp59);
+        const s_t residual_tmp89 = residual_tmp39*residual_tmp42;
+        const s_t residual_tmp90 = ((s_t(1) / s_t(3)))*residual_tmp59;
+        const s_t residual_tmp91 = residual_tmp90*u2_grad_0;
+        const s_t residual_tmp92 = residual_tmp34*(-eta_s*(residual_tmp40*residual_tmp42 - residual_tmp43*residual_tmp46) + ((s_t(1) / s_t(3)))*residual_tmp38*residual_tmp59);
+        const s_t residual_tmp93 = newmark_velocity_alpha*residual_tmp16 + residual_tmp13*u0_grad_1 - residual_tmp14*u0_grad_2;
+        const s_t residual_tmp94 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp22 - residual_tmp23 + residual_tmp24 - residual_tmp26 + residual_tmp27);
+        const s_t residual_tmp95 = residual_tmp12*residual_tmp41 - residual_tmp13*residual_tmp40 + residual_tmp14*residual_tmp36 + residual_tmp16*residual_tmp45 + residual_tmp19*residual_tmp43 - residual_tmp20*residual_tmp44;
+        const s_t residual_tmp96 = residual_tmp31*(s_t(2)*residual_tmp12*residual_tmp45 + s_t(2)*residual_tmp13*residual_tmp43 - residual_tmp49 - residual_tmp50 - s_t(2)*residual_tmp51 - residual_tmp54 - residual_tmp57) + residual_tmp58;
+        const s_t residual_tmp97 = residual_tmp34*(-eta_s*(-residual_tmp16*residual_tmp95 + residual_tmp46*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp12*residual_tmp96);
+        const s_t residual_tmp98 = residual_tmp31*(s_t(2)*residual_tmp62 - residual_tmp63 + residual_tmp64 - residual_tmp66 + residual_tmp67) + residual_tmp69;
+        const s_t residual_tmp99 = -newmark_velocity_alpha*residual_tmp40 + residual_tmp14*residual_tmp39 - residual_tmp45*u0_grad_1;
+        const s_t residual_tmp100 = -residual_tmp46*u2_grad_1 + residual_tmp95*u0_grad_1;
+        const s_t residual_tmp101 = residual_tmp31*(-s_t(2)*residual_tmp76 + residual_tmp77 - residual_tmp78 + residual_tmp80 - residual_tmp81) + residual_tmp83;
+        const s_t residual_tmp102 = newmark_velocity_alpha*residual_tmp36 - residual_tmp13*residual_tmp39 + residual_tmp45*u0_grad_2;
+        const s_t residual_tmp103 = residual_tmp95*u0_grad_2;
+        const s_t residual_tmp104 = ((s_t(1) / s_t(3)))*residual_tmp44;
+        const s_t residual_tmp105 = residual_tmp34*(eta_s*(residual_tmp36*residual_tmp95 + residual_tmp37*residual_tmp46) - residual_tmp104*residual_tmp96);
+        const s_t residual_tmp106 = residual_tmp46*u2_grad_0;
+        const s_t residual_tmp107 = residual_tmp34*(-eta_s*(-residual_tmp38*residual_tmp46 + residual_tmp40*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp43*residual_tmp96);
+        const s_t residual_tmp108 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp19*u0_grad_1 - residual_tmp22 - s_t(2)*residual_tmp24 - residual_tmp28);
+        const s_t residual_tmp109 = residual_tmp31*(s_t(2)*residual_tmp16*residual_tmp41 + s_t(2)*residual_tmp20*residual_tmp36 - residual_tmp47 - residual_tmp48 - residual_tmp52 - s_t(2)*residual_tmp53 - residual_tmp57) + residual_tmp58;
+        const s_t residual_tmp110 = residual_tmp34*(-eta_s*(-residual_tmp12*residual_tmp95 + residual_tmp42*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp109*residual_tmp16);
+        const s_t residual_tmp111 = residual_tmp31*(s_t(2)*residual_tmp20*residual_tmp39 - residual_tmp62 - s_t(2)*residual_tmp64 - residual_tmp68) + residual_tmp69;
+        const s_t residual_tmp112 = residual_tmp42*u2_grad_1;
+        const s_t residual_tmp113 = ((s_t(1) / s_t(3)))*residual_tmp109;
+        const s_t residual_tmp114 = residual_tmp31*(residual_tmp76 - s_t(2)*residual_tmp77 + s_t(2)*residual_tmp78 + residual_tmp82) + residual_tmp83;
+        const s_t residual_tmp115 = residual_tmp42*residual_tmp6;
+        const s_t residual_tmp116 = residual_tmp113*u0_grad_2;
+        const s_t residual_tmp117 = residual_tmp34*(-eta_s*(-residual_tmp37*residual_tmp42 + residual_tmp44*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp109*residual_tmp36);
+        const s_t residual_tmp118 = residual_tmp42*u2_grad_0;
+        const s_t residual_tmp119 = ((s_t(1) / s_t(3)))*residual_tmp40;
+        const s_t residual_tmp120 = -(s_t(1) / s_t(3))*residual_tmp109;
+        const s_t residual_tmp121 = residual_tmp34*(eta_s*(residual_tmp38*residual_tmp42 + residual_tmp43*residual_tmp95) + residual_tmp120*residual_tmp40);
+        const s_t grad_coeff0_0 = trial_grad0*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp15 + residual_tmp16*residual_tmp21) - residual_tmp32*residual_tmp33) + residual_tmp12*residual_tmp61) + trial_grad1*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp85 + residual_tmp16*residual_tmp86 + residual_tmp87) - residual_tmp33*residual_tmp84 + residual_tmp6*residual_tmp74) + residual_tmp61*residual_tmp75) + trial_grad2*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp71 + residual_tmp16*residual_tmp72 - residual_tmp73) - residual_tmp33*residual_tmp70 - residual_tmp74*u2_grad_1) + residual_tmp43*residual_tmp61);
+        const s_t grad_coeff0_1 = trial_grad0*(residual_tmp11*(-eta_s*(residual_tmp15*residual_tmp44 - residual_tmp21*residual_tmp36 + residual_tmp87) + ((s_t(1) / s_t(3)))*residual_tmp32*residual_tmp37 + residual_tmp6*residual_tmp90) + residual_tmp12*residual_tmp88) + trial_grad1*(residual_tmp11*(-eta_s*(-residual_tmp36*residual_tmp86 + residual_tmp44*residual_tmp85) + ((s_t(1) / s_t(3)))*residual_tmp37*residual_tmp84) + residual_tmp75*residual_tmp88) + trial_grad2*(residual_tmp11*(-eta_s*(-residual_tmp36*residual_tmp72 + residual_tmp44*residual_tmp71 - residual_tmp89) + ((s_t(1) / s_t(3)))*residual_tmp37*residual_tmp70 - residual_tmp91) + residual_tmp43*residual_tmp88);
+        const s_t grad_coeff0_2 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp15*residual_tmp43 + residual_tmp21*residual_tmp40 - residual_tmp73) + ((s_t(1) / s_t(3)))*residual_tmp32*residual_tmp38 - residual_tmp90*u2_grad_1) + residual_tmp12*residual_tmp92) + trial_grad1*(residual_tmp11*(-eta_s*(residual_tmp40*residual_tmp86 - residual_tmp43*residual_tmp85 + residual_tmp89) + ((s_t(1) / s_t(3)))*residual_tmp38*residual_tmp84 + residual_tmp91) + residual_tmp75*residual_tmp92) + trial_grad2*(residual_tmp11*(-eta_s*(residual_tmp40*residual_tmp72 - residual_tmp43*residual_tmp71) + ((s_t(1) / s_t(3)))*residual_tmp38*residual_tmp70) + residual_tmp43*residual_tmp92);
+        const s_t grad_coeff1_0 = trial_grad0*(residual_tmp11*(-eta_s*(residual_tmp15*residual_tmp7 - residual_tmp16*residual_tmp93) + ((s_t(1) / s_t(3)))*residual_tmp12*residual_tmp94) + residual_tmp12*residual_tmp97) + trial_grad1*(residual_tmp11*(-eta_s*(-residual_tmp102*residual_tmp16 - residual_tmp103 + residual_tmp46*residual_tmp6 + residual_tmp7*residual_tmp85) + ((s_t(1) / s_t(3)))*residual_tmp101*residual_tmp12) + residual_tmp75*residual_tmp97) + trial_grad2*(residual_tmp11*(-eta_s*(residual_tmp100 - residual_tmp16*residual_tmp99 + residual_tmp7*residual_tmp71) + ((s_t(1) / s_t(3)))*residual_tmp12*residual_tmp98) + residual_tmp43*residual_tmp97);
+        const s_t grad_coeff1_1 = trial_grad0*(residual_tmp105*residual_tmp12 + residual_tmp11*(eta_s*(-residual_tmp103 + residual_tmp15*residual_tmp37 + residual_tmp36*residual_tmp93 + residual_tmp46*residual_tmp6) - residual_tmp104*residual_tmp94)) + trial_grad1*(residual_tmp105*residual_tmp75 + residual_tmp11*(eta_s*(residual_tmp102*residual_tmp36 + residual_tmp37*residual_tmp85) - residual_tmp101*residual_tmp104)) + trial_grad2*(residual_tmp105*residual_tmp43 + residual_tmp11*(eta_s*(-residual_tmp106 + residual_tmp36*residual_tmp99 + residual_tmp37*residual_tmp71 + residual_tmp39*residual_tmp95) - residual_tmp104*residual_tmp98));
+        const s_t grad_coeff1_2 = trial_grad0*(residual_tmp107*residual_tmp12 + residual_tmp11*(-eta_s*(-residual_tmp100 - residual_tmp15*residual_tmp38 + residual_tmp40*residual_tmp93) + ((s_t(1) / s_t(3)))*residual_tmp43*residual_tmp94)) + trial_grad1*(residual_tmp107*residual_tmp75 + residual_tmp11*(-eta_s*(residual_tmp102*residual_tmp40 - residual_tmp106 - residual_tmp38*residual_tmp85 + residual_tmp39*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp101*residual_tmp43)) + trial_grad2*(residual_tmp107*residual_tmp43 + residual_tmp11*(-eta_s*(-residual_tmp38*residual_tmp71 + residual_tmp40*residual_tmp99) + ((s_t(1) / s_t(3)))*residual_tmp43*residual_tmp98));
+        const s_t grad_coeff2_0 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp12*residual_tmp93 + residual_tmp21*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp108*residual_tmp16) + residual_tmp110*residual_tmp12) + trial_grad1*(residual_tmp11*(-eta_s*(-residual_tmp102*residual_tmp12 + residual_tmp115 + residual_tmp7*residual_tmp86) + ((s_t(1) / s_t(3)))*residual_tmp114*residual_tmp16 + residual_tmp116) + residual_tmp110*residual_tmp75) + trial_grad2*(residual_tmp11*(-eta_s*(-residual_tmp112 - residual_tmp12*residual_tmp99 + residual_tmp7*residual_tmp72) + ((s_t(1) / s_t(3)))*residual_tmp111*residual_tmp16 - residual_tmp113*u0_grad_1) + residual_tmp110*residual_tmp43);
+        const s_t grad_coeff2_1 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp115 - residual_tmp21*residual_tmp37 + residual_tmp44*residual_tmp93) + ((s_t(1) / s_t(3)))*residual_tmp108*residual_tmp36 - residual_tmp116) + residual_tmp117*residual_tmp12) + trial_grad1*(residual_tmp11*(-eta_s*(residual_tmp102*residual_tmp44 - residual_tmp37*residual_tmp86) + ((s_t(1) / s_t(3)))*residual_tmp114*residual_tmp36) + residual_tmp117*residual_tmp75) + trial_grad2*(residual_tmp11*(-eta_s*(residual_tmp118 - residual_tmp37*residual_tmp72 + residual_tmp44*residual_tmp99) + ((s_t(1) / s_t(3)))*residual_tmp111*residual_tmp36 + residual_tmp113*residual_tmp39) + residual_tmp117*residual_tmp43);
+        const s_t grad_coeff2_2 = trial_grad0*(residual_tmp11*(eta_s*(-residual_tmp112 + residual_tmp21*residual_tmp38 + residual_tmp43*residual_tmp93) - residual_tmp108*residual_tmp119 - residual_tmp120*u0_grad_1) + residual_tmp12*residual_tmp121) + trial_grad1*(residual_tmp11*(eta_s*(residual_tmp102*residual_tmp43 + residual_tmp118 + residual_tmp38*residual_tmp86) - residual_tmp114*residual_tmp119 + residual_tmp120*residual_tmp39) + residual_tmp121*residual_tmp75) + trial_grad2*(residual_tmp11*(eta_s*(residual_tmp38*residual_tmp72 + residual_tmp43*residual_tmp99) - residual_tmp111*residual_tmp119) + residual_tmp121*residual_tmp43);
+        grad_coeff0_0_values[lane] = grad_coeff0_0;
+        grad_coeff0_1_values[lane] = grad_coeff0_1;
+        grad_coeff0_2_values[lane] = grad_coeff0_2;
+        grad_coeff1_0_values[lane] = grad_coeff1_0;
+        grad_coeff1_1_values[lane] = grad_coeff1_1;
+        grad_coeff1_2_values[lane] = grad_coeff1_2;
+        grad_coeff2_0_values[lane] = grad_coeff2_0;
+        grad_coeff2_1_values[lane] = grad_coeff2_1;
+        grad_coeff2_2_values[lane] = grad_coeff2_2;
+      }
+      for (int test = 0; test < NS; ++test) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det = determinant[goff];
+          const s_t adj0 = adjugate[0][goff];
+          const s_t adj1 = adjugate[1][goff];
+          const s_t adj2 = adjugate[2][goff];
+          const s_t adj3 = adjugate[3][goff];
+          const s_t adj4 = adjugate[4][goff];
+          const s_t adj5 = adjugate[5][goff];
+          const s_t adj6 = adjugate[6][goff];
+          const s_t adj7 = adjugate[7][goff];
+          const s_t adj8 = adjugate[8][goff];
+          const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
+          const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
+          const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
+          element_matrix[(0 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
+          element_matrix[(1 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
+          element_matrix[(2 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+        }
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const ptrdiff_t goff = q * geometry_stride + lane;
+        const s_t det = determinant[goff];
+        const s_t adj0 = adjugate[0][goff];
+        const s_t adj1 = adjugate[1][goff];
+        const s_t adj2 = adjugate[2][goff];
+        const s_t adj3 = adjugate[3][goff];
+        const s_t adj4 = adjugate[4][goff];
+        const s_t adj5 = adjugate[5][goff];
+        const s_t adj6 = adjugate[6][goff];
+        const s_t adj7 = adjugate[7][goff];
+        const s_t adj8 = adjugate[8][goff];
+        const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
+        const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
+        const s_t u0_grad_2_ref = u0_grad_2_ref_values[lane];
+        const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
+        const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
+        const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
+        const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
+        const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
+        const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[lane];
+        const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
+        const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
+        const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
+        const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
+        const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
+        const s_t u1_grad_2_ref = u1_grad_2_ref_values[lane];
+        const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
+        const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
+        const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
+        const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
+        const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
+        const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[lane];
+        const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
+        const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
+        const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
+        const s_t u2_grad_0_ref = u2_grad_0_ref_values[lane];
+        const s_t u2_grad_1_ref = u2_grad_1_ref_values[lane];
+        const s_t u2_grad_2_ref = u2_grad_2_ref_values[lane];
+        const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
+        const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
+        const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
+        const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[lane];
+        const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[lane];
+        const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[lane];
+        const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
+        const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
+        const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
+        const s_t trial_grad0 = (grad_ref_x[q * NS + trial] * adj0 + grad_ref_y[q * NS + trial] * adj3 + grad_ref_z[q * NS + trial] * adj6) / det;
+        const s_t trial_grad1 = (grad_ref_x[q * NS + trial] * adj1 + grad_ref_y[q * NS + trial] * adj4 + grad_ref_z[q * NS + trial] * adj7) / det;
+        const s_t trial_grad2 = (grad_ref_x[q * NS + trial] * adj2 + grad_ref_y[q * NS + trial] * adj5 + grad_ref_z[q * NS + trial] * adj8) / det;
+        const s_t residual_tmp0 = u0_grad_0*u1_grad_1;
+        const s_t residual_tmp1 = u0_grad_1*u1_grad_2;
+        const s_t residual_tmp2 = u0_grad_2*u2_grad_1;
+        const s_t residual_tmp3 = u1_grad_2*u2_grad_1;
+        const s_t residual_tmp4 = u0_grad_1*u1_grad_0;
+        const s_t residual_tmp5 = u0_grad_2*u2_grad_0;
+        const s_t residual_tmp6 = u1_grad_1 + s_t(1);
+        const s_t residual_tmp7 = -residual_tmp3 + residual_tmp6 + u1_grad_1*u2_grad_2 + u2_grad_2;
+        const s_t residual_tmp8 = -residual_tmp5 + u0_grad_0*u2_grad_2;
+        const s_t residual_tmp9 = residual_tmp0 - residual_tmp4 + u0_grad_0;
+        const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
+        const s_t residual_tmp11 = pow_m1(residual_tmp10);
+        const s_t residual_tmp12 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
+        const s_t residual_tmp13 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+        const s_t residual_tmp14 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+        const s_t residual_tmp15 = -newmark_velocity_alpha*residual_tmp7 - residual_tmp13*u1_grad_2 + residual_tmp14*residual_tmp6;
+        const s_t residual_tmp16 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
+        const s_t residual_tmp17 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
+        const s_t residual_tmp18 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+        const s_t residual_tmp19 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+        const s_t residual_tmp20 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+        const s_t residual_tmp21 = -residual_tmp17*u0_grad_1 - residual_tmp18*u1_grad_2 + residual_tmp19*u0_grad_2 + residual_tmp20*residual_tmp6;
+        const s_t residual_tmp22 = newmark_velocity_alpha*residual_tmp12;
+        const s_t residual_tmp23 = residual_tmp18*u0_grad_2;
+        const s_t residual_tmp24 = residual_tmp20*u0_grad_1;
+        const s_t residual_tmp25 = residual_tmp22 + residual_tmp23 - residual_tmp24;
+        const s_t residual_tmp26 = residual_tmp17*residual_tmp6;
+        const s_t residual_tmp27 = residual_tmp19*u1_grad_2;
+        const s_t residual_tmp28 = residual_tmp26 - residual_tmp27;
+        const s_t residual_tmp29 = s_t(3)*eta_b;
+        const s_t residual_tmp30 = residual_tmp29*(residual_tmp25 + residual_tmp28);
+        const s_t residual_tmp31 = s_t(2)*eta_s;
+        const s_t residual_tmp32 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp17*residual_tmp6 - residual_tmp25 - s_t(2)*residual_tmp27);
+        const s_t residual_tmp33 = ((s_t(1) / s_t(3)))*residual_tmp7;
+        const s_t residual_tmp34 = pow_m2(residual_tmp10);
+        const s_t residual_tmp35 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+        const s_t residual_tmp36 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
+        const s_t residual_tmp37 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
+        const s_t residual_tmp38 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
+        const s_t residual_tmp39 = residual_tmp6 + residual_tmp9;
+        const s_t residual_tmp40 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+        const s_t residual_tmp41 = residual_tmp12*residual_tmp35 + residual_tmp13*residual_tmp37 + residual_tmp14*residual_tmp38 - residual_tmp17*residual_tmp39 + residual_tmp19*residual_tmp36 - residual_tmp40*residual_tmp7;
+        const s_t residual_tmp42 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
+        const s_t residual_tmp43 = u0_grad_0 + s_t(1);
+        const s_t residual_tmp44 = residual_tmp43 + residual_tmp8 + u2_grad_2;
+        const s_t residual_tmp45 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+        const s_t residual_tmp46 = residual_tmp16*residual_tmp35 + residual_tmp17*residual_tmp42 + residual_tmp18*residual_tmp37 - residual_tmp19*residual_tmp44 + residual_tmp20*residual_tmp38 - residual_tmp45*residual_tmp7;
+        const s_t residual_tmp47 = residual_tmp16*residual_tmp45;
+        const s_t residual_tmp48 = residual_tmp20*residual_tmp42;
+        const s_t residual_tmp49 = residual_tmp12*residual_tmp40;
+        const s_t residual_tmp50 = residual_tmp13*residual_tmp36;
+        const s_t residual_tmp51 = residual_tmp18*residual_tmp44;
+        const s_t residual_tmp52 = -residual_tmp51;
+        const s_t residual_tmp53 = residual_tmp14*residual_tmp39;
+        const s_t residual_tmp54 = -residual_tmp53;
+        const s_t residual_tmp55 = residual_tmp47 + residual_tmp48 + residual_tmp49 + residual_tmp50 + residual_tmp52 + residual_tmp54;
+        const s_t residual_tmp56 = residual_tmp35*residual_tmp7;
+        const s_t residual_tmp57 = residual_tmp17*residual_tmp38 + residual_tmp19*residual_tmp37 - residual_tmp56;
+        const s_t residual_tmp58 = residual_tmp29*(residual_tmp55 + residual_tmp57);
+        const s_t residual_tmp59 = residual_tmp31*(s_t(2)*residual_tmp17*residual_tmp38 + s_t(2)*residual_tmp19*residual_tmp37 - residual_tmp55 - s_t(2)*residual_tmp56) + residual_tmp58;
+        const s_t residual_tmp60 = -residual_tmp59;
+        const s_t residual_tmp61 = residual_tmp34*(eta_s*(residual_tmp12*residual_tmp41 + residual_tmp16*residual_tmp46) + residual_tmp33*residual_tmp60);
+        const s_t residual_tmp62 = newmark_velocity_alpha*residual_tmp36;
+        const s_t residual_tmp63 = residual_tmp20*residual_tmp43;
+        const s_t residual_tmp64 = residual_tmp45*u0_grad_2;
+        const s_t residual_tmp65 = residual_tmp62 + residual_tmp63 - residual_tmp64;
+        const s_t residual_tmp66 = residual_tmp35*u1_grad_2;
+        const s_t residual_tmp67 = residual_tmp17*u1_grad_0;
+        const s_t residual_tmp68 = residual_tmp66 - residual_tmp67;
+        const s_t residual_tmp69 = residual_tmp29*(residual_tmp65 + residual_tmp68);
+        const s_t residual_tmp70 = residual_tmp31*(s_t(2)*residual_tmp35*u1_grad_2 - residual_tmp65 - s_t(2)*residual_tmp67) + residual_tmp69;
+        const s_t residual_tmp71 = newmark_velocity_alpha*residual_tmp37 - residual_tmp14*u1_grad_0 + residual_tmp40*u1_grad_2;
+        const s_t residual_tmp72 = residual_tmp17*residual_tmp43 - residual_tmp20*u1_grad_0 - residual_tmp35*u0_grad_2 + residual_tmp45*u1_grad_2;
+        const s_t residual_tmp73 = residual_tmp46*u0_grad_2;
+        const s_t residual_tmp74 = ((s_t(1) / s_t(3)))*residual_tmp60;
+        const s_t residual_tmp75 = -residual_tmp39;
+        const s_t residual_tmp76 = newmark_velocity_alpha*residual_tmp39;
+        const s_t residual_tmp77 = residual_tmp18*residual_tmp43;
+        const s_t residual_tmp78 = residual_tmp45*u0_grad_1;
+        const s_t residual_tmp79 = residual_tmp76 + residual_tmp77 - residual_tmp78;
+        const s_t residual_tmp80 = residual_tmp35*residual_tmp6;
+        const s_t residual_tmp81 = residual_tmp19*u1_grad_0;
+        const s_t residual_tmp82 = residual_tmp80 - residual_tmp81;
+        const s_t residual_tmp83 = residual_tmp29*(-residual_tmp79 - residual_tmp82);
+        const s_t residual_tmp84 = residual_tmp31*(residual_tmp79 - s_t(2)*residual_tmp80 + s_t(2)*residual_tmp81) + residual_tmp83;
+        const s_t residual_tmp85 = newmark_velocity_alpha*residual_tmp38 + residual_tmp13*u1_grad_0 - residual_tmp40*residual_tmp6;
+        const s_t residual_tmp86 = residual_tmp18*u1_grad_0 - residual_tmp19*residual_tmp43 + residual_tmp35*u0_grad_1 - residual_tmp45*residual_tmp6;
+        const s_t residual_tmp87 = residual_tmp46*u0_grad_1;
+        const s_t residual_tmp88 = residual_tmp34*(-eta_s*(-residual_tmp36*residual_tmp41 + residual_tmp44*residual_tmp46) + ((s_t(1) / s_t(3)))*residual_tmp37*residual_tmp59);
+        const s_t residual_tmp89 = ((s_t(1) / s_t(3)))*residual_tmp59;
+        const s_t residual_tmp90 = residual_tmp43*residual_tmp46;
+        const s_t residual_tmp91 = residual_tmp89*u1_grad_0;
+        const s_t residual_tmp92 = residual_tmp34*(-eta_s*(residual_tmp39*residual_tmp41 - residual_tmp42*residual_tmp46) + ((s_t(1) / s_t(3)))*residual_tmp38*residual_tmp59);
+        const s_t residual_tmp93 = newmark_velocity_alpha*residual_tmp16 + residual_tmp13*u0_grad_2 - residual_tmp14*u0_grad_1;
+        const s_t residual_tmp94 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp18*u0_grad_2 - residual_tmp22 - s_t(2)*residual_tmp24 - residual_tmp28);
+        const s_t residual_tmp95 = residual_tmp12*residual_tmp45 - residual_tmp13*residual_tmp44 + residual_tmp14*residual_tmp42 + residual_tmp16*residual_tmp40 + residual_tmp18*residual_tmp36 - residual_tmp20*residual_tmp39;
+        const s_t residual_tmp96 = residual_tmp31*(s_t(2)*residual_tmp16*residual_tmp45 + s_t(2)*residual_tmp20*residual_tmp42 - residual_tmp49 - residual_tmp50 - s_t(2)*residual_tmp51 - residual_tmp54 - residual_tmp57) + residual_tmp58;
+        const s_t residual_tmp97 = residual_tmp34*(-eta_s*(-residual_tmp12*residual_tmp95 + residual_tmp46*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp16*residual_tmp96);
+        const s_t residual_tmp98 = residual_tmp31*(s_t(2)*residual_tmp20*residual_tmp43 - residual_tmp62 - s_t(2)*residual_tmp64 - residual_tmp68) + residual_tmp69;
+        const s_t residual_tmp99 = -newmark_velocity_alpha*residual_tmp44 + residual_tmp14*residual_tmp43 - residual_tmp40*u0_grad_2;
+        const s_t residual_tmp100 = residual_tmp46*u1_grad_2;
+        const s_t residual_tmp101 = ((s_t(1) / s_t(3)))*residual_tmp96;
+        const s_t residual_tmp102 = residual_tmp31*(residual_tmp76 - s_t(2)*residual_tmp77 + s_t(2)*residual_tmp78 + residual_tmp82) + residual_tmp83;
+        const s_t residual_tmp103 = newmark_velocity_alpha*residual_tmp42 - residual_tmp13*residual_tmp43 + residual_tmp40*u0_grad_1;
+        const s_t residual_tmp104 = residual_tmp46*residual_tmp6;
+        const s_t residual_tmp105 = residual_tmp101*u0_grad_1;
+        const s_t residual_tmp106 = ((s_t(1) / s_t(3)))*residual_tmp44;
+        const s_t residual_tmp107 = -(s_t(1) / s_t(3))*residual_tmp96;
+        const s_t residual_tmp108 = residual_tmp34*(eta_s*(residual_tmp36*residual_tmp95 + residual_tmp37*residual_tmp46) + residual_tmp107*residual_tmp44);
+        const s_t residual_tmp109 = residual_tmp46*u1_grad_0;
+        const s_t residual_tmp110 = residual_tmp34*(-eta_s*(-residual_tmp38*residual_tmp46 + residual_tmp39*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp42*residual_tmp96);
+        const s_t residual_tmp111 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp22 - residual_tmp23 + residual_tmp24 - residual_tmp26 + residual_tmp27);
+        const s_t residual_tmp112 = residual_tmp31*(s_t(2)*residual_tmp12*residual_tmp40 + s_t(2)*residual_tmp13*residual_tmp36 - residual_tmp47 - residual_tmp48 - residual_tmp52 - s_t(2)*residual_tmp53 - residual_tmp57) + residual_tmp58;
+        const s_t residual_tmp113 = residual_tmp34*(-eta_s*(-residual_tmp16*residual_tmp95 + residual_tmp41*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp112*residual_tmp12);
+        const s_t residual_tmp114 = residual_tmp31*(s_t(2)*residual_tmp62 - residual_tmp63 + residual_tmp64 - residual_tmp66 + residual_tmp67) + residual_tmp69;
+        const s_t residual_tmp115 = -residual_tmp41*u1_grad_2 + residual_tmp95*u0_grad_2;
+        const s_t residual_tmp116 = residual_tmp31*(-s_t(2)*residual_tmp76 + residual_tmp77 - residual_tmp78 + residual_tmp80 - residual_tmp81) + residual_tmp83;
+        const s_t residual_tmp117 = residual_tmp95*u0_grad_1;
+        const s_t residual_tmp118 = residual_tmp34*(-eta_s*(-residual_tmp37*residual_tmp41 + residual_tmp44*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp112*residual_tmp36);
+        const s_t residual_tmp119 = residual_tmp41*u1_grad_0;
+        const s_t residual_tmp120 = ((s_t(1) / s_t(3)))*residual_tmp39;
+        const s_t residual_tmp121 = residual_tmp34*(eta_s*(residual_tmp38*residual_tmp41 + residual_tmp42*residual_tmp95) - residual_tmp112*residual_tmp120);
+        const s_t grad_coeff0_0 = trial_grad0*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp15 + residual_tmp16*residual_tmp21) - residual_tmp32*residual_tmp33) + residual_tmp12*residual_tmp61) + trial_grad1*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp71 + residual_tmp16*residual_tmp72 - residual_tmp73) - residual_tmp33*residual_tmp70 - residual_tmp74*u1_grad_2) + residual_tmp36*residual_tmp61) + trial_grad2*(residual_tmp11*(eta_s*(residual_tmp12*residual_tmp85 + residual_tmp16*residual_tmp86 + residual_tmp87) - residual_tmp33*residual_tmp84 + residual_tmp6*residual_tmp74) + residual_tmp61*residual_tmp75);
+        const s_t grad_coeff0_1 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp15*residual_tmp36 + residual_tmp21*residual_tmp44 - residual_tmp73) + ((s_t(1) / s_t(3)))*residual_tmp32*residual_tmp37 - residual_tmp89*u1_grad_2) + residual_tmp12*residual_tmp88) + trial_grad1*(residual_tmp11*(-eta_s*(-residual_tmp36*residual_tmp71 + residual_tmp44*residual_tmp72) + ((s_t(1) / s_t(3)))*residual_tmp37*residual_tmp70) + residual_tmp36*residual_tmp88) + trial_grad2*(residual_tmp11*(-eta_s*(-residual_tmp36*residual_tmp85 + residual_tmp44*residual_tmp86 + residual_tmp90) + ((s_t(1) / s_t(3)))*residual_tmp37*residual_tmp84 + residual_tmp91) + residual_tmp75*residual_tmp88);
+        const s_t grad_coeff0_2 = trial_grad0*(residual_tmp11*(-eta_s*(residual_tmp15*residual_tmp39 - residual_tmp21*residual_tmp42 + residual_tmp87) + ((s_t(1) / s_t(3)))*residual_tmp32*residual_tmp38 + residual_tmp6*residual_tmp89) + residual_tmp12*residual_tmp92) + trial_grad1*(residual_tmp11*(-eta_s*(residual_tmp39*residual_tmp71 - residual_tmp42*residual_tmp72 - residual_tmp90) + ((s_t(1) / s_t(3)))*residual_tmp38*residual_tmp70 - residual_tmp91) + residual_tmp36*residual_tmp92) + trial_grad2*(residual_tmp11*(-eta_s*(residual_tmp39*residual_tmp85 - residual_tmp42*residual_tmp86) + ((s_t(1) / s_t(3)))*residual_tmp38*residual_tmp84) + residual_tmp75*residual_tmp92);
+        const s_t grad_coeff1_0 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp12*residual_tmp93 + residual_tmp21*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp16*residual_tmp94) + residual_tmp12*residual_tmp97) + trial_grad1*(residual_tmp11*(-eta_s*(-residual_tmp100 - residual_tmp12*residual_tmp99 + residual_tmp7*residual_tmp72) - residual_tmp101*u0_grad_2 + ((s_t(1) / s_t(3)))*residual_tmp16*residual_tmp98) + residual_tmp36*residual_tmp97) + trial_grad2*(residual_tmp11*(-eta_s*(-residual_tmp103*residual_tmp12 + residual_tmp104 + residual_tmp7*residual_tmp86) + ((s_t(1) / s_t(3)))*residual_tmp102*residual_tmp16 + residual_tmp105) + residual_tmp75*residual_tmp97);
+        const s_t grad_coeff1_1 = trial_grad0*(residual_tmp108*residual_tmp12 + residual_tmp11*(eta_s*(-residual_tmp100 + residual_tmp21*residual_tmp37 + residual_tmp36*residual_tmp93) - residual_tmp106*residual_tmp94 - residual_tmp107*u0_grad_2)) + trial_grad1*(residual_tmp108*residual_tmp36 + residual_tmp11*(eta_s*(residual_tmp36*residual_tmp99 + residual_tmp37*residual_tmp72) - residual_tmp106*residual_tmp98)) + trial_grad2*(residual_tmp108*residual_tmp75 + residual_tmp11*(eta_s*(residual_tmp103*residual_tmp36 + residual_tmp109 + residual_tmp37*residual_tmp86) - residual_tmp102*residual_tmp106 + residual_tmp107*residual_tmp43));
+        const s_t grad_coeff1_2 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp104 - residual_tmp21*residual_tmp38 + residual_tmp39*residual_tmp93) - residual_tmp105 + ((s_t(1) / s_t(3)))*residual_tmp42*residual_tmp94) + residual_tmp110*residual_tmp12) + trial_grad1*(residual_tmp11*(-eta_s*(residual_tmp109 - residual_tmp38*residual_tmp72 + residual_tmp39*residual_tmp99) + residual_tmp101*residual_tmp43 + ((s_t(1) / s_t(3)))*residual_tmp42*residual_tmp98) + residual_tmp110*residual_tmp36) + trial_grad2*(residual_tmp11*(-eta_s*(residual_tmp103*residual_tmp39 - residual_tmp38*residual_tmp86) + ((s_t(1) / s_t(3)))*residual_tmp102*residual_tmp42) + residual_tmp110*residual_tmp75);
+        const s_t grad_coeff2_0 = trial_grad0*(residual_tmp11*(-eta_s*(residual_tmp15*residual_tmp7 - residual_tmp16*residual_tmp93) + ((s_t(1) / s_t(3)))*residual_tmp111*residual_tmp12) + residual_tmp113*residual_tmp12) + trial_grad1*(residual_tmp11*(-eta_s*(residual_tmp115 - residual_tmp16*residual_tmp99 + residual_tmp7*residual_tmp71) + ((s_t(1) / s_t(3)))*residual_tmp114*residual_tmp12) + residual_tmp113*residual_tmp36) + trial_grad2*(residual_tmp11*(-eta_s*(-residual_tmp103*residual_tmp16 - residual_tmp117 + residual_tmp41*residual_tmp6 + residual_tmp7*residual_tmp85) + ((s_t(1) / s_t(3)))*residual_tmp116*residual_tmp12) + residual_tmp113*residual_tmp75);
+        const s_t grad_coeff2_1 = trial_grad0*(residual_tmp11*(-eta_s*(-residual_tmp115 - residual_tmp15*residual_tmp37 + residual_tmp44*residual_tmp93) + ((s_t(1) / s_t(3)))*residual_tmp111*residual_tmp36) + residual_tmp118*residual_tmp12) + trial_grad1*(residual_tmp11*(-eta_s*(-residual_tmp37*residual_tmp71 + residual_tmp44*residual_tmp99) + ((s_t(1) / s_t(3)))*residual_tmp114*residual_tmp36) + residual_tmp118*residual_tmp36) + trial_grad2*(residual_tmp11*(-eta_s*(residual_tmp103*residual_tmp44 - residual_tmp119 - residual_tmp37*residual_tmp85 + residual_tmp43*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp116*residual_tmp36) + residual_tmp118*residual_tmp75);
+        const s_t grad_coeff2_2 = trial_grad0*(residual_tmp11*(eta_s*(-residual_tmp117 + residual_tmp15*residual_tmp38 + residual_tmp41*residual_tmp6 + residual_tmp42*residual_tmp93) - residual_tmp111*residual_tmp120) + residual_tmp12*residual_tmp121) + trial_grad1*(residual_tmp11*(eta_s*(-residual_tmp119 + residual_tmp38*residual_tmp71 + residual_tmp42*residual_tmp99 + residual_tmp43*residual_tmp95) - residual_tmp114*residual_tmp120) + residual_tmp121*residual_tmp36) + trial_grad2*(residual_tmp11*(eta_s*(residual_tmp103*residual_tmp42 + residual_tmp38*residual_tmp85) - residual_tmp116*residual_tmp120) + residual_tmp121*residual_tmp75);
+        grad_coeff0_0_values[lane] = grad_coeff0_0;
+        grad_coeff0_1_values[lane] = grad_coeff0_1;
+        grad_coeff0_2_values[lane] = grad_coeff0_2;
+        grad_coeff1_0_values[lane] = grad_coeff1_0;
+        grad_coeff1_1_values[lane] = grad_coeff1_1;
+        grad_coeff1_2_values[lane] = grad_coeff1_2;
+        grad_coeff2_0_values[lane] = grad_coeff2_0;
+        grad_coeff2_1_values[lane] = grad_coeff2_1;
+        grad_coeff2_2_values[lane] = grad_coeff2_2;
+      }
+      for (int test = 0; test < NS; ++test) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det = determinant[goff];
+          const s_t adj0 = adjugate[0][goff];
+          const s_t adj1 = adjugate[1][goff];
+          const s_t adj2 = adjugate[2][goff];
+          const s_t adj3 = adjugate[3][goff];
+          const s_t adj4 = adjugate[4][goff];
+          const s_t adj5 = adjugate[5][goff];
+          const s_t adj6 = adjugate[6][goff];
+          const s_t adj7 = adjugate[7][goff];
+          const s_t adj8 = adjugate[8][goff];
+          const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
+          const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
+          const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
+          element_matrix[(0 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
+          element_matrix[(1 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
+          element_matrix[(2 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+        }
+      }
+    }
+  }
+}
+
 } // namespace codegen
 } // namespace sfem
 

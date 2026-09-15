@@ -62,21 +62,44 @@ def direction_gradient_symbols(field_names, dim):
     )
 
 
-def trial_direction_substitution(field_names, dim, trial_component, trial_gradient):
+def direction_value_symbols(field_names):
+    """The symbols a flux carries the direction's own value in.
+
+    A form that contracts the direction's value as well as its gradient -- a
+    mass term, a reaction term -- reads these.  They are substituted by the
+    trial function's value, exactly as the gradients are by its gradient.
+    """
+    return tuple(sp.Symbol("%s_direction" % name) for name in field_names)
+
+
+def trial_direction_substitution(
+    field_names, dim, trial_component, trial_gradient, trial_value=None
+):
     """Replace the direction by one trial basis function.
 
     `trial_gradient[axis]` is whatever the emitter calls the trial function's
-    physical gradient -- a name, because the shape it belongs to is a run-time
-    loop index and only its gradient values differ between shapes.  Every
-    component other than `trial_component` goes to zero, because a basis
-    function for one field has no gradient in the others.
+    physical gradient, and `trial_value` its value -- names, because the shape
+    they belong to is a run-time loop index and only their values differ between
+    shapes.  Every component other than `trial_component` goes to zero, because
+    a basis function for one field is zero in the others.
+
+    `trial_value` is optional because one shape cannot supply it: a closed-form
+    element folds its basis into the arithmetic and reads no shape table, so it
+    has nowhere to get the value from and `closed_form_assembly_admits` refuses
+    a form that needs one.  Left out, the value symbols are not substituted at
+    all, and a flux that mentions one would reach C as an undeclared name --
+    loud, rather than a silent zero.
     """
-    symbols = direction_gradient_symbols(field_names, dim)
     substitution = {}
-    for component, row in enumerate(symbols):
+    for component, row in enumerate(direction_gradient_symbols(field_names, dim)):
         for axis, symbol in enumerate(row):
             substitution[symbol] = (
                 trial_gradient[axis] if component == trial_component else sp.Integer(0)
+            )
+    if trial_value is not None:
+        for component, symbol in enumerate(direction_value_symbols(field_names)):
+            substitution[symbol] = (
+                trial_value if component == trial_component else sp.Integer(0)
             )
     return substitution
 
@@ -91,6 +114,7 @@ def flux_is_linear_in_the_direction(expression, field_names, dim):
     matrix with no other symptom.
     """
     symbols = [s for row in direction_gradient_symbols(field_names, dim) for s in row]
+    symbols.extend(direction_value_symbols(field_names))
     present = [s for s in symbols if s in expression.free_symbols]
     for symbol in present:
         first = sp.diff(expression, symbol)
@@ -131,34 +155,58 @@ def assembles_in_closed_form(element_type):
 CLOSED_FORM_ENTRY_LIMIT = 400
 
 
+def substituted_assembly_admits(
+    *, matrix_formats, coefficients, dependencies, field_names, dim
+):
+    """Whether this form's matrix can be built from the substituted flux at all.
+
+    The conditions all three assembly shapes share, and the reason they are
+    asked here rather than in an emitter: an emitter that asked them itself
+    would be emission deciding what to emit, and three emitters asking them
+    separately could disagree.
+
+    A matrix must be published at all, or there is nothing to assemble.  The
+    form must have a direction to substitute for, and something for the test
+    function to contract.  The flux must be *linear* in that direction:
+    otherwise substituting a trial function is not a matrix column, and the
+    failure has no other symptom than a plausible wrong number in the right
+    place.
+    """
+    if not {"crs", "bsr"}.intersection(matrix_formats):
+        return False
+    if not dependencies.direction:
+        return False
+    if not any(any(row) for row in dependencies.gradient_coefficients):
+        return False
+    return all(
+        flux_is_linear_in_the_direction(sp.sympify(expression), field_names, dim)
+        for coefficient in coefficients
+        for expression in coefficient.gradient
+    )
+
+
 def closed_form_assembly_admits(
     *,
     element_type,
     tensor_product,
-    matrix_formats,
-    coefficients,
     dependencies,
-    field_names,
-    dim,
     reference_gradients,
     n_entries,
+    **shared
 ):
-    """Whether this form on this element is assembled entry by entry.
+    """Whether this form on this element is assembled entry by entry, no loops.
 
-    Every condition here is a fact about the form or the element rather than a
-    preference, and all of them are asked in one place because an emitter that
-    asked them itself would be emission deciding what to emit.
+    On top of what `substituted_assembly_admits` requires: the element must be
+    one `assembles_in_closed_form` admits and must actually have constant
+    reference gradients; and the matrix must be small enough to eliminate whole.
 
-    The element must be one `assembles_in_closed_form` admits and must actually
-    have constant reference gradients.  A matrix must be published at all, and
-    it must not be a tensor-product element, whose assembly is factorised rather
-    than enumerated.  The form must have a direction to substitute for, and must
-    be linear in it -- otherwise substituting a trial function is not a matrix
-    column, and the failure has no other symptom than a wrong number in the
-    right place.  It must contract only test gradients, because a test *value*
-    on a one-point rule needs the shape value at that point and the closed form
-    folds no shape table.  And the matrix must be small enough to eliminate
-    whole.
+    Neither the test function's value nor the trial function's may be needed.
+    This shape folds the basis into the arithmetic and reads no shape table, so
+    it has the gradients as constants and the values nowhere -- the reference
+    data a rule carries is its gradients, not its shape values.  A form that
+    wants either falls back to the quadrature shape, which reads both from the
+    table; that is a fallback rather than a refusal, so no element is left
+    probing for want of this one.
     """
     if reference_gradients is None:
         return False
@@ -166,18 +214,37 @@ def closed_form_assembly_admits(
         return False
     if not assembles_in_closed_form(element_type):
         return False
-    if not {"crs", "bsr"}.intersection(matrix_formats):
-        return False
-    if not dependencies.direction:
-        return False
-    if any(dependencies.value_coefficients):
-        return False
-    if not any(any(row) for row in dependencies.gradient_coefficients):
+    if any(dependencies.value_coefficients) or dependencies.direction_value:
         return False
     if int(n_entries) > CLOSED_FORM_ENTRY_LIMIT:
         return False
-    return all(
-        flux_is_linear_in_the_direction(sp.sympify(expression), field_names, dim)
-        for coefficient in coefficients
-        for expression in coefficient.gradient
-    )
+    return substituted_assembly_admits(dependencies=dependencies, **shared)
+
+
+def quadrature_assembly_admits(*, tensor_product, dependencies, **shared):
+    """Whether this form is assembled a quadrature point at a time.
+
+    The shape for a simplex the closed form does not admit -- a higher-order
+    one, where enumerating every entry would be a 900-term elimination on TET10
+    and where the basis is not constant anyway.  It asks nothing the shared test
+    does not: the trial degree of freedom stays a run-time loop, so neither the
+    entry count nor the element's reference gradients constrain it, and a test
+    value is contracted like any other coefficient.
+    """
+    if tensor_product:
+        return False
+    return substituted_assembly_admits(dependencies=dependencies, **shared)
+
+
+def sum_factorized_assembly_admits(*, tensor_product, dependencies, **shared):
+    """Whether this form is assembled one column at a time, factorised.
+
+    The shape for a tensor-product element, and the only one it may have.
+    Contracting its test functions point by point is `p^6` work per column where
+    the factorised contraction is `p^4`, so the quadrature shape above is not a
+    fallback for this family -- it is the wrong complexity, on the elements
+    where the exponent matters most.
+    """
+    if not tensor_product:
+        return False
+    return substituted_assembly_admits(dependencies=dependencies, **shared)

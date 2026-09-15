@@ -153,6 +153,27 @@ def contracted_test_quantities(dependencies):
     return tuple(quantities)
 
 
+def substituted_trial_quantities(dependencies):
+    """Which of the trial function's value and gradient an assembly substitutes.
+
+    The mirror of `contracted_test_quantities`, on the other side of the
+    bilinear form, and returned as a sequence for the same reason: emission
+    iterates what the plan says rather than branching on the plan itself.
+
+    A matrix column is the flux with a trial basis function put where the
+    direction was, so what has to be substituted is exactly what the flux reads
+    the direction through.  A gradient is always among them -- a form with no
+    gradient coefficient publishes no assembly at all -- and a value only when
+    the flux contracts one.
+    """
+    quantities = []
+    if dependencies.direction_value:
+        quantities.append("value")
+    if dependencies.direction_gradient:
+        quantities.append("gradient")
+    return tuple(quantities)
+
+
 def live_gradient_directions(dependencies, dim):
     """The spatial directions in which some row's gradient coefficient is live.
 

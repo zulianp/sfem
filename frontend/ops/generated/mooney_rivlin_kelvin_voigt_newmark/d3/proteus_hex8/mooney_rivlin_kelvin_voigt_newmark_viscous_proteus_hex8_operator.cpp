@@ -877,8 +877,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_h
     s_t bdeterminant[NQ * VS];
     s_t bcurrent[N_STREAMS][VS];
     s_t bprevious[N_STREAMS][VS];
-    s_t bdirection[N_STREAMS][VS];
-    s_t boutput[N_STREAMS][VS];
     const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
 
     for (int shape = 0; shape < NS; ++shape) {
@@ -912,80 +910,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_h
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    const auto row_tensor_stream = [](const int local) -> int {
-      switch (local) {
-        case 0: return 0;
-        case 1: return 3;
-        case 2: return 6;
-        case 3: return 9;
-        case 4: return 12;
-        case 5: return 15;
-        case 6: return 18;
-        case 7: return 21;
-        case 8: return 1;
-        case 9: return 4;
-        case 10: return 7;
-        case 11: return 10;
-        case 12: return 13;
-        case 13: return 16;
-        case 14: return 19;
-        case 15: return 22;
-        case 16: return 2;
-        case 17: return 5;
-        case 18: return 8;
-        case 19: return 11;
-        case 20: return 14;
-        case 21: return 17;
-        case 22: return 20;
-        case 23: return 23;
-        default: return 0;
-      }
-    };
-    const auto col_tensor_stream = [](const int local) -> int {
-      switch (local) {
-        case 0: return 0;
-        case 1: return 3;
-        case 2: return 6;
-        case 3: return 9;
-        case 4: return 12;
-        case 5: return 15;
-        case 6: return 18;
-        case 7: return 21;
-        case 8: return 1;
-        case 9: return 4;
-        case 10: return 7;
-        case 11: return 10;
-        case 12: return 13;
-        case 13: return 16;
-        case 14: return 19;
-        case 15: return 22;
-        case 16: return 2;
-        case 17: return 5;
-        case 18: return 8;
-        case 19: return 11;
-        case 20: return 14;
-        case 21: return 17;
-        case 22: return 20;
-        case 23: return 23;
-        default: return 0;
-      }
-    };
-    for (int entry = 0; entry < 576; ++entry) {
-      element_matrix[entry] = s_t(0);
-    }
-    for (int trial_local = 0; trial_local < 24; ++trial_local) {
-      const int trial = col_tensor_stream(trial_local);
-      for (int stream = 0; stream < N_STREAMS; ++stream) {
-        bdirection[stream][0] = s_t(0);
-        boutput[stream][0] = s_t(0);
-      }
-      bdirection[trial][0] = s_t(1);
-      mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, newmark_velocity_alpha, boutput);
-      for (int test_local = 0; test_local < 24; ++test_local) {
-        const int test = row_tensor_stream(test_local);
-        element_matrix[test_local * 24 + trial_local] = boutput[test][0];
-      }
-    }
+    mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_hessian_block<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, newmark_velocity_alpha, element_matrix);
 
     mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_hessian_crs_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }

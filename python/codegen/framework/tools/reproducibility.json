@@ -152,6 +152,66 @@
       "l2": 0.01263277023177,
       "material": "linear_elasticity"
     },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_a_msoa": {
+      "l1": 8.613859695633,
+      "l2": 0.7706310912531,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_a_msoa": {
+      "l1": 8.613859695633,
+      "l2": 0.7706310912531,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_3d_a_msoa": {
+      "l1": 8.613859695633,
+      "l2": 0.7706310912531,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_a_msoa": {
+      "l1": 10.82095204466,
+      "l2": 1.131779853645,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_a_msoa": {
+      "l1": 10.82095204466,
+      "l2": 1.131779853645,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_a_msoa": {
+      "l1": 10.82095204466,
+      "l2": 1.131779853645,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_3d_i_msoa": {
+      "l1": 2218.462335191,
+      "l2": 70.25977473859,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_a_msoa": {
+      "l1": 0.5746214197014,
+      "l2": 0.02997768064062,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_a_msoa": {
+      "l1": 0.5746214197014,
+      "l2": 0.02997768064062,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_3d_i_msoa": {
+      "l1": 1135.647458613,
+      "l2": 35.21570971775,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_a_msoa": {
+      "l1": 3.52548426962,
+      "l2": 0.3702958404002,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_a_msoa": {
+      "l1": 7.415115626729,
+      "l2": 0.7254350041345,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
     "neohookean_ogden_apply_3d_a_msoa": {
       "l1": 3.228647584654,
       "l2": 0.3089869182481,
@@ -238,6 +298,41 @@
       "l1": 0.004180660229151,
       "l2": 0.0007972337594443,
       "material": "linear_elasticity"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_a_msoa": {
+      "l1": 1.292930677999,
+      "l2": 0.282608406867,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_a_msoa": {
+      "l1": 0.9741055395569,
+      "l2": 0.2113758276252,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_2d_i_msoa": {
+      "l1": 925.0629226516,
+      "l2": 81.66669791638,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_a_msoa": {
+      "l1": 0.009334499628658,
+      "l2": 0.001764755253256,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_2d_i_msoa": {
+      "l1": 402.9342010884,
+      "l2": 36.42091572461,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_a_msoa": {
+      "l1": 0.2414745096678,
+      "l2": 0.04676957972963,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_a_msoa": {
+      "l1": 0.6714853456902,
+      "l2": 0.1419035836409,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
     },
     "neohookean_ogden_apply_2d_a_msoa": {
       "l1": 0.5900686476991,
