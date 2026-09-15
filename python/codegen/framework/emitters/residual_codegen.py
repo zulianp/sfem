@@ -106,6 +106,7 @@ from codegen.framework.plans.residual_structure import (
     residual_local_phase_plans,
     residual_mesh_phase_plans,
 )
+from codegen.framework.plans.direct_assembly import trial_direction_substitution
 from codegen.framework.plans.geometry_variants import packed_kernel_forms
 from codegen.framework.plans.streams import field_stream_layout
 from codegen.framework.plans.geometry_quantities import (
@@ -3197,6 +3198,63 @@ def _simplex_local_body(
             body=_assemble_local_phases(sections),
         ),
     )
+
+
+class _SubstitutedCoefficient:
+    """One coefficient with the direction replaced by a trial basis function.
+
+    `_coefficient_evaluation_nodes` reads only `.value` and `.gradient`, so this
+    is all the shape it needs.
+    """
+
+    __slots__ = ("value", "gradient")
+
+    def __init__(self, value, gradient):
+        self.value = value
+        self.gradient = tuple(gradient)
+
+
+def _trial_substituted_coefficients(system, coefficients, trial_component, trial_gradient):
+    """`coefficients` with the direction taken to be one trial basis function.
+
+    The flux is linear in the direction, so this *is* that trial degree of
+    freedom's column -- which is why the matrix needs no probing.  See
+    `plans/direct_assembly.py` for the substitution and the check that the
+    linearity actually holds.
+    """
+    field_names = tuple(field.name for field in system.fields)
+    substitution = trial_direction_substitution(
+        field_names, system.dim, trial_component, trial_gradient
+    )
+    return tuple(
+        _SubstitutedCoefficient(
+            coefficient.value.subs(substitution),
+            [component.subs(substitution) for component in coefficient.gradient],
+        )
+        for coefficient in coefficients
+    )
+
+
+def _basis_gradient_nodes(name, shape_index, dim, reference_gradients=None):
+    """One basis function's physical gradient at this quadrature point.
+
+    The same push-forward the test functions get, with the shape index left as
+    whatever loop variable the caller is standing in -- `test` for the
+    contraction, `trial` for the column being built.
+    """
+    nodes = []
+    for d in range(dim):
+        terms = " + ".join(
+            "%s[q * NS + %s] * adj%d"
+            % (sfem_simplex_grad_ref_name("grad_ref", k), shape_index, k * dim + d)
+            for k in range(dim)
+        )
+        nodes.append(
+            BufferDeclNode(
+                "const s_t", "%s%d" % (name, d), (), expr_ref("(%s) / det" % terms)
+            )
+        )
+    return nodes
 
 
 def _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
