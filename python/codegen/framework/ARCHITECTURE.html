@@ -546,7 +546,7 @@
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 29</div>
     <div class="body">
-      <div class="op-title">The energy family did not have the mesh-loop lowering it was credited with <span class="chip c-ok">closed &mdash; nvcc 13 of 17 &rarr; 18 of 18, and a serial <code>__global__</code> can no longer ship</span></div>
+      <div class="op-title">The energy family did not have the mesh-loop lowering it was credited with <span class="chip c-ok">closed &mdash; nvcc 13 of 17 &rarr; 18 of 18, and the simplex lowering agrees on a GH200 to 6e-16</span></div>
 
       <p><b>What OP 27 left, and what was wrong with the note it left it as.</b> OP 27 closed saying the residual and inexact families cannot reach CUDA because they emit <code>_operator.cpp</code> around a host mesh loop, &ldquo;the mesh-loop lowering, which the energy family already has and which is the natural next piece&rdquo;. The energy family did not already have it. It had it for the kernels OP 27 compiled &mdash; six operators, all tensor-product &mdash; and not for the ones it did not.</p>
 
@@ -568,9 +568,21 @@
 
       <p><b>The gate does not need a GPU.</b> <code>test_cuda_operators_open_every_mesh_loop_on_the_device</code> generates all three materials on all four elements for CUDA and rejects any operator holding a serial mesh loop, a <code>return SFEM_SUCCESS;</code> closing a <code>__global__</code> body, or an OpenMP pragma &mdash; 18 subtests. Run against the pre-fix tree it rejects exactly laplace TET4 and TRI3, so it is not vacuous, and it makes the check the source contract structurally cannot.</p>
 
-      <p><b>What is not claimed.</b> Nothing here ran on the device; A0 and A1 are a compile gate, and the answers were not compared against the OpenMP ones for the four kernels that changed shape. Byte-identity says the CPU tree did not move, which is the whole of the numerical evidence so far. The residual and inexact families still emit <code>_operator.cpp</code> and are still refused, unchanged by this.</p>
+      <p><b>Then run, because compiling is not computing.</b> <code>spikes/cuda_apply_compare</code> already asked this question of one tensor-product kernel; it now asks it of every kernel whose lowering changed, and asks it better. Twelve output vectors, device against host on byte-identical inputs, on a GH200: <b>worst 6e-16</b> relative to the largest entry. The agreement mesh has <em>shared</em> connectivity on purpose, so the scatter is contended and <code>atomicAdd</code> is exercised rather than bypassed &mdash; which is also why the answers are not bit-identical.</p>
 
-      <div class="op-facts"><span><i>nvcc</i> 13 of 17 &rarr; <b>18 of 18</b></span><span><i>serial <code>__global__</code> kernels</i> 4 &rarr; <b>0</b></span><span><i>literal spellings routed to the seam</i> 5</span><span><i>gate</i> byte-identity + 18 subtests, no GPU needed</span></div>
+      <p><b>The comparison it replaces could not have failed the interesting way.</b> The spike compared two runs by printing each one's own L2 and L-infinity norms. Two answers can share both and differ entrywise, so that check could see gross disagreement and nothing finer &mdash; and it was the only check the PROTEUS_HEX8 apply had. It differences the vectors now. Not vacuous in either available direction: every vector is fully non-zero with every entry distinct, and moving one entry by 1e-9 relative makes it fail at 1.2e-10.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>one GH200, 72 host threads, saturated</th><th>ndof</th><th>host</th><th>device</th></tr>
+        <tr><td>neo-Hookean PROTEUS_HEX8 apply</td><td>12,519,843</td><td>213.7</td><td><b>2,334.3 MDOF/s &mdash; 10.9&times;</b></td></tr>
+        <tr><td>laplace TET4 gradient, closed form</td><td>4,173,281</td><td>522.1</td><td><b>5,481.2 MDOF/s &mdash; 10.5&times;</b></td></tr>
+      </table>
+
+      <p>The tetrahedral sweep is the new one, and it is the kernel this OP fixed. Both sides are flat over the last doubling &mdash; the host across the whole range, the device by 0.1% and 1.2% &mdash; so each ratio is between two saturated numbers. Timed on the Kuhn subdivision of a structured lattice rather than on the agreement mesh, because a timing on scrambled connectivity is not a result.</p>
+
+      <p><b>What is not claimed.</b> Nothing about the other two families: <code>residual_codegen</code> and <code>inexact_apply_codegen</code> still emit <code>_operator.cpp</code> around a host mesh loop and are still refused. Nor that anything in the library can <em>call</em> these kernels &mdash; <code>CMakeLists.txt</code> globs no <code>.cu</code> and the CUDA backend publishes no <code>sfem::Op</code>.</p>
+
+      <div class="op-facts"><span><i>nvcc</i> 13 of 17 &rarr; <b>18 of 18</b></span><span><i>serial <code>__global__</code> kernels</i> 4 &rarr; <b>0</b></span><span><i>literal spellings routed to the seam</i> 5</span><span><i>agreement</i> 12 vectors to 6e-16, differenced not normed</span><span><i>GH200</i> 10.9&times; hex apply &middot; 10.5&times; tet gradient, both saturated</span></div>
     </div>
   </div>
 
