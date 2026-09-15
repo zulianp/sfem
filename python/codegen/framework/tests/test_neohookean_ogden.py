@@ -43,6 +43,7 @@ from codegen.framework.fem.reference import (
     sfem_supported_element_types,
 )
 from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
+from codegen.framework.plans.energy import EnergySoAKernelEmissionPlan
 from codegen.framework.emitters.energy_codegen import _sfem_soa_diagnostics_header
 from codegen.framework.fem import sfem_fem_policy, sfem_tensor_hex_shape_index
 from codegen.framework.plans.scheduling import build_expression_graph
@@ -407,22 +408,24 @@ def generated_neohookean_weak_form_files(element_type, prefix, vector_size=16, l
     )
     weak_form = sfem_soa_weak_form(neohookean_ogden_energy(F, *sp.symbols("mu lmbda")), F)
     return specialization, generate_sfem_soa_cpp_files_for_element(
-        (
-            sfem_soa_kernel_form(
-                "gradient",
-                weak_form=weak_form,
-                output_mode="accumulate",
+        EnergySoAKernelEmissionPlan(
+            forms=(
+                sfem_soa_kernel_form(
+                    "gradient",
+                    weak_form=weak_form,
+                    output_mode="accumulate",
+                ),
+                sfem_soa_kernel_form(
+                    "apply",
+                    weak_form=weak_form,
+                    has_direction=True,
+                    output_mode="accumulate",
+                ),
             ),
-            sfem_soa_kernel_form(
-                "apply",
-                weak_form=weak_form,
-                has_direction=True,
-                output_mode="accumulate",
-            ),
+            prefix=prefix,
+            emission_plan=emission_plan_from_specialization(specialization),
+            local_prefix=local_prefix,
         ),
-        prefix=prefix,
-        emission_plan=emission_plan_from_specialization(specialization),
-        local_prefix=local_prefix,
     )
 
 
@@ -878,14 +881,16 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         )
 
         generated_files = generate_sfem_soa_cpp_files_for_element(
-            (
-                sfem_soa_kernel_form(
-                    "objective",
-                    graph,
+            EnergySoAKernelEmissionPlan(
+                forms=(
+                    sfem_soa_kernel_form(
+                        "objective",
+                        graph,
+                    ),
                 ),
+                prefix="generated_quad4_tensor_product",
+                emission_plan=emission_plan_from_specialization(specialization),
             ),
-            prefix="generated_quad4_tensor_product",
-            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -986,14 +991,16 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         )
 
         generated_files = generate_sfem_soa_cpp_files_for_element(
-            (
-                sfem_soa_kernel_form(
-                    "objective",
-                    graph,
+            EnergySoAKernelEmissionPlan(
+                forms=(
+                    sfem_soa_kernel_form(
+                        "objective",
+                        graph,
+                    ),
                 ),
+                prefix="generated_hex8_tensor_product",
+                emission_plan=emission_plan_from_specialization(specialization),
             ),
-            prefix="generated_hex8_tensor_product",
-            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -1072,26 +1079,28 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         weak_form = sfem_soa_weak_form(neohookean_ogden_energy(F, *sp.symbols("mu lmbda")), F)
 
         generated_files = generate_sfem_soa_cpp_files_for_element(
-            (
-                sfem_soa_kernel_form(
-                    "objective",
-                    weak_form=weak_form,
-                    output_mode="accumulate",
+            EnergySoAKernelEmissionPlan(
+                forms=(
+                    sfem_soa_kernel_form(
+                        "objective",
+                        weak_form=weak_form,
+                        output_mode="accumulate",
+                    ),
+                    sfem_soa_kernel_form(
+                        "gradient",
+                        weak_form=weak_form,
+                        output_mode="accumulate",
+                    ),
+                    sfem_soa_kernel_form(
+                        "apply",
+                        weak_form=weak_form,
+                        has_direction=True,
+                        output_mode="accumulate",
+                    ),
                 ),
-                sfem_soa_kernel_form(
-                    "gradient",
-                    weak_form=weak_form,
-                    output_mode="accumulate",
-                ),
-                sfem_soa_kernel_form(
-                    "apply",
-                    weak_form=weak_form,
-                    has_direction=True,
-                    output_mode="accumulate",
-                ),
+                prefix="generated_weak_neohookean",
+                emission_plan=emission_plan_from_specialization(specialization),
             ),
-            prefix="generated_weak_neohookean",
-            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -1172,21 +1181,23 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         weak_form = sfem_soa_weak_form(neohookean_ogden_energy(F, *sp.symbols("mu lmbda")), F)
 
         generated_files = generate_sfem_soa_cpp_files_for_element(
-            (
-                sfem_soa_kernel_form(
-                    "gradient",
-                    weak_form=weak_form,
-                    output_mode="accumulate",
+            EnergySoAKernelEmissionPlan(
+                forms=(
+                    sfem_soa_kernel_form(
+                        "gradient",
+                        weak_form=weak_form,
+                        output_mode="accumulate",
+                    ),
+                    sfem_soa_kernel_form(
+                        "apply",
+                        weak_form=weak_form,
+                        has_direction=True,
+                        output_mode="accumulate",
+                    ),
                 ),
-                sfem_soa_kernel_form(
-                    "apply",
-                    weak_form=weak_form,
-                    has_direction=True,
-                    output_mode="accumulate",
-                ),
+                prefix="generated_quad4_weak_neohookean",
+                emission_plan=emission_plan_from_specialization(specialization),
             ),
-            prefix="generated_quad4_weak_neohookean",
-            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -1237,15 +1248,17 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         weak_form = sfem_soa_weak_form(neohookean_ogden_energy(F, *sp.symbols("mu lmbda")), F)
 
         generated_files = generate_sfem_soa_cpp_files_for_element(
-            (
-                sfem_soa_kernel_form(
-                    "objective",
-                    weak_form=weak_form,
-                    output_mode="accumulate",
+            EnergySoAKernelEmissionPlan(
+                forms=(
+                    sfem_soa_kernel_form(
+                        "objective",
+                        weak_form=weak_form,
+                        output_mode="accumulate",
+                    ),
                 ),
+                prefix="generated_quad4_iso_objective",
+                emission_plan=emission_plan_from_specialization(specialization),
             ),
-            prefix="generated_quad4_iso_objective",
-            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         operator_source = {
@@ -1286,21 +1299,23 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         weak_form = sfem_soa_weak_form(neohookean_ogden_energy(F, *sp.symbols("mu lmbda")), F)
 
         generated_files = generate_sfem_soa_cpp_files_for_element(
-            (
-                sfem_soa_kernel_form(
-                    "gradient",
-                    weak_form=weak_form,
-                    output_mode="accumulate",
+            EnergySoAKernelEmissionPlan(
+                forms=(
+                    sfem_soa_kernel_form(
+                        "gradient",
+                        weak_form=weak_form,
+                        output_mode="accumulate",
+                    ),
+                    sfem_soa_kernel_form(
+                        "apply",
+                        weak_form=weak_form,
+                        has_direction=True,
+                        output_mode="accumulate",
+                    ),
                 ),
-                sfem_soa_kernel_form(
-                    "apply",
-                    weak_form=weak_form,
-                    has_direction=True,
-                    output_mode="accumulate",
-                ),
+                prefix="generated_hex27_weak_neohookean",
+                emission_plan=emission_plan_from_specialization(specialization),
             ),
-            prefix="generated_hex27_weak_neohookean",
-            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}
@@ -2129,23 +2144,25 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             )
 
         generated_files = generate_sfem_soa_cpp_files_for_element(
-            (
-                sfem_soa_kernel_form(
-                    "objective",
-                    expression_graph(energy, common_data, "nh_obj_tmp"),
+            EnergySoAKernelEmissionPlan(
+                forms=(
+                    sfem_soa_kernel_form(
+                        "objective",
+                        expression_graph(energy, common_data, "nh_obj_tmp"),
+                    ),
+                    sfem_soa_kernel_form(
+                        "gradient",
+                        expression_graph(residual, common_data, "nh_grad_tmp"),
+                    ),
+                    sfem_soa_kernel_form(
+                        "apply",
+                        expression_graph(hessian_action, apply_data, "nh_apply_tmp"),
+                        has_direction=True,
+                    ),
                 ),
-                sfem_soa_kernel_form(
-                    "gradient",
-                    expression_graph(residual, common_data, "nh_grad_tmp"),
-                ),
-                sfem_soa_kernel_form(
-                    "apply",
-                    expression_graph(hessian_action, apply_data, "nh_apply_tmp"),
-                    has_direction=True,
-                ),
+                prefix="generated_neohookean_ogden",
+                emission_plan=emission_plan_from_specialization(specialization),
             ),
-            prefix="generated_neohookean_ogden",
-            emission_plan=emission_plan_from_specialization(specialization),
         )
 
         source_by_path = {generated.path: generated.source for generated in generated_files}

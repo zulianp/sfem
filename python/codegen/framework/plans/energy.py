@@ -3,14 +3,25 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class EnergySoAKernelEmissionPlan:
-    unit: object
-    context: object
+    """What the energy emitter is handed, and what the backend reads beside it.
+
+    The first three are the emission itself and every consumer needs them.  The
+    rest are the backend's half -- file names, signatures, the matrix formats --
+    and default, so a caller that only wants kernels out of the emitter can
+    build a plan that says so rather than fabricating fields it will not use.
+
+    `unit` and `context` used to be here as well.  Nothing ever read them: the
+    backend's traversal carries its own, and the emitter works from the forms
+    and the emission plan.  They were the plan remembering where it came from,
+    which is the thing a plan is supposed to stop doing.
+    """
+
     forms: tuple
     prefix: str
-    local_prefix: str
-    local_kernel: object
-    mesh_kernel: object
     emission_plan: object
+    local_prefix: str = None
+    local_kernel: object = None
+    mesh_kernel: object = None
     reference_data_plan: object = None
     diagnostics_plan: object = None
     matrix_format_plan: object = None
@@ -61,8 +72,6 @@ def energy_soa_kernel_emission_plan(unit, context):
         local_signatures,
     )
     return EnergySoAKernelEmissionPlan(
-        unit=unit,
-        context=context,
         forms=_energy_kernel_forms(unit),
         prefix=mesh_kernel.name,
         local_prefix=local_kernel.name,

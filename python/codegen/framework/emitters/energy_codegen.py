@@ -725,17 +725,30 @@ def generate_sfem_soa_cpp_files(
 
 
 def generate_sfem_soa_cpp_files_for_element(
-    forms,
+    plan,
     *,
-    prefix,
-    emission_plan,
     array_inputs=None,
-    local_prefix=None,
-    reference_data_plan=None,
-    diagnostics_plan=None,
-    matrix_format_plan=None,
     source_builder=None,
 ):
+    """Emit one element's kernels from the plan that decided them.
+
+    The plan used to arrive here in pieces: the façade in `emitters/energy.py`
+    took an `EnergySoAKernelEmissionPlan` apart into seven arguments and handed
+    them over, so the plan-driven generation stopped at the door and everything
+    beneath it was the argument-driven one.  Two generations of this emitter
+    coexisting, with the seam exactly one function wide.
+
+    `array_inputs` and `source_builder` stay arguments because neither is the
+    plan's: the first is derived from the specialization when nobody overrides
+    it, and the second is the target's spelling, which the backend binds.
+    """
+    forms = plan.forms
+    prefix = plan.prefix
+    emission_plan = plan.emission_plan
+    local_prefix = plan.local_prefix
+    reference_data_plan = plan.reference_data_plan
+    diagnostics_plan = plan.diagnostics_plan
+    matrix_format_plan = plan.matrix_format_plan
     if emission_plan is None:
         raise ValueError("energy code generation requires an ElementEmissionPlan")
     specialization = emission_plan.isoparametric_specialization
