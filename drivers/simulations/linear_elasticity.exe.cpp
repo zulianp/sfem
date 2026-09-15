@@ -154,7 +154,9 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
     }
 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
-    fs->initialize_packed_mesh();
+    if (smesh::Env::read("SFEM_USE_PACKED_MESH", true)) {
+        fs->initialize_packed_mesh();
+    }
 
     std::shared_ptr<sfem::Op> op;
     if (operator_path.to_string() != "NONE") {

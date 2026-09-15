@@ -131,6 +131,27 @@ int linear_elasticity_assemble_value_aos(const smesh::ElemType             eleme
         case smesh::TET4: {
             return tet4_linear_elasticity_value(nelements, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], value);
         }
+        case smesh::HEX8: {
+            const real_t step = 0;
+            return hex8_linear_elasticity_objective_steps(nelements,
+                                                          1,
+                                                          nnodes,
+                                                          elements,
+                                                          points,
+                                                          mu,
+                                                          lambda,
+                                                          3,
+                                                          &u[0],
+                                                          &u[1],
+                                                          &u[2],
+                                                          3,
+                                                          &u[0],
+                                                          &u[1],
+                                                          &u[2],
+                                                          1,
+                                                          &step,
+                                                          value);
+        }
         default: {
             SFEM_ERROR("linear_elasticity_assemble_value_aos not implemented for type %s\n", type_to_string(element_type));
         }

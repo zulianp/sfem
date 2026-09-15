@@ -1,0 +1,7 @@
+operator:
+  type: {operator}
+  mu: {material_mu}
+  lmbda: {material_lambda}
+  c1: {material_c1}
+  c2: {material_c2}
+  kappa: {material_kappa}

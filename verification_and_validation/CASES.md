@@ -56,8 +56,10 @@ outside this material-focused catalog.
 ### EL-2D-01: `linear_patch_2d`
 
 - **Type:** verification; fast gate.
-- **Target:** `LinearElasticity` and `GeneratedLinearElasticity` on `TRI3` and
-  `QUAD4`; add `TRI6` and generated Proteus variants to the extended lane.
+- **Target:** legacy `LinearElasticity` on `TRI3`, plus
+  `GeneratedLinearElasticity` on `TRI3` and `QUAD4`. The legacy operator has no
+  `QUAD4` kernel; add `TRI6` and generated Proteus variants to the extended
+  lane.
 - **Setup:** unit square with all boundary displacements prescribed from three
   affine fields: deviatoric extension, simple shear, and mixed volumetric
   strain. Include at least one non-axis-aligned mesh.
@@ -89,7 +91,8 @@ outside this material-focused catalog.
 ### EL-2D-02: `kirsch_plate_hole_2d`
 
 - **Type:** verification with spatial convergence; medium gate.
-- **Target:** the two linear-elastic operators on `TRI3` and `QUAD4`.
+- **Target:** legacy `LinearElasticity` on `TRI3`, plus
+  `GeneratedLinearElasticity` on `TRI3` and `QUAD4`.
 - **Setup:** quarter annulus around a traction-free circular hole. Apply
   symmetry on the coordinate axes and the analytical plane-strain Kirsch
   displacement on the finite outer arc. Generate at least three radial and
@@ -128,8 +131,8 @@ outside this material-focused catalog.
 
 - **Type:** constitutive verification; fast gate.
 - **Target:** `GeneratedNeoHookeanOgden`,
-  `GeneratedModifiedMooneyRivlin`, and, after registration,
-  `GeneratedSaintVenantKirchhoff`; `TRI3` and `QUAD4` are required.
+  `GeneratedModifiedMooneyRivlin`, and `GeneratedSaintVenantKirchhoff`;
+  `TRI3` and `QUAD4` are required.
 - **Setup:** a unit square subjected independently to finite uniaxial plane
   strain, simple shear, and uniform in-plane dilation. Prescribe the exact
   affine boundary field and solve for interior nodes.
@@ -147,8 +150,8 @@ outside this material-focused catalog.
 
 - **Type:** constitutive verification; fast gate.
 - **Target:** the generated hyperelastic operators on `TET4` and `HEX8`, plus
-  compatible legacy and packed Neo-Hookean/Mooney-Rivlin variants. Add
-  `TET10` and `HEX27` to the extended lane.
+  compatible legacy Neo-Hookean variants. Add packed paths, `TET10`, and
+  `HEX27` to the extended lane after the primary variants pass.
 - **Setup:** unit cube under finite uniaxial deformation, simple shear, and
   isotropic dilation. Add one combined nonsymmetric deformation gradient to
   exercise all off-diagonal terms.

@@ -48,6 +48,11 @@ The suite writes one isolated output directory and log per variant plus
 `SKIP`; skipped variants require a reason and do not count as covered. The
 runner returns a non-zero status for failures or errors.
 
+The fast tier contains affine 2D and 3D linear-elastic patch tests and
+homogeneous 2D and 3D hyperelastic mode tests. These cases compare independent
+displacement, free residual, energy, face-reaction, and deformation-Jacobian
+oracles across legacy and generated simplex and tensor-product kernels.
+
 ## Driver inputs
 
 The static linear-elasticity driver accepts both its original command and the

@@ -102,7 +102,7 @@ Implement only the input capabilities required by the catalog:
 driver invocations still work, and no V&V case relies on procedural state hidden
 inside a driver.
 
-## Phase 3: Fast Exact Verification Cases
+## Phase 3: Fast Exact Verification Cases (Complete)
 
 Implement these folders first because they give broad coverage at low runtime:
 
