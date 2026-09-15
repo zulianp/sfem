@@ -33,6 +33,19 @@ print whatever comes back.
 import sympy as sp
 
 
+#: Do not `expand` the flux on the way to the entries.
+#:
+#: Measured on the Mooney-Rivlin Kelvin-Voigt Newmark viscous flux: substituting
+#: and then eliminating gives 483 temporaries and 2,980 operations for all 144
+#: entries of the TET4 matrix.  Taking `sp.expand` first, to read the tangent
+#: off as coefficients, gives **56,715,906** operations before elimination even
+#: starts, and takes minutes.  Same mathematics, four orders of magnitude apart.
+#:
+#: The tangent is also dense -- all 81 of its `[row][d][col][e]` entries are
+#: non-zero for this material -- so there is no structural sparsity waiting to
+#: pay the expansion back.  Substitute, then let `cse` find the sharing.
+
+
 def direction_gradient_symbols(field_names, dim):
     """The symbols a Jacobian-action flux carries its direction in.
 
