@@ -32,6 +32,11 @@ print whatever comes back.
 
 import sympy as sp
 
+from codegen.framework.plans.evaluation_strategy import (
+    EvaluationStrategy,
+    evaluation_strategy,
+)
+
 
 #: Do not `expand` the flux on the way to the entries.
 #:
@@ -92,3 +97,87 @@ def flux_is_linear_in_the_direction(expression, field_names, dim):
         if any(s in first.free_symbols for s in symbols):
             return False
     return True
+
+
+def assembles_in_closed_form(element_type):
+    """Whether this element's matrix is built with no loops at all.
+
+    The same rule that decides how a form is *applied* decides how it is
+    assembled, and for the same reason: it is a property of the element.  A
+    lowest-order simplex has constant basis gradients and one quadrature point,
+    so every entry of its matrix is an expression in the adjugate, the
+    determinant and the state -- which is exactly the shape of SFEM's
+    hand-written `tet4_linear_elasticity_crs_adj`, 144 entries and 178 shared
+    temporaries with not one loop in it.
+
+    Asking `plans.evaluation_strategy` rather than answering here is the point.
+    The strategy is one table, and an assembly that made its own decision would
+    be free to disagree with the apply it has to match.  A tensor-product
+    element assembles through sum factorization and a higher-order simplex
+    through quadrature, because that is what those elements want; neither is a
+    lesser case of this one.
+    """
+    return evaluation_strategy(element_type) is EvaluationStrategy.EXPANDED
+
+
+#: How many `[row][column]` entries a closed-form element matrix may hold before
+#: this plan declines it.  The cost of the closed form is that `cse` sees every
+#: entry at once, which is what buys the sharing and also what makes it
+#: superlinear: TET4 with three fields is 144 entries, 483 temporaries and 2,980
+#: operations, and TET10 with three fields would be 900 entries.  Lowest-order
+#: simplices are the only elements `assembles_in_closed_form` admits, so nothing
+#: reaches this limit today; it is here so that the day something does, it
+#: declines visibly rather than by running for an hour.
+CLOSED_FORM_ENTRY_LIMIT = 400
+
+
+def closed_form_assembly_admits(
+    *,
+    element_type,
+    tensor_product,
+    matrix_formats,
+    coefficients,
+    dependencies,
+    field_names,
+    dim,
+    reference_gradients,
+    n_entries,
+):
+    """Whether this form on this element is assembled entry by entry.
+
+    Every condition here is a fact about the form or the element rather than a
+    preference, and all of them are asked in one place because an emitter that
+    asked them itself would be emission deciding what to emit.
+
+    The element must be one `assembles_in_closed_form` admits and must actually
+    have constant reference gradients.  A matrix must be published at all, and
+    it must not be a tensor-product element, whose assembly is factorised rather
+    than enumerated.  The form must have a direction to substitute for, and must
+    be linear in it -- otherwise substituting a trial function is not a matrix
+    column, and the failure has no other symptom than a wrong number in the
+    right place.  It must contract only test gradients, because a test *value*
+    on a one-point rule needs the shape value at that point and the closed form
+    folds no shape table.  And the matrix must be small enough to eliminate
+    whole.
+    """
+    if reference_gradients is None:
+        return False
+    if tensor_product:
+        return False
+    if not assembles_in_closed_form(element_type):
+        return False
+    if not {"crs", "bsr"}.intersection(matrix_formats):
+        return False
+    if not dependencies.direction:
+        return False
+    if any(dependencies.value_coefficients):
+        return False
+    if not any(any(row) for row in dependencies.gradient_coefficients):
+        return False
+    if int(n_entries) > CLOSED_FORM_ENTRY_LIMIT:
+        return False
+    return all(
+        flux_is_linear_in_the_direction(sp.sympify(expression), field_names, dim)
+        for coefficient in coefficients
+        for expression in coefficient.gradient
+    )

@@ -91,6 +91,7 @@ SKIPPED_BUDGET = {}
 MATERIALS = (
     "laplace",
     "linear_elasticity",
+    "mooney_rivlin_kelvin_voigt_newmark",
     "neohookean_ogden",
     "two_phase_flow",
 )

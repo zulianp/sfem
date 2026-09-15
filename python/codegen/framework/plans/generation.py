@@ -33,6 +33,12 @@ class DataStreamLayout(Enum):
     QP_SOA = "qp_soa"
     TENSOR_PRODUCT_1D = "tensor_product_1d"
 
+    #: One flat array the kernel indexes itself, rather than a stream per
+    #: degree of freedom.  An element matrix is the case: its entries are
+    #: addressed `[row * n_columns + column]`, so there is nothing per-lane or
+    #: per-item for the boundary to describe.
+    DENSE = "dense"
+
 
 class MeshPhase(Enum):
     GATHER = "gather"

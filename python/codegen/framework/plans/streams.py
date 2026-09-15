@@ -242,6 +242,8 @@ def local_kernel_stream_plans(
     metric_components,
     stream_layout="pointer",
     grad_ref_name=None,
+    needs_reference_basis=True,
+    output=None,
 ):
     """Which streams cross a local kernel's boundary, and in what order.
 
@@ -258,6 +260,16 @@ def local_kernel_stream_plans(
 
     The order is part of the contract: it is the kernel's ABI, and every
     caller the framework emits depends on it.
+
+    Two of the arguments describe kernels that are not applies.
+    ``needs_reference_basis`` is
+    ``plans.evaluation_strategy.ElementEvaluationPlan.needs_reference_basis_data``:
+    a kernel that evaluates in closed form has the basis gradients folded into
+    its arithmetic as constants, so it is handed no shape table, no reference
+    gradients and no quadrature weights -- and taking them would be three dead
+    parameters at every call site.  ``output`` replaces the per-degree-of-freedom
+    output streams with a single stream, which is what a kernel that fills an
+    element matrix writes to.
     """
     streams = []
 
@@ -314,7 +326,7 @@ def local_kernel_stream_plans(
     else:
         # A gradient-metric kernel contracts the basis into the metric before
         # it is called, so it is handed no reference basis at all.
-        if not uses_gradient_metric:
+        if not uses_gradient_metric and needs_reference_basis:
             streams.append(
                 DataStreamPlan(
                     name="shape",
@@ -331,13 +343,14 @@ def local_kernel_stream_plans(
                     )
                     for d in range(dim)
                 )
-        streams.append(
-            DataStreamPlan(
-                name="q_weight",
-                role=DataStreamRole.REFERENCE,
-                layout=DataStreamLayout.SCALAR,
+        if needs_reference_basis:
+            streams.append(
+                DataStreamPlan(
+                    name="q_weight",
+                    role=DataStreamRole.REFERENCE,
+                    layout=DataStreamLayout.SCALAR,
+                )
             )
-        )
 
     contiguous = field_stream_layout(stream_layout) is DataStreamLayout.AOS
     for name in _FIELD_STREAM_ORDER:
@@ -366,7 +379,9 @@ def local_kernel_stream_plans(
     )
 
     streams.append(
-        DataStreamPlan(
+        output
+        if output is not None
+        else DataStreamPlan(
             name="output",
             role=DataStreamRole.OUTPUT,
             layout=DataStreamLayout.AOS if contiguous else DataStreamLayout.SOA,
@@ -374,6 +389,21 @@ def local_kernel_stream_plans(
         )
     )
     return tuple(streams)
+
+
+def element_matrix_stream_plan(name="element_matrix"):
+    """The output of a kernel that fills an element matrix, not a vector.
+
+    An apply writes one value per degree of freedom and takes a stream per
+    degree of freedom to write it to.  An assembly writes every entry of a
+    dense square, addressed by row and column, and there is no per-degree-of-
+    freedom structure at the boundary to describe -- so it is one array.
+    """
+    return DataStreamPlan(
+        name=name,
+        role=DataStreamRole.OUTPUT,
+        layout=DataStreamLayout.DENSE,
+    )
 
 
 #: How each field stream's per-field arrays are named at the mesh boundary,

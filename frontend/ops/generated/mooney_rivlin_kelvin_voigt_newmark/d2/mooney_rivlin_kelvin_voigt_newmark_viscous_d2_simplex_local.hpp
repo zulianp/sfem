@@ -1176,6 +1176,177 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_tr
   }
 }
 
+template <typename s_t, int NQ, int NS, int VS>
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d2_simplex_tri3_hessian_block(
+    const int ne,
+    const ptrdiff_t geometry_stride,
+    const s_t *const RSTR determinant,
+    const s_t *const RSTR adjugate[4],
+    const s_t current[2 * NS][VS],
+    const s_t previous[2 * NS][VS],
+    const s_t eta_b,
+    const s_t eta_s,
+    const s_t newmark_velocity_alpha,
+    s_t *const RSTR element_matrix
+) {
+  const int q = 0;
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    const ptrdiff_t goff = q * geometry_stride + lane;
+    const s_t det = determinant[goff];
+    const s_t adj0 = adjugate[0][goff];
+    const s_t adj1 = adjugate[1][goff];
+    const s_t adj2 = adjugate[2][goff];
+    const s_t adj3 = adjugate[3][goff];
+    const s_t u0_grad_0_ref = -(current[0][lane]) + current[2][lane];
+    const s_t u0_grad_1_ref = -(current[0][lane]) + current[4][lane];
+    const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
+    const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
+    const s_t u0_old_grad_0_ref = -(previous[0][lane]) + previous[2][lane];
+    const s_t u0_old_grad_1_ref = -(previous[0][lane]) + previous[4][lane];
+    const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj2) / det;
+    const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj3) / det;
+    const s_t u1_grad_0_ref = -(current[1][lane]) + current[3][lane];
+    const s_t u1_grad_1_ref = -(current[1][lane]) + current[5][lane];
+    const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
+    const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
+    const s_t u1_old_grad_0_ref = -(previous[1][lane]) + previous[3][lane];
+    const s_t u1_old_grad_1_ref = -(previous[1][lane]) + previous[5][lane];
+    const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj2) / det;
+    const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj3) / det;
+    const s_t basis0_grad0 = (-(adj0) - adj2) / det;
+    const s_t basis0_grad1 = (-(adj1) - adj3) / det;
+    const s_t basis1_grad0 = (adj0) / det;
+    const s_t basis1_grad1 = (adj1) / det;
+    const s_t basis2_grad0 = (adj2) / det;
+    const s_t basis2_grad1 = (adj3) / det;
+    const s_t element_matrix_tmp0 = u1_grad_1 + s_t(1);
+    const s_t element_matrix_tmp1 = element_matrix_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0;
+    const s_t element_matrix_tmp2 = pow_m1(element_matrix_tmp1);
+    const s_t element_matrix_tmp3 = eta_s*u0_old_grad_1;
+    const s_t element_matrix_tmp4 = element_matrix_tmp0*newmark_velocity_alpha;
+    const s_t element_matrix_tmp5 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+    const s_t element_matrix_tmp6 = eta_b*(-element_matrix_tmp4 - element_matrix_tmp5);
+    const s_t element_matrix_tmp7 = -element_matrix_tmp4 + element_matrix_tmp5;
+    const s_t element_matrix_tmp8 = -element_matrix_tmp7;
+    const s_t element_matrix_tmp9 = element_matrix_tmp6 - element_matrix_tmp8*eta_s;
+    const s_t element_matrix_tmp10 = -element_matrix_tmp0;
+    const s_t element_matrix_tmp11 = pow_m2(element_matrix_tmp1);
+    const s_t element_matrix_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+    const s_t element_matrix_tmp13 = u0_grad_0 + s_t(1);
+    const s_t element_matrix_tmp14 = newmark_velocity_alpha*u0_grad_1;
+    const s_t element_matrix_tmp15 = element_matrix_tmp14 + u0_old_grad_1;
+    const s_t element_matrix_tmp16 = newmark_velocity_alpha*u1_grad_0;
+    const s_t element_matrix_tmp17 = element_matrix_tmp16 + u1_old_grad_0;
+    const s_t element_matrix_tmp18 = eta_s*(-element_matrix_tmp0*element_matrix_tmp17 + element_matrix_tmp12*u0_grad_1 - element_matrix_tmp13*element_matrix_tmp15 + element_matrix_tmp5*u1_grad_0);
+    const s_t element_matrix_tmp19 = element_matrix_tmp15*u1_grad_0;
+    const s_t element_matrix_tmp20 = element_matrix_tmp0*element_matrix_tmp12;
+    const s_t element_matrix_tmp21 = -element_matrix_tmp13*element_matrix_tmp5 + element_matrix_tmp17*u0_grad_1;
+    const s_t element_matrix_tmp22 = eta_b*(element_matrix_tmp19 - element_matrix_tmp20 + element_matrix_tmp21);
+    const s_t element_matrix_tmp23 = eta_s*(-element_matrix_tmp19 + element_matrix_tmp20 + element_matrix_tmp21);
+    const s_t element_matrix_tmp24 = element_matrix_tmp22 - element_matrix_tmp23;
+    const s_t element_matrix_tmp25 = element_matrix_tmp11*(-element_matrix_tmp0*element_matrix_tmp24 + element_matrix_tmp18*u0_grad_1);
+    const s_t element_matrix_tmp26 = element_matrix_tmp10*element_matrix_tmp25 + element_matrix_tmp2*(-element_matrix_tmp0*element_matrix_tmp9 - element_matrix_tmp3*u0_grad_1);
+    const s_t element_matrix_tmp27 = element_matrix_tmp13*newmark_velocity_alpha;
+    const s_t element_matrix_tmp28 = element_matrix_tmp12 - element_matrix_tmp27;
+    const s_t element_matrix_tmp29 = element_matrix_tmp28*eta_s;
+    const s_t element_matrix_tmp30 = eta_b*(s_t(2)*element_matrix_tmp16 + u1_old_grad_0);
+    const s_t element_matrix_tmp31 = element_matrix_tmp30 - eta_s*u1_old_grad_0;
+    const s_t element_matrix_tmp32 = element_matrix_tmp2*(-element_matrix_tmp0*element_matrix_tmp31 + element_matrix_tmp18 + element_matrix_tmp29*u0_grad_1) + element_matrix_tmp25*u1_grad_0;
+    const s_t element_matrix_tmp33 = basis0_grad0*element_matrix_tmp26 + basis0_grad1*element_matrix_tmp32;
+    const s_t element_matrix_tmp34 = element_matrix_tmp11*(-element_matrix_tmp13*element_matrix_tmp18 + element_matrix_tmp24*u1_grad_0);
+    const s_t element_matrix_tmp35 = element_matrix_tmp2*(-element_matrix_tmp13*element_matrix_tmp29 + element_matrix_tmp31*u1_grad_0) + element_matrix_tmp34*u1_grad_0;
+    const s_t element_matrix_tmp36 = -element_matrix_tmp18;
+    const s_t element_matrix_tmp37 = element_matrix_tmp10*element_matrix_tmp34 + element_matrix_tmp2*(element_matrix_tmp13*element_matrix_tmp3 + element_matrix_tmp36 + element_matrix_tmp9*u1_grad_0);
+    const s_t element_matrix_tmp38 = basis0_grad0*element_matrix_tmp37 + basis0_grad1*element_matrix_tmp35;
+    const s_t element_matrix_tmp39 = ((s_t(1) / s_t(2)))*det;
+    const s_t element_matrix_tmp40 = element_matrix_tmp6 + element_matrix_tmp8*eta_s;
+    const s_t element_matrix_tmp41 = element_matrix_tmp22 + element_matrix_tmp23;
+    const s_t element_matrix_tmp42 = element_matrix_tmp11*(-element_matrix_tmp0*element_matrix_tmp18 + element_matrix_tmp41*u0_grad_1);
+    const s_t element_matrix_tmp43 = element_matrix_tmp10*element_matrix_tmp42 + element_matrix_tmp2*(element_matrix_tmp0*element_matrix_tmp3 + element_matrix_tmp40*u0_grad_1);
+    const s_t element_matrix_tmp44 = eta_s*u1_old_grad_0;
+    const s_t element_matrix_tmp45 = element_matrix_tmp30 + element_matrix_tmp44;
+    const s_t element_matrix_tmp46 = element_matrix_tmp2*(-element_matrix_tmp0*element_matrix_tmp29 + element_matrix_tmp41 + element_matrix_tmp45*u0_grad_1) + element_matrix_tmp42*u1_grad_0;
+    const s_t element_matrix_tmp47 = basis0_grad0*element_matrix_tmp43 + basis0_grad1*element_matrix_tmp46;
+    const s_t element_matrix_tmp48 = element_matrix_tmp11*(-element_matrix_tmp13*element_matrix_tmp41 + element_matrix_tmp18*u1_grad_0);
+    const s_t element_matrix_tmp49 = element_matrix_tmp2*(-element_matrix_tmp13*element_matrix_tmp45 + element_matrix_tmp29*u1_grad_0) + element_matrix_tmp48*u1_grad_0;
+    const s_t element_matrix_tmp50 = element_matrix_tmp10*element_matrix_tmp48 + element_matrix_tmp2*(-element_matrix_tmp13*element_matrix_tmp40 - element_matrix_tmp3*u1_grad_0 - element_matrix_tmp41);
+    const s_t element_matrix_tmp51 = basis0_grad0*element_matrix_tmp50 + basis0_grad1*element_matrix_tmp49;
+    const s_t element_matrix_tmp52 = basis1_grad0*element_matrix_tmp26 + basis1_grad1*element_matrix_tmp32;
+    const s_t element_matrix_tmp53 = basis1_grad0*element_matrix_tmp37 + basis1_grad1*element_matrix_tmp35;
+    const s_t element_matrix_tmp54 = basis1_grad0*element_matrix_tmp43 + basis1_grad1*element_matrix_tmp46;
+    const s_t element_matrix_tmp55 = basis1_grad0*element_matrix_tmp50 + basis1_grad1*element_matrix_tmp49;
+    const s_t element_matrix_tmp56 = basis2_grad0*element_matrix_tmp26 + basis2_grad1*element_matrix_tmp32;
+    const s_t element_matrix_tmp57 = basis2_grad0*element_matrix_tmp37 + basis2_grad1*element_matrix_tmp35;
+    const s_t element_matrix_tmp58 = basis2_grad0*element_matrix_tmp43 + basis2_grad1*element_matrix_tmp46;
+    const s_t element_matrix_tmp59 = basis2_grad0*element_matrix_tmp50 + basis2_grad1*element_matrix_tmp49;
+    const s_t element_matrix_tmp60 = element_matrix_tmp7*eta_s;
+    const s_t element_matrix_tmp61 = eta_b*(s_t(2)*element_matrix_tmp14 + u0_old_grad_1);
+    const s_t element_matrix_tmp62 = element_matrix_tmp3 + element_matrix_tmp61;
+    const s_t element_matrix_tmp63 = element_matrix_tmp2*(-element_matrix_tmp0*element_matrix_tmp62 + element_matrix_tmp60*u0_grad_1) + element_matrix_tmp25*u0_grad_1;
+    const s_t element_matrix_tmp64 = eta_b*(-element_matrix_tmp12 - element_matrix_tmp27);
+    const s_t element_matrix_tmp65 = -element_matrix_tmp28*eta_s + element_matrix_tmp64;
+    const s_t element_matrix_tmp66 = -element_matrix_tmp13;
+    const s_t element_matrix_tmp67 = element_matrix_tmp2*(-element_matrix_tmp0*element_matrix_tmp65 - element_matrix_tmp24 - element_matrix_tmp44*u0_grad_1) + element_matrix_tmp25*element_matrix_tmp66;
+    const s_t element_matrix_tmp68 = basis0_grad0*element_matrix_tmp63 + basis0_grad1*element_matrix_tmp67;
+    const s_t element_matrix_tmp69 = element_matrix_tmp2*(element_matrix_tmp13*element_matrix_tmp44 + element_matrix_tmp65*u1_grad_0) + element_matrix_tmp34*element_matrix_tmp66;
+    const s_t element_matrix_tmp70 = element_matrix_tmp2*(-element_matrix_tmp13*element_matrix_tmp60 + element_matrix_tmp24 + element_matrix_tmp62*u1_grad_0) + element_matrix_tmp34*u0_grad_1;
+    const s_t element_matrix_tmp71 = basis0_grad0*element_matrix_tmp70 + basis0_grad1*element_matrix_tmp69;
+    const s_t element_matrix_tmp72 = -element_matrix_tmp3 + element_matrix_tmp61;
+    const s_t element_matrix_tmp73 = element_matrix_tmp2*(-element_matrix_tmp0*element_matrix_tmp60 + element_matrix_tmp72*u0_grad_1) + element_matrix_tmp42*u0_grad_1;
+    const s_t element_matrix_tmp74 = element_matrix_tmp29 + element_matrix_tmp64;
+    const s_t element_matrix_tmp75 = element_matrix_tmp2*(element_matrix_tmp0*element_matrix_tmp44 + element_matrix_tmp36 + element_matrix_tmp74*u0_grad_1) + element_matrix_tmp42*element_matrix_tmp66;
+    const s_t element_matrix_tmp76 = basis0_grad0*element_matrix_tmp73 + basis0_grad1*element_matrix_tmp75;
+    const s_t element_matrix_tmp77 = element_matrix_tmp2*(-element_matrix_tmp13*element_matrix_tmp74 - element_matrix_tmp44*u1_grad_0) + element_matrix_tmp48*element_matrix_tmp66;
+    const s_t element_matrix_tmp78 = element_matrix_tmp2*(-element_matrix_tmp13*element_matrix_tmp72 + element_matrix_tmp18 + element_matrix_tmp60*u1_grad_0) + element_matrix_tmp48*u0_grad_1;
+    const s_t element_matrix_tmp79 = basis0_grad0*element_matrix_tmp78 + basis0_grad1*element_matrix_tmp77;
+    const s_t element_matrix_tmp80 = basis1_grad0*element_matrix_tmp63 + basis1_grad1*element_matrix_tmp67;
+    const s_t element_matrix_tmp81 = basis1_grad0*element_matrix_tmp70 + basis1_grad1*element_matrix_tmp69;
+    const s_t element_matrix_tmp82 = basis1_grad0*element_matrix_tmp73 + basis1_grad1*element_matrix_tmp75;
+    const s_t element_matrix_tmp83 = basis1_grad0*element_matrix_tmp78 + basis1_grad1*element_matrix_tmp77;
+    const s_t element_matrix_tmp84 = basis2_grad0*element_matrix_tmp63 + basis2_grad1*element_matrix_tmp67;
+    const s_t element_matrix_tmp85 = basis2_grad0*element_matrix_tmp70 + basis2_grad1*element_matrix_tmp69;
+    const s_t element_matrix_tmp86 = basis2_grad0*element_matrix_tmp73 + basis2_grad1*element_matrix_tmp75;
+    const s_t element_matrix_tmp87 = basis2_grad0*element_matrix_tmp78 + basis2_grad1*element_matrix_tmp77;
+    element_matrix[0] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp33 + basis0_grad1*element_matrix_tmp38);
+    element_matrix[6] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp33 + basis1_grad1*element_matrix_tmp38);
+    element_matrix[12] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp33 + basis2_grad1*element_matrix_tmp38);
+    element_matrix[18] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp47 + basis0_grad1*element_matrix_tmp51);
+    element_matrix[24] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp47 + basis1_grad1*element_matrix_tmp51);
+    element_matrix[30] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp47 + basis2_grad1*element_matrix_tmp51);
+    element_matrix[1] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp52 + basis0_grad1*element_matrix_tmp53);
+    element_matrix[7] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp52 + basis1_grad1*element_matrix_tmp53);
+    element_matrix[13] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp52 + basis2_grad1*element_matrix_tmp53);
+    element_matrix[19] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp54 + basis0_grad1*element_matrix_tmp55);
+    element_matrix[25] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp54 + basis1_grad1*element_matrix_tmp55);
+    element_matrix[31] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp54 + basis2_grad1*element_matrix_tmp55);
+    element_matrix[2] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp56 + basis0_grad1*element_matrix_tmp57);
+    element_matrix[8] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp56 + basis1_grad1*element_matrix_tmp57);
+    element_matrix[14] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp56 + basis2_grad1*element_matrix_tmp57);
+    element_matrix[20] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp58 + basis0_grad1*element_matrix_tmp59);
+    element_matrix[26] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp58 + basis1_grad1*element_matrix_tmp59);
+    element_matrix[32] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp58 + basis2_grad1*element_matrix_tmp59);
+    element_matrix[3] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp68 + basis0_grad1*element_matrix_tmp71);
+    element_matrix[9] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp68 + basis1_grad1*element_matrix_tmp71);
+    element_matrix[15] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp68 + basis2_grad1*element_matrix_tmp71);
+    element_matrix[21] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp76 + basis0_grad1*element_matrix_tmp79);
+    element_matrix[27] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp76 + basis1_grad1*element_matrix_tmp79);
+    element_matrix[33] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp76 + basis2_grad1*element_matrix_tmp79);
+    element_matrix[4] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp80 + basis0_grad1*element_matrix_tmp81);
+    element_matrix[10] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp80 + basis1_grad1*element_matrix_tmp81);
+    element_matrix[16] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp80 + basis2_grad1*element_matrix_tmp81);
+    element_matrix[22] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp82 + basis0_grad1*element_matrix_tmp83);
+    element_matrix[28] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp82 + basis1_grad1*element_matrix_tmp83);
+    element_matrix[34] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp82 + basis2_grad1*element_matrix_tmp83);
+    element_matrix[5] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp84 + basis0_grad1*element_matrix_tmp85);
+    element_matrix[11] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp84 + basis1_grad1*element_matrix_tmp85);
+    element_matrix[17] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp84 + basis2_grad1*element_matrix_tmp85);
+    element_matrix[23] = element_matrix_tmp39*(basis0_grad0*element_matrix_tmp86 + basis0_grad1*element_matrix_tmp87);
+    element_matrix[29] = element_matrix_tmp39*(basis1_grad0*element_matrix_tmp86 + basis1_grad1*element_matrix_tmp87);
+    element_matrix[35] = element_matrix_tmp39*(basis2_grad0*element_matrix_tmp86 + basis2_grad1*element_matrix_tmp87);
+  }
+}
+
 } // namespace codegen
 } // namespace sfem
 

@@ -429,7 +429,23 @@ PLAN_INPUTS = (
 #: already uses.  Table order preserves the emitted order, and a format the plan
 #: publishes now reaches this site by being in the sequence rather than by
 #: someone remembering to add a branch beside the other two.
-BUDGET = 102
+#:
+#: 102 -> 101: the declaration a data stream's layout implies.  `_declare_stream`
+#: opened with `if stream.layout is DataStreamLayout.AOS:` and would have gained
+#: a second such branch when the element-matrix kernels arrived with a flat
+#: `DENSE` output, so the two became `_LAYOUT_DECLARATIONS`, a table keyed by the
+#: layout.  Which layouts exist is the plan's business, and each one used to cost
+#: emission a branch of its own.
+#:
+#: The same change is where the budget earned its keep rather than merely being
+#: satisfied.  The closed-form element matrix was first written with its
+#: admission test -- the element's strategy, whether a matrix is published at
+#: all, whether the flux is linear in its direction, whether the form contracts a
+#: test value, how many entries the elimination would see -- spelled inside
+#: `emitters/residual_codegen.py`, and this test caught it at 118.  The test
+#: moved to `plans.direct_assembly.closed_form_assembly_admits`, where an
+#: assembly and an apply read one answer instead of two.
+BUDGET = 101
 
 
 def _tested_names(test):

@@ -822,16 +822,22 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
 
     #: Kernels that still build an element matrix by probing.  Only ever fewer.
     #:
-    #: All five are the Mooney-Rivlin Kelvin-Voigt Newmark *viscous* unit, which
-    #: is written as a residual.  The same material's *elastic* unit, written as
-    #: an energy, assembles directly on the same elements -- which is what says
-    #: this is the path and not the mathematics.
+    #: All of them are the Mooney-Rivlin Kelvin-Voigt Newmark *viscous* unit,
+    #: which is written as a residual.  The same material's *elastic* unit,
+    #: written as an energy, assembles directly on the same elements -- which is
+    #: what says this is the path and not the mathematics.
+    #:
+    #: TET4 and TRI3 have left this list.  They are the elements
+    #: `plans.direct_assembly.assembles_in_closed_form` admits, and they now
+    #: call a kernel that writes every entry of the matrix from the substituted
+    #: flux.  The three that remain are the elements whose evaluation strategy
+    #: is not closed form -- a higher-order simplex and two tensor-product
+    #: elements -- and what they need is that strategy's own assembly, not this
+    #: one written out again.
     PROBING = {
         "mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_operator.cpp": 30,
         "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_operator.cpp": 24,
-        "mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_operator.cpp": 12,
         "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_operator.cpp": 8,
-        "mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_operator.cpp": 6,
     }
 
     @staticmethod
@@ -910,6 +916,81 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
                     "kernel" % path.name,
                 )
                 self.assertNotIn("bdirection[trial][0] = s_t(1);", source)
+
+
+class ClosedFormAssemblyShapeTest(unittest.TestCase):
+    """A closed-form element matrix has no loops, because that is the point.
+
+    SFEM's hand-written `tet4_linear_elasticity_crs_adj` writes 144 entries with
+    178 temporaries shared across all of them and not one loop.  The sharing is
+    what the shape buys: a loop over trial functions can eliminate only within
+    one column and re-derives for every column what the columns have in common,
+    which on a constant-basis element is nearly everything.
+
+    So this asserts the shape rather than the absence of probing -- the ratchet
+    above already forbids probing, and a kernel could obey it while still being
+    a loop nest that shares nothing.
+    """
+
+    @staticmethod
+    def _shipped_tree():
+        from codegen.framework.tools.codegen_snapshot import shipped_tree
+
+        return Path(shipped_tree())
+
+    def _closed_form_kernels(self):
+        """Every generated closed-form element-matrix kernel, as its body."""
+        import re
+
+        opening = re.compile(r"^static SFEM_INLINE void (\S+_hessian_block)\($", re.M)
+        found = {}
+        for path in sorted(self._shipped_tree().rglob("*_local.hpp")):
+            lines = path.read_text().split("\n")
+            for index, line in enumerate(lines):
+                match = opening.match(line)
+                if match is None:
+                    continue
+                for end in range(index + 1, len(lines)):
+                    if lines[end] == "}":
+                        found[match.group(1)] = lines[index:end]
+                        break
+        return found
+
+    def test_a_closed_form_element_matrix_opens_no_loop_of_its_own(self):
+        kernels = self._closed_form_kernels()
+        self.assertTrue(
+            kernels,
+            "no closed-form element-matrix kernel is shipped; if the last one "
+            "was withdrawn, say so here rather than leaving this vacuous",
+        )
+        for name, body in sorted(kernels.items()):
+            loops = [line.strip() for line in body if "for (" in line]
+            with self.subTest(kernel=name):
+                # The work-item loop is the target's, not the kernel's: under
+                # CUDA it is not a loop at all.  Anything else would be a
+                # quadrature, shape or component loop this shape does not have.
+                self.assertEqual(
+                    [loop for loop in loops if "lane" not in loop],
+                    [],
+                    "%s opens a loop of its own" % name,
+                )
+
+    def test_every_entry_is_written_exactly_once(self):
+        """Written, not accumulated -- there is nothing to accumulate over."""
+        import re
+
+        entry = re.compile(r"element_matrix\[(\d+)\] = ")
+        accumulated = re.compile(r"element_matrix\[[^]]*\] \+= ")
+        for name, body in sorted(self._closed_form_kernels().items()):
+            source = "\n".join(body)
+            written = [int(index) for index in entry.findall(source)]
+            with self.subTest(kernel=name):
+                self.assertEqual(
+                    sorted(written),
+                    list(range(len(written))),
+                    "%s does not write each entry of a dense square once" % name,
+                )
+                self.assertIsNone(accumulated.search(source))
 
 
 if __name__ == "__main__":

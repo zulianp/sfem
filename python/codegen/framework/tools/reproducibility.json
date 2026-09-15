@@ -960,6 +960,126 @@
       "l2": 0.005546566393131,
       "material": "linear_elasticity"
     },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_a_msoa": {
+      "l1": 10.679174375,
+      "l2": 0.4352508967357,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_i_msoa": {
+      "l1": 10.67917397554,
+      "l2": 0.4352508718731,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_a_msoa": {
+      "l1": 10.679174375,
+      "l2": 0.4352508967357,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_3d_i_msoa": {
+      "l1": 10.67917397554,
+      "l2": 0.4352508718731,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_3d_a_msoa": {
+      "l1": 10.679174375,
+      "l2": 0.4352508967357,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_apply_packed_two_pass_3d_i_msoa": {
+      "l1": 10.67917397554,
+      "l2": 0.4352508718731,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_a_msoa": {
+      "l1": 11.19015449911,
+      "l2": 0.4282438916083,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_i_msoa": {
+      "l1": 11.19015399845,
+      "l2": 0.4282438651657,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_a_msoa": {
+      "l1": 11.19015449911,
+      "l2": 0.4282438916083,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_3d_i_msoa": {
+      "l1": 11.19015399845,
+      "l2": 0.4282438651657,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_a_msoa": {
+      "l1": 11.19015449911,
+      "l2": 0.4282438916083,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_packed_two_pass_3d_i_msoa": {
+      "l1": 11.19015399845,
+      "l2": 0.4282438651657,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_hessian_bsr_3d_i_msoa": {
+      "l1": 4264.554367098,
+      "l2": 46.79389990571,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_a_msoa": {
+      "l1": 0.3762650057949,
+      "l2": 0.01782125942181,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_i_msoa": {
+      "l1": 0.3762649959995,
+      "l2": 0.01782125890308,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_a_msoa": {
+      "l1": 0.3762650057949,
+      "l2": 0.01782125942181,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_packed_3d_i_msoa": {
+      "l1": 0.3762649959995,
+      "l2": 0.01782125890308,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_3d_i_msoa": {
+      "l1": 2309.631859204,
+      "l2": 24.90689771935,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_a_msoa": {
+      "l1": 3.264920396082,
+      "l2": 0.1218650675994,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_maos": {
+      "l1": 0.1329681835367,
+      "l2": 0.006095233449796,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_msoa": {
+      "l1": 3.264920259322,
+      "l2": 0.1218650621193,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_a_msoa": {
+      "l1": 7.749771592893,
+      "l2": 0.3012947546351,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_maos": {
+      "l1": 0.4924578743661,
+      "l2": 0.0205275682373,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
+    "mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_msoa": {
+      "l1": 7.749771311255,
+      "l2": 0.3012947389272,
+      "material": "mooney_rivlin_kelvin_voigt_newmark"
+    },
     "neohookean_ogden_apply_3d_a_msoa": {
       "l1": 4.467995591265,
       "l2": 0.1951648722907,
