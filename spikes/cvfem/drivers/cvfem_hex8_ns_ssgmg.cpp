@@ -2933,7 +2933,17 @@ int main(int argc, char **argv) {
     // successes and took the reachable Reynolds number from 3200 (at target) down to 1682.
     // Retained only as an experiment knob.
     const real_t      nl_stol    = smesh::Env::read<real_t>("SFEM_NL_STOL", 0);
-    const real_t      lin_rtol   = smesh::Env::read<real_t>("SFEM_LSOLVE_RTOL", 1e-8);
+    // 1e-3, not 1e-8. A Newton step only needs its linear solve to reduce the residual well
+    // below the nonlinear one it corrects; the last five orders are Krylov iterations that
+    // change the step by nothing Newton can see. FDA nozzle, Re 500, FGMRES + multigrid, Grace
+    // 72 threads -- same 28 Newton steps and every printed station identical to the digit:
+    //
+    //     dof        rtol   linear its   t_solve   run
+    //     116,212    1e-8     2,386       45.4 s    76 s
+    //     116,212    1e-3     1,171       16.9 s    48 s
+    //     893,924    1e-8     4,020        713 s   761 s   (first solve capped at 1000)
+    //     893,924    1e-3     2,031        278 s   324 s
+    const real_t      lin_rtol   = smesh::Env::read<real_t>("SFEM_LSOLVE_RTOL", 1e-3);
     const real_t      lin_atol   = smesh::Env::read<real_t>("SFEM_LSOLVE_ATOL", 1e-14);
     const int         lin_max_it = smesh::Env::read<int>("SFEM_LSOLVE_MAX_IT", 1000);
     const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
