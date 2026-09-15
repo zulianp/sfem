@@ -49,7 +49,6 @@ class _OpenMPTraversal:
     operator_prefix: str = ""
     operator_name: str = ""
     emission_plan: object = None
-    kernel_forms: tuple = ()
     system: object = None
     compatible_element: object = None
     residual_coeffs: tuple = ()
@@ -167,7 +166,6 @@ class OpenMPSoABackend:
             operator_prefix=energy_plan.mesh_kernel.name,
             operator_name=energy_plan.mesh_kernel.source,
             emission_plan=energy_plan.emission_plan,
-            kernel_forms=energy_plan.forms,
             local_signatures=energy_plan.local_signatures,
             mesh_signature=energy_plan.mesh_signature,
             reference_data_plan=energy_plan.reference_data_plan,

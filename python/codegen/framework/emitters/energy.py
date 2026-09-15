@@ -460,14 +460,7 @@ class OpenMPEnergySoAEmitter:
         from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
 
         return generate_sfem_soa_cpp_files_for_element(
-            plan.forms,
-            prefix=plan.prefix,
-            local_prefix=plan.local_prefix,
-            emission_plan=plan.emission_plan,
-            reference_data_plan=plan.reference_data_plan,
-            diagnostics_plan=plan.diagnostics_plan,
-            matrix_format_plan=plan.matrix_format_plan,
-            source_builder=self._source_builder(),
+            plan, source_builder=self._source_builder()
         )
 
 
@@ -498,14 +491,16 @@ class CUDAEnergySoAEmitter:
         return shared_primitive_files(self._source_builder(), "tensor_product")
 
     def emit_plan(self, plan):
+        import dataclasses
+
         from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
 
+        # No matrix assembly on this target, said out loud.  The façade used to
+        # express it by leaving `matrix_format_plan` out of the seven arguments
+        # it unpacked, which is the kind of decision that survives only as long
+        # as nobody tidies the argument list -- passing the plan whole brought
+        # the formats back and two backend tests caught it immediately.
         return generate_sfem_soa_cpp_files_for_element(
-            plan.forms,
-            prefix=plan.prefix,
-            local_prefix=plan.local_prefix,
-            emission_plan=plan.emission_plan,
-            reference_data_plan=plan.reference_data_plan,
-            diagnostics_plan=plan.diagnostics_plan,
+            dataclasses.replace(plan, matrix_format_plan=None),
             source_builder=self._source_builder(),
         )
