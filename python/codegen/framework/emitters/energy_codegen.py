@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import sympy as sp
 
 from codegen.framework.emitters.kernel_prologue import (
@@ -159,6 +160,9 @@ from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.form_transformations import (
     constant_p1_simplex_reference_gradients,
+)
+from codegen.framework.plans.direct_assembly import (
+    assembles_in_closed_form,
 )
 from codegen.framework.plans.scheduling import build_expression_graph
 
@@ -948,6 +952,53 @@ def _sfem_soa_direct_hessian_function_name(
     return "%s_direct_hessian_%s_element_matrix" % (local_prefix, family)
 
 
+@dataclass(frozen=True)
+class _ClosedFormHessian:
+    """The constant-P1 element-matrix kernel of a simplex hessian header.
+
+    Asked for by the header that defines it and by the operator that calls it,
+    so the two cannot disagree about whether there is one or what it is called.
+
+    A simplex header is shared by an element that evaluates in closed form and
+    one that does not -- TET4 and TET10 reach the same file -- so the closed form
+    arrives as a second, specialised kernel beside the generic one, and is
+    reached through the same constant-P1 specialisation the apply already uses.
+    Both generations name it from that specialisation, so the file comes out
+    identical for either.
+    """
+
+    name: str
+    quadrature_rule: object
+    reference_gradients: tuple
+
+
+def _sfem_soa_closed_form_hessian(
+    local_prefix,
+    quadrature_rule,
+    use_tensor_product_reference,
+):
+    """That kernel, or None when this element does not evaluate in closed form.
+
+    A tensor-product element is excluded outright: its evaluation strategy is
+    sum factorization, and enumerating every entry of its matrix would be the
+    wrong shape rather than a smaller one.
+    """
+    if use_tensor_product_reference:
+        return None
+    specialized = _constant_p1_specialized_local(local_prefix, quadrature_rule)
+    if specialized is None:
+        return None
+    specialized_prefix, specialized_rule = specialized
+    reference_gradients = constant_p1_simplex_reference_gradients(specialized_rule)
+    if reference_gradients is None:
+        return None
+    return _ClosedFormHessian(
+        name="%s_direct_hessian_element_matrix" % specialized_prefix,
+        quadrature_rule=specialized_rule,
+        reference_gradients=reference_gradients,
+    )
+
+
 def _sfem_soa_hessian_header(
     forms,
     prefix,
@@ -1035,6 +1086,27 @@ def _sfem_soa_hessian_header(
             )
         )
         lines.append("")
+        constant_p1 = _sfem_soa_closed_form_hessian(
+            prefix,
+            quadrature_rule,
+            use_tensor_product_reference,
+        )
+        if constant_p1 is not None and constant_p1.name not in emitted:
+            emitted.add(constant_p1.name)
+            lines.extend(
+                _sfem_soa_direct_hessian_element_matrix_function(
+                    form,
+                    constant_p1.name,
+                    dim,
+                    constant_p1.quadrature_rule,
+                    reference_inputs,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    source_builder,
+                    constant_p1=constant_p1,
+                )
+            )
+            lines.append("")
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
@@ -1049,6 +1121,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     use_tensor_product_reference,
     use_reference_gradient_vectors,
     source_builder,
+    constant_p1=None,
 ):
     n_field_components = form_n_field_components(form, dim)
     params = [
@@ -1058,7 +1131,11 @@ def _sfem_soa_direct_hessian_element_matrix_function(
         ),
         "const s_t *const RSTR bdet0",
     ]
-    if use_tensor_product_reference:
+    if constant_p1 is not None:
+        # Its basis gradients and its weight are exact rationals in the
+        # arithmetic, so it reads no table and takes none.
+        pass
+    elif use_tensor_product_reference:
         params.extend(
             (
                 "const s_t *const RSTR shape_1d",
@@ -1116,10 +1193,21 @@ def _sfem_soa_direct_hessian_element_matrix_function(
             ]
         )
     # Which shape this element's matrix is built in is its evaluation
-    # strategy's answer, the same table the apply reads.  A tensor-product
-    # element contracts its test functions dimension by dimension; anything else
-    # does it point by point.
-    if use_tensor_product_reference:
+    # strategy's answer, the same table the apply reads.  A lowest-order simplex
+    # enumerates every entry and eliminates once; a tensor-product element
+    # contracts its test functions dimension by dimension; anything else does it
+    # point by point.
+    if constant_p1 is not None:
+        lines.extend(
+            _sfem_soa_direct_hessian_closed_form_assembly_lines(
+                form,
+                dim,
+                constant_p1.quadrature_rule,
+                constant_p1.reference_gradients,
+                "  ",
+            )
+        )
+    elif use_tensor_product_reference:
         lines.extend(
             _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
                 form,
@@ -6920,6 +7008,163 @@ def _sfem_soa_direct_hessian_material_lines(material, dim, indent):
     return lines
 
 
+def _sfem_soa_direct_hessian_closed_form_assembly_lines(
+    form,
+    dim,
+    quadrature_rule,
+    reference_gradients,
+    indent,
+):
+    """Every entry of the element matrix, eliminated together, with no loops.
+
+    The shape a lowest-order simplex asks for, and the one SFEM's hand-written
+    `tet4_linear_elasticity_crs_adj` is written in: the basis gradients are
+    constants and the rule has one point, so every entry is an expression in the
+    adjugate, the determinant and the state, and the whole matrix is a single
+    elimination.
+
+    That elimination is the reason for the shape.  A loop over trial functions
+    can share subexpressions within a column and structurally cannot share them
+    across columns, and on an element whose geometry and state are constant the
+    columns have nearly everything in common.
+
+    The quadrature weight and the reference gradients are folded in as exact
+    rationals rather than read from tables, which is what leaves this kernel
+    with no reference argument at all.
+    """
+    n_field_components = form_n_field_components(form, dim)
+    uses_current = form_reads_current(form, default=True)
+    weak_form = form.weak_form
+    n_shape = len(reference_gradients)
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        _weak_form_deformation_gradient_substitutions(
+            weak_form,
+            "gu",
+            scalar_temporaries=True,
+        ),
+        tuple(
+            sp.symbols("trial_grad[%d]" % i)
+            for i in range(weak_form.n_field_components * dim)
+        ),
+    )
+
+    adj = [
+        sp.Symbol(current_target().work_item_name("adj", component))
+        for component in range(dim * dim)
+    ]
+    idet = sp.Symbol("idet")
+    weight = sp.nsimplify(quadrature_rule.weights[0])
+
+    lines = list(current_target().work_item_prologue_lines(indent))
+    lines.append(
+        "%sconst ptrdiff_t goff = %s;"
+        % (indent, current_target().work_item_offset(0, "VS"))
+    )
+    lines.extend(
+        "%sconst s_t %s = badj%d[goff];" % (indent, adj[component], component)
+        for component in range(dim * dim)
+    )
+    lines.extend(
+        [
+            "%sconst s_t %s = bdet0[goff];"
+            % (indent, current_target().work_item_name("det", 0)),
+            "%sconst s_t idet = s_t(1) / %s;"
+            % (indent, current_target().work_item_name("det", 0)),
+        ]
+    )
+    if uses_current:
+        # The state's reference gradient is a sum over the element's nodes with
+        # constant coefficients, so it needs neither a table nor a loop.  The
+        # push-forward after it is the one every other shape uses.
+        for row in range(n_field_components):
+            for k in range(dim):
+                nodal = sum(
+                    (
+                        sp.sympify(reference_gradients[shape][k])
+                        * sp.Symbol(
+                            "bu_data[%d]%s"
+                            % (
+                                shape * n_field_components + row,
+                                current_target().work_item_subscript(),
+                            )
+                        )
+                        for shape in range(n_shape)
+                    ),
+                    sp.S.Zero,
+                )
+                lines.append(
+                    "%sconst s_t gu_ref%d = %s;"
+                    % (indent, row * dim + k, _sfem_ccode(nodal))
+                )
+        lines.extend(
+            _sfem_soa_direct_hessian_push_forward_lines(weak_form, dim, indent)
+        )
+
+    entries = []
+    for trial_component in range(n_field_components):
+        for trial_shape in range(n_shape):
+            substitution = {}
+            for component in range(weak_form.n_field_components):
+                for d in range(dim):
+                    substitution[sp.Symbol("trial_grad[%d]" % (component * dim + d))] = (
+                        sum(
+                            (
+                                sp.sympify(reference_gradients[trial_shape][k])
+                                * adj[k * dim + d]
+                                for k in range(dim)
+                            ),
+                            sp.S.Zero,
+                        )
+                        * idet
+                        if component == trial_component
+                        else sp.S.Zero
+                    )
+            column = [entry.subs(substitution) for entry in material]
+            for test_component in range(n_field_components):
+                for test_shape in range(n_shape):
+                    entries.append(
+                        weight
+                        * sum(
+                            (
+                                sp.sympify(reference_gradients[test_shape][k])
+                                * sum(
+                                    (
+                                        column[test_component * dim + d] * adj[k * dim + d]
+                                        for d in range(dim)
+                                    ),
+                                    sp.S.Zero,
+                                )
+                                for k in range(dim)
+                            ),
+                            sp.S.Zero,
+                        )
+                    )
+
+    # One elimination over the whole matrix.  Doing it per column would give
+    # each column its own temporaries and share nothing between them, which is
+    # the loop shape written out flat rather than the closed form.
+    targets = [
+        "element_matrix[%d]"
+        % (
+            (test_component * n_shape + test_shape) * n_field_components * n_shape
+            + trial_component * n_shape
+            + trial_shape
+        )
+        for trial_component in range(n_field_components)
+        for trial_shape in range(n_shape)
+        for test_component in range(n_field_components)
+        for test_shape in range(n_shape)
+    ]
+    body = []
+    _append_cse_array_assignments(
+        body, tuple(entries), ["%s =" % target for target in targets], "hessian_tmp"
+    )
+    lines.extend("%s%s" % (indent, line.strip()) for line in body)
+    return lines
+
+
 def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
     form,
     dim,
@@ -7333,12 +7578,17 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
     scalar_weight_name,
     reference_prefix,
     indent,
+    constant_p1=False,
 ):
     args = [
         *("badj%d" % i for i in range(dim * dim)),
         "bdet0",
     ]
-    if use_tensor_product_reference:
+    if constant_p1:
+        # It reads no table, so it is passed none: the signature and this call
+        # skip the reference arguments together.
+        pass
+    elif use_tensor_product_reference:
         args.extend((tensor_shape_name, tensor_grad_name, tensor_weight_name))
     elif use_reference_gradient_vectors:
         args.extend(
@@ -7391,6 +7641,7 @@ def _sfem_soa_hessian_packed_crs_passes(
     uses_current,
     n_field_components=None,
     assembly=None,
+    constant_p1=False,
 ):
     """The multi-pass packed CRS assembly: discover the pattern, then fill it.
 
@@ -7676,6 +7927,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 scalar_weight_name,
                 reference_prefix,
                 "      ",
+                    constant_p1=constant_p1,
             )
         )
         lines.extend(
@@ -7752,9 +8004,32 @@ def _sfem_soa_hessian_matrix_assembly_function(
     )
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
     coordinate_streams_name = "bcoordinate_data"
-    direct_hessian_function_name = _sfem_soa_direct_hessian_function_name(
-        local_prefix,
-        use_tensor_product_reference,
+    # A lowest-order simplex calls the specialised kernel that folds its basis
+    # gradients in; every other element calls the generic one.  One helper
+    # answers for the header that defines the kernel and for this call, and the
+    # element's own strategy decides which of them this operator is.
+    #
+    # The two questions are not the same one.  A simplex header is shared, so it
+    # defines the specialised kernel whichever element generated it -- that is
+    # what keeps the file identical for TET4 and TET10 -- and TET10 must not
+    # then call it.
+    element_folds_its_basis = assembles_in_closed_form(quadrature_rule.element_type)
+    constant_p1_hessian = (
+        _sfem_soa_closed_form_hessian(
+            local_prefix,
+            quadrature_rule,
+            use_tensor_product_reference,
+        )
+        if element_folds_its_basis
+        else None
+    )
+    direct_hessian_function_name = (
+        constant_p1_hessian.name
+        if constant_p1_hessian is not None
+        else _sfem_soa_direct_hessian_function_name(
+            local_prefix,
+            use_tensor_product_reference,
+        )
     )
 
     function_base = _sfem_soa_hessian_matrix_public_function_base(
@@ -7972,6 +8247,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
             scalar_weight_name,
             reference_prefix,
             "    ",
+            constant_p1=constant_p1_hessian is not None,
         )
     )
     lines.append("")
@@ -8013,6 +8289,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         use_tensor_product_reference,
         uses_current,
         n_field_components=n_field_components,
+        constant_p1=constant_p1_hessian is not None,
     )
     lines.extend(
         [

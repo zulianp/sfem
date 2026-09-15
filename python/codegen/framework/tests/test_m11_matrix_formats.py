@@ -950,9 +950,9 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
             'n_qp': 1,
             'n_shape': 4,
             'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_tet4_hessian_block',
-            'assembly_reference': '',
             'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_tet4_jacobian_action_block_contiguous',
-            'apply_reference': 'sfem::codegen::ref_tet4_q1<s_t>::shape(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), ',
+            'reference': 'ref_tet4_q1',
+            'quadrature': 'quad_tet_q1',
             'includes': ('tet4_q1.hpp', 'quad_tet_q1.hpp'),
         },
         {
@@ -963,9 +963,9 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
             'n_qp': 11,
             'n_shape': 10,
             'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_hessian_block',
-            'assembly_reference': 'sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), ',
             'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous',
-            'apply_reference': 'sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), ',
+            'reference': 'ref_tet10_q11',
+            'quadrature': 'quad_tet_q11',
             'includes': ('tet10_q11.hpp', 'quad_tet_q11.hpp'),
         },
         {
@@ -976,9 +976,9 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
             'n_qp': 8,
             'n_shape': 8,
             'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_hessian_block',
-            'assembly_reference': 'sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), ',
             'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block_contiguous',
-            'apply_reference': 'sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), ',
+            'reference': 'ref_line_p1_q2',
+            'quadrature': 'quad_line_q2',
             'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
         },
         {
@@ -989,14 +989,14 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
             'n_qp': 4,
             'n_shape': 4,
             'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_hessian_block',
-            'assembly_reference': 'sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), ',
             'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block_contiguous',
-            'apply_reference': 'sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), ',
+            'reference': 'ref_line_p1_q2',
+            'quadrature': 'quad_line_q2',
             'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
         },
     )
 
-    DRIVER = '// Does the element matrix agree with the operator it assembles?\n//\n// The matrix is built from the flux with a trial basis function substituted for\n// the direction; the apply evaluates the same flux with a real direction in it.\n// They are one bilinear form, so `A * v` must equal `apply(v)` for every `v`.\n// That is the property probing had by construction -- the column *was* an apply\n// -- and the property the substitution has to earn.\n//\n// Checked over every basis direction and one dense one, on a perturbed identity\n// geometry and a random state, so a defect in one column cannot hide behind the\n// zeros of the next.\n#include <cstdio>\n#include <cmath>\n#include <cstdlib>\n#include <cmath>\n#include "@LOCAL_HEADER@"\n@INCLUDES@\n\nusing s_t = double;\nstatic constexpr int NQ = @NQ@;\nstatic constexpr int NS = @NS@;\nstatic constexpr int NC = @NC@;\nstatic constexpr int ND = @ND@;\nstatic constexpr int VS = 1;\n\n// Which fields this matrix has rows and columns for.  A coupled system\n// publishes one matrix per Jacobian block as well as the whole square, and the\n// two are the same check with different field lists.\nstatic constexpr int ROW_FIELDS[] = {@ROW_FIELDS@};\nstatic constexpr int COL_FIELDS[] = {@COLUMN_FIELDS@};\nstatic constexpr int N_ROWS = (int)(sizeof(ROW_FIELDS) / sizeof(int)) * NS;\nstatic constexpr int N_COLS = (int)(sizeof(COL_FIELDS) / sizeof(int)) * NS;\n\n// A matrix row or column is `field position * NS + shape`; a kernel stream is\n// `shape * NC + field`.  Both orders appear below because the apply speaks\n// streams and the matrix speaks its own rows and columns.\nstatic int row_stream(int row) { return (row % NS) * NC + ROW_FIELDS[row / NS]; }\nstatic int col_stream(int col) { return (col % NS) * NC + COL_FIELDS[col / NS]; }\n\nstatic double rnd() { return (double)rand() / RAND_MAX - 0.5; }\n\nint main() {\n  srand(20260915);\n  // The material\'s parameters, in the order its kernels take them.  Values\n  // chosen to be ordinary rather than special: a zero or a one can hide a term.\n@PARAM_DECLS@\n\n  s_t det[NQ * VS], adj_data[ND * ND][NQ * VS];\n  const s_t *adj[ND * ND];\n  for (int c = 0; c < ND * ND; ++c) adj[c] = adj_data[c];\n  for (int q = 0; q < NQ; ++q) {\n    for (int c = 0; c < ND * ND; ++c)\n      adj_data[c][q] = (c % (ND + 1) == 0 ? 1.0 : 0.0) + 0.2 * rnd();\n    det[q] = 1.0 + 0.1 * rnd();\n  }\n\n  // Both state roles are filled whether or not the kernels take both; which\n  // ones cross the boundary is the form\'s answer and `@STATE@` carries it.\n  s_t current[NC * NS][VS], previous[NC * NS][VS];\n  for (int i = 0; i < NC * NS; ++i) {\n    // `field` is which of the system\'s fields this stream carries; a material\n    // whose state has to satisfy an inequality reads it.\n    const int field = i % NC;\n    (void)field;\n    current[i][0] = @STATE_INIT@;\n    previous[i][0] = @STATE_INIT@;\n  }\n\n  s_t element_matrix[N_ROWS * N_COLS];\n  sfem::codegen::@ASSEMBLY@<s_t, NQ, NS, VS>(\n      1, 1, det, adj, @ASSEMBLY_REFERENCE@@STATE@@PARAMS@element_matrix);\n\n  // Checked before anything is compared.  `fmax` returns its non-NaN operand,\n  // so a NaN entry would leave `worst` at zero and read as perfect agreement --\n  // which is how a state outside a material\'s domain, where a fractional power\n  // of a negative number is taken, would pass this test silently.\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) {\n    if (!std::isfinite(element_matrix[i])) {\n      printf("nan %d\\n", i);\n      return 1;\n    }\n  }\n\n  double worst = 0.0, scale = 0.0;\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) scale = fmax(scale, fabs(element_matrix[i]));\n\n  for (int trial_local = 0; trial_local <= N_COLS; ++trial_local) {\n    s_t direction[NC * NS][VS], out[NC * NS][VS];\n    for (int i = 0; i < NC * NS; ++i) { direction[i][0] = 0.0; out[i][0] = 0.0; }\n    if (trial_local < N_COLS) {\n      direction[col_stream(trial_local)][0] = 1.0;\n    } else {\n      // A dense direction, confined to the columns this matrix has: anything\n      // outside them is not in the matrix and the apply would answer for it.\n      for (int col = 0; col < N_COLS; ++col) direction[col_stream(col)][0] = rnd();\n    }\n    sfem::codegen::@APPLY@<s_t, NQ, NS, VS>(\n        1, 1, det, adj, @APPLY_REFERENCE@@STATE@direction, @PARAMS@out);\n\n    for (int test_local = 0; test_local < N_ROWS; ++test_local) {\n      double from_matrix = 0.0;\n      for (int j = 0; j < N_COLS; ++j) {\n        from_matrix += element_matrix[test_local * N_COLS + j]\n                     * direction[col_stream(j)][0];\n      }\n      worst = fmax(worst, fabs(from_matrix - out[row_stream(test_local)][0]));\n    }\n  }\n  printf("%.17e %.17e\\n", worst, scale);\n  return 0;\n}\n'
+    DRIVER = '// Does the element matrix agree with the operator it assembles?\n//\n// The matrix is built from the flux with a trial basis function substituted for\n// the direction; the apply evaluates the same flux with a real direction in it.\n// They are one bilinear form, so `A * v` must equal `apply(v)` for every `v`.\n// That is the property probing had by construction -- the column *was* an apply\n// -- and the property the substitution has to earn.\n//\n// Checked over every basis direction and one dense one, on a perturbed identity\n// geometry and a random state, so a defect in one column cannot hide behind the\n// zeros of the next.\n#include <cstdio>\n#include <cmath>\n#include <cstdlib>\n#include <cmath>\n#include "@LOCAL_HEADER@"\n@INCLUDES@\n\nusing s_t = double;\nstatic constexpr int NQ = @NQ@;\nstatic constexpr int NS = @NS@;\nstatic constexpr int NC = @NC@;\nstatic constexpr int ND = @ND@;\nstatic constexpr int VS = 1;\n\n// Which fields this matrix has rows and columns for.  A coupled system\n// publishes one matrix per Jacobian block as well as the whole square, and the\n// two are the same check with different field lists.\nstatic constexpr int ROW_FIELDS[] = {@ROW_FIELDS@};\nstatic constexpr int COL_FIELDS[] = {@COLUMN_FIELDS@};\nstatic constexpr int N_ROWS = (int)(sizeof(ROW_FIELDS) / sizeof(int)) * NS;\nstatic constexpr int N_COLS = (int)(sizeof(COL_FIELDS) / sizeof(int)) * NS;\n\n// A matrix row or column is `field position * NS + shape`; a kernel stream is\n// `shape * NC + field`.  Both orders appear below because the apply speaks\n// streams and the matrix speaks its own rows and columns.\nstatic int row_stream(int row) { return (row % NS) * NC + ROW_FIELDS[row / NS]; }\nstatic int col_stream(int col) { return (col % NS) * NC + COL_FIELDS[col / NS]; }\n\nstatic double rnd() { return (double)rand() / RAND_MAX - 0.5; }\n\nint main() {\n  srand(20260915);\n  // The material\'s parameters, in the order its kernels take them.  Values\n  // chosen to be ordinary rather than special: a zero or a one can hide a term.\n@PARAM_DECLS@\n\n  s_t det[NQ * VS], adj_data[ND * ND][NQ * VS];\n  const s_t *adj[ND * ND];\n  for (int c = 0; c < ND * ND; ++c) adj[c] = adj_data[c];\n  for (int q = 0; q < NQ; ++q) {\n    for (int c = 0; c < ND * ND; ++c)\n      adj_data[c][q] = (c % (ND + 1) == 0 ? 1.0 : 0.0) + 0.2 * rnd();\n    det[q] = 1.0 + 0.1 * rnd();\n  }\n\n  // Both state roles are filled whether or not the kernels take both; which\n  // ones cross the boundary is the form\'s answer and `@STATE@` carries it.\n  s_t current[NC * NS][VS], previous[NC * NS][VS];\n  for (int i = 0; i < NC * NS; ++i) {\n    // `field` is which of the system\'s fields this stream carries; a material\n    // whose state has to satisfy an inequality reads it.\n    const int field = i % NC;\n    (void)field;\n    current[i][0] = @STATE_INIT@;\n    previous[i][0] = @STATE_INIT@;\n  }\n\n  s_t element_matrix[N_ROWS * N_COLS];\n  sfem::codegen::@ASSEMBLY@<s_t, NQ, NS, VS>(\n      1, 1, det, adj, @ASSEMBLY_ARGS@element_matrix);\n\n  // Checked before anything is compared.  `fmax` returns its non-NaN operand,\n  // so a NaN entry would leave `worst` at zero and read as perfect agreement --\n  // which is how a state outside a material\'s domain, where a fractional power\n  // of a negative number is taken, would pass this test silently.\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) {\n    if (!std::isfinite(element_matrix[i])) {\n      printf("nan %d\\n", i);\n      return 1;\n    }\n  }\n\n  double worst = 0.0, scale = 0.0;\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) scale = fmax(scale, fabs(element_matrix[i]));\n\n  for (int trial_local = 0; trial_local <= N_COLS; ++trial_local) {\n    s_t direction[NC * NS][VS], out[NC * NS][VS];\n    for (int i = 0; i < NC * NS; ++i) { direction[i][0] = 0.0; out[i][0] = 0.0; }\n    if (trial_local < N_COLS) {\n      direction[col_stream(trial_local)][0] = 1.0;\n    } else {\n      // A dense direction, confined to the columns this matrix has: anything\n      // outside them is not in the matrix and the apply would answer for it.\n      for (int col = 0; col < N_COLS; ++col) direction[col_stream(col)][0] = rnd();\n    }\n    sfem::codegen::@APPLY@<s_t, NQ, NS, VS>(\n        1, 1, det, adj, @APPLY_ARGS@out);\n\n    for (int test_local = 0; test_local < N_ROWS; ++test_local) {\n      double from_matrix = 0.0;\n      for (int j = 0; j < N_COLS; ++j) {\n        from_matrix += element_matrix[test_local * N_COLS + j]\n                     * direction[col_stream(j)][0];\n      }\n      worst = fmax(worst, fabs(from_matrix - out[row_stream(test_local)][0]));\n    }\n  }\n  printf("%.17e %.17e\\n", worst, scale);\n  return 0;\n}\n'
 
     @staticmethod
     def _shipped_tree():
@@ -1025,28 +1025,79 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
                 )
 
     @staticmethod
-    def _material_parameters(material, header, kernel):
-        """The kernel's parameters, in its order, at the material's defaults.
+    def _parameter_names(header, kernel):
+        """One kernel's arguments, in its order, read from its signature.
 
-        Read rather than transcribed: a material's parameters have a physical
-        range, and values invented to look harmless can put the state outside
-        it.  The order is the kernel's own, taken from its signature, because
-        that order is the plan's and not something this test should predict.
+        Everything this driver passes between the adjugate and the element
+        matrix is taken from here rather than transcribed into the case: the
+        reference tables a kernel reads, the state roles it takes, and its
+        material parameters.
+
+        That is not tidiness.  A hard-coded list goes stale silently and looks
+        like a defect in the kernel when it does -- the first version of this
+        test spelled a `shape` argument, a later change correctly stopped the
+        quadrature kernel taking a table it never read, and the test then failed
+        as though the kernel were wrong.
         """
         import re
 
-        defaults = dict(material.parameter_defaults)
         signature = header.read_text().split("void %s(" % kernel, 1)[1]
         signature = signature.split(") {", 1)[0]
-        names = re.findall(r"^\s+const s_t (\w+),$", signature, re.M)
-        return tuple((name, repr(float(defaults[name]))) for name in names)
+        names = []
+        for line in signature.split("\n"):
+            # `const s_t *const RSTR adjugate[9],` and `const s_t eta_b,` and
+            # `const s_t current[3 * NS][VS],` all end in the name, once the
+            # array extents are off.
+            declaration = re.sub(r"\[.*$", "", line.strip().rstrip(",")).strip()
+            if declaration:
+                names.append(declaration.split()[-1].lstrip("*"))
+        return tuple(names)
+
+    #: What each argument name is spelled as at the call.  Reference tables come
+    #: from the element's own structs, which the case names; a state role is the
+    #: local array of that name; anything else is a material parameter.
+    REFERENCE_ACCESSORS = {
+        "shape": "%(ref)s<s_t>::shape()",
+        "grad_ref_x": "%(ref)s<s_t>::grad_ref_x()",
+        "grad_ref_y": "%(ref)s<s_t>::grad_ref_y()",
+        "grad_ref_z": "%(ref)s<s_t>::grad_ref_z()",
+        "q_weight": "%(quad)s<s_t>::q_weight()",
+        "shape_1d": "%(ref)s<s_t>::shape_1d()",
+        "grad_1d": "%(ref)s<s_t>::grad_1d()",
+        "q_weight_1d": "%(quad)s<s_t>::q_weight_1d()",
+    }
+    STATE_ARGUMENTS = ("current", "previous", "direction")
+
+    @classmethod
+    def _call_arguments(cls, header, kernel, case, defaults):
+        """The argument list this kernel is called with, and the values it needs."""
+        spelling = {"ref": case["reference"], "quad": case["quadrature"]}
+        arguments, parameters = [], []
+        # The first four and the last are what the driver spells itself: the
+        # work-item count, the geometry stride, the geometry, and whatever the
+        # kernel writes -- `element_matrix` for an assembly, `output` for an
+        # apply, which is why the last is dropped by position and not by name.
+        for name in cls._parameter_names(header, kernel)[4:-1]:
+            if name in cls.REFERENCE_ACCESSORS:
+                arguments.append(
+                    "sfem::codegen::" + cls.REFERENCE_ACCESSORS[name] % spelling
+                )
+            elif name in cls.STATE_ARGUMENTS:
+                arguments.append(name)
+            else:
+                arguments.append(name)
+                parameters.append((name, repr(float(defaults[name]))))
+        return arguments, parameters
 
     def _check(self, case, headers, tree, material):
         """Build and run the driver for one case, and hold it to the claim."""
         compiler = shutil.which("c++") or shutil.which("g++")
-        parameters = self._material_parameters(
-            material, headers / case["header"], case["assembly"]
+        header = headers / case["header"]
+        defaults = dict(material.parameter_defaults)
+        assembly_args, parameters = self._call_arguments(
+            header, case["assembly"], case, defaults
         )
+        apply_args, _ = self._call_arguments(header, case["apply"], case, defaults)
         source = self.DRIVER
         for key, value in (
             ("@LOCAL_HEADER@", case["header"]),
@@ -1056,28 +1107,22 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
             ("@NS@", str(case["n_shape"])),
             ("@NC@", str(case["n_fields"])),
             ("@ND@", str(case["dim"])),
-            ("@STATE@", case.get("state", "current, previous, ")),
-            ("@STATE_INIT@", case.get("state_init", "0.05 * rnd()")),
-            ("@PARAM_DECLS@",
-             "\n".join(
-                 "  const s_t %s = %s;" % (name, value)
-                 for name, value in parameters
-             )),
-            ("@PARAMS@",
-             "".join(
-                 "%s, " % name
-                 for name, _ in parameters
-             )),
             ("@ROW_FIELDS@",
              ", ".join(str(f) for f in case.get(
                  "row_fields", range(case["n_fields"])))),
             ("@COLUMN_FIELDS@",
              ", ".join(str(f) for f in case.get(
                  "column_fields", range(case["n_fields"])))),
+            ("@STATE_INIT@", case.get("state_init", "0.05 * rnd()")),
+            ("@PARAM_DECLS@",
+             "\n".join(
+                 "  const s_t %s = %s;" % (name, value)
+                 for name, value in parameters
+             )),
             ("@ASSEMBLY@", case["assembly"]),
-            ("@ASSEMBLY_REFERENCE@", case["assembly_reference"]),
+            ("@ASSEMBLY_ARGS@", "".join("%s, " % a for a in assembly_args)),
             ("@APPLY@", case["apply"]),
-            ("@APPLY_REFERENCE@", case["apply_reference"]),
+            ("@APPLY_ARGS@", "".join("%s, " % a for a in apply_args)),
         ):
             source = source.replace(key, value)
         with tempfile.TemporaryDirectory() as work:
@@ -1117,38 +1162,20 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
     #: element whose shape cannot supply a trial value, so the block falls back
     #: to the quadrature shape rather than to probing.
     BLOCK_CASE = {
-        "element": "TRI3",
-        "header": "two_phase_flow_form_2_p_w_p_w_d2_simplex_local.hpp",
-        "dim": 2,
-        "n_fields": 2,
-        "n_qp": 6,
-        "n_shape": 3,
-        "row_fields": (0,),
-        "column_fields": (0,),
-        # This form's Jacobian action reads no previous time step.
-        "state": "current, ",
-        # The capillary pressure must exceed the wetting-phase pressure: the
-        # saturation curve raises their difference to a fractional power, and a
-        # negative difference is outside the material's domain rather than a
-        # hard case for the kernel.
-        # `p_c` is a capillary pressure and must exceed `p_w`, and both sit
-        # near the material's reference pressure `p_wr = 1.0`.
-        "state_init": "(field == 1 ? 1.2 + 0.02 * rnd() : 1.0 + 0.02 * rnd())",
-        "assembly": "two_phase_flow_form_2_p_w_p_w_d2_simplex_hessian_block",
-        "assembly_reference": (
-            "sfem::codegen::ref_tri3_q6<s_t>::shape(), "
-            "sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), "
-            "sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y(), "
-            "sfem::codegen::quad_tri_q6<s_t>::q_weight(), "
-        ),
-        "apply": "two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action_block_contiguous",
-        "apply_reference": (
-            "sfem::codegen::ref_tri3_q6<s_t>::shape(), "
-            "sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), "
-            "sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y(), "
-            "sfem::codegen::quad_tri_q6<s_t>::q_weight(), "
-        ),
-        "includes": ("tri3_q6.hpp", "quad_tri_q6.hpp"),
+        'element': 'TRI3',
+        'header': 'two_phase_flow_form_2_p_w_p_w_d2_simplex_local.hpp',
+        'dim': 2,
+        'n_fields': 2,
+        'n_qp': 6,
+        'n_shape': 3,
+        'row_fields': (0,),
+        'column_fields': (0,),
+        'assembly': 'two_phase_flow_form_2_p_w_p_w_d2_simplex_hessian_block',
+        'apply': 'two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action_block_contiguous',
+        'reference': 'ref_tri3_q6',
+        'quadrature': 'quad_tri_q6',
+        'includes': ('tri3_q6.hpp', 'quad_tri_q6.hpp'),
+        'state_init': '(field == 1 ? 1.2 + 0.02 * rnd() : 1.0 + 0.02 * rnd())',
     }
 
     def test_a_jacobian_block_applies_like_the_operator(self):
