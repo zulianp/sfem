@@ -2699,6 +2699,47 @@ int main() {
             self.assertNotIn("#pragma omp", operator_source)
             self.assertNotIn("lane", operator_source)
 
+    def test_cuda_operators_open_every_mesh_loop_on_the_device(self):
+        """No `__global__` kernel may walk the mesh serially.
+
+        `_validate_cuda_source_contract` cannot see this: a body that keeps the
+        host's `for (ptrdiff_t element = 0; element < nelements; ++element)`
+        still ends up inside `__global__ void`, still carries no `lane` and no
+        `#pragma omp`, and so passes every check the contract makes -- while
+        every thread walks every element and `atomicAdd`s, which scales the
+        answer by the thread count.  Measured before the source builder owned
+        the scalar loop: laplace TRI3 and TET4 each had two such kernels.
+
+        `return SFEM_SUCCESS;` inside a `__global__ void` is the same defect
+        seen from the other side, and nvcc does reject that one -- which is the
+        only reason it was ever noticed.
+        """
+        cases = (
+            (laplace, ("TRI3", "QUAD4", "TET4", "HEX8")),
+            (linear_elasticity, ("TRI3", "QUAD4", "TET4", "HEX8")),
+            (neohookean_ogden, ("TRI3", "QUAD4", "TET4", "HEX8")),
+        )
+        for material, elements in cases:
+            with tempfile.TemporaryDirectory() as out_dir:
+                result = gen.generate(
+                    material, out_dir, elements=elements, target="cuda"
+                )
+                operators = [
+                    path for path in result.sources if path.endswith("_operator.cu")
+                ]
+                self.assertTrue(operators)
+                for path in operators:
+                    with self.subTest(source=os.path.basename(path)):
+                        with open(path, encoding="utf-8") as input_file:
+                            source = input_file.read()
+                        self.assertIn("__global__ void", source)
+                        self.assertNotIn(
+                            "for (ptrdiff_t element = 0; element < nelements;",
+                            source,
+                        )
+                        self.assertNotIn("return SFEM_SUCCESS;\n}", source)
+                        self.assertNotIn("#pragma omp", source)
+
     def test_compiles_generated_cuda_material_energy_kernel_when_nvcc_is_available(self):
         compiler = shutil.which("nvcc")
         if compiler is None:

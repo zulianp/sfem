@@ -1519,7 +1519,7 @@ def _sfem_soa_weak_form_block_function(
         # is to declare is the plan's, and a scalar accumulator declares nothing.
         lines.extend(
             _WEAK_OUTPUT_STREAM_ARRAY[form_accumulation(form)](
-                form, dim, n_field_components, n_nodes, shared.stream_shape_order
+                form, n_field_components, n_nodes, shared.stream_shape_order
             )
         )
     if shared.use_tensor_product_reference:
@@ -3477,7 +3477,7 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
         "namespace codegen {",
         "",
         "template <typename s_t, typename g_t>",
-        "static SFEM_INLINE int %s(" % implementation_name,
+        source_builder.mesh_function_line(implementation_name),
     ]
     lines.extend(parameter_list_lines(impl_params))
     lines.extend(
@@ -3485,8 +3485,7 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
             ") {",
             discard_unused("nnodes", indent="  "),
             "",
-            *source_builder.parallel_for_lines(),
-            "  for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            *source_builder.element_loop_lines(),
             "    const idx_t ev0 = elements[0][element];",
             "    const idx_t ev1 = elements[1][element];",
             "    const idx_t ev2 = elements[2][element];",
@@ -3573,18 +3572,14 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
         ("outz", "ev2", "q7"),
         ("outz", "ev3", "q8"),
     )
+    scatter = _target_scatter_add_lines(source_builder)
     for out, ev, value in scatter_values:
-        lines.extend(
-            [
-                "    #pragma omp atomic update",
-                "    %s[%s * out_stride] += %s;" % (out, ev, value),
-            ]
-        )
+        lines.extend(scatter("%s[%s * out_stride]" % (out, ev), value, "    "))
     lines.extend(
         [
             "  }",
             "",
-            "  return SFEM_SUCCESS;",
+            *source_builder.success_return_lines(),
             "}",
             "",
             "} // namespace codegen",
@@ -3598,16 +3593,14 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
         runtime_typed_entry_point_lines(
             function_name,
             wrapper_params,
-            lambda scalar_type, _positional: [
-                "  return sfem::codegen::%s<%s, geom_t>(%s);"
-                % (
+            lambda scalar_type, _positional: list(
+                source_builder.wrapper_call_lines(
                     implementation_name,
                     scalar_type,
-                    ", ".join(
-                        cast_arguments(wrapper_params, wrapper_args, scalar_type)
-                    ),
-                ),
-            ],
+                    ", geom_t",
+                    cast_arguments(wrapper_params, wrapper_args, scalar_type),
+                )
+            ),
             parameter_lines=parameter_list_lines,
         )
     )
@@ -4197,7 +4190,7 @@ def _append_mesh_operator_stream_arrays(
                     "const s_t *",
                     "bu_streams",
                     "bu_data",
-                    dim,
+                    n_field_components,
                     stream_shape_order,
                     "    ",
                 )
@@ -4206,7 +4199,7 @@ def _append_mesh_operator_stream_arrays(
             lines.append(
                 "    const s_t *const bu_streams[NS * %d] = {%s};"
                 % (
-                    dim,
+                    n_field_components,
                     ", ".join(
                         _BLOCK_FMT % stream
                         for stream in streams_in_shape_order(
@@ -4224,7 +4217,7 @@ def _append_mesh_operator_stream_arrays(
                         "const s_t *",
                         "bh_streams",
                         "bh_data",
-                        dim,
+                        n_field_components,
                         stream_shape_order,
                         "    ",
                     )
@@ -4233,7 +4226,7 @@ def _append_mesh_operator_stream_arrays(
                 lines.append(
                     "    const s_t *const bh_streams[NS * %d] = {%s};"
                     % (
-                        dim,
+                        n_field_components,
                         ", ".join(
                             _BLOCK_FMT % stream
                             for stream in streams_in_shape_order(
@@ -4246,19 +4239,19 @@ def _append_mesh_operator_stream_arrays(
                 )
         lines.extend(
             _BLOCK_OUTPUT_STREAM_ARRAY[form_accumulation(form)](
-                form, dim, n_field_components, n_nodes,
+                form, n_field_components, n_nodes,
                 compact_stream_buffers, stream_shape_order,
             )
         )
 
 
-def _per_shape_weak_output_stream_array(form, dim, n_field_components, n_nodes,
+def _per_shape_weak_output_stream_array(form, n_field_components, n_nodes,
                                         stream_shape_order):
     """The stream array a per-shape weak block writes through."""
     return [
         "  s_t *const weak_out_streams[NS * %d] = {%s};"
         % (
-            dim,
+            n_field_components,
             ", ".join(
                 streams_in_shape_order(
                     _output_stream_names(form, n_field_components, n_nodes),
@@ -4272,23 +4265,23 @@ def _per_shape_weak_output_stream_array(form, dim, n_field_components, n_nodes,
 
 _WEAK_OUTPUT_STREAM_ARRAY = {
     FormAccumulation.SCALAR: (
-        lambda form, dim, n_field_components, n_nodes, order: []
+        lambda form, n_field_components, n_nodes, order: []
     ),
     FormAccumulation.PER_SHAPE: _per_shape_weak_output_stream_array,
 }
 
 
-def _per_shape_block_output_stream_array(form, dim, n_field_components, n_nodes,
+def _per_shape_block_output_stream_array(form, n_field_components, n_nodes,
                                          compact_stream_buffers, stream_shape_order):
     """The pointer array the block writes its per-shape output through."""
     if compact_stream_buffers:
         return _ordered_stream_pointer_array_lines(
-            "s_t *", "bout_streams", "bout_data", dim, stream_shape_order, "    "
+            "s_t *", "bout_streams", "bout_data", n_field_components, stream_shape_order, "    "
         )
     return [
         "    s_t *const bout_streams[NS * %d] = {%s};"
         % (
-            dim,
+            n_field_components,
             ", ".join(
                 _BLOCK_FMT % stream
                 for stream in streams_in_shape_order(
@@ -4305,7 +4298,7 @@ def _per_shape_block_output_stream_array(form, dim, n_field_components, n_nodes,
 #: an empty sequence, which emits nothing without anyone deciding not to.
 _BLOCK_OUTPUT_STREAM_ARRAY = {
     FormAccumulation.SCALAR: (
-        lambda form, dim, n_field_components, n_nodes, compact, order: []
+        lambda form, n_field_components, n_nodes, compact, order: []
     ),
     FormAccumulation.PER_SHAPE: _per_shape_block_output_stream_array,
 }
@@ -4801,10 +4794,7 @@ def _expanded_simplex_metric_body(plan, source_builder):
     scale = _sfem_ccode(plan.scale)
     scatter = _target_scatter_add_lines(source_builder)
     lines = [discard_unused("nnodes", indent="  "), ""]
-    lines.extend(_target_parallel_element_loop_lines(source_builder))
-    lines.append(
-        "  for (ptrdiff_t element = 0; element < nelements; ++element) {"
-    )
+    lines.extend(source_builder.element_loop_lines("  "))
     lines.extend(
         "    const idx_t ev%d = elements[%d][element];" % (shape, shape)
         for shape in range(plan.n_shape)
@@ -4830,7 +4820,7 @@ def _expanded_simplex_metric_body(plan, source_builder):
         lines.extend(
             scatter("outx[ev%d * out_stride]" % shape, "e%d" % shape, "    ")
         )
-    lines.extend(["  }", "", "  return SFEM_SUCCESS;"])
+    lines.extend(["  }", "", *source_builder.success_return_lines()])
     return lines
 
 
@@ -4844,14 +4834,6 @@ _MESH_OPERATOR_BODY_BY_EXPANDED = {
     ),
     False: lambda plan, source_builder: None,
 }
-
-
-def _target_parallel_element_loop_lines(source_builder):
-    """The pragma opening a parallel element loop, from the bound target."""
-    target = getattr(source_builder, "target", None)
-    if target is None or not hasattr(target, "parallel_element_loop_lines"):
-        return []
-    return ["  %s" % line for line in target.parallel_element_loop_lines("static")]
 
 
 def _target_scatter_add_lines(source_builder):
@@ -5734,7 +5716,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                             "const s_t *",
                             "bu_streams",
                             "bu_data",
-                            dim,
+                            n_field_components,
                             stream_shape_order,
                             "        ",
                         )
@@ -5745,7 +5727,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                             "const s_t *",
                             "bh_streams",
                             "bh_data",
-                            dim,
+                            n_field_components,
                             stream_shape_order,
                             "        ",
                         )
@@ -5756,7 +5738,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "s_t *",
                         "bout_streams",
                         "bout_data",
-                        dim,
+                        n_field_components,
                         stream_shape_order,
                         "        ",
                     ),
@@ -6059,10 +6041,7 @@ def _expanded_simplex_metric_value_body(plan, source_builder):
         discard_unused("nnodes", indent="  "),
         "",
     ]
-    lines.extend(_target_parallel_element_loop_lines(source_builder))
-    lines.append(
-        "  for (ptrdiff_t element = 0; element < nelements; ++element) {"
-    )
+    lines.extend(source_builder.element_loop_lines("  "))
     lines.extend(
         "    const idx_t ev%d = elements[%d][element];" % (shape, shape)
         for shape in range(plan.n_shape)
@@ -6098,7 +6077,7 @@ def _expanded_simplex_metric_value_body(plan, source_builder):
             "    }",
             "  }",
             "",
-            "  return SFEM_SUCCESS;",
+            *source_builder.success_return_lines(),
         ]
     )
     return lines
@@ -6451,7 +6430,7 @@ def _objective_steps_lines(
                     "const s_t *",
                     "bu_streams",
                     "bu_data",
-                    dim,
+                    n_field_components,
                     stream_shape_order,
                     "    ",
                 ),
@@ -6476,7 +6455,7 @@ def _objective_steps_lines(
         lines.append(
             "    const s_t *const bu_streams[NS * %d] = {%s};"
             % (
-                dim,
+                n_field_components,
                 ", ".join(
                     _BLOCK_FMT % stream
                     for stream in streams_in_shape_order(
@@ -8151,8 +8130,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         [
             "",
             *_sfem_soa_matrix_format_assertion_lines(formats, "  "),
-            *source_builder.parallel_for_lines(),
-            "  for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            *source_builder.element_loop_lines(),
             "    idx_t ev[NS];",
             "    s_t element_matrix[NDOFS * NDOFS];",
             "    s_t bcoordinate_data[NS * ND][VS];",
@@ -8256,7 +8234,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         [
             "  }",
             "",
-            "  return SFEM_SUCCESS;",
+            *source_builder.success_return_lines(),
             "}",
             "",
         ]
@@ -8419,7 +8397,14 @@ def _ordered_element_pointer_array_lines(pointer_type, array_name, source_name, 
     ]
 
 
-def _ordered_stream_pointer_array_lines(pointer_type, array_name, storage_name, dim, stream_shape_order, indent):
+def _ordered_stream_pointer_array_lines(pointer_type, array_name, storage_name, n_field_components, stream_shape_order, indent):
+    #: The permutation is `fem.tensor_product.streams_in_shape_order`, asked for
+    #: rather than rewritten.  Open-coding it here is what let the index stride
+    #: by the spatial dimension while the array was declared `[NS * NC]`, which
+    #: agree only for a vector field: a laplace QUAD4 (NS=4, NC=1) declared four
+    #: pointers and supplied eight.  The tracked OpenMP tree never showed it,
+    #: because a mesh-order element delegates to its PROTEUS twin and the twin's
+    #: shape order is the identity, which takes the loop above.
     lines = [
         "%s%s%s[NS * NC];" % (indent, pointer_type, array_name),
     ]
@@ -8440,9 +8425,14 @@ def _ordered_stream_pointer_array_lines(pointer_type, array_name, storage_name, 
             pointer_type,
             array_name,
             ", ".join(
-                "%s[%d]" % (storage_name, shape * dim + d)
-                for shape in stream_shape_order
-                for d in range(dim)
+                streams_in_shape_order(
+                    tuple(
+                        "%s[%d]" % (storage_name, stream)
+                        for stream in range(len(stream_shape_order) * n_field_components)
+                    ),
+                    n_field_components,
+                    stream_shape_order,
+                )
             ),
         )
     ]

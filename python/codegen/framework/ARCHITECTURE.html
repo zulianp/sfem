@@ -541,7 +541,38 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Twenty-nine, ordered by what unblocks what. Eight are new since the last pass, and five of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Thirty, ordered by what unblocks what. Nine are new since the last pass, and six of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 29</div>
+    <div class="body">
+      <div class="op-title">The energy family did not have the mesh-loop lowering it was credited with <span class="chip c-ok">closed &mdash; nvcc 13 of 17 &rarr; 18 of 18, and a serial <code>__global__</code> can no longer ship</span></div>
+
+      <p><b>What OP 27 left, and what was wrong with the note it left it as.</b> OP 27 closed saying the residual and inexact families cannot reach CUDA because they emit <code>_operator.cpp</code> around a host mesh loop, &ldquo;the mesh-loop lowering, which the energy family already has and which is the natural next piece&rdquo;. The energy family did not already have it. It had it for the kernels OP 27 compiled &mdash; six operators, all tensor-product &mdash; and not for the ones it did not.</p>
+
+      <p><b>Measured before anything was designed.</b> Every CUDA operator the generator can emit for the three energy materials on four elements &mdash; 18 files &mdash; through nvcc 12.6 on a GH200 node at <code>-arch=sm_90</code>. <b>13 passed, 4 failed, and one never reached the compiler</b>: <code>linear_elasticity</code> TET4 was refused by <code>_validate_cuda_source_contract</code> for carrying 24 <code>#pragma omp atomic update</code>. Every predicted defect was discarded by the same run: the reference accessors already carry <code>__host__ __device__</code> (OP 27 fixed that), and <code>unsupported_dispatch</code> is <code>__host__</code>-only, so its <code>std::fprintf</code> was never a problem.</p>
+
+      <p><b>The compile errors were the lucky half.</b> laplace TRI3 and TET4 failed on <code>return SFEM_SUCCESS;</code> in a <code>__global__ void</code> &mdash; and those same two kernels contain no <code>blockIdx</code> anywhere and a serial <code>for (ptrdiff_t element = 0; element &lt; nelements; ++element)</code> inside the device body. Had the return type happened to match, they would have compiled, passed the contract check &mdash; which tests only that the filename ends <code>_operator.cu</code>, that the file holds <code>__global__ void</code>, and that it holds no <code>lane</code> and no <code>#pragma omp</code> &mdash; and produced an answer scaled by the thread count, because every thread would walk every element and <code>atomicAdd</code>. A contract stated over the text cannot see the difference between a device loop and a host loop that was moved into a device function.</p>
+
+      <p><b>One structural defect underneath all of it.</b> <code>emitters/energy.py</code> publishes the seam &mdash; <code>mesh_loop_lines</code>, <code>mesh_function_line</code>, <code>success_return_lines</code>, <code>scatter_add_lines</code>, <code>wrapper_call_lines</code> &mdash; and that is exactly why 13 files compiled. But the seam published only the <em>blocked</em> mesh loop, over <code>evb</code> in strides of <code>VS</code>. A constant-P1 simplex works an element at a time, and for that shape the builder offered only <code>parallel_for_lines()</code>, which CUDA answers with nothing; so five sites wrote the loop, the signature, the scatter, the return and the launch literally, and on a device target the pragma vanished and the serial loop stayed. Both builders now publish <code>element_loop_lines()</code>, and the five literal spellings ask for theirs. <code>_target_parallel_element_loop_lines</code>, a private duplicate of <code>parallel_for_lines</code>, is gone with them.</p>
+
+      <p><b>A second defect the same run exposed, latent rather than device-specific.</b> <code>_ordered_stream_pointer_array_lines</code> declared <code>[NS * NC]</code> and filled it by striding the spatial dimension: <code>storage[shape * dim + d]</code>. Those agree only for a vector field, so a laplace QUAD4 &mdash; four shapes, one component &mdash; declared four pointers and supplied eight, which is the <code>too many initializer values</code> nvcc reported. It is the same correction as &ldquo;the field's components, not the spatial dimension&rdquo;, in a place that change could not reach: under OpenMP a mesh-order QUAD4 delegates to its PROTEUS twin, and the twin's shape order is the identity, which takes the loop branch instead of the initializer list. The permutation is <code>fem.tensor_product.streams_in_shape_order</code> and is now asked for rather than rewritten; five sibling sites that declared <code>[NS * dim]</code> now declare <code>[NS * NC]</code>.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>nvcc 12.6, GH200, <code>-arch=sm_90</code></th><th>before</th><th>after</th></tr>
+        <tr><td>operators compiled</td><td>13 of 17</td><td><b>18 of 18</b></td></tr>
+        <tr><td>refused by the contract before nvcc saw them</td><td>1</td><td>0</td></tr>
+        <tr><td><code>__global__</code> kernels walking the mesh serially</td><td>4</td><td><b>0</b></td></tr>
+        <tr><td>tracked OpenMP tree</td><td colspan="2">byte-identical, 387 files, at every step</td></tr>
+      </table>
+
+      <p><b>The gate does not need a GPU.</b> <code>test_cuda_operators_open_every_mesh_loop_on_the_device</code> generates all three materials on all four elements for CUDA and rejects any operator holding a serial mesh loop, a <code>return SFEM_SUCCESS;</code> closing a <code>__global__</code> body, or an OpenMP pragma &mdash; 18 subtests. Run against the pre-fix tree it rejects exactly laplace TET4 and TRI3, so it is not vacuous, and it makes the check the source contract structurally cannot.</p>
+
+      <p><b>What is not claimed.</b> Nothing here ran on the device; A0 and A1 are a compile gate, and the answers were not compared against the OpenMP ones for the four kernels that changed shape. Byte-identity says the CPU tree did not move, which is the whole of the numerical evidence so far. The residual and inexact families still emit <code>_operator.cpp</code> and are still refused, unchanged by this.</p>
+
+      <div class="op-facts"><span><i>nvcc</i> 13 of 17 &rarr; <b>18 of 18</b></span><span><i>serial <code>__global__</code> kernels</i> 4 &rarr; <b>0</b></span><span><i>literal spellings routed to the seam</i> 5</span><span><i>gate</i> byte-identity + 18 subtests, no GPU needed</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 28</div>
