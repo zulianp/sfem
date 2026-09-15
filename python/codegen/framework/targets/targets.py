@@ -93,6 +93,15 @@ class TargetPlatform:
     def restrict_qualifier(self):
         return ""
 
+    def restrict_definition(self):
+        """What `SFEM_RESTRICT` expands to in a generated header.
+
+        Empty on a host target, which is the CPU tree's own choice; a device
+        target spells the real qualifier.  Distinct from
+        `restrict_qualifier`, which is the *name* a generated declaration uses.
+        """
+        return ""
+
     def parallel_for_pragma(self, schedule=None, reduction=None):
         return None
 
@@ -290,14 +299,18 @@ class TargetPlatform:
             ),
         )
 
-    def element_loop_nodes(self):
+    def element_loop_nodes(self, index="element", extent="nelements"):
         """The scalar pass over the mesh: one element per iteration.
 
         The other shape is `mesh_loop_nodes`.  A constant-P1 simplex takes this
         one -- its staging is the whole of its cost, so it works an element at a
         time rather than blocking.
+
+        `index` and `extent` are parameters because the boundary emitter walks
+        sides rather than elements and calls its counter `s`; what the target
+        decides is how the pass is opened, not what it counts.
         """
-        element_iterator = iterator("element", "ptrdiff_t")
+        element_iterator = iterator(index, "ptrdiff_t")
         return (
             LoopHeaderNode(
                 LoopNode(
@@ -305,12 +318,25 @@ class TargetPlatform:
                     element_iterator,
                     iteration_range(
                         expr_ref("0", "first_element"),
-                        expr_ref("nelements", "element_count"),
+                        expr_ref(extent, "element_count"),
                     ),
                     pre_increment(element_iterator),
                 )
             ),
         )
+
+    def header_name(self, stem):
+        """What a generated header is called here.
+
+        Beside `mesh_function_line`: the name of a translation unit is a target
+        fact.  A device generation that writes `kernel_math.hpp` has not just
+        chosen an inconvenient name -- it has written a file that collides by
+        path with the CPU tree's file of the same name and different contents.
+        """
+        return "%s.hpp" % stem
+
+    def header_guard_suffix(self):
+        return "HPP"
 
     def mesh_function_line(self, implementation_name):
         """How the mesh kernel itself is declared."""
@@ -320,8 +346,16 @@ class TargetPlatform:
         """The mesh kernel's status return, where it has one to give."""
         return ("%sreturn SFEM_SUCCESS;" % indent,)
 
-    def mesh_launch_lines(self, implementation_name, template_args, arguments, indent="  "):
-        """How the `extern \"C\"` entry point reaches the mesh kernel."""
+    def mesh_launch_lines(
+        self, implementation_name, template_args, arguments, indent="  ", extent="nelements"
+    ):
+        """How the `extern \"C\"` entry point reaches the mesh kernel.
+
+        `extent` is how many work items there are.  A host target does not use
+        it -- the kernel's own loop reads it -- but a device target sizes its
+        grid from it, and the boundary family's sideset entry points count
+        `nsides` rather than `nelements`.
+        """
         return (
             "%sreturn sfem::codegen::%s<%s>(%s);"
             % (indent, implementation_name, template_args, ", ".join(arguments)),
@@ -560,6 +594,9 @@ class CUDATarget(TargetPlatform):
     def restrict_qualifier(self):
         return "__restrict__"
 
+    def restrict_definition(self):
+        return "__restrict__"
+
     def parallel_for_pragma(self, schedule=None, reduction=None):
         return None
 
@@ -611,10 +648,10 @@ class CUDATarget(TargetPlatform):
             "evb", (BufferDeclNode("const int", "ne", (), "1"),)
         )
 
-    def element_loop_nodes(self):
-        return self._grid_stride_nodes("element", ())
+    def element_loop_nodes(self, index="element", extent="nelements"):
+        return self._grid_stride_nodes(index, (), extent)
 
-    def _grid_stride_nodes(self, index, trailing):
+    def _grid_stride_nodes(self, index, trailing, extent="nelements"):
         kernel_iterator = iterator(index, "ptrdiff_t")
         return (
             LoopHeaderNode(
@@ -626,7 +663,7 @@ class CUDATarget(TargetPlatform):
                             "(ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x",
                             "cuda_thread_start",
                         ),
-                        expr_ref("nelements", "element_count"),
+                        expr_ref(extent, "element_count"),
                     ),
                     add_assign_increment(
                         kernel_iterator,
@@ -637,6 +674,12 @@ class CUDATarget(TargetPlatform):
             *trailing,
         )
 
+    def header_name(self, stem):
+        return "%s.cuh" % stem
+
+    def header_guard_suffix(self):
+        return "CUH"
+
     def mesh_function_line(self, implementation_name):
         return "__global__ void %s(" % implementation_name
 
@@ -644,10 +687,13 @@ class CUDATarget(TargetPlatform):
         """Nothing: a `__global__` kernel returns void."""
         return ()
 
-    def mesh_launch_lines(self, implementation_name, template_args, arguments, indent="  "):
+    def mesh_launch_lines(
+        self, implementation_name, template_args, arguments, indent="  ", extent="nelements"
+    ):
         return (
             "%sconst int block_size = 256;" % indent,
-            "%sconst int grid_size = (int)((nelements + block_size - 1) / block_size);" % indent,
+            "%sconst int grid_size = (int)((%s + block_size - 1) / block_size);"
+            % (indent, extent),
             "%ssfem::codegen::%s<%s><<<grid_size, block_size>>>(%s);"
             % (indent, implementation_name, template_args, ", ".join(arguments)),
             "%sreturn SFEM_SUCCESS;" % indent,

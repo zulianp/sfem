@@ -158,6 +158,28 @@ def _restrict_define_line(restrict_definition):
     return "#define RSTR"
 
 
+def tensor_product_kernels_header_source_for(target):
+    """`tensor_product_kernels`, spelled for one target.
+
+    The twin of `geometry_kernels_header_source_for`, and it exists for the
+    same reason: the residual emitter called the builder with its CPU defaults,
+    and a device target's work item is the literal `0`, so what came out was
+    `for (int 0 = 0; 0 < ne; ++0)`.  One place turns a target into this header.
+    """
+    inline_qualifier = target.inline_qualifier()
+    vectorize_pragma = target.vectorize_pragma()
+    policy = target.loop_lowering_policy()
+    return sfem_tensor_product_kernels_header_source(
+        inline_qualifier=inline_qualifier,
+        define_sfem_inline=inline_qualifier == "SFEM_INLINE",
+        restrict_definition=target.restrict_definition(),
+        work_item_index=target.work_item_index(),
+        simd_lines=() if vectorize_pragma is None else (vectorize_pragma,),
+        single_work_item=not policy.emits_lane_loop,
+        header_guard_suffix=target.header_guard_suffix(),
+    )
+
+
 def sfem_tensor_product_kernels_header_source(
     *,
     inline_qualifier=None,

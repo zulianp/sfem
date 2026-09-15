@@ -63,16 +63,6 @@ class KernelTarget(Enum):
     HIP = "hip"
 
 
-#: What a mesh kernel's translation unit is called for each target.  It is a
-#: fact about the target and it belongs beside the target, but `plans` is index
-#: 2 and `targets` is index 4, so the plan layer reads it off the enum it
-#: already holds rather than importing the platform to ask.
-MESH_SOURCE_EXTENSION = {
-    KernelTarget.CUDA: "cu",
-    KernelTarget.HIP: "hip",
-}
-
-
 class KernelScope(Enum):
     MONOLITHIC = "monolithic"
     BLOCK = "block"
@@ -95,6 +85,7 @@ class LocalKernelPlan:
     dim: int
     family: str
     suffix: str = ""
+    header_extension: str = "hpp"
 
     def __post_init__(self):
         prefix = str(self.prefix)
@@ -120,7 +111,7 @@ class LocalKernelPlan:
 
     @property
     def header(self):
-        return "%s_local.hpp" % self.name
+        return "%s_local.%s" % (self.name, self.header_extension)
 
     def to_dict(self):
         return {
@@ -166,14 +157,20 @@ class MeshKernelPlan:
         }
 
 
-def local_kernel_plan_for(prefix, dim, family, suffix=""):
+def local_kernel_plan_for(prefix, dim, family, suffix="", header_extension="hpp"):
     """The element-local header a kernel of this dimension and family gets.
 
     Naming is a structural decision -- it fixes which files exist and what each
     includes -- so it belongs to the plan rather than to whichever emitter runs
     first.  ``LocalKernelPlan.name`` and ``.header`` are the single definition.
     """
-    return LocalKernelPlan(prefix=prefix, dim=dim, family=family, suffix=suffix)
+    return LocalKernelPlan(
+        prefix=prefix,
+        dim=dim,
+        family=family,
+        suffix=suffix,
+        header_extension=header_extension,
+    )
 
 
 def mesh_kernel_plan_for_element(prefix, element_type):
@@ -196,13 +193,19 @@ def mesh_kernel_plan_for_element(prefix, element_type):
     return MeshKernelPlan(prefix=prefix, element_label=element_label)
 
 
-def mesh_kernel_plan_from_context(unit, context, prefix, *, element_label=None):
+def mesh_kernel_plan_from_context(
+    unit, context, prefix, *, element_label=None, source_extension="cpp"
+):
+    """The mesh kernel's name and translation unit.
+
+    `source_extension` comes from the backend rather than from `unit.target`,
+    which is not the generation's target: a CUDA run still reports
+    `KernelTarget.OPENMP` on the unit it emits.  The backend is the thing that
+    knows which target it is emitting for, and `plans` is index 2 while
+    `targets` is index 4, so it is handed down rather than asked for.
+    """
     label = _mesh_kernel_element_label(unit, context, element_label)
-    return MeshKernelPlan(
-        prefix,
-        label,
-        MESH_SOURCE_EXTENSION.get(getattr(unit, "target", None), "cpp"),
-    )
+    return MeshKernelPlan(prefix, label, source_extension)
 
 
 def _mesh_kernel_element_label(unit, context, element_label=None):
@@ -717,12 +720,13 @@ class KernelPlan:
             matrix_format_plan=matrix_format_plan,
         )
 
-    def local_kernel_plan(self, context, prefix, suffix=""):
+    def local_kernel_plan(self, context, prefix, suffix="", header_extension="hpp"):
         return LocalKernelPlan(
             prefix,
             context.specialization.dim,
             context.family,
             suffix,
+            header_extension,
         )
 
     def mesh_kernel_plan(self, context, prefix):

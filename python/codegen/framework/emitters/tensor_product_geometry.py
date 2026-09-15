@@ -84,6 +84,32 @@ def isoparametric_adjugate_lines(
     raise ValueError("isoparametric geometry supports dimensions 1, 2, and 3")
 
 
+def geometry_kernels_header_source_for(target):
+    """`geometry_kernels`, spelled for one target.
+
+    Every argument below is one of the target's own answers, so there is one
+    place that turns a target into this header.  There used to be three: the
+    OpenMP source builder passed its answers, `emitters/energy.py` carried a
+    125-line hand-written copy for CUDA, and the residual emitter called the
+    builder with its CPU defaults -- which under a device target produced
+    `for (int 0 = 0; 0 < ne; ++0)`, since the default work item is a lane name
+    and the device's is the literal `0`.  Two of those wrote
+    `geometry_kernels.cuh` with different contents.
+    """
+    inline_qualifier = target.inline_qualifier()
+    vectorize_pragma = target.vectorize_pragma()
+    policy = target.loop_lowering_policy()
+    return sfem_geometry_kernels_header_source(
+        inline_qualifier=inline_qualifier,
+        define_sfem_inline=inline_qualifier == "SFEM_INLINE",
+        restrict_definition=target.restrict_definition(),
+        work_item_index=target.work_item_index(),
+        simd_lines=() if vectorize_pragma is None else (vectorize_pragma,),
+        single_work_item=not policy.emits_lane_loop,
+        header_guard_suffix=target.header_guard_suffix(),
+    )
+
+
 def sfem_geometry_kernels_header_source(
     *,
     inline_qualifier=None,

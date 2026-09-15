@@ -141,12 +141,12 @@ from codegen.framework.forms.residual import (
 )
 from codegen.framework.emitters.tensor_product_geometry import (
     isoparametric_adjugate_call_lines,
-    sfem_geometry_kernels_header_source,
+    geometry_kernels_header_source_for,
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
     tensor_product_gradient_isoparametric_geometry_lines,
 )
-from codegen.framework.emitters.tensor_product_kernels import sfem_tensor_product_kernels_header_source
+from codegen.framework.emitters.tensor_product_kernels import tensor_product_kernels_header_source_for
 from codegen.framework.fem.geometry import GeometryMode
 from codegen.framework.targets import current_target
 from codegen.framework.fem.reference import (
@@ -387,6 +387,81 @@ def _mesh_loop_lines():
 
 def _atomic_update_pragma():
     return _target().atomic_update_pragma()
+
+
+def _math_header_source():
+    """`kernel_math`, spelled for the bound target.
+
+    The parameters are the target's answers rather than the CPU defaults the
+    function carries, which is why a device generation was writing a header
+    full of `SFEM_INLINE` under a `.cuh` name.
+    """
+    inline_qualifier = _target().inline_qualifier()
+    return _sfem_math_header_source(
+        _target().header_guard_suffix(),
+        inline_qualifier,
+        inline_qualifier == "SFEM_INLINE",
+    )
+
+
+def _diagnostics_header_source():
+    """`kernel_diagnostics`, spelled for the bound target.
+
+    Same reason as `_math_header_source`, plus one of its own: the dispatch
+    reporter prints to `stderr`, which device code has no notion of, so it
+    takes the target's *host* qualifier rather than its inline one.
+    """
+    inline_qualifier = _target().inline_qualifier()
+    return "\n".join(
+        _sfem_soa_diagnostics_header(
+            _target().diagnostic_work_item(),
+            _target().header_guard_suffix(),
+            inline_qualifier,
+            inline_qualifier == "SFEM_INLINE",
+            host_qualifier=_target().host_function_qualifier(),
+        )
+    )
+
+
+def _packed_thread_scratch_includes():
+    """The include that goes with `_packed_thread_scratch_files`.
+
+    Gated on the same answer, because emitting the header conditionally and
+    including it unconditionally is how fourteen device operators came to name
+    a file that was deliberately not written.
+    """
+    if not _target().loop_lowering_policy().parallel_element_loop:
+        return ()
+    return ('#include "%s"' % _header("packed_thread_scratch"),)
+
+
+def _packed_thread_scratch_files():
+    """The OpenMP thread-local scratch header, where the target has threads.
+
+    It preallocates per-thread scratch with `#pragma omp parallel`, and what
+    per-thread scratch means on a device is a design question rather than a
+    spelling one -- `HardcodedPragmaRatchetTest` records it as such.  A target
+    that runs no host parallel element loop gets no such header, rather than
+    one full of pragmas it cannot honour.
+    """
+    if not _target().loop_lowering_policy().parallel_element_loop:
+        return ()
+    return (
+        GeneratedKernelFile(
+            _header("packed_thread_scratch"),
+            _sfem_packed_thread_scratch_header_source(),
+        ),
+    )
+
+
+def _header(stem):
+    """What a generated header is called for the bound target.
+
+    The residual emitter spelled `.hpp` in twenty-two places, which is correct
+    for the only target it had ever run under and writes a file that collides
+    by path with the CPU tree's under any other.
+    """
+    return _target().header_name(stem)
 
 
 def _scatter_add_lines(lhs, rhs, indent="", pragma_indent=None):
@@ -1867,25 +1942,22 @@ def generate_coupled_residual_sfem_files(
         matrix_format_plan=matrix_format_plan,
         emit_diagnostics=diagnostics_plan is not None,
     )
-    diagnostics_name = "kernel_diagnostics.hpp"
+    diagnostics_name = _header("kernel_diagnostics")
     return (
-        GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
+        GeneratedKernelFile(_header("kernel_math"), _math_header_source()),
         GeneratedKernelFile(
-            "tensor_product_kernels.hpp",
-            sfem_tensor_product_kernels_header_source(),
+            _header("tensor_product_kernels"),
+            tensor_product_kernels_header_source_for(_target()),
         ),
         GeneratedKernelFile(
-            "geometry_kernels.hpp",
-            sfem_geometry_kernels_header_source(),
+            _header("geometry_kernels"),
+            geometry_kernels_header_source_for(_target()),
         ),
         GeneratedKernelFile(
             diagnostics_name,
-            "\n".join(_sfem_soa_diagnostics_header()),
+            _diagnostics_header_source(),
         ),
-        GeneratedKernelFile(
-            "packed_thread_scratch.hpp",
-            _sfem_packed_thread_scratch_header_source(),
-        ),
+        *_packed_thread_scratch_files(),
         GeneratedKernelFile(local_name, local_source),
         GeneratedKernelFile(operator_name, operator_source),
     ) + _reference_header_files(
@@ -1990,23 +2062,20 @@ def generate_mixed_residual_sfem_files(
         geometry_family=geometry_family,
     )
     return (
-        GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
+        GeneratedKernelFile(_header("kernel_math"), _math_header_source()),
         GeneratedKernelFile(
-            "tensor_product_kernels.hpp",
-            sfem_tensor_product_kernels_header_source(),
+            _header("tensor_product_kernels"),
+            tensor_product_kernels_header_source_for(_target()),
         ),
         GeneratedKernelFile(
-            "geometry_kernels.hpp",
-            sfem_geometry_kernels_header_source(),
+            _header("geometry_kernels"),
+            geometry_kernels_header_source_for(_target()),
         ),
         GeneratedKernelFile(
-            "kernel_diagnostics.hpp",
-            "\n".join(_sfem_soa_diagnostics_header()),
+            _header("kernel_diagnostics"),
+            _diagnostics_header_source(),
         ),
-        GeneratedKernelFile(
-            "packed_thread_scratch.hpp",
-            _sfem_packed_thread_scratch_header_source(),
-        ),
+        *_packed_thread_scratch_files(),
         GeneratedKernelFile(local_name, local_source),
         GeneratedKernelFile(operator_name, operator_source),
     ) + _reference_header_files(
@@ -2290,8 +2359,8 @@ def _local_header(
         "#define SFEM_GENERATED_SCALAR_T",
         "#endif",
         "#endif",
-        '#include "kernel_math.hpp"',
-        '#include "tensor_product_kernels.hpp"',
+        '#include "%s"' % _header("kernel_math"),
+        '#include "%s"' % _header("tensor_product_kernels"),
         "",
         *_inline_definition_lines(),
         *restrict_prelude(""),
@@ -5349,9 +5418,9 @@ def _operator_source(
         "#include <cstdlib>",
         "#include <string.h>",
         '#include "%s"' % local_name,
-        '#include "geometry_kernels.hpp"',
-        '#include "kernel_diagnostics.hpp"',
-        '#include "packed_thread_scratch.hpp"',
+        '#include "%s"' % _header("geometry_kernels"),
+        '#include "%s"' % _header("kernel_diagnostics"),
+        *_packed_thread_scratch_includes(),
         *_reference_includes(
             (affine_specialization.quadrature_rule, rule),
             sfem_mesh_reference_data,
@@ -5585,9 +5654,9 @@ def _mixed_operator_source(
                 cell_rule, system, field_element_types, basis_family
             ),
         ),
-        '#include "kernel_math.hpp"',
-        '#include "geometry_kernels.hpp"',
-        '#include "kernel_diagnostics.hpp"',
+        '#include "%s"' % _header("kernel_math"),
+        '#include "%s"' % _header("geometry_kernels"),
+        '#include "%s"' % _header("kernel_diagnostics"),
         "",
         *restrict_prelude(""),
         *_inline_definition_lines(),
@@ -7162,7 +7231,7 @@ def _compatible_matrix_field_indices_from_prefix(prefix, system, element_type):
 
 def _crs_find_cols_lines(function_base, n_shape):
     lines = [
-        "static SFEM_INLINE void %s_find_cols(" % function_base,
+        "%s void %s_find_cols(" % (_function_qualifier(), function_base),
         "    const idx_t *const RSTR targets,",
         "    const idx_t *const RSTR row,",
         "    const int lenrow,",
@@ -7231,7 +7300,7 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
     )
     return _crs_find_cols_lines(function_base, n_shape) + [
         "template <typename s_t>",
-        "static SFEM_INLINE void %s_scatter_crs(" % function_base,
+        "%s void %s_scatter_crs(" % (_function_qualifier(), function_base),
         "    const idx_t *const RSTR ev,",
         "    const s_t *const RSTR element_matrix,",
         "    const count_t *const RSTR %s," % row_pointer,
@@ -7264,7 +7333,7 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
     shape_offsets = _compatible_stream_shape_offsets(n_fields, n_shape)
     return _crs_find_cols_lines(function_base, n_shape) + [
         "template <typename s_t>",
-        "static SFEM_INLINE void %s_scatter_crs(" % function_base,
+        "%s void %s_scatter_crs(" % (_function_qualifier(), function_base),
         "    const idx_t *const RSTR ev,",
         "    const s_t *const RSTR element_matrix,",
         "    const count_t *const RSTR rowptr,",
@@ -7327,7 +7396,7 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
 
 def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_streams, column_streams):
     lines = [
-        "static SFEM_INLINE idx_t %s_packed_global_node(" % function_base,
+        "%s idx_t %s_packed_global_node(" % (_function_qualifier(), function_base),
         "    const uint16_t packed_node,",
         "    const ptrdiff_t pack,",
         "    const ptrdiff_t *const RSTR owned_nodes_ptr,",
@@ -7338,7 +7407,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
         "}",
         "",
         "template <typename s_t>",
-        "static SFEM_INLINE void %s_discover_packed_crs_entries(" % function_base,
+        "%s void %s_discover_packed_crs_entries(" % (_function_qualifier(), function_base),
         "    const idx_t *const RSTR ev,",
         "    const count_t *const RSTR rowptr,",
         "    const idx_t *const RSTR colidx,",
@@ -7361,7 +7430,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
         lines.extend(
             [
                 "template <typename s_t>",
-                "static SFEM_INLINE void %s_scatter_packed_crs_entries(" % function_base,
+                "%s void %s_scatter_packed_crs_entries(" % (_function_qualifier(), function_base),
                 "    const s_t *const RSTR element_matrix,",
                 "    const count_t *const RSTR entries,",
                 "    s_t *const RSTR values) {",
@@ -7387,7 +7456,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
     lines.extend(
         [
             "template <typename s_t>",
-            "static SFEM_INLINE void %s_scatter_packed_crs_entries(" % function_base,
+            "%s void %s_scatter_packed_crs_entries(" % (_function_qualifier(), function_base),
             "    const s_t *const RSTR element_matrix,",
             "    const count_t *const RSTR entries,",
             "    s_t *const RSTR values) {",

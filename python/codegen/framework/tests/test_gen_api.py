@@ -60,6 +60,7 @@ from ..materials.neumann import material as neumann
 from ..materials.poro_hyperelasticity import material as poro_hyperelasticity
 from ..materials.stokes import material as stokes
 from ..materials.two_phase_flow import material as two_phase_flow
+from ..materials.navier_stokes import material as navier_stokes
 from ..generators.stokes import validate_m6_4 as validate_stokes_m6_4
 from ..emitters.tensor_product_geometry import (
     tensor_product_evaluated_isoparametric_geometry_lines,
@@ -1037,7 +1038,7 @@ class GenApiTest(unittest.TestCase):
         self.assertNotIn(sp.Symbol("u_direction"), matrix[0][1].dependencies.symbols)
 
     def test_backend_rejects_coefficients_not_declared_by_form_metadata(self):
-        from ..backends.openmp import _validate_coefficient_dependencies
+        from ..backends.soa import _validate_coefficient_dependencies
         from ..forms.residual import WeakResidualCoefficients
 
         coeffs = (WeakResidualCoefficients("u", sp.Symbol("mu"), (sp.S.Zero, sp.S.Zero)),)
@@ -2698,6 +2699,35 @@ int main() {
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)
             self.assertNotIn("lane", operator_source)
+
+    def test_cuda_reaches_every_kernel_family(self):
+        """All four families emit CUDA, not just the energy one.
+
+        `CUDASoABackend` accepted `energy_soa` units and raised on everything
+        else.  That was never a statement about the residual, mixed-order or
+        boundary families -- it was that the traversal which lowers them lived
+        behind `OpenMPSoABackend`, and that their emitters wrote the mesh loop,
+        the kernel signature, the scatter and the launch by hand in the CPU's
+        spelling.
+
+        One material per family, and a `.cu` operator from each is the whole
+        assertion: `_validate_cuda_source_contract` checks the rest, and it now
+        runs on all four.
+        """
+        cases = (
+            ("energy", laplace, ("TET4",)),
+            ("residual", two_phase_flow, ("TRI3",)),
+            ("mixed_residual", navier_stokes, ("TRI6_TRI3",)),
+            ("boundary_residual", neumann, ("TRI3",)),
+        )
+        for family, material, elements in cases:
+            with self.subTest(family=family):
+                with tempfile.TemporaryDirectory() as out_dir:
+                    result = gen.generate(
+                        material, out_dir, elements=elements, target="cuda"
+                    )
+                    operators = [path for path in result.sources if path.endswith(".cu")]
+                    self.assertTrue(operators, "%s emitted no CUDA operator" % family)
 
     def test_cuda_operators_open_every_mesh_loop_on_the_device(self):
         """No `__global__` kernel may walk the mesh serially.

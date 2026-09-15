@@ -354,7 +354,15 @@ def mesh_loop_lines(target, indent="  "):
     return _indented_nodes(target.mesh_loop_nodes(), "mesh_loop", indent)
 
 
-def element_loop_lines(target, pragma_indent="", indent="  ", reduction=None):
+def element_loop_lines(
+    target,
+    pragma_indent="",
+    indent="  ",
+    reduction=None,
+    index="element",
+    extent="nelements",
+    schedule="static",
+):
     """The target's scalar pass over the mesh, spelled.
 
     `pragma_indent` exists only because the tracked tree spells the parallel-for
@@ -365,9 +373,9 @@ def element_loop_lines(target, pragma_indent="", indent="  ", reduction=None):
     return (
         *(
             "%s%s" % (pragma_indent, pragma)
-            for pragma in target.parallel_element_loop_lines("static", reduction)
+            for pragma in target.parallel_element_loop_lines(schedule, reduction)
         ),
-        *_indented_nodes(target.element_loop_nodes(), "element_loop", indent),
+        *_indented_nodes(target.element_loop_nodes(index, extent), "element_loop", indent),
     )
 
 
