@@ -243,6 +243,7 @@ def local_kernel_stream_plans(
     stream_layout="pointer",
     grad_ref_name=None,
     needs_reference_basis=True,
+    reads_shape_values=True,
     output=None,
 ):
     """Which streams cross a local kernel's boundary, and in what order.
@@ -267,9 +268,13 @@ def local_kernel_stream_plans(
     a kernel that evaluates in closed form has the basis gradients folded into
     its arithmetic as constants, so it is handed no shape table, no reference
     gradients and no quadrature weights -- and taking them would be three dead
-    parameters at every call site.  ``output`` replaces the per-degree-of-freedom
-    output streams with a single stream, which is what a kernel that fills an
-    element matrix writes to.
+    parameters at every call site.  ``reads_shape_values`` is the finer question
+    for a kernel that does take reference data: the shape *values* are read only
+    where a form contracts a test function's value or substitutes a trial
+    function's, and a kernel that does neither would otherwise name a table it
+    never touches.  ``output`` replaces the per-degree-of-freedom output streams
+    with a single stream, which is what a kernel that fills an element matrix
+    writes to.
     """
     streams = []
 
@@ -327,13 +332,14 @@ def local_kernel_stream_plans(
         # A gradient-metric kernel contracts the basis into the metric before
         # it is called, so it is handed no reference basis at all.
         if not uses_gradient_metric and needs_reference_basis:
-            streams.append(
-                DataStreamPlan(
-                    name="shape",
-                    role=DataStreamRole.REFERENCE,
-                    layout=DataStreamLayout.SCALAR,
+            if reads_shape_values:
+                streams.append(
+                    DataStreamPlan(
+                        name="shape",
+                        role=DataStreamRole.REFERENCE,
+                        layout=DataStreamLayout.SCALAR,
+                    )
                 )
-            )
             if dependencies.uses_reference_gradients:
                 streams.extend(
                     DataStreamPlan(

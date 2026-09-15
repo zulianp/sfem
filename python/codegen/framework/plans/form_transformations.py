@@ -144,6 +144,14 @@ def _gradient_metric_dependencies(fields, coefficients, dependencies):
 
 
 def constant_p1_simplex_reference_gradients(rule):
+    """The constant reference gradients of a lowest-order simplex rule, or None.
+
+    `None` in, `None` out: a caller that has no rule -- because the element has
+    no constant-P1 specialisation -- asks anyway and reads the answer, rather
+    than guarding the call and making the same decision a second time.
+    """
+    if rule is None:
+        return None
     return _constant_reference_gradients(rule) if _is_constant_p1_simplex_rule(rule) else None
 
 

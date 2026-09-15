@@ -25,6 +25,7 @@ from codegen.framework.emitters.runtime_typed_abi import (
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
+    substituted_trial_quantities,
     contracted_gradient_components,
     live_gradient_directions,
     contracted_test_quantities,
@@ -107,9 +108,14 @@ from codegen.framework.plans.residual_structure import (
     residual_mesh_phase_plans,
 )
 from codegen.framework.plans.direct_assembly import (
-    assembles_in_closed_form,
     closed_form_assembly_admits,
+    quadrature_assembly_admits,
+    sum_factorized_assembly_admits,
     trial_direction_substitution,
+)
+from codegen.framework.plans.evaluation_strategy import (
+    EvaluationStrategy,
+    evaluation_strategy,
 )
 from codegen.framework.plans.geometry_variants import packed_kernel_forms
 from codegen.framework.plans.streams import field_stream_layout
@@ -1808,6 +1814,9 @@ def generate_coupled_residual_sfem_files(
         action_coeffs,
         basis_family=family,
         matrix_format_plan=matrix_format_plan,
+        matrix_block=_ElementMatrixBlock(
+            *_compatible_matrix_field_indices_from_prefix(prefix, system, element_type)
+        ),
     )
     operator_source = _operator_source(
         system,
@@ -1974,112 +1983,196 @@ def generate_mixed_residual_sfem_files(
 
 
 @dataclass(frozen=True)
-class _ClosedFormElementMatrixKernel:
-    """The closed-form element-matrix kernel of one local header.
+class _ElementMatrixBlock:
+    """Which fields this matrix has rows and columns for, and where they land.
+
+    A coupled system publishes one matrix per Jacobian block as well as the
+    whole square, and a block is not a smaller version of the square: its rows
+    are one field's, its columns another's, and its stride is its own.  Stating
+    that once here is what lets the three assembly shapes write their entries
+    without any of them knowing whether it is assembling a block or everything.
+    """
+
+    row_fields: tuple
+    column_fields: tuple
+
+    @property
+    def columns(self):
+        """The matrix's row stride, in shape functions."""
+        return "%d * NS" % len(self.column_fields)
+
+    @property
+    def entries(self):
+        return "%d * NS * %s" % (len(self.row_fields), self.columns)
+
+    def entry(self, row_field, column_field, test, trial):
+        """Where the `(test, trial)` entry of one field pair lives."""
+        return "element_matrix[(%d * NS + %s) * %s + %d * NS + %s]" % (
+            self.row_fields.index(row_field),
+            test,
+            self.columns,
+            self.column_fields.index(column_field),
+            trial,
+        )
+
+    def row(self, row_field, test):
+        """The matrix row one test degree of freedom writes."""
+        return "(%d * NS + %s) * %s" % (
+            self.row_fields.index(row_field), test, self.columns
+        )
+
+    def column(self, column_field, trial):
+        """The matrix column one trial degree of freedom fills."""
+        return "%d * NS + %s" % (self.column_fields.index(column_field), trial)
+
+
+def _whole_square_block(system, n_shape):
+    """The block a matrix over every field is: all of them, both ways."""
+    fields = tuple(range(len(system.fields)))
+    return _ElementMatrixBlock(row_fields=fields, column_fields=fields)
+
+
+@dataclass(frozen=True)
+class _ElementMatrixKernel:
+    """One element-matrix kernel of a local header.
 
     Asked for by both the header that defines it and the operator source that
     calls it, so the two cannot disagree about whether there is one, what it is
-    called, or which element it was built for.
+    called, or which shape it was built in.
     """
 
     name: str
+    strategy: EvaluationStrategy
     specialization: object
-    reference_gradients: tuple
-    row_streams: tuple
-    column_streams: tuple
+    block: _ElementMatrixBlock
+    reference_gradients: tuple = ()
 
 
-def _closed_form_element_matrix_kernel(
+def _element_matrix_kernels(
     system,
     local_prefix,
     specialization,
     action_coeffs,
     action_dependencies,
     matrix_format_plan,
+    block,
     basis_family=None,
     mixed=False,
 ):
-    """The closed-form element-matrix kernel for this local header, or None.
+    """Every element-matrix kernel this local header defines, by strategy.
 
-    It is the constant-P1 specialisation of a simplex header -- the same
-    specialisation the apply already has, reached the same way -- so a TET4 and
-    a TET10 operator sharing one header both name the TET4 kernel and the file
-    comes out identical for either.  Whether a given *operator* may call it is a
-    second question, and `plans.direct_assembly.assembles_in_closed_form` of its
-    own element answers that at the call site.
+    A simplex header serves more than one element -- TET4 and TET10 share one --
+    and they do not assemble the same way, so it can define more than one.
 
-    Whether there is one at all is `plans.direct_assembly`'s answer, asked once
-    and read here.  This spells the kernel; it does not decide it.
+    The closed-form kernel is the constant-P1 specialisation of the header, the
+    same specialisation the apply already has and reached the same way, so a
+    TET4 and a TET10 run both name the TET4 kernel and the file comes out
+    identical for either.  The quadrature kernel is generic: its trial and test
+    shapes are run-time loops over `NS` and its points a loop over `NQ`, both
+    template parameters, so one body serves every simplex of its dimension.
+
+    Which of them a given *operator* calls is a second question, answered at the
+    call site by `plans.evaluation_strategy` of its own element.  Whether either
+    exists at all is `plans.direct_assembly`'s answer, asked once and read here.
+    This spells the kernels; it does not decide them.
     """
-    specialized = (
-        None
-        if mixed
-        else _constant_p1_affine_specialized_local(local_prefix, specialization)
-    )
-    if specialized is None:
-        return None
-    specialized_prefix, specialized_specialization = specialized
-    rule = specialized_specialization.quadrature_rule
-    reference_gradients = constant_p1_simplex_reference_gradients(rule)
-    n_fields = len(system.fields)
-    streams = _compatible_matrix_stream_indices(
-        tuple(range(n_fields)), int(rule.n_shape), n_fields
-    )
-    admitted = closed_form_assembly_admits(
-        element_type=rule.element_type,
+    if mixed:
+        return {}
+    shared = dict(
         tensor_product=is_tensor_product_family(basis_family),
         matrix_formats=published_matrix_formats(matrix_format_plan),
         coefficients=action_coeffs,
         dependencies=action_dependencies,
         field_names=tuple(field.name for field in system.fields),
         dim=system.dim,
-        reference_gradients=reference_gradients,
-        n_entries=len(streams) * len(streams),
     )
-    if not admitted:
-        return None
-    return _ClosedFormElementMatrixKernel(
-        name="%s_hessian_block" % specialized_prefix,
-        specialization=specialized_specialization,
-        reference_gradients=reference_gradients,
-        row_streams=streams,
-        column_streams=streams,
+    kernels = {}
+
+    # Asked and read, not guarded.  The constant-P1 specialisation may not
+    # exist, and every step below answers for a missing one rather than making
+    # the same decision a second time: no rule means no reference gradients, and
+    # no reference gradients is the first thing the plan's test refuses.
+    closed_form_prefix, closed_form_specialization = (
+        _constant_p1_affine_specialized_local(local_prefix, specialization)
+        or (None, None)
     )
+    closed_form_rule = getattr(closed_form_specialization, "quadrature_rule", None)
+    reference_gradients = constant_p1_simplex_reference_gradients(closed_form_rule)
+    closed_form_admitted = closed_form_assembly_admits(
+        element_type=getattr(closed_form_rule, "element_type", None),
+        reference_gradients=reference_gradients,
+        n_entries=len(block.row_fields)
+        * len(block.column_fields)
+        * int(getattr(closed_form_rule, "n_shape", 0)) ** 2,
+        **shared
+    )
+    if closed_form_admitted:
+        kernels[EvaluationStrategy.EXPANDED] = _ElementMatrixKernel(
+            name="%s_hessian_block" % closed_form_prefix,
+            strategy=EvaluationStrategy.EXPANDED,
+            specialization=closed_form_specialization,
+            block=block,
+            reference_gradients=reference_gradients,
+        )
+
+    for strategy, admits in (
+        (EvaluationStrategy.QUADRATURE, quadrature_assembly_admits),
+        (EvaluationStrategy.SUM_FACTORIZED, sum_factorized_assembly_admits),
+    ):
+        # A header is one family, so at most one of these answers yes; both are
+        # asked because which one it is belongs to the plan.
+        if admits(**shared):
+            kernels[strategy] = _ElementMatrixKernel(
+                name="%s_hessian_block" % local_prefix,
+                strategy=strategy,
+                specialization=specialization,
+                block=block,
+            )
+    return kernels
 
 
-def _closed_form_element_matrix_function(
+def _element_matrix_functions(
     system,
     local_prefix,
     specialization,
     action_coeffs,
     action_dependencies,
     matrix_format_plan,
+    block,
     basis_family=None,
     mixed=False,
 ):
-    """The lines defining that kernel, or none if there is no such kernel."""
-    kernel = _closed_form_element_matrix_kernel(
+    """The lines defining them, in a fixed order, or none if there are none."""
+    kernels = _element_matrix_kernels(
         system,
         local_prefix,
         specialization,
         action_coeffs,
         action_dependencies,
         matrix_format_plan,
+        block,
         basis_family=basis_family,
         mixed=mixed,
     )
-    if kernel is None:
-        return []
-    return ["", *_element_matrix_function(
-        system,
-        kernel.name,
-        kernel.specialization,
-        action_coeffs,
-        action_dependencies,
-        kernel.reference_gradients,
-        kernel.row_streams,
-        kernel.column_streams,
-    )]
+    lines = []
+    for strategy in (
+        EvaluationStrategy.EXPANDED,
+        EvaluationStrategy.QUADRATURE,
+        EvaluationStrategy.SUM_FACTORIZED,
+    ):
+        kernel = kernels.get(strategy)
+        if kernel is None:
+            continue
+        lines.append("")
+        lines.extend(
+            _element_matrix_function(
+                system,
+                kernel,
+                action_coeffs,
+                action_dependencies,
+            )
+        )
+    return lines
 
 
 def _local_header(
@@ -2091,6 +2184,7 @@ def _local_header(
     basis_family=None,
     field_element_types=None,
     matrix_format_plan=None,
+    matrix_block=None,
 ):
     """The element-local header for one kernel.
 
@@ -2286,13 +2380,14 @@ def _local_header(
             )
         )
     lines.extend(
-        _closed_form_element_matrix_function(
+        _element_matrix_functions(
             system,
             local_prefix,
             specialization,
             action_coeffs,
             action_dependencies,
             matrix_format_plan,
+            matrix_block or _whole_square_block(system, rule.n_shape),
             basis_family=basis_family,
             mixed=mixed,
         )
@@ -3100,14 +3195,456 @@ def _local_function(
     )
 
 
+def _counted_loop_node(name, count, body):
+    """A loop over a fixed count -- the entries of a square, not a shape."""
+    index = iterator(name, "int")
+    return LoopNode(
+        LoopKind.SCATTER,
+        index,
+        iteration_range(0, expr_ref(str(count))),
+        pre_increment(index),
+        body=tuple(body),
+    )
+
+
+
+
+#: How a tensor-product element's shape and quadrature indices decompose into
+#: their one-dimensional factors.  `q` is `qx + NQ1 * (qy + NQ1 * qz)` and a
+#: shape `sx + NS1 * (sy + NS1 * sz)`, which is the order
+#: `tensor_product_kernels.hpp` builds and reads them in; the table states it
+#: once instead of at each of the sites that has to take one apart.
+#: `{index}` is the flat index and `{extent}` its per-dimension count, so the
+#: two callers -- the quadrature point and the trial shape -- read one table.
+_TENSOR_INDEX_DECOMPOSITION = {
+    2: ("{index} % {extent}", "{index} / {extent}"),
+    3: (
+        "{index} % {extent}",
+        "({index} / {extent}) % {extent}",
+        "{index} / ({extent} * {extent})",
+    ),
+}
+
+
+def _tensor_index_nodes(name, extent, dim):
+    """`name_x`, `name_y`, `name_z` from a flat `name`, for this dimension."""
+    return [
+        BufferDeclNode(
+            "const int",
+            "%s_%s" % (name, letter),
+            (),
+            expr_ref(
+                _TENSOR_INDEX_DECOMPOSITION[dim][axis].format(
+                    index=name, extent="%s1" % extent
+                )
+            ),
+        )
+        for axis, letter in enumerate(_TENSOR_AXES[:dim])
+    ]
+
+
+def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
+    """Every entry of the element matrix, one column at a time, factorised.
+
+    The shape for a tensor-product element, and the reason it is not either of
+    the other two is complexity.  Contracting the test functions point by point
+    is `NQ * NS` work per column, which is `p^6` for a degree-`p` element;
+    `tensor_integrate` is the same contraction taken one dimension at a time, at
+    `p^4`, and it is the routine the matrix-free apply on this element already
+    calls.  The state is evaluated the same way, once, by `tensor_evaluate` --
+    also the apply's routine.  Reproducing either by other means here would be a
+    second implementation of the element's evaluation strategy.
+
+    Still not probing, and here the difference is largest.  Probing calls the
+    operator once per column, so the state evaluation -- itself a sum
+    factorisation over every quadrature point -- is repeated for all twenty-four
+    columns of a HEX8 block and all but one value of each is discarded.  This
+    evaluates the state once and the *flux* per column, with the direction taken
+    to be the trial basis function: `plans.direct_assembly`'s substitution, made
+    at generation time.
+
+    A trial basis function needs no contraction of its own.  It is a product of
+    one-dimensional factors, so its reference gradient is that product with one
+    factor differentiated -- `_basis_gradient_nodes` spells it -- and evaluating
+    it through `tensor_evaluate` on a unit vector, which is what probing does,
+    is `p^4` work to recover something already in closed form.
+
+    One element per call.  The column pointers are bound into `element_matrix`
+    with no work-item index, so `ne` must be 1, which is what the mesh loop
+    passes.
+    """
+    dim = system.dim
+    n_fields = len(system.fields)
+    assembled = assembled_matrix_dependencies(dependencies)
+    templates = ("s_t", "NQ", "NS", "VS", "ND", "NC")
+    quantities = contracted_test_quantities(dependencies)
+    uses_determinant = uses_geometry_values(dependencies)
+
+    nodes = [
+        _counted_loop_node(
+            "entry",
+            block.entries,
+            [AssignmentNode(expr_ref("element_matrix[entry]"), expr_ref("s_t(0)"))],
+        )
+    ]
+
+    # The state at every quadrature point, once, through the apply's own
+    # routine.  Probing paid for this per column.
+    for group in _dependency_stream_groups(assembled):
+        uses_gradient = getattr(assembled, "%s_gradient" % group.name)
+        nodes.append(
+            BufferDeclNode("s_t", "%s_value" % group.name, ("NC * NQ * VS",))
+        )
+        if uses_gradient:
+            nodes.append(
+                BufferDeclNode(
+                    "s_t", "%s_grad_ref" % group.name, ("NC * NQ * ND * VS",)
+                )
+            )
+            nodes.append(
+                CallNode(
+                    "tensor_evaluate_contiguous",
+                    ("ne", "shape_1d", "grad_1d", group.name,
+                     "%s_value" % group.name, "%s_grad_ref" % group.name),
+                    templates,
+                    wrap_arguments=True,
+                )
+            )
+        else:
+            nodes.append(
+                CallNode(
+                    "tensor_evaluate_value_contiguous",
+                    ("ne", "shape_1d", group.name, "%s_value" % group.name),
+                    templates,
+                    wrap_arguments=True,
+                )
+            )
+
+    nodes.append(BufferDeclNode("s_t", "value_coeff", ("NC * NQ * VS",)))
+    nodes.extend(
+        BufferDeclNode("s_t", "grad_coeff_ref", ("NC * NQ * ND * VS",))
+        for quantity in quantities
+        if quantity == "gradient"
+    )
+    nodes.extend(
+        [
+            BufferDeclNode(
+                "static constexpr int", "NQ1", (), expr_ref("integer_root(NQ, ND)")
+            ),
+            BufferDeclNode(
+                "static constexpr int", "NS1", (), expr_ref("integer_root(NS, ND)")
+            ),
+            # Where this column lands.  `tensor_integrate` accumulates through a
+            # stream per degree of freedom, so pointing those streams straight
+            # into the matrix writes the column without a scratch vector and a
+            # copy after it.
+            BufferDeclNode("s_t *", "column", ("NC * NS",)),
+        ]
+    )
+
+    entry_point, arguments = _TENSOR_INTEGRATE_BY_QUANTITIES[quantities]
+    # The trial function's value, where the flux contracts it: on this element
+    # it is the product of the one-dimensional factors, as its gradient is.
+    trial_value_nodes = [
+        BufferDeclNode(
+            "const s_t",
+            "trial_value",
+            (),
+            expr_ref(
+                " * ".join(
+                    "shape_1d[q_%s * NS1 + trial_%s]" % (letter, letter)
+                    for letter in _TENSOR_AXES[:dim]
+                )
+            ),
+        )
+        for quantity in substituted_trial_quantities(dependencies)
+        if quantity == "value"
+    ]
+    for trial_component in block.column_fields:
+        column = _trial_substituted_coefficients(
+            system,
+            coefficients,
+            trial_component,
+            [sp.Symbol("trial_grad%d" % d) for d in range(dim)],
+            sp.Symbol("trial_value") if trial_value_nodes else None,
+        )
+
+        quadrature_body = list(_tensor_index_nodes("q", "NQ", dim))
+        quadrature_body.append(
+            BufferDeclNode(
+                "const s_t",
+                "qw",
+                (),
+                expr_ref(
+                    " * ".join(
+                        "q_weight_1d[q_%s]" % letter
+                        for letter in _TENSOR_AXES[:dim]
+                    )
+                ),
+            )
+        )
+        lane_body = []
+        if uses_determinant:
+            quadrature_body.append(
+                BufferDeclNode(
+                    "const s_t *const RSTR", "det_q", (),
+                    expr_ref("determinant + q * geometry_stride"),
+                )
+            )
+            lane_body.append(
+                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _wi()))
+            )
+        for i in _adjugate_components(dependencies, dim):
+            quadrature_body.append(
+                BufferDeclNode(
+                    "const s_t *const RSTR", "adj_q%d" % i, (),
+                    expr_ref("adjugate[%d] + q * geometry_stride" % i),
+                )
+            )
+            lane_body.append(
+                BufferDeclNode(
+                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
+                )
+            )
+        field_hoists, field_aliases = _tensor_field_alias_nodes(system, assembled)
+        quadrature_body.extend(field_hoists)
+        lane_body.extend(field_aliases)
+        lane_body.extend(
+            _basis_gradient_nodes(
+                "trial_grad",
+                "trial",
+                dim,
+                directions=tuple(live_gradient_directions(dependencies, dim)),
+                tensor_product=True,
+            )
+        )
+        lane_body.extend(trial_value_nodes)
+        lane_body.extend(
+            _coefficient_evaluation_nodes(system, column, dependencies)
+        )
+        for row in block.row_fields:
+            value = _VALUE_COEFFICIENT_TERM[
+                bool(dependencies.value_coefficients[row])
+            ](row)
+            quadrature_body.append(
+                BufferDeclNode(
+                    "s_t *const RSTR", "value_coeff_q%d" % row, (),
+                    expr_ref(
+                        "&value_coeff[%s * VS]"
+                        % c_group(c_sum(c_product(row, "NQ"), "q"))
+                    ),
+                )
+            )
+            lane_body.append(
+                AssignmentNode(
+                    expr_ref(('value_coeff_q%d' + _wi()) % row), expr_ref(value)
+                )
+            )
+            for k in contracted_gradient_components(dependencies, dim):
+                terms = [
+                    "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
+                    for d in range(dim)
+                    if dependencies.gradient_coefficients[row][d]
+                ]
+                value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
+                quadrature_body.append(
+                    BufferDeclNode(
+                        "s_t *const RSTR", "grad_coeff_ref_q%d_%d" % (row, k), (),
+                        expr_ref(
+                            "&grad_coeff_ref[%s * VS]"
+                            % c_group(
+                                c_sum(
+                                    c_product(
+                                        c_group(c_sum(c_product(row, "NQ"), "q")), "ND"
+                                    ),
+                                    k,
+                                )
+                            )
+                        ),
+                    )
+                )
+                lane_body.append(
+                    AssignmentNode(
+                        expr_ref(('grad_coeff_ref_q%d_%d' + _wi()) % (row, k)),
+                        expr_ref(value),
+                    )
+                )
+        quadrature_body.append(_work_item_loop_node(lane_body))
+
+        trial_body = list(_tensor_index_nodes("trial", "NS", dim))
+        quadrature = iterator("q", "int")
+        trial_body.append(
+            LoopNode(
+                LoopKind.QUADRATURE,
+                quadrature,
+                iteration_range(0, expr_ref("NQ", "quadrature_count")),
+                pre_increment(quadrature),
+                body=tuple(quadrature_body),
+            )
+        )
+        trial_body.append(
+            _shape_loop_node(
+                "out_shape",
+                [
+                    AssignmentNode(
+                        expr_ref("column[out_shape * NC + %d]" % row),
+                        expr_ref(
+                            "&%s"
+                            % block.entry(row, trial_component, "out_shape", "trial")
+                        ),
+                    )
+                    for row in block.row_fields
+                ],
+            )
+        )
+        trial_body.append(
+            CallNode(
+                entry_point % "",
+                tuple(
+                    "column" if argument == "output" else argument
+                    for argument in arguments
+                ),
+                templates,
+                wrap_arguments=True,
+            )
+        )
+        nodes.append(_shape_loop_node("trial", trial_body))
+    return tuple(nodes)
+
+
+def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
+    """Every entry of the element matrix, a quadrature point at a time.
+
+    The shape for an element that does not evaluate in closed form.  The state
+    and the geometry are read once per quadrature point, as every kernel of this
+    family does; what loops is the trial degree of freedom, because the element
+    has more of them than is worth spelling -- ten shape functions on TET10,
+    where the closed form would be a 900-entry elimination.
+
+    Still not probing, and the difference is what is inside the loop.  Probing
+    calls the *operator* once per column, so the geometry, the state gather and
+    the whole test contraction are repeated inside every one of those calls and
+    all but one value of each is thrown away.  This evaluates the *flux* with
+    the direction taken to be the trial basis function -- `plans.direct_assembly`'s
+    substitution, made at generation time -- with the state and the geometry
+    already in hand.
+
+    The trial component is unrolled and the trial shape is not.  Unrolling the
+    component is what lets the substitution put a literal zero where the basis
+    function has no gradient, which is two thirds of the direction on a
+    three-field system; keeping it would need a run-time array for the flux to
+    index instead, and every term would survive into the arithmetic.  The shape
+    stays a loop because that is what keeps the body independent of the element:
+    `NS` and `NQ` are template parameters, so one body serves every simplex of
+    its dimension, which is what lets TET4 and TET10 share a header.
+
+    One element per call.  The entries carry no work-item index, so `ne` must be
+    1, which is what the mesh loop passes.  Blocking the assembly over elements
+    would mean giving the matrix a lane index and the scatter that reads it a
+    stride.
+    """
+    dim = system.dim
+    n_fields = len(system.fields)
+    assembled = assembled_matrix_dependencies(dependencies)
+    usage = _simplex_field_usage(system, assembled)
+    directions = tuple(live_gradient_directions(dependencies, dim))
+
+    body = [
+        _counted_loop_node(
+            "entry",
+            block.entries,
+            [AssignmentNode(expr_ref("element_matrix[entry]"), expr_ref("s_t(0)"))],
+        )
+    ]
+    body.extend(_simplex_state_staging_nodes(system, assembled, usage))
+    body.extend(
+        BufferDeclNode("s_t", "%s_values" % name, ("VS",))
+        for row in range(n_fields)
+        for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
+    )
+
+    # A flux may contract the direction's value as well as its gradient.  Where
+    # the shape table is in hand the trial function's value is one lookup, so
+    # the substitution covers it; `substituted_trial_quantities` is the plan's
+    # sequence and this walks it.
+    trial_value_nodes = [
+        BufferDeclNode(
+            "const s_t", "trial_value", (), expr_ref("shape[q * NS + trial]")
+        )
+        for quantity in substituted_trial_quantities(dependencies)
+        if quantity == "value"
+    ]
+    trial_body = []
+    for trial_component in block.column_fields:
+        column = _trial_substituted_coefficients(
+            system,
+            coefficients,
+            trial_component,
+            [sp.Symbol("trial_grad%d" % d) for d in range(dim)],
+            sp.Symbol("trial_value") if trial_value_nodes else None,
+        )
+        # The transform is rebuilt per trial component rather than staged: it is
+        # a handful of multiplies and one divide per field direction, while the
+        # material block beside it is thousands of operations, and staging it
+        # would cost a buffer per field and role.
+        material = list(_simplex_state_transform_nodes(system, assembled, usage))
+        material.extend(
+            _basis_gradient_nodes("trial_grad", "trial", dim, directions=directions)
+        )
+        material.extend(trial_value_nodes)
+        material.extend(_coefficient_evaluation_nodes(system, column, dependencies))
+        material.extend(
+            AssignmentNode(expr_ref(('%s_values' + _wi()) % name), expr_ref(name))
+            for row in range(n_fields)
+            for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
+        )
+        trial_body.append(_work_item_loop_node(material))
+
+        test_body = list(_geometry_value_nodes(dependencies, dim))
+        test_body.extend(_test_value_nodes(dependencies))
+        test_body.extend(
+            _basis_gradient_nodes("test_grad", "test", dim, directions=directions)
+        )
+        for row in block.row_fields:
+            terms = [
+                ('%s_values' + _wi() + ' * %s') % (name, _LOCAL_TEST_FACTOR[kind](axis))
+                for kind, axis, name in live_test_coefficients(dependencies, row, dim)
+            ]
+            if not terms:
+                continue
+            test_body.append(
+                ScatterNode(
+                    expr_ref(block.entry(row, trial_component, "test", "trial")),
+                    expr_ref("q_weight[q] * det * (%s)" % " + ".join(terms)),
+                    "+=",
+                )
+            )
+        trial_body.append(
+            _shape_loop_node("test", [_work_item_loop_node(test_body)])
+        )
+
+    quadrature_body = list(_simplex_state_gather_nodes(system, assembled, usage))
+    quadrature_body.append(_shape_loop_node("trial", trial_body))
+    quadrature = iterator("q", "int")
+    body.append(
+        LoopNode(
+            LoopKind.QUADRATURE,
+            quadrature,
+            iteration_range(0, expr_ref("NQ", "quadrature_count")),
+            pre_increment(quadrature),
+            body=tuple(quadrature_body),
+        )
+    )
+    return tuple(body)
+
+
 def _closed_form_element_matrix_nodes(
     system,
     rule,
     coefficients,
     dependencies,
     reference_gradients,
-    row_streams,
-    column_streams,
+    block,
 ):
     """Every entry of the element matrix, eliminated together, with no loops.
 
@@ -3129,6 +3666,14 @@ def _closed_form_element_matrix_nodes(
     n_shape = int(rule.n_shape)
     assembled = assembled_matrix_dependencies(dependencies)
     directions = tuple(live_gradient_directions(dependencies, dim))
+    # In the order the scatter reads them: position is the matrix row or column,
+    # value is the kernel stream it belongs to.
+    row_streams = _compatible_matrix_stream_indices(
+        block.row_fields, n_shape, n_fields
+    )
+    column_streams = _compatible_matrix_stream_indices(
+        block.column_fields, n_shape, n_fields
+    )
 
     body = list(_geometry_value_nodes(assembled, dim))
     body.extend(
@@ -3202,43 +3747,104 @@ def _closed_form_element_matrix_nodes(
     )
 
 
-def _element_matrix_function(
-    system,
-    function_name,
-    specialization,
-    coefficients,
-    dependencies,
-    reference_gradients,
-    row_streams,
-    column_streams,
-):
-    """The closed-form element-matrix kernel, signature and body.
+@dataclass(frozen=True)
+class _ElementMatrixShape:
+    """What one assembly shape needs at its boundary and how its body is built.
+
+    A table rather than a branch on the strategy: which shapes exist is
+    `plans.evaluation_strategy`'s business, and each one that arrived would
+    otherwise be another `if` in emission.
+
+    The two boundary flags are what shows at the call site.  A closed-form
+    element has its basis gradients and its weight folded into the arithmetic
+    and takes no reference tables at all; a quadrature one reads the
+    per-point tables; a sum-factorised one reads the one-dimensional factors
+    instead, which is what `tensor_product` selects.
+    """
+
+    needs_reference_basis: bool
+    tensor_product: bool
+    build_body: object
+
+
+_ELEMENT_MATRIX_SHAPES = {
+    EvaluationStrategy.EXPANDED: _ElementMatrixShape(
+        needs_reference_basis=False,
+        tensor_product=False,
+        build_body=lambda system, kernel, coefficients, dependencies: (
+            _closed_form_element_matrix_nodes(
+                system,
+                kernel.specialization.quadrature_rule,
+                coefficients,
+                dependencies,
+                kernel.reference_gradients,
+                kernel.block,
+            )
+        ),
+    ),
+    EvaluationStrategy.QUADRATURE: _ElementMatrixShape(
+        needs_reference_basis=True,
+        tensor_product=False,
+        build_body=lambda system, kernel, coefficients, dependencies: (
+            _quadrature_element_matrix_nodes(
+                system, coefficients, dependencies, kernel.block
+            )
+        ),
+    ),
+    EvaluationStrategy.SUM_FACTORIZED: _ElementMatrixShape(
+        needs_reference_basis=True,
+        tensor_product=True,
+        build_body=lambda system, kernel, coefficients, dependencies: (
+            _tensor_element_matrix_nodes(
+                system, coefficients, dependencies, kernel.block
+            )
+        ),
+    ),
+}
+
+
+def _reads_shape_values(dependencies):
+    """Whether an element-matrix kernel reads the shape *values* at all.
+
+    It does where the form contracts a test function's value or substitutes a
+    trial function's, and those are the plan's two sequences.  A form that reads
+    neither -- a flux contracting only gradients, which is most of them -- would
+    otherwise take a table it never touches, which `test_kernels_are_lean`
+    counts and which it caught here.
+    """
+    return (
+        "value" in contracted_test_quantities(dependencies)
+        or "value" in substituted_trial_quantities(dependencies)
+    )
+
+
+def _element_matrix_function(system, kernel, coefficients, dependencies):
+    """One element-matrix kernel, signature and body.
 
     Built the way `_local_function` builds an apply, and for the same reason:
     the streams that cross the boundary are `local_kernel_stream_plans`'s
-    answer, so the call site and the signature read one plan.  Two things
-    differ, and the plan states both -- the output is the element matrix rather
-    than a stream per degree of freedom, and the kernel is handed no reference
-    basis, because a closed-form element has its basis gradients folded into
-    the arithmetic.
+    answer, so the call site and the signature read one plan.  One thing always
+    differs -- the output is the element matrix rather than a stream per degree
+    of freedom -- and the rest differs by shape, which `_ELEMENT_MATRIX_SHAPES`
+    states.
     """
-    rule = specialization.quadrature_rule
     dim = system.dim
     n_fields = len(system.fields)
-    assembled = assembled_matrix_dependencies(dependencies)
+    shape = _ELEMENT_MATRIX_SHAPES[kernel.strategy]
     params = ["const int ne", "const ptrdiff_t geometry_stride"]
     params.extend(
         _declare_stream(stream)
         for stream in local_kernel_stream_plans(
-            assembled,
+            assembled_matrix_dependencies(dependencies),
             dim=dim,
             n_fields=n_fields,
-            tensor_product=False,
+            tensor_product=shape.tensor_product,
             uses_gradient_metric=False,
             metric_components=symmetric_metric_component_count(dim),
             stream_layout="contiguous",
             grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
-            needs_reference_basis=False,
+            needs_reference_basis=shape.needs_reference_basis,
+            reads_shape_values=_reads_shape_values(dependencies),
             output=element_matrix_stream_plan(),
         )
     )
@@ -3246,20 +3852,10 @@ def _element_matrix_function(
         BufferDeclNode("static constexpr int", "ND", (), expr_ref(str(dim))),
         BufferDeclNode("static constexpr int", "NC", (), expr_ref(str(n_fields))),
     ]
-    body.extend(
-        _closed_form_element_matrix_nodes(
-            system,
-            rule,
-            coefficients,
-            dependencies,
-            reference_gradients,
-            row_streams,
-            column_streams,
-        )
-    )
+    body.extend(shape.build_body(system, kernel, coefficients, dependencies))
     return _print_kernel_function(
         FunctionDefNode(
-            function_name,
+            kernel.name,
             params=tuple(params),
             body=tuple(body),
             qualifier=_function_qualifier(),
@@ -3543,17 +4139,23 @@ class _SubstitutedCoefficient:
         self.gradient = tuple(gradient)
 
 
-def _trial_substituted_coefficients(system, coefficients, trial_component, trial_gradient):
+def _trial_substituted_coefficients(
+    system, coefficients, trial_component, trial_gradient, trial_value=None
+):
     """`coefficients` with the direction taken to be one trial basis function.
 
     The flux is linear in the direction, so this *is* that trial degree of
     freedom's column -- which is why the matrix needs no probing.  See
     `plans/direct_assembly.py` for the substitution and the check that the
     linearity actually holds.
+
+    `trial_value` is the name the caller gives the trial function's own value,
+    for a flux that contracts it as well as its gradient.  A closed-form element
+    has none to give and passes nothing.
     """
     field_names = tuple(field.name for field in system.fields)
     substitution = trial_direction_substitution(
-        field_names, system.dim, trial_component, trial_gradient
+        field_names, system.dim, trial_component, trial_gradient, trial_value
     )
     return tuple(
         _SubstitutedCoefficient(
@@ -3564,27 +4166,66 @@ def _trial_substituted_coefficients(system, coefficients, trial_component, trial
     )
 
 
+#: The axis letters a tensor-product element's one-dimensional factors are
+#: indexed by, in the order the shape and quadrature indices decompose.
+_TENSOR_AXES = ("x", "y", "z")
+
+
 def _basis_gradient_nodes(
-    name, shape_index, dim, reference_gradients=None, directions=None
+    name,
+    shape_index,
+    dim,
+    reference_gradients=None,
+    directions=None,
+    tensor_product=False,
 ):
-    """One basis function's physical gradient, in whichever of its two forms.
+    """One basis function's physical gradient, in whichever form its element has.
 
     The same push-forward the test functions get, with the shape index left as
     whatever loop variable the caller is standing in -- `test` for the
     contraction, `trial` for the column being built.
 
-    `reference_gradients` decides the spelling, and it is the element's answer
-    rather than this function's: when they are constants, which is
-    `plans.evaluation_strategy`'s EXPANDED family, the reference gradient is
-    folded into the arithmetic and no table is read; otherwise it is looked up
-    at the quadrature point.  Same object, two spellings, one owner -- the
-    constant one used to be written out again inside
-    `_constant_p1_gradient_expanded_body`, where nothing held the two to the
-    same chain rule.
+    Three spellings of the reference gradient, and which one applies is the
+    element's answer rather than this function's -- it is
+    `plans.evaluation_strategy`'s three families, one each:
+
+      EXPANDED        `reference_gradients` are constants, folded into the
+                      arithmetic, and no table is read at all
+      QUADRATURE      looked up at the quadrature point, `[q * NS + shape]`
+      SUM_FACTORIZED  the product of one-dimensional factors, which is what a
+                      tensor-product basis function *is*; the caller decomposes
+                      the quadrature and shape indices and this reads them
+
+    One owner for all three.  The constant spelling used to be written out again
+    inside `_constant_p1_gradient_expanded_body`, where nothing held the two to
+    the same chain rule.
     """
     nodes = []
+    if tensor_product:
+        # A tensor-product basis function's reference gradient needs no
+        # contraction: differentiating a product of one-dimensional factors
+        # replaces exactly one of them by its derivative.
+        nodes.extend(
+            BufferDeclNode(
+                "const s_t",
+                "%s_ref%d" % (name, k),
+                (),
+                expr_ref(
+                    " * ".join(
+                        "%s_1d[q_%s * NS1 + %s_%s]"
+                        % ("grad" if axis == k else "shape", letter, shape_index, letter)
+                        for axis, letter in enumerate(_TENSOR_AXES[:dim])
+                    )
+                ),
+            )
+            for k in range(dim)
+        )
     for d in range(dim) if directions is None else directions:
-        if reference_gradients is None:
+        if tensor_product:
+            gradient = " + ".join(
+                "%s_ref%d * adj%d" % (name, k, k * dim + d) for k in range(dim)
+            )
+        elif reference_gradients is None:
             gradient = " + ".join(
                 "%s[q * NS + %s] * adj%d"
                 % (sfem_simplex_grad_ref_name("grad_ref", k), shape_index, k * dim + d)
@@ -6972,6 +7613,28 @@ def _element_matrix_fill_lines(
     return lines
 
 
+#: What an element settles for when its own shape declines the form.  A
+#: closed-form element folds its basis into the arithmetic and so has no shape
+#: values; a form that contracts the trial function's value or the test
+#: function's needs them, and the quadrature shape reads both from the table.
+#:
+#: Written down as a fallback rather than left to the element, because the
+#: alternative is not "some other shape" -- it is probing, and there is no form
+#: for which probing is the right answer.  A tensor-product element has no
+#: fallback and needs none: the factorised shape reads every table there is.
+_ELEMENT_MATRIX_FALLBACK = {
+    EvaluationStrategy.EXPANDED: EvaluationStrategy.QUADRATURE,
+}
+
+
+def _element_matrix_kernel_for(strategy, kernels):
+    """The kernel this element uses, or the one it falls back to."""
+    kernel = kernels.get(strategy)
+    if kernel is not None:
+        return kernel
+    return kernels.get(_ELEMENT_MATRIX_FALLBACK.get(strategy))
+
+
 def _scalar_crs_matrix_assembly_source(
     system,
     prefix,
@@ -7017,49 +7680,55 @@ def _scalar_crs_matrix_assembly_source(
     field_streams_in_tensor_order = _stream_to_tensor_order(field_stream_order)
     row_tensor_streams = tuple(field_streams_in_tensor_order[stream] for stream in row_streams)
     column_tensor_streams = tuple(field_streams_in_tensor_order[stream] for stream in column_streams)
-    # Whether this element's matrix is built in closed form is the element's
-    # answer -- `plans.direct_assembly` asks `plans.evaluation_strategy`, the
-    # same table the apply reads -- and the kernel that does it belongs to the
-    # local header.  Both sides name it from one plan so they cannot disagree.
+    # How this element's matrix is built is the element's answer:
+    # `plans.evaluation_strategy` is the same table the apply reads, and the
+    # local header defines one kernel per shape it serves.  Both sides name the
+    # kernel from one plan, so they cannot disagree.
     #
-    # The order check is not redundant with that.  The closed-form kernel writes
-    # its entries at fixed offsets, so it can only serve an operator whose rows
-    # and columns sit where it puts them: a permuted stream order, or a single
-    # Jacobian block of a coupled system, is a different matrix and falls back
-    # rather than being filled wrongly.
-    element_assembles_directly = assembles_in_closed_form(rule.element_type)
+    # The order check is not redundant with that.  Either kernel writes its
+    # entries at fixed offsets in the whole field-major square, so it can only
+    # serve an operator whose rows and columns sit where it puts them: a
+    # permuted stream order, or a single Jacobian block of a coupled system, is
+    # a different matrix and falls back rather than being filled wrongly.
     entries_sit_where_the_kernel_writes_them = (
         row_tensor_streams == row_streams
         and column_tensor_streams == column_streams
     )
     element_matrix_kernel = (
-        _closed_form_element_matrix_kernel(
-            system,
-            local_prefix,
-            specialization,
-            coefficients,
-            dependencies,
-            matrix_format_plan,
-            basis_family=basis_family,
+        _element_matrix_kernel_for(
+            evaluation_strategy(rule.element_type),
+            _element_matrix_kernels(
+                system,
+                local_prefix,
+                specialization,
+                coefficients,
+                dependencies,
+                matrix_format_plan,
+                _ElementMatrixBlock(row_fields, column_fields),
+                basis_family=basis_family,
+            ),
         )
-        if element_assembles_directly and entries_sit_where_the_kernel_writes_them
+        if entries_sit_where_the_kernel_writes_them
         else None
     )
-    serves_this_matrix = element_matrix_kernel is not None and (
-        element_matrix_kernel.row_streams == row_streams
-        and element_matrix_kernel.column_streams == column_streams
-    )
-    if not serves_this_matrix:
-        element_matrix_kernel = None
+    serves_this_matrix = element_matrix_kernel is not None
     element_matrix_call = (
         element_matrix_kernel.name if serves_this_matrix else None
     )
-    # A closed-form assembly still builds its Jacobian from the reference
-    # gradients, and reads nothing else: the kernel it calls takes no reference
-    # data, so the shape values and the quadrature weights have no reader.
+    # The mesh loop still builds its Jacobian from the reference gradients.
+    # Which of the other tables survive is the kernel's: a closed-form one reads
+    # none of them, so the shape values and the quadrature weights would be two
+    # aliases with no reader, while a quadrature one is handed all of them.
+    kernel_shape = (
+        _ELEMENT_MATRIX_SHAPES[element_matrix_kernel.strategy]
+        if serves_this_matrix
+        else None
+    )
     kept_reference_tables = (
         tuple(sfem_simplex_grad_ref_name("grad_ref", d) for d in range(dim))
-        if serves_this_matrix and not tensor_product_geometry
+        if kernel_shape is not None
+        and not kernel_shape.needs_reference_basis
+        and not tensor_product_geometry
         else None
     )
     element_matrix_call_args = (
@@ -7069,19 +7738,20 @@ def _scalar_crs_matrix_assembly_source(
                 assembled_matrix_dependencies(dependencies),
                 dim=dim,
                 n_fields=n_fields,
-                tensor_product=False,
+                tensor_product=kernel_shape.tensor_product,
                 uses_gradient_metric=False,
                 metric_components=symmetric_metric_component_count(dim),
                 stream_layout="contiguous",
                 grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
-                needs_reference_basis=False,
+                needs_reference_basis=kernel_shape.needs_reference_basis,
+                reads_shape_values=_reads_shape_values(dependencies),
                 output=element_matrix_stream_plan(),
             ),
             lambda stream: _block_call_argument(
                 stream, ISOPARAMETRIC_MODE, {"element_matrix": "element_matrix"}
             ),
         )
-        if serves_this_matrix
+        if kernel_shape is not None
         else []
     )
     field_element_lines, field_element_array = _single_field_element_alias_lines(

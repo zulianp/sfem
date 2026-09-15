@@ -3,6 +3,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -827,18 +828,18 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
     #: written as an energy, assembles directly on the same elements -- which is
     #: what says this is the path and not the mathematics.
     #:
-    #: TET4 and TRI3 have left this list.  They are the elements
-    #: `plans.direct_assembly.assembles_in_closed_form` admits, and they now
-    #: call a kernel that writes every entry of the matrix from the substituted
-    #: flux.  The three that remain are the elements whose evaluation strategy
-    #: is not closed form -- a higher-order simplex and two tensor-product
-    #: elements -- and what they need is that strategy's own assembly, not this
-    #: one written out again.
-    PROBING = {
-        "mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_operator.cpp": 30,
-        "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_operator.cpp": 24,
-        "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_operator.cpp": 8,
-    }
+    #: Empty, and it stays empty.  Every element in the tree now builds its
+    #: matrix from the substituted flux, in the shape its own evaluation
+    #: strategy asks for: entry by entry with no loop where the element
+    #: evaluates in closed form, a quadrature point at a time on a higher-order
+    #: simplex, a column at a time through the factorised contraction on a
+    #: tensor-product element.
+    #:
+    #: The list is kept rather than the test simplified to `assertEqual(found,
+    #: {})`, because what it says is not "there are none" but "these are the
+    #: ones left and they may only get fewer".  A material added tomorrow gets
+    #: the same answer with no edit here.
+    PROBING = {}
 
     @staticmethod
     def _shipped_tree():
@@ -918,6 +919,257 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
                 self.assertNotIn("bdirection[trial][0] = s_t(1);", source)
 
 
+class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
+    """The element matrix and the operator it assembles are one bilinear form.
+
+    `A * v == apply(v)` for every `v`.  Probing had that property by
+    construction -- the column *was* an apply -- and the substitution has to earn
+    it, so it is checked rather than argued.
+
+    It is the gate that matters for the assembly rework, and the reproducibility
+    harness is not: that harness drives each material on a HEX8 grid, so a digest
+    at `refine=6` says nothing about a TET4 or a TET10 kernel, and its TET10 run
+    cannot start at all.  This compares the assembly against the operator it is
+    supposed to *be*, rather than against an older copy of itself.
+
+    All four shapes are checked, because they are four pieces of code: TET4
+    writes its entries with no loop, TET10 accumulates a quadrature point at a
+    time, and the two tensor-product elements build a column at a time through
+    the factorised contraction.
+    """
+
+    #: What each case needs to instantiate the driver below.  The apply is the
+    #: same element's Jacobian-action block at the same rule, which is the only
+    #: kernel that can settle the question.
+    CASES = (
+        {
+            'element': 'TET4',
+            'header': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_local.hpp',
+            'dim': 3,
+            'n_fields': 3,
+            'n_qp': 1,
+            'n_shape': 4,
+            'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_tet4_hessian_block',
+            'assembly_reference': '',
+            'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_tet4_jacobian_action_block_contiguous',
+            'apply_reference': 'sfem::codegen::ref_tet4_q1<s_t>::shape(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q1<s_t>::q_weight(), ',
+            'includes': ('tet4_q1.hpp', 'quad_tet_q1.hpp'),
+        },
+        {
+            'element': 'TET10',
+            'header': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_local.hpp',
+            'dim': 3,
+            'n_fields': 3,
+            'n_qp': 11,
+            'n_shape': 10,
+            'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_hessian_block',
+            'assembly_reference': 'sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), ',
+            'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous',
+            'apply_reference': 'sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), ',
+            'includes': ('tet10_q11.hpp', 'quad_tet_q11.hpp'),
+        },
+        {
+            'element': 'PROTEUS_HEX8',
+            'header': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_local.hpp',
+            'dim': 3,
+            'n_fields': 3,
+            'n_qp': 8,
+            'n_shape': 8,
+            'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_hessian_block',
+            'assembly_reference': 'sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), ',
+            'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block_contiguous',
+            'apply_reference': 'sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), ',
+            'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
+        },
+        {
+            'element': 'PROTEUS_QUAD4',
+            'header': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_local.hpp',
+            'dim': 2,
+            'n_fields': 2,
+            'n_qp': 4,
+            'n_shape': 4,
+            'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_hessian_block',
+            'assembly_reference': 'sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), ',
+            'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block_contiguous',
+            'apply_reference': 'sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), ',
+            'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
+        },
+    )
+
+    DRIVER = '// Does the element matrix agree with the operator it assembles?\n//\n// The matrix is built from the flux with a trial basis function substituted for\n// the direction; the apply evaluates the same flux with a real direction in it.\n// They are one bilinear form, so `A * v` must equal `apply(v)` for every `v`.\n// That is the property probing had by construction -- the column *was* an apply\n// -- and the property the substitution has to earn.\n//\n// Checked over every basis direction and one dense one, on a perturbed identity\n// geometry and a random state, so a defect in one column cannot hide behind the\n// zeros of the next.\n#include <cstdio>\n#include <cmath>\n#include <cstdlib>\n#include <cmath>\n#include "@LOCAL_HEADER@"\n@INCLUDES@\n\nusing s_t = double;\nstatic constexpr int NQ = @NQ@;\nstatic constexpr int NS = @NS@;\nstatic constexpr int NC = @NC@;\nstatic constexpr int ND = @ND@;\nstatic constexpr int VS = 1;\n\n// Which fields this matrix has rows and columns for.  A coupled system\n// publishes one matrix per Jacobian block as well as the whole square, and the\n// two are the same check with different field lists.\nstatic constexpr int ROW_FIELDS[] = {@ROW_FIELDS@};\nstatic constexpr int COL_FIELDS[] = {@COLUMN_FIELDS@};\nstatic constexpr int N_ROWS = (int)(sizeof(ROW_FIELDS) / sizeof(int)) * NS;\nstatic constexpr int N_COLS = (int)(sizeof(COL_FIELDS) / sizeof(int)) * NS;\n\n// A matrix row or column is `field position * NS + shape`; a kernel stream is\n// `shape * NC + field`.  Both orders appear below because the apply speaks\n// streams and the matrix speaks its own rows and columns.\nstatic int row_stream(int row) { return (row % NS) * NC + ROW_FIELDS[row / NS]; }\nstatic int col_stream(int col) { return (col % NS) * NC + COL_FIELDS[col / NS]; }\n\nstatic double rnd() { return (double)rand() / RAND_MAX - 0.5; }\n\nint main() {\n  srand(20260915);\n  // The material\'s parameters, in the order its kernels take them.  Values\n  // chosen to be ordinary rather than special: a zero or a one can hide a term.\n@PARAM_DECLS@\n\n  s_t det[NQ * VS], adj_data[ND * ND][NQ * VS];\n  const s_t *adj[ND * ND];\n  for (int c = 0; c < ND * ND; ++c) adj[c] = adj_data[c];\n  for (int q = 0; q < NQ; ++q) {\n    for (int c = 0; c < ND * ND; ++c)\n      adj_data[c][q] = (c % (ND + 1) == 0 ? 1.0 : 0.0) + 0.2 * rnd();\n    det[q] = 1.0 + 0.1 * rnd();\n  }\n\n  // Both state roles are filled whether or not the kernels take both; which\n  // ones cross the boundary is the form\'s answer and `@STATE@` carries it.\n  s_t current[NC * NS][VS], previous[NC * NS][VS];\n  for (int i = 0; i < NC * NS; ++i) {\n    // `field` is which of the system\'s fields this stream carries; a material\n    // whose state has to satisfy an inequality reads it.\n    const int field = i % NC;\n    (void)field;\n    current[i][0] = @STATE_INIT@;\n    previous[i][0] = @STATE_INIT@;\n  }\n\n  s_t element_matrix[N_ROWS * N_COLS];\n  sfem::codegen::@ASSEMBLY@<s_t, NQ, NS, VS>(\n      1, 1, det, adj, @ASSEMBLY_REFERENCE@@STATE@@PARAMS@element_matrix);\n\n  // Checked before anything is compared.  `fmax` returns its non-NaN operand,\n  // so a NaN entry would leave `worst` at zero and read as perfect agreement --\n  // which is how a state outside a material\'s domain, where a fractional power\n  // of a negative number is taken, would pass this test silently.\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) {\n    if (!std::isfinite(element_matrix[i])) {\n      printf("nan %d\\n", i);\n      return 1;\n    }\n  }\n\n  double worst = 0.0, scale = 0.0;\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) scale = fmax(scale, fabs(element_matrix[i]));\n\n  for (int trial_local = 0; trial_local <= N_COLS; ++trial_local) {\n    s_t direction[NC * NS][VS], out[NC * NS][VS];\n    for (int i = 0; i < NC * NS; ++i) { direction[i][0] = 0.0; out[i][0] = 0.0; }\n    if (trial_local < N_COLS) {\n      direction[col_stream(trial_local)][0] = 1.0;\n    } else {\n      // A dense direction, confined to the columns this matrix has: anything\n      // outside them is not in the matrix and the apply would answer for it.\n      for (int col = 0; col < N_COLS; ++col) direction[col_stream(col)][0] = rnd();\n    }\n    sfem::codegen::@APPLY@<s_t, NQ, NS, VS>(\n        1, 1, det, adj, @APPLY_REFERENCE@@STATE@direction, @PARAMS@out);\n\n    for (int test_local = 0; test_local < N_ROWS; ++test_local) {\n      double from_matrix = 0.0;\n      for (int j = 0; j < N_COLS; ++j) {\n        from_matrix += element_matrix[test_local * N_COLS + j]\n                     * direction[col_stream(j)][0];\n      }\n      worst = fmax(worst, fabs(from_matrix - out[row_stream(test_local)][0]));\n    }\n  }\n  printf("%.17e %.17e\\n", worst, scale);\n  return 0;\n}\n'
+
+    @staticmethod
+    def _shipped_tree():
+        from codegen.framework.tools.codegen_snapshot import shipped_tree
+
+        return Path(shipped_tree())
+
+    def test_the_matrix_applies_like_the_operator(self):
+        compiler = shutil.which("c++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("C++ compiler is not available")
+        tree = self._shipped_tree()
+        material = tree / "mooney_rivlin_kelvin_voigt_newmark"
+        if not material.is_dir():
+            self.skipTest("the material is not in the shipped tree")
+
+        from codegen.framework.materials import mooney_rivlin_kelvin_voigt_newmark
+
+        for case in self.CASES:
+            with self.subTest(element=case["element"]):
+                self._check(
+                    case,
+                    material / ("d%d" % case["dim"]),
+                    tree,
+                    mooney_rivlin_kelvin_voigt_newmark.material,
+                )
+
+    @staticmethod
+    def _material_parameters(material, header, kernel):
+        """The kernel's parameters, in its order, at the material's defaults.
+
+        Read rather than transcribed: a material's parameters have a physical
+        range, and values invented to look harmless can put the state outside
+        it.  The order is the kernel's own, taken from its signature, because
+        that order is the plan's and not something this test should predict.
+        """
+        import re
+
+        defaults = dict(material.parameter_defaults)
+        signature = header.read_text().split("void %s(" % kernel, 1)[1]
+        signature = signature.split(") {", 1)[0]
+        names = re.findall(r"^\s+const s_t (\w+),$", signature, re.M)
+        return tuple((name, repr(float(defaults[name]))) for name in names)
+
+    def _check(self, case, headers, tree, material):
+        """Build and run the driver for one case, and hold it to the claim."""
+        compiler = shutil.which("c++") or shutil.which("g++")
+        parameters = self._material_parameters(
+            material, headers / case["header"], case["assembly"]
+        )
+        source = self.DRIVER
+        for key, value in (
+            ("@LOCAL_HEADER@", case["header"]),
+            ("@INCLUDES@",
+             "\n".join('#include "%s"' % name for name in case["includes"])),
+            ("@NQ@", str(case["n_qp"])),
+            ("@NS@", str(case["n_shape"])),
+            ("@NC@", str(case["n_fields"])),
+            ("@ND@", str(case["dim"])),
+            ("@STATE@", case.get("state", "current, previous, ")),
+            ("@STATE_INIT@", case.get("state_init", "0.05 * rnd()")),
+            ("@PARAM_DECLS@",
+             "\n".join(
+                 "  const s_t %s = %s;" % (name, value)
+                 for name, value in parameters
+             )),
+            ("@PARAMS@",
+             "".join(
+                 "%s, " % name
+                 for name, _ in parameters
+             )),
+            ("@ROW_FIELDS@",
+             ", ".join(str(f) for f in case.get(
+                 "row_fields", range(case["n_fields"])))),
+            ("@COLUMN_FIELDS@",
+             ", ".join(str(f) for f in case.get(
+                 "column_fields", range(case["n_fields"])))),
+            ("@ASSEMBLY@", case["assembly"]),
+            ("@ASSEMBLY_REFERENCE@", case["assembly_reference"]),
+            ("@APPLY@", case["apply"]),
+            ("@APPLY_REFERENCE@", case["apply_reference"]),
+        ):
+            source = source.replace(key, value)
+        with tempfile.TemporaryDirectory() as work:
+            driver = Path(work) / "check.cpp"
+            driver.write_text(source)
+            binary = Path(work) / "check"
+            build = subprocess.run(
+                [
+                    compiler, "-O1", "-std=c++17", "-Wno-unknown-pragmas",
+                    "-I", str(headers),
+                    "-I", str(tree / "reference"),
+                    "-I", str(tree),
+                    "-o", str(binary), str(driver),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(build.returncode, 0, build.stderr[-4000:])
+            run = subprocess.run([str(binary)], capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0, run.stderr[-4000:])
+            worst, scale = (float(x) for x in run.stdout.split())
+            self.assertGreater(scale, 0.0, "the matrix is all zeros")
+            self.assertLess(
+                worst / scale,
+                1e-12,
+                "the assembled matrix and the apply disagree by "
+                + ("%.3e" % (worst / scale))
+                + " relative to the largest entry",
+            )
+
+
+    #: One Jacobian block of a coupled system, which is a different matrix from
+    #: the whole square: its rows are one field's, its columns another's, and
+    #: its stride is its own.  Two-phase flow is the case that exercises it, and
+    #: it exercises two more things with it -- its flux contracts the
+    #: *direction's value* as well as its gradient, and TRI3 is a closed-form
+    #: element whose shape cannot supply a trial value, so the block falls back
+    #: to the quadrature shape rather than to probing.
+    BLOCK_CASE = {
+        "element": "TRI3",
+        "header": "two_phase_flow_form_2_p_w_p_w_d2_simplex_local.hpp",
+        "dim": 2,
+        "n_fields": 2,
+        "n_qp": 6,
+        "n_shape": 3,
+        "row_fields": (0,),
+        "column_fields": (0,),
+        # This form's Jacobian action reads no previous time step.
+        "state": "current, ",
+        # The capillary pressure must exceed the wetting-phase pressure: the
+        # saturation curve raises their difference to a fractional power, and a
+        # negative difference is outside the material's domain rather than a
+        # hard case for the kernel.
+        # `p_c` is a capillary pressure and must exceed `p_w`, and both sit
+        # near the material's reference pressure `p_wr = 1.0`.
+        "state_init": "(field == 1 ? 1.2 + 0.02 * rnd() : 1.0 + 0.02 * rnd())",
+        "assembly": "two_phase_flow_form_2_p_w_p_w_d2_simplex_hessian_block",
+        "assembly_reference": (
+            "sfem::codegen::ref_tri3_q6<s_t>::shape(), "
+            "sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), "
+            "sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y(), "
+            "sfem::codegen::quad_tri_q6<s_t>::q_weight(), "
+        ),
+        "apply": "two_phase_flow_form_2_p_w_p_w_d2_simplex_jacobian_action_block_contiguous",
+        "apply_reference": (
+            "sfem::codegen::ref_tri3_q6<s_t>::shape(), "
+            "sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), "
+            "sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y(), "
+            "sfem::codegen::quad_tri_q6<s_t>::q_weight(), "
+        ),
+        "includes": ("tri3_q6.hpp", "quad_tri_q6.hpp"),
+    }
+
+    def test_a_jacobian_block_applies_like_the_operator(self):
+        """The block is generated here: no material ships one in the tree."""
+        if shutil.which("c++") is None and shutil.which("g++") is None:
+            self.skipTest("C++ compiler is not available")
+        from codegen.framework.materials import two_phase_flow
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(
+                two_phase_flow.material,
+                out_dir,
+                elements=("TRI3",),
+                clean=True,
+                matrix_formats=("crs", "bsr"),
+            )
+            tree = Path(out_dir)
+            self._check(
+                self.BLOCK_CASE, tree / "d2", tree, two_phase_flow.material
+            )
+
 class ClosedFormAssemblyShapeTest(unittest.TestCase):
     """A closed-form element matrix has no loops, because that is the point.
 
@@ -939,7 +1191,14 @@ class ClosedFormAssemblyShapeTest(unittest.TestCase):
         return Path(shipped_tree())
 
     def _closed_form_kernels(self):
-        """Every generated closed-form element-matrix kernel, as its body."""
+        """Every generated closed-form element-matrix kernel, as its body.
+
+        Told apart from the quadrature one by what it *takes*, not by its name:
+        a closed-form kernel has its basis gradients and its quadrature weight
+        folded into the arithmetic, so no `q_weight` crosses its boundary.  A
+        name test would have to know the specialisation's spelling; this reads
+        the property the shape is defined by.
+        """
         import re
 
         opening = re.compile(r"^static SFEM_INLINE void (\S+_hessian_block)\($", re.M)
@@ -952,7 +1211,10 @@ class ClosedFormAssemblyShapeTest(unittest.TestCase):
                     continue
                 for end in range(index + 1, len(lines)):
                     if lines[end] == "}":
-                        found[match.group(1)] = lines[index:end]
+                        body = lines[index:end]
+                        signature = body[: body.index(") {")] if ") {" in body else body
+                        if not any("q_weight" in line for line in signature):
+                            found[match.group(1)] = body
                         break
         return found
 
