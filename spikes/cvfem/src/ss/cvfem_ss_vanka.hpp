@@ -47,6 +47,7 @@
 #include "smesh_env.hpp"
 
 #include <cmath>
+#include <memory>
 #include <vector>
 
 namespace cvfem_ss {
@@ -59,12 +60,20 @@ namespace cvfem_ss {
     //   invdF[ic]   = 1 / dF[ic]             (24)
     //   S_lu, piv   = LU of the 8x8 Schur complement
     // 472 doubles + 8 ints per cell, about 3.8 KiB.
+    //
+    // Stored in single precision (vanka_t), computed in double. Every product above is formed
+    // and the Schur complement factorised in double in vanka_setup; only the results are
+    // narrowed, and the sweep promotes them back before any arithmetic. The sweep is memory
+    // bound -- on the FDA nozzle at 893,924 dof it was 72% of the socket's cycles with 72% of
+    // those stalled in the backend -- so what matters is the bytes it streams, not the FLOPs.
+    // A smoother only has to reduce the error, and FGMRES around it absorbs the difference.
+    using vanka_t = float;
     struct VankaCell {
-        scalar_t Dhat[8][24];
-        scalar_t Ghat[24][8];
-        scalar_t invdF[24];
-        scalar_t S[8][8];
-        int      piv[8];
+        vanka_t Dhat[8][24];
+        vanka_t Ghat[24][8];
+        vanka_t invdF[24];
+        vanka_t S[8][8];
+        int     piv[8];
     };
 
     struct VankaData {
@@ -74,6 +83,9 @@ namespace cvfem_ss {
         const sfem::count_t *rowptr{nullptr};
         const sfem::idx_t   *colidx{nullptr};
         const real_t        *values{nullptr};
+        // `values` in single precision, which is what the multiplicative sweep's row walk
+        // reads: that walk was half the sweep's samples, on the loads of these blocks.
+        std::unique_ptr<vanka_t[]> values_f;
 
         int                    L{0};
         ptrdiff_t              nmacro{0};
@@ -124,7 +136,8 @@ namespace cvfem_ss {
         return true;
     }
 
-    static SFEM_INLINE void vanka_solve8(const scalar_t A[8][8], const int piv[8], scalar_t b[8]) {
+    template <typename F>
+    static SFEM_INLINE void vanka_solve8(const F A[8][8], const int piv[8], scalar_t b[8]) {
         for (int k = 0; k < 8; ++k) {
             const int p = piv[k];
             if (p != k) std::swap(b[k], b[p]);
@@ -280,6 +293,9 @@ namespace cvfem_ss {
                         static const double schur_tol =
                                 smesh::Env::read<double>("SFEM_VANKA_SCHUR_TOL", 1e-14);
                         const scalar_t dfloor = dscale * (scalar_t)dtol;
+                        // Double throughout; narrowed into the cell only at the end.
+                        scalar_t invd[24];
+                        scalar_t Sd[8][8];
                         for (int a = 0; a < 8; ++a)
                             for (int t = 0; t < 3; ++t) {
                                 scalar_t dd = A[a][a][t * 4 + t];
@@ -296,38 +312,49 @@ namespace cvfem_ss {
                                     if (std::fabs(dd) < lo)
                                         dd = (dd < scalar_t(0)) ? -lo : lo;
                                 }
-                                c.invdF[a * 3 + t] = (std::fabs(dd) > dfloor &&
-                                                      std::fabs(dd) > scalar_t(1e-300))
-                                                             ? scalar_t(1) / dd
-                                                             : scalar_t(0);
+                                invd[a * 3 + t] = (std::fabs(dd) > dfloor &&
+                                                   std::fabs(dd) > scalar_t(1e-300))
+                                                          ? scalar_t(1) / dd
+                                                          : scalar_t(0);
+                                c.invdF[a * 3 + t] = (vanka_t)invd[a * 3 + t];
                             }
 
                         for (int a = 0; a < 8; ++a)
                             for (int i = 0; i < 8; ++i)
                                 for (int t = 0; t < 3; ++t)
-                                    c.Dhat[a][i * 3 + t] = A[a][i][12 + t] * c.invdF[i * 3 + t];
+                                    c.Dhat[a][i * 3 + t] = (vanka_t)(A[a][i][12 + t] * invd[i * 3 + t]);
                         for (int i = 0; i < 8; ++i)
                             for (int t = 0; t < 3; ++t)
                                 for (int b = 0; b < 8; ++b)
-                                    c.Ghat[i * 3 + t][b] = A[i][b][t * 4 + 3] * c.invdF[i * 3 + t];
+                                    c.Ghat[i * 3 + t][b] = (vanka_t)(A[i][b][t * 4 + 3] * invd[i * 3 + t]);
 
                         for (int a = 0; a < 8; ++a)
                             for (int b = 0; b < 8; ++b) {
                                 scalar_t sv = A[a][b][15];
                                 for (int i = 0; i < 8; ++i)
                                     for (int t = 0; t < 3; ++t)
-                                        sv -= A[a][i][12 + t] * c.invdF[i * 3 + t] * A[i][b][t * 4 + 3];
-                                c.S[a][b] = sv;
+                                        sv -= A[a][i][12 + t] * invd[i * 3 + t] * A[i][b][t * 4 + 3];
+                                Sd[a][b] = sv;
                             }
 
-                        if (!vanka_lu8(c.S, c.piv, (scalar_t)schur_tol)) {
+                        if (!vanka_lu8(Sd, c.piv, (scalar_t)schur_tol)) {
                             for (int a = 0; a < 8; ++a) {
-                                for (int b = 0; b < 8; ++b) c.S[a][b] = (a == b) ? scalar_t(1) : scalar_t(0);
+                                for (int b = 0; b < 8; ++b) Sd[a][b] = (a == b) ? scalar_t(1) : scalar_t(0);
                                 c.piv[a] = a;
                             }
                         }
+                        for (int a = 0; a < 8; ++a)
+                            for (int b = 0; b < 8; ++b) c.S[a][b] = (vanka_t)Sd[a][b];
                     }
         }
+
+        // The row walk's copy of the values, narrowed. Uninitialised allocation and a parallel
+        // fill, so its pages are first touched by the threads that sweep them and no serial
+        // zero pass of nnz * 16 floats is paid per Newton step.
+        const size_t nval = (size_t)rowptr[(size_t)d.nnodes] * 16;
+        v.values_f.reset(new vanka_t[nval]);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t k = 0; k < (ptrdiff_t)nval; ++k) v.values_f[(size_t)k] = (vanka_t)values[(size_t)k];
     }
 
     // One additive Vanka application: z = omega * sum_k R_k^T Ahat_k^-1 R_k r, averaged over
@@ -500,7 +527,7 @@ namespace cvfem_ss {
                                     for (sfem::count_t k = v.rowptr[gn]; k < v.rowptr[gn + 1]; ++k) {
                                         const int lj = loc_of[(size_t)v.colidx[(size_t)k]];
                                         if (lj < 0) continue;  // outside this element: additive
-                                        const real_t *const blk = v.values + (size_t)k * 16;
+                                        const vanka_t *const blk = v.values_f.get() + (size_t)k * 16;
                                         const scalar_t *const zz = &zl[(size_t)lj * N_FIELDS];
                                         for (int rr = 0; rr < N_FIELDS; ++rr)
                                             for (int cc = 0; cc < N_FIELDS; ++cc)
