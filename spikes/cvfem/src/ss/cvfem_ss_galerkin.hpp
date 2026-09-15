@@ -459,6 +459,7 @@ namespace cvfem_ss {
 
     inline void galerkin_build_pattern(const GalerkinLevel &g, std::vector<sfem::count_t> &rowptr,
                                        std::vector<sfem::idx_t> &colidx) {
+        SFEM_TRACE_SCOPE("cvfem_ss::galerkin_build_pattern");
         const ptrdiff_t n  = g.n_coarse;
         const int       nc = g.nc, Lc = g.Lc;
 
@@ -507,6 +508,7 @@ namespace cvfem_ss {
     // linear scan an mm-produced pattern would force.
     inline void galerkin_build_scatter(const GalerkinLevel &g, const std::vector<sfem::count_t> &rowptr,
                                        const std::vector<sfem::idx_t> &colidx, std::vector<ptrdiff_t> &pos) {
+        SFEM_TRACE_SCOPE("cvfem_ss::galerkin_build_scatter");
         const int nc = g.nc, Lc = g.Lc;
         pos.assign((size_t)g.nmacro * (size_t)nc * 27, -1);
 
@@ -531,34 +533,59 @@ namespace cvfem_ss {
     // Invert the scatter so accumulation runs over destinations rather than sources: each
     // block sums its own contributions in a fixed order, with no atomics and therefore the
     // same bits on any thread count. This is the two-pass packed idea applied to assembly.
-    inline void galerkin_build_inverse(const std::vector<ptrdiff_t> &pos, const ptrdiff_t nblocks,
-                                       const size_t kbegin, const size_t kend, std::vector<ptrdiff_t> &iptr,
-                                       std::vector<ptrdiff_t> &iidx) {
-        iptr.assign((size_t)nblocks + 1, 0);
-        for (size_t k = kbegin; k < kend; ++k)
-            if (pos[k] >= 0) iptr[(size_t)pos[k] + 1]++;
-        for (ptrdiff_t i = 0; i < nblocks; ++i) iptr[(size_t)i + 1] += iptr[(size_t)i];
+    //
+    // Over the blocks the source range [kbegin, kend) actually reaches, not over every block.
+    // `blocks` lists those, `iptr`/`iidx` are compact over that list with each block's sources
+    // in increasing k, and `slot` is the caller's block -> list-position map, nblocks long and
+    // all -1 on entry and on return. The chunked assembly calls this once per chunk of a dozen
+    // macro-elements, and sized to the whole matrix it was the setup's largest cost: on the FDA
+    // nozzle's fine level (893,924 dof, 5.8M blocks, 36 chunks) 253 ms of the 607 ms a Newton
+    // step's Vanka assembly took, and the accumulation walking every block per chunk another
+    // 161 ms. The sums are unchanged -- same sources, same order per block -- so are the bits.
+    inline void galerkin_build_inverse(const std::vector<ptrdiff_t> &pos, const size_t kbegin, const size_t kend,
+                                       std::vector<ptrdiff_t> &slot, std::vector<ptrdiff_t> &blocks,
+                                       std::vector<ptrdiff_t> &iptr, std::vector<ptrdiff_t> &iidx) {
+        SFEM_TRACE_SCOPE("cvfem_ss::galerkin_build_inverse");
+        blocks.clear();
+        iptr.assign(1, 0);
+        for (size_t k = kbegin; k < kend; ++k) {
+            const ptrdiff_t b = pos[k];
+            if (b < 0) continue;
+            if (slot[(size_t)b] < 0) {
+                slot[(size_t)b] = (ptrdiff_t)blocks.size();
+                blocks.push_back(b);
+                iptr.push_back(0);
+            }
+            iptr[(size_t)slot[(size_t)b] + 1]++;
+        }
+        const size_t nt = blocks.size();
+        for (size_t t = 0; t < nt; ++t) iptr[t + 1] += iptr[t];
 
-        iidx.assign((size_t)iptr[(size_t)nblocks], 0);
-        std::vector<ptrdiff_t> at(iptr.begin(), iptr.end());
-        for (size_t k = kbegin; k < kend; ++k)
-            if (pos[k] >= 0) iidx[(size_t)at[(size_t)pos[k]]++] = (ptrdiff_t)(k - kbegin);
+        iidx.assign((size_t)iptr[nt], 0);
+        std::vector<ptrdiff_t> at(iptr.begin(), iptr.end() - 1);
+        for (size_t k = kbegin; k < kend; ++k) {
+            const ptrdiff_t b = pos[k];
+            if (b >= 0) iidx[(size_t)at[(size_t)slot[(size_t)b]]++] = (ptrdiff_t)(k - kbegin);
+        }
+        for (const ptrdiff_t b : blocks) slot[(size_t)b] = -1;
     }
 
-    inline void galerkin_accumulate(const GalerkinLevel &g, const std::vector<ptrdiff_t> &iptr,
-                                    const std::vector<ptrdiff_t> &iidx, scalar_t *const SFEM_RESTRICT values) {
+    inline void galerkin_accumulate(const GalerkinLevel &g, const std::vector<ptrdiff_t> &blocks,
+                                    const std::vector<ptrdiff_t> &iptr, const std::vector<ptrdiff_t> &iidx,
+                                    scalar_t *const SFEM_RESTRICT values) {
         SFEM_TRACE_SCOPE("cvfem_ss::galerkin_accumulate");
-        const ptrdiff_t nblocks = (ptrdiff_t)iptr.size() - 1;
+        const ptrdiff_t nt = (ptrdiff_t)blocks.size();
 #pragma omp parallel for schedule(static)
-        for (ptrdiff_t b = 0; b < nblocks; ++b) {
+        for (ptrdiff_t t = 0; t < nt; ++t) {
             scalar_t acc[16];
             for (int c = 0; c < 16; ++c) acc[c] = scalar_t(0);
-            for (ptrdiff_t k = iptr[(size_t)b]; k < iptr[(size_t)b + 1]; ++k) {
+            for (ptrdiff_t k = iptr[(size_t)t]; k < iptr[(size_t)t + 1]; ++k) {
                 const scalar_t *const SFEM_RESTRICT src = g.C.data() + (size_t)iidx[(size_t)k] * 16;
 #pragma omp simd
                 for (int c = 0; c < 16; ++c) acc[c] += src[c];
             }
-            for (int c = 0; c < 16; ++c) values[(size_t)b * 16 + c] += acc[c];
+            const size_t b = (size_t)blocks[(size_t)t] * 16;
+            for (int c = 0; c < 16; ++c) values[b + c] += acc[c];
         }
     }
 

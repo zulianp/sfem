@@ -38,7 +38,11 @@ namespace cvfem_ss {
         // Assemble the fine operator through the element-wise Galerkin path at q = 1, where
         // the prolongation is the identity and P^T A P is A itself. That path's identity gate
         // matches the matrix-free apply at 1.54e-16, so these are the operator's own entries.
-        auto A = assemble_coarse_operator(op, space, space, nullptr, constrained);
+        std::shared_ptr<CoarseBSR> A;
+        {
+            SFEM_TRACE_SCOPE("cvfem_ss::make_diagonal_vanka::assemble_fine");
+            A = assemble_coarse_operator(op, space, space, nullptr, constrained);
+        }
         st->A  = A;  // keep alive; the patch factorisations were built from it
 
         vanka_setup(*ss, constrained, A->row_ptr->data(), A->col_idx->data(), A->values->data(), st->v);

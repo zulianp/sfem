@@ -40,23 +40,27 @@ namespace cvfem_ss {
 
         // Assemble and reduce a chunk of macro-elements at a time. Chunk order is fixed and
         // each block sums its own sources, so the result is the same bits on any thread count.
-        std::vector<scalar_t>  acc((size_t)nblocks * 16, scalar_t(0));
-        std::vector<ptrdiff_t> iptr, iidx;
+        //
+        // Accumulated straight into the returned value buffer. It comes from calloc, so it is
+        // zero without a serial fill and its pages are first touched by the accumulating
+        // threads; a separate zeroed accumulator and the copy out of it cost 37 + 64 ms per
+        // Newton step on the FDA nozzle's fine level, 745 MB each way.
+        auto rp = smesh::create_host_buffer<sfem::count_t>(rowptr.size());
+        auto ci = smesh::create_host_buffer<sfem::idx_t>(colidx.size());
+        auto va = smesh::create_host_buffer<real_t>((size_t)nblocks * 16);
+        std::vector<ptrdiff_t> iptr, iidx, blocks;
+        std::vector<ptrdiff_t> slot((size_t)nblocks, -1);
         const ptrdiff_t        step   = galerkin_chunk(gl);
         const size_t           stride = (size_t)gl.nc * 27;
         for (ptrdiff_t e0 = 0; e0 < gl.nmacro; e0 += step) {
             const ptrdiff_t e1 = std::min(gl.nmacro, e0 + step);
             galerkin_assemble(*ss, (scalar_t)op.rho, (scalar_t)op.mu, gl, e0, e1);
-            galerkin_build_inverse(pos, nblocks, (size_t)e0 * stride, (size_t)e1 * stride, iptr, iidx);
-            galerkin_accumulate(gl, iptr, iidx, acc.data());
+            galerkin_build_inverse(pos, (size_t)e0 * stride, (size_t)e1 * stride, slot, blocks, iptr, iidx);
+            galerkin_accumulate(gl, blocks, iptr, iidx, va->data());
         }
 
-        auto rp = smesh::create_host_buffer<sfem::count_t>(rowptr.size());
-        auto ci = smesh::create_host_buffer<sfem::idx_t>(colidx.size());
-        auto va = smesh::create_host_buffer<real_t>((size_t)nblocks * 16);
         std::copy(rowptr.begin(), rowptr.end(), rp->data());
         std::copy(colidx.begin(), colidx.end(), ci->data());
-        std::copy(acc.begin(), acc.end(), va->data());
 
         if (diag_out) {
             diag_out->assign((size_t)gl.n_coarse * 16, real_t(0));
@@ -78,13 +82,14 @@ namespace cvfem_ss {
             std::vector<sfem::idx_t>   colidx;
             galerkin_build_pattern(gl, rowptr, colidx);
 
-            std::vector<ptrdiff_t> pos, iptr, iidx;
+            std::vector<ptrdiff_t> pos, iptr, iidx, blocks;
             galerkin_build_scatter(gl, rowptr, colidx, pos);
-            const ptrdiff_t nblocks = (ptrdiff_t)colidx.size();
-            galerkin_build_inverse(pos, nblocks, 0, pos.size(), iptr, iidx);
+            const ptrdiff_t        nblocks = (ptrdiff_t)colidx.size();
+            std::vector<ptrdiff_t> slot((size_t)nblocks, -1);
+            galerkin_build_inverse(pos, 0, pos.size(), slot, blocks, iptr, iidx);
 
             std::vector<scalar_t> acc((size_t)nblocks * 16, scalar_t(0));
-            galerkin_accumulate(gl, iptr, iidx, acc.data());
+            galerkin_accumulate(gl, blocks, iptr, iidx, acc.data());
 
             auto rp = smesh::create_host_buffer<sfem::count_t>(rowptr.size());
             auto ci = smesh::create_host_buffer<sfem::idx_t>(colidx.size());
