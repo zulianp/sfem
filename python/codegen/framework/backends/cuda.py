@@ -1,48 +1,61 @@
+"""The SoA backend bound to a GPU target.
+
+Everything about *how* a planned unit becomes files is
+`backends/soa.SoABackend`, which is the same whatever the target.  What is here
+is only the four answers a device target gives.
+
+Until the mesh-kernel lowering moved onto `TargetPlatform`, this backend
+accepted `energy_soa` units and raised on everything else.  That was never a
+statement about the residual family -- it was that the traversal which lowers
+it lived behind a class this module could not name, and that the emitters wrote
+their mesh loop, their kernel signature, their scatter and their launch by hand
+in the CPU's spelling.
+"""
+
 from dataclasses import dataclass
 import re
 
+from codegen.framework.backends.soa import SoABackend, SoAEmission
 from codegen.framework.forms.forms import FormOrder
-from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 from codegen.framework.emitters.energy import CUDAEnergySoAEmitter
 from codegen.framework.plans.generation import KernelTarget, MeshPhase
-from codegen.framework.targets import CUDATarget, HIPTarget, use_target
+from codegen.framework.targets import CUDATarget, HIPTarget, TargetLanguage, use_target
+
+#: The name this module published before the traversal moved.
+CUDASoAEmission = SoAEmission
 
 
 @dataclass(frozen=True)
-class CUDASoAEmission:
-    files: tuple
-
-    def __iter__(self):
-        return iter(self.files)
-
-
-@dataclass(frozen=True)
-class CUDASoABackend:
-    """CUDA/SoA backend boundary for planned material code-generation units."""
+class CUDASoABackend(SoABackend):
+    """CUDA/HIP SoA backend boundary for planned material code-generation units."""
 
     supports_op_wrapper: bool = False
     target: object = CUDATarget()
     emitter: object = None
 
-    def emit(self, unit, context):
-        _require_gpu_target(unit)
-        unit.validate_for_context(context)
-        kind = _kind_value(unit.kind)
-        if kind != "energy_soa":
-            raise ValueError(
-                "CUDA SoA backend currently supports energy_soa units; got '%s'"
-                % kind
-            )
-        with use_target(self.target):
-            files = tuple(self._emit_energy(unit, context))
-        _validate_cuda_source_contract(files)
-        return CUDASoAEmission(files)
+    def mesh_source_extension(self):
+        return "hip" if isinstance(self.target, HIPTarget) else "cu"
+
+    def local_header_extension(self):
+        #: `.cuh` for HIP too: the header is included by device code either
+        #: way, and `hipcc` reads `.cuh` without complaint.  The extension that
+        #: matters is the translation unit's.
+        return "cuh"
 
     def _shared_emitter(self):
-        operator_extension = "hip" if isinstance(self.target, HIPTarget) else "cu"
         return CUDAEnergySoAEmitter(
-            target=self.target, operator_extension=operator_extension
+            target=self.target, operator_extension=self.mesh_source_extension()
         )
+
+    def _require_backend_target(self):
+        if self.target.language not in (TargetLanguage.CUDA, TargetLanguage.HIP):
+            raise ValueError("CUDA SoA backend requires a device target")
+
+    def _require_unit_target(self, unit):
+        _require_gpu_target(unit)
+
+    def _validate_emitted(self, files, traversal):
+        _validate_cuda_source_contract(files)
 
     def shared_primitive_files(self):
         """The target's material-independent headers, bound to this target.
@@ -58,25 +71,12 @@ class CUDASoABackend:
         """No device lowering for the inexact-apply family yet.
 
         The backend is asked rather than the driver testing the target, so the
-        answer lives where the target's capabilities do.  It is empty because
-        the family's emitter spells a CPU vector lane -- `bev%d[lane]`,
-        `[lane]` on every staged read -- and `_validate_cuda_source_contract`
-        below rejects exactly that, correctly.  What it needs is the work-item
-        lowering the rest of the tree already goes through, not a suppression
-        here; until that lands there is nothing to hand back.
+        answer lives where the target's capabilities do.  The residual family
+        reached CUDA when the mesh-kernel lowering moved onto the target; this
+        one has not been measured under a device target yet, and an untested
+        `()` is a more honest answer than an untested file.
         """
         return ()
-
-    def _emit_energy(self, unit, context):
-        _validate_energy_plan(unit)
-        emitter = self.emitter
-        if emitter is None:
-            operator_extension = "hip" if isinstance(self.target, HIPTarget) else "cu"
-            emitter = CUDAEnergySoAEmitter(
-                target=self.target,
-                operator_extension=operator_extension,
-            )
-        return emitter.emit_plan(energy_soa_kernel_emission_plan(unit, context))
 
 
 def _kind_value(kind):
@@ -166,5 +166,18 @@ def _validate_cuda_source_contract(files):
             raise RuntimeError("CUDA file '%s' contains fake thread lowering" % file.path)
         if "SFEM_INLINE" in file.source:
             raise RuntimeError("CUDA file '%s' contains SFEM_INLINE macro usage" % file.path)
-        if re.search(r"(?<![A-Za-z0-9_])pow\s*\(", file.source):
-            raise RuntimeError("CUDA file '%s' contains generic pow usage" % file.path)
+        #: A `pow` whose exponent is a literal should have been one of the
+        #: target's `pow_m1` / `pow2` helpers, and that is what this catches.
+        #: A `pow` whose exponent is a runtime value -- van Genuchten's `m`,
+        #: two-phase flow's `C_kw1` -- has no specialisation to have missed,
+        #: and CUDA provides `pow(double, double)` for device code.  Banning
+        #: the name outright rejected eleven correct calls in
+        #: `two_phase_flow_d2_simplex_local` and said nothing about any of them.
+        literal_exponent = re.search(
+            r"(?<![A-Za-z0-9_])pow\s*\([^()]*,\s*-?\d+(?:\.\d+)?\s*\)", file.source
+        )
+        if literal_exponent:
+            raise RuntimeError(
+                "CUDA file '%s' calls pow with a literal exponent: %s"
+                % (file.path, literal_exponent.group(0))
+            )

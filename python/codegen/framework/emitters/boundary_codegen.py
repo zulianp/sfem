@@ -21,6 +21,7 @@ from codegen.framework.fem.reference import (
     _tri6_reference_gradients,
 )
 from codegen.framework.targets import current_target
+from codegen.framework.emitters.ast_printer import element_loop_lines
 from codegen.framework.plans.boundary_usage import (
     boundary_coefficient_usage,
     coordinate_symbols as _coordinate_candidates,
@@ -105,11 +106,97 @@ def generate_boundary_residual_sfem_files(
         system,
         use_tensor_product=_uses_tensor_product_boundary_surface(surface),
     )
+    target = current_target()
+    inline_qualifier = target.inline_qualifier()
     return (
-        GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
-        GeneratedKernelFile("kernel_diagnostics.hpp", "\n".join(_sfem_soa_diagnostics_header())),
-        GeneratedKernelFile("%s_boundary_operator.cpp" % prefix, source),
+        GeneratedKernelFile(
+            target.header_name("kernel_math"),
+            _sfem_math_header_source(
+                target.header_guard_suffix(),
+                inline_qualifier,
+                inline_qualifier == "SFEM_INLINE",
+            ),
+        ),
+        GeneratedKernelFile(
+            target.header_name("kernel_diagnostics"),
+            "\n".join(
+                _sfem_soa_diagnostics_header(
+                    target.diagnostic_work_item(),
+                    target.header_guard_suffix(),
+                    inline_qualifier,
+                    inline_qualifier == "SFEM_INLINE",
+                    host_qualifier=target.host_function_qualifier(),
+                )
+            ),
+        ),
+        GeneratedKernelFile(
+            "%s_boundary_operator.%s" % (prefix, _boundary_operator_extension(target)),
+            source,
+        ),
     )
+
+
+def _boundary_target_lines(function, sideset_function, current_args, param_args, scatter_streams):
+    """The five things about a boundary kernel that the target decides.
+
+    Same set the mesh kernels take -- how the pass is opened, how the kernel is
+    declared, how it returns, how the entry point reaches it -- and the same
+    reason: written down here they were the CPU's answers, and a device
+    generation produced an `extern "C"` host function containing
+    `#pragma omp parallel for` and a serial walk of every element.
+    """
+    target = current_target()
+    #: The leading break is this family's own wrapping, preserved for the
+    #: reason the counter name is.
+    element_arguments = (
+        "\n      nelements, nnodes, elements, points%s%s, out_stride, %s"
+        % (current_args, param_args, scatter_streams)
+    )
+    sideset_arguments = (
+        "\n      nsides, nnodes, elements, parent, side_idx, points%s%s, out_stride, %s"
+        % (current_args, param_args, scatter_streams)
+    )
+    return {
+        "element_kernel_line": target.mesh_function_line("%s_impl" % function),
+        "sideset_kernel_line": target.mesh_function_line("%s_impl" % sideset_function),
+        #: `index="e"` and no schedule: this family has always spelled its
+        #: counter `e` and its pragma without one, and the point of routing it
+        #: through the target is the device lowering, not a tidy-up that moves
+        #: bytes in thirteen tracked files.
+        "element_loop": "\n".join(
+            element_loop_lines(target, index="e", schedule=None)
+        ),
+        "sideset_loop": "\n".join(
+            element_loop_lines(target, index="s", extent="nsides", schedule=None)
+        ),
+        "success_return": "\n".join(target.success_return_lines()),
+        "element_launch_real": "\n".join(
+            target.mesh_launch_lines("%s_impl" % function, "real_t", (element_arguments,))
+        ),
+        "element_launch_float": "\n".join(
+            target.mesh_launch_lines("%s_impl" % function, "float", (element_arguments,))
+        ),
+        "sideset_launch_real": "\n".join(
+            target.mesh_launch_lines(
+                "%s_impl" % sideset_function, "real_t", (sideset_arguments,), extent="nsides"
+            )
+        ),
+        "sideset_launch_float": "\n".join(
+            target.mesh_launch_lines(
+                "%s_impl" % sideset_function, "float", (sideset_arguments,), extent="nsides"
+            )
+        ),
+    }
+
+
+def _boundary_operator_extension(target):
+    """The boundary operator's translation unit, named by the target.
+
+    The mesh kernels take theirs from the backend, which is handed down through
+    `MeshKernelPlan`; this emitter builds its own filename from a prefix, so it
+    asks the bound target directly.
+    """
+    return {"cuda": "cu", "hip": "hip"}.get(target.language.value, "cpp")
 
 
 def _surface_element(element_type):
@@ -347,7 +434,7 @@ def _boundary_source(function, element_type, surface, components, parameters, co
 {restrict_prelude}
 
 #include <math.h>
-#include "kernel_math.hpp"
+#include "{math_header}"
 
 namespace sfem {{
 namespace codegen {{
@@ -446,15 +533,14 @@ template <typename s_t>
 }}
 
 template <typename s_t>
-{function_qualifier} int {function}_impl(
+{element_kernel_line}
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points{current_decls}{param_decls},
     const int out_stride,
 {out_params}) {{
-{parallel_for_pragma}
-  for (ptrdiff_t e = 0; e < nelements; ++e) {{
+{element_loop}
     idx_t ev[{n_shape}];
     s_t element_vector[{components}][{n_shape}];
     for (int i = 0; i < {n_shape}; ++i) {{
@@ -469,11 +555,11 @@ template <typename s_t>
     {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
   }}
 
-  return SFEM_SUCCESS;
+{success_return}
 }}
 
 template <typename s_t>
-{function_qualifier} int {sideset_function}_impl(
+{sideset_kernel_line}
     const ptrdiff_t nsides,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -482,8 +568,7 @@ template <typename s_t>
     const geom_t *const *const RSTR points{current_decls}{param_decls},
     const int out_stride,
 {out_params}) {{
-{parallel_for_pragma}
-  for (ptrdiff_t s = 0; s < nsides; ++s) {{
+{sideset_loop}
     idx_t ev[{n_shape}];
     s_t element_vector[{components}][{n_shape}];
     {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
@@ -496,7 +581,7 @@ template <typename s_t>
     {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
   }}
 
-  return SFEM_SUCCESS;
+{success_return}
 }}
 
 }}  // namespace codegen
@@ -509,8 +594,7 @@ extern "C" int {function}(
     const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
     const int out_stride,
 {extern_out_params}) {{
-  return sfem::codegen::{function}_impl<real_t>(
-      nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+{element_launch_real}
 }}
 
 extern "C" int {function}_float(
@@ -520,8 +604,7 @@ extern "C" int {function}_float(
     const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
     const int out_stride,
 {extern_float_out_params}) {{
-  return sfem::codegen::{function}_impl<float>(
-      nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+{element_launch_float}
 }}
 
 extern "C" int {sideset_function}(
@@ -533,8 +616,7 @@ extern "C" int {sideset_function}(
     const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
     const int out_stride,
 {extern_out_params}) {{
-  return sfem::codegen::{sideset_function}_impl<real_t>(
-      nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+{sideset_launch_real}
 }}
 
 extern "C" int {sideset_function}_float(
@@ -546,15 +628,18 @@ extern "C" int {sideset_function}_float(
     const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
     const int out_stride,
 {extern_float_out_params}) {{
-  return sfem::codegen::{sideset_function}_impl<float>(
-      nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+{sideset_launch_float}
 }}
 """.format(
         restrict_prelude="\n".join(restrict_prelude()),
+        math_header=current_target().header_name("kernel_math"),
+        **_boundary_target_lines(
+            function, sideset_function, current_args, param_args, scatter_streams
+        ),
         function=function,
         function_qualifier=_function_qualifier(),
         parallel_for_pragma=_parallel_for_pragma(),
-        vectorize_pragma=_vectorize_pragma(),
+        vectorize_pragma=_vectorize_pragma() or "",
         sideset_function=sideset_function,
         n_shape=n_shape,
         n_qp=n_qp,
@@ -588,11 +673,14 @@ extern "C" int {sideset_function}_float(
             for c in range(components)
         ),
         scatter_lines="\n".join(
-            "{atomic_update_pragma}\n            out{c}[node * out_stride] += element_vector[{c}][i];".format(
-                atomic_update_pragma=_atomic_update_pragma(),
-                c=c,
-            )
+            line
             for c in range(components)
+            for line in current_target().scatter_add_lines(
+                "out%d[node * out_stride]" % c,
+                "element_vector[%d][i]" % c,
+                "            ",
+                pragma_indent="",
+            )
         ),
         scatter_streams=scatter_streams,
     )
@@ -767,7 +855,7 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
 {restrict_prelude}
 
 #include <math.h>
-#include "kernel_math.hpp"
+#include "{math_header}"
 
 namespace sfem {{
 namespace codegen {{
@@ -910,15 +998,14 @@ template <typename s_t>
 }}
 
 template <typename s_t>
-{function_qualifier} int {function}_impl(
+{element_kernel_line}
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points{current_decls}{param_decls},
     const int out_stride,
 {out_params}) {{
-{parallel_for_pragma}
-  for (ptrdiff_t e = 0; e < nelements; ++e) {{
+{element_loop}
     idx_t ev[{n_shape}];
     s_t element_vector[{components}][{n_shape}];
     for (int i = 0; i < {n_shape}; ++i) {{
@@ -933,11 +1020,11 @@ template <typename s_t>
     {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
   }}
 
-  return SFEM_SUCCESS;
+{success_return}
 }}
 
 template <typename s_t>
-{function_qualifier} int {sideset_function}_impl(
+{sideset_kernel_line}
     const ptrdiff_t nsides,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -946,8 +1033,7 @@ template <typename s_t>
     const geom_t *const *const RSTR points{current_decls}{param_decls},
     const int out_stride,
 {out_params}) {{
-{parallel_for_pragma}
-  for (ptrdiff_t s = 0; s < nsides; ++s) {{
+{sideset_loop}
     idx_t ev[{n_shape}];
     s_t element_vector[{components}][{n_shape}];
     {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
@@ -960,7 +1046,7 @@ template <typename s_t>
     {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
   }}
 
-  return SFEM_SUCCESS;
+{success_return}
 }}
 
 }}  // namespace codegen
@@ -973,8 +1059,7 @@ extern "C" int {function}(
     const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
     const int out_stride,
 {extern_out_params}) {{
-  return sfem::codegen::{function}_impl<real_t>(
-      nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+{element_launch_real}
 }}
 
 extern "C" int {function}_float(
@@ -984,8 +1069,7 @@ extern "C" int {function}_float(
     const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
     const int out_stride,
 {extern_float_out_params}) {{
-  return sfem::codegen::{function}_impl<float>(
-      nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+{element_launch_float}
 }}
 
 extern "C" int {sideset_function}(
@@ -997,8 +1081,7 @@ extern "C" int {sideset_function}(
     const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
     const int out_stride,
 {extern_out_params}) {{
-  return sfem::codegen::{sideset_function}_impl<real_t>(
-      nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+{sideset_launch_real}
 }}
 
 extern "C" int {sideset_function}_float(
@@ -1010,15 +1093,18 @@ extern "C" int {sideset_function}_float(
     const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
     const int out_stride,
 {extern_float_out_params}) {{
-  return sfem::codegen::{sideset_function}_impl<float>(
-      nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+{sideset_launch_float}
 }}
 """.format(
         restrict_prelude="\n".join(restrict_prelude()),
+        math_header=current_target().header_name("kernel_math"),
+        **_boundary_target_lines(
+            function, sideset_function, current_args, param_args, scatter_streams
+        ),
         function=function,
         function_qualifier=_function_qualifier(),
         parallel_for_pragma=_parallel_for_pragma(),
-        vectorize_pragma=_vectorize_pragma(),
+        vectorize_pragma=_vectorize_pragma() or "",
         sideset_function=sideset_function,
         n_shape=n_shape,
         n_shape_1d=n_shape_1d,
@@ -1052,11 +1138,14 @@ extern "C" int {sideset_function}_float(
             for c in range(components)
         ),
         scatter_lines="\n".join(
-            "{atomic_update_pragma}\n            out{c}[node * out_stride] += element_vector[{c}][i];".format(
-                atomic_update_pragma=_atomic_update_pragma(),
-                c=c,
-            )
+            line
             for c in range(components)
+            for line in current_target().scatter_add_lines(
+                "out%d[node * out_stride]" % c,
+                "element_vector[%d][i]" % c,
+                "            ",
+                pragma_indent="",
+            )
         ),
         scatter_streams=scatter_streams,
     )
