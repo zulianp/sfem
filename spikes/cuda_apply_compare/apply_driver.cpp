@@ -1,24 +1,37 @@
-// One driver, two compilers.  Built by g++ against the OpenMP tree and by nvcc
-// against the CUDA tree, it calls the same generated entry point by the same
-// name and writes the same output file, so the two can be diffed.  Compiling it
-// twice is what keeps the comparison honest: there is no second implementation
-// of the operator anywhere in here.
+// The generated kernels, host against device: one source, compiled twice.
+//
+// Built by `g++` against an OpenMP generation and by `nvcc` against a CUDA
+// generation of the same materials.  Both link the same `extern "C"` entry
+// points under the same names and run the same mesh, so what the two runs
+// differ by is the generated kernel and nothing else.  The device arm is
+// selected by `__CUDACC__` and is only memory plumbing -- allocate, copy,
+// launch, copy back.
+//
+// Two things are measured, and they want different meshes:
+//
+//   * **Agreement.**  Every kernel whose device lowering is worth doubting,
+//     run on a small mesh with *shared* connectivity so the scatter is
+//     contended and `atomicAdd` is exercised rather than bypassed.  Each
+//     output vector is written out by name; `compare.py` differences the two
+//     files entry by entry.  Printing each run's own norms instead -- which
+//     this driver used to do -- cannot see two answers that share an L2 and
+//     differ entrywise.
+//
+//   * **Throughput.**  A structured lattice, because a timing on scrambled
+//     connectivity is not a result.  Hexahedra for the tensor-product apply,
+//     and the Kuhn subdivision of the same lattice for the simplex gradient.
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
-#include <chrono>
-#include <algorithm>
-#include <cstddef>
 
-// The same fallback typedefs the generated headers use when sfem_base.hpp is
-// not on the include path, so the driver and the kernel agree on every type
-// without dragging in the library build.
-typedef double real_t;
 typedef ptrdiff_t idx_t;
-typedef ptrdiff_t count_t;
+typedef double real_t;
 typedef double geom_t;
 #define SFEM_GENERATED_SCALAR_T
 
@@ -26,157 +39,410 @@ typedef double geom_t;
 #include <cuda_runtime.h>
 #define CUDA_OK(call)                                                            \
   do {                                                                           \
-    cudaError_t status = (call);                                                 \
+    const cudaError_t status = (call);                                           \
     if (status != cudaSuccess) {                                                 \
-      std::fprintf(stderr, "%s:%d %s\n", __FILE__, __LINE__,                     \
-                   cudaGetErrorString(status));                                  \
+      std::fprintf(stderr, "cuda: %s at %s:%d\n", cudaGetErrorString(status),    \
+                   __FILE__, __LINE__);                                          \
       std::exit(1);                                                              \
     }                                                                            \
   } while (0)
+static const char *WHERE = "gh200 (device)";
+template <class T> static T *upload(const std::vector<T> &host) {
+  T *device = nullptr;
+  CUDA_OK(cudaMalloc((void **)&device, host.size() * sizeof(T)));
+  CUDA_OK(cudaMemcpy(device, host.data(), host.size() * sizeof(T), cudaMemcpyHostToDevice));
+  return device;
+}
+template <class T> static void download(std::vector<T> &host, T *device) {
+  CUDA_OK(cudaDeviceSynchronize());
+  CUDA_OK(cudaMemcpy(host.data(), device, host.size() * sizeof(T), cudaMemcpyDeviceToHost));
+}
+template <class T> static void clear(T *device, size_t count) {
+  CUDA_OK(cudaMemset(device, 0, count * sizeof(T)));
+}
+static void sync() { CUDA_OK(cudaDeviceSynchronize()); }
+#else
+static const char *WHERE = "host (OpenMP)";
+template <class T> static T *upload(const std::vector<T> &host) {
+  T *copy = (T *)std::malloc(host.size() * sizeof(T));
+  std::memcpy(copy, host.data(), host.size() * sizeof(T));
+  return copy;
+}
+template <class T> static void download(std::vector<T> &host, T *device) {
+  std::memcpy(host.data(), device, host.size() * sizeof(T));
+}
+template <class T> static void clear(T *device, size_t count) {
+  std::memset(device, 0, count * sizeof(T));
+}
+static void sync() {}
 #endif
 
-extern "C" int neohookean_ogden_proteus_hex8_apply_i_msoa(
-    const int scalar_bytes, const ptrdiff_t nelements, const ptrdiff_t nnodes,
-    idx_t **const elements, const geom_t *const *const points,
-    const real_t lmbda, const real_t mu,
-    const ptrdiff_t u_stride, const void *const ux, const void *const uy, const void *const uz,
-    const ptrdiff_t h_stride, const void *const hx, const void *const hy, const void *const hz,
-    const ptrdiff_t out_stride, void *const outx, void *const outy, void *const outz);
+extern "C" {
+int neohookean_ogden_proteus_hex8_apply_i_msoa(
+    const int, const ptrdiff_t, const ptrdiff_t, idx_t **const, const geom_t *const *const,
+    const real_t, const real_t, const ptrdiff_t, const void *const, const void *const,
+    const void *const, const ptrdiff_t, const void *const, const void *const, const void *const,
+    const ptrdiff_t, void *const, void *const, void *const);
+int laplace_tri3_gradient_a_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const real_t,
+    const ptrdiff_t, const void *, const ptrdiff_t, void *);
+int laplace_tri3_apply_a_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const real_t,
+    const ptrdiff_t, const void *, const ptrdiff_t, void *);
+int laplace_tet4_gradient_a_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
+int laplace_tet4_apply_a_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
+int linear_elasticity_tet4_gradient_a_msoa_aos_unit(const int, const ptrdiff_t, const ptrdiff_t,
+    idx_t **, const geom_t *, const geom_t *, const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void *);
+int laplace_quad4_gradient_i_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
+int laplace_hex8_gradient_i_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
+}
 
-static const int NS = 8, ND = 3;
+static double seconds() {
+  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
-// A structured lattice of n^3 hexahedra, nodes numbered lexicographically with x
-// fastest -- which is the order a PROTEUS element's micro-kernel is written in,
-// so no permutation is needed here.
-struct Mesh {
-  ptrdiff_t n, nnodes, nelements;
-  std::vector<idx_t> ev[8];
+// One stream with a fixed seed: both binaries must see byte-identical inputs,
+// so nothing here may depend on the compiler's random number generator.
+static unsigned long long rng_state = 0x9e3779b97f4a7c15ull;
+static double rnd() {
+  rng_state ^= rng_state << 13;
+  rng_state ^= rng_state >> 7;
+  rng_state ^= rng_state << 17;
+  return (double)((rng_state >> 11) & ((1ull << 53) - 1)) / (double)(1ull << 53);
+}
+static void reseed() { rng_state = 0x9e3779b97f4a7c15ull; }
+
+static FILE *record_file = nullptr;
+static void record(const char *name, const std::vector<real_t> &values) {
+  if (record_file == nullptr) return;
+  std::fprintf(record_file, "# %s %zu\n", name, values.size());
+  for (size_t i = 0; i < values.size(); ++i) std::fprintf(record_file, "%.17g\n", values[i]);
+}
+
+static std::vector<real_t> random_field(ptrdiff_t n) {
+  std::vector<real_t> field(n);
+  for (ptrdiff_t i = 0; i < n; ++i) field[i] = 2.0 * rnd() - 1.0;
+  return field;
+}
+
+// Shared connectivity: several elements land on the same node, which is the
+// case the scatter has to survive.
+static idx_t **shared_element_table(int n_shape, ptrdiff_t nelements, ptrdiff_t nnodes) {
+  std::vector<idx_t *> columns(n_shape);
+  for (int shape = 0; shape < n_shape; ++shape) {
+    std::vector<idx_t> column(nelements);
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
+      idx_t node = (idx_t)(rnd() * (double)nnodes);
+      column[e] = node >= nnodes ? nnodes - 1 : node;
+    }
+    columns[shape] = upload(column);
+  }
+  return upload(columns);
+}
+
+// A symmetric positive-definite metric per element, L L^T with a positive
+// diagonal, so the kernels see numbers a real mesh could produce.
+static std::vector<std::vector<geom_t>> spd_metric(int dim, ptrdiff_t nelements) {
+  const int n_component = dim == 2 ? 3 : 6;
+  std::vector<std::vector<geom_t>> metric(n_component, std::vector<geom_t>(nelements));
+  for (ptrdiff_t e = 0; e < nelements; ++e) {
+    double L[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    for (int i = 0; i < dim; ++i)
+      for (int j = 0; j <= i; ++j) L[i][j] = (i == j) ? 0.5 + rnd() : 0.4 * (2.0 * rnd() - 1.0);
+    double M[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    for (int i = 0; i < dim; ++i)
+      for (int j = 0; j < dim; ++j)
+        for (int k = 0; k < dim; ++k) M[i][j] += L[i][k] * L[j][k];
+    int c = 0;
+    for (int i = 0; i < dim; ++i)
+      for (int j = i; j < dim; ++j) metric[c++][e] = M[i][j];
+  }
+  return metric;
+}
+
+// A structured lattice of side^dim cells, nodes numbered lexicographically with
+// x fastest -- which is the order a PROTEUS element's micro-kernel is written
+// in, so no permutation is needed here.
+struct Lattice {
+  ptrdiff_t side, np, nnodes, ncells;
   std::vector<geom_t> px[3];
-  explicit Mesh(ptrdiff_t side) : n(side) {
-    const ptrdiff_t np = n + 1;
-    nnodes = np * np * np;
-    nelements = n * n * n;
-    for (int c = 0; c < 3; ++c) px[c].resize(nnodes);
-    for (ptrdiff_t k = 0; k < np; ++k)
-      for (ptrdiff_t j = 0; j < np; ++j)
-        for (ptrdiff_t i = 0; i < np; ++i) {
-          const ptrdiff_t v = i + np * (j + np * k);
-          px[0][v] = (geom_t)i / (geom_t)n;
-          px[1][v] = (geom_t)j / (geom_t)n;
-          px[2][v] = (geom_t)k / (geom_t)n;
-        }
-    for (int s = 0; s < 8; ++s) ev[s].resize(nelements);
-    for (ptrdiff_t k = 0; k < n; ++k)
-      for (ptrdiff_t j = 0; j < n; ++j)
-        for (ptrdiff_t i = 0; i < n; ++i) {
-          const ptrdiff_t e = i + n * (j + n * k);
-          for (int s = 0; s < 8; ++s) {
-            const ptrdiff_t di = s & 1, dj = (s >> 1) & 1, dk = (s >> 2) & 1;
-            ev[s][e] = (idx_t)((i + di) + np * ((j + dj) + np * (k + dk)));
-          }
-        }
+  Lattice(ptrdiff_t n, int dim) : side(n), np(n + 1) {
+    nnodes = 1;
+    ncells = 1;
+    for (int d = 0; d < dim; ++d) { nnodes *= np; ncells *= n; }
+    for (int c = 0; c < dim; ++c) px[c].resize(nnodes);
+    for (ptrdiff_t node = 0; node < nnodes; ++node) {
+      ptrdiff_t rest = node;
+      for (int d = 0; d < dim; ++d) { px[d][node] = (geom_t)(rest % np) / (geom_t)n; rest /= np; }
+    }
+  }
+  ptrdiff_t corner(const ptrdiff_t base[3], int code, int dim) const {
+    ptrdiff_t node = 0, stride = 1;
+    for (int d = 0; d < dim; ++d) { node += (base[d] + ((code >> d) & 1)) * stride; stride *= np; }
+    return node;
+  }
+  void cell_base(ptrdiff_t cell, int dim, ptrdiff_t base[3]) const {
+    ptrdiff_t rest = cell;
+    for (int d = 0; d < dim; ++d) { base[d] = rest % side; rest /= side; }
   }
 };
+
+// The mesh-order corner sequence: counter-clockwise on the bottom face, then
+// the top, which is 0,1,3,2 in cube-corner bits.
+static const int MESH_ORDER[8] = {0, 1, 3, 2, 4, 5, 7, 6};
+
+static std::vector<std::vector<idx_t>> lattice_connectivity(const Lattice &lattice, int dim,
+                                                            bool mesh_order) {
+  const int n_shape = 1 << dim;
+  std::vector<std::vector<idx_t>> connectivity(n_shape, std::vector<idx_t>(lattice.ncells));
+  for (ptrdiff_t cell = 0; cell < lattice.ncells; ++cell) {
+    ptrdiff_t base[3] = {0, 0, 0};
+    lattice.cell_base(cell, dim, base);
+    for (int shape = 0; shape < n_shape; ++shape) {
+      const int code = mesh_order ? MESH_ORDER[shape] : shape;
+      connectivity[shape][cell] = lattice.corner(base, code, dim);
+    }
+  }
+  return connectivity;
+}
+
+// The Kuhn subdivision: the six paths 0 -> e_a -> e_a + e_b -> 7 through a
+// cube's corners, which tile it with six tetrahedra and keep the lattice's
+// locality.
+static std::vector<std::vector<idx_t>> kuhn_connectivity(const Lattice &lattice) {
+  static const int KUHN[6][4] = {{0, 1, 3, 7}, {0, 1, 5, 7}, {0, 2, 3, 7},
+                                 {0, 2, 6, 7}, {0, 4, 5, 7}, {0, 4, 6, 7}};
+  std::vector<std::vector<idx_t>> connectivity(4, std::vector<idx_t>(6 * lattice.ncells));
+  for (ptrdiff_t cell = 0; cell < lattice.ncells; ++cell) {
+    ptrdiff_t base[3] = {0, 0, 0};
+    lattice.cell_base(cell, 3, base);
+    for (int t = 0; t < 6; ++t)
+      for (int shape = 0; shape < 4; ++shape)
+        connectivity[shape][6 * cell + t] = lattice.corner(base, KUHN[t][shape], 3);
+  }
+  return connectivity;
+}
+
+template <class T> static T **upload_table(const std::vector<std::vector<T>> &columns) {
+  std::vector<T *> uploaded(columns.size());
+  for (size_t c = 0; c < columns.size(); ++c) uploaded[c] = upload(columns[c]);
+  return upload(uploaded);
+}
+
+// ---------------------------------------------------------------- agreement
+
+static void agree_simplex_metric(int dim) {
+  const ptrdiff_t nelements = 4096, nnodes = 1024;
+  reseed();
+  idx_t **elements = shared_element_table(dim == 2 ? 3 : 4, nelements, nnodes);
+  std::vector<std::vector<geom_t>> metric = spd_metric(dim, nelements);
+  std::vector<geom_t *> met(metric.size());
+  for (size_t c = 0; c < metric.size(); ++c) met[c] = upload(metric[c]);
+  real_t *u = upload(random_field(nnodes));
+  const std::vector<real_t> zero(nnodes, 0.0);
+
+  char name[128];
+  for (int is_apply = 0; is_apply < 2; ++is_apply) {
+    real_t *out = upload(zero);
+    if (dim == 2) {
+      (is_apply ? laplace_tri3_apply_a_msoa : laplace_tri3_gradient_a_msoa)(
+          (int)sizeof(real_t), nelements, nnodes, elements, met[0], met[1], met[2],
+          1.7, 1, u, 1, out);
+    } else {
+      (is_apply ? laplace_tet4_apply_a_msoa : laplace_tet4_gradient_a_msoa)(
+          (int)sizeof(real_t), nelements, nnodes, elements,
+          met[0], met[1], met[2], met[3], met[4], met[5], 1.7, 1, u, 1, out);
+    }
+    sync();
+    std::vector<real_t> result(nnodes);
+    download(result, out);
+    std::snprintf(name, sizeof(name), "laplace_%s_%s_a_msoa", dim == 2 ? "tri3" : "tet4",
+                  is_apply ? "apply" : "gradient");
+    record(name, result);
+  }
+}
+
+static void agree_linear_elasticity_tet4() {
+  const ptrdiff_t nelements = 4096, nnodes = 1024;
+  reseed();
+  idx_t **elements = shared_element_table(4, nelements, nnodes);
+
+  std::vector<geom_t> adj_aos(9 * nelements), det(nelements);
+  for (ptrdiff_t e = 0; e < nelements; ++e) {
+    double J[3][3];
+    for (int i = 0; i < 3; ++i)
+      for (int j = 0; j < 3; ++j) J[i][j] = (i == j ? 1.0 : 0.0) + 0.25 * (2.0 * rnd() - 1.0);
+    det[e] = J[0][0] * (J[1][1] * J[2][2] - J[1][2] * J[2][1]) -
+             J[0][1] * (J[1][0] * J[2][2] - J[1][2] * J[2][0]) +
+             J[0][2] * (J[1][0] * J[2][1] - J[1][1] * J[2][0]);
+    // the adjugate: the transposed cofactor matrix
+    adj_aos[9 * e + 0] =  (J[1][1] * J[2][2] - J[1][2] * J[2][1]);
+    adj_aos[9 * e + 1] = -(J[0][1] * J[2][2] - J[0][2] * J[2][1]);
+    adj_aos[9 * e + 2] =  (J[0][1] * J[1][2] - J[0][2] * J[1][1]);
+    adj_aos[9 * e + 3] = -(J[1][0] * J[2][2] - J[1][2] * J[2][0]);
+    adj_aos[9 * e + 4] =  (J[0][0] * J[2][2] - J[0][2] * J[2][0]);
+    adj_aos[9 * e + 5] = -(J[0][0] * J[1][2] - J[0][2] * J[1][0]);
+    adj_aos[9 * e + 6] =  (J[1][0] * J[2][1] - J[1][1] * J[2][0]);
+    adj_aos[9 * e + 7] = -(J[0][0] * J[2][1] - J[0][1] * J[2][0]);
+    adj_aos[9 * e + 8] =  (J[0][0] * J[1][1] - J[0][1] * J[1][0]);
+  }
+  geom_t *g_adj = upload(adj_aos), *g_det = upload(det);
+  real_t *ux = upload(random_field(nnodes));
+  real_t *uy = upload(random_field(nnodes));
+  real_t *uz = upload(random_field(nnodes));
+  const std::vector<real_t> zero(nnodes, 0.0);
+  real_t *ox = upload(zero), *oy = upload(zero), *oz = upload(zero);
+
+  linear_elasticity_tet4_gradient_a_msoa_aos_unit(
+      (int)sizeof(real_t), nelements, nnodes, elements, g_adj, g_det, 0.31, 0.77,
+      1, ux, uy, uz, 1, ox, oy, oz);
+  sync();
+  std::vector<real_t> rx(nnodes), ry(nnodes), rz(nnodes);
+  download(rx, ox); download(ry, oy); download(rz, oz);
+  record("linear_elasticity_tet4_gradient_a_msoa_aos_unit_x", rx);
+  record("linear_elasticity_tet4_gradient_a_msoa_aos_unit_y", ry);
+  record("linear_elasticity_tet4_gradient_a_msoa_aos_unit_z", rz);
+}
+
+// These two take points rather than a metric, so they get a lattice: random
+// coordinates would give inverted or degenerate cells.
+static void agree_mesh_order_tensor_product(int dim) {
+  reseed();
+  const Lattice lattice(dim == 2 ? 24 : 10, dim);
+  idx_t **elements = upload_table(lattice_connectivity(lattice, dim, true));
+  std::vector<std::vector<geom_t>> point_columns(lattice.px, lattice.px + dim);
+  geom_t **points = upload_table(point_columns);
+  real_t *u = upload(random_field(lattice.nnodes));
+  real_t *out = upload(std::vector<real_t>(lattice.nnodes, 0.0));
+
+  if (dim == 2) {
+    laplace_quad4_gradient_i_msoa((int)sizeof(real_t), lattice.ncells, lattice.nnodes,
+                                  elements, points, 1.3, 1, u, 1, out);
+  } else {
+    laplace_hex8_gradient_i_msoa((int)sizeof(real_t), lattice.ncells, lattice.nnodes,
+                                 elements, points, 1.3, 1, u, 1, out);
+  }
+  sync();
+  std::vector<real_t> result(lattice.nnodes);
+  download(result, out);
+  record(dim == 2 ? "laplace_quad4_gradient_i_msoa" : "laplace_hex8_gradient_i_msoa", result);
+}
+
+// --------------------------------------------------------------- throughput
+
+static void bench_hex8_apply(ptrdiff_t side, int repeats, const char *out_path) {
+  const Lattice lattice(side, 3);
+  idx_t **elements = upload_table(lattice_connectivity(lattice, 3, false));
+  std::vector<std::vector<geom_t>> point_columns(lattice.px, lattice.px + 3);
+  geom_t **points = upload_table(point_columns);
+
+  std::vector<real_t> u_host[3], h_host[3];
+  for (int c = 0; c < 3; ++c) {
+    u_host[c].resize(lattice.nnodes);
+    h_host[c].resize(lattice.nnodes);
+    for (ptrdiff_t v = 0; v < lattice.nnodes; ++v) {
+      const double x = lattice.px[0][v], y = lattice.px[1][v], z = lattice.px[2][v];
+      u_host[c][v] = 0.05 * std::sin((1.0 + c) * x + 2.0 * y + 0.5 * z);
+      h_host[c][v] = 0.03 * std::sin(0.7 * x + (1.0 + c) * y + 1.3 * z);
+    }
+  }
+  real_t *u[3], *h[3], *out[3];
+  const std::vector<real_t> zero(lattice.nnodes, 0.0);
+  for (int c = 0; c < 3; ++c) {
+    u[c] = upload(u_host[c]); h[c] = upload(h_host[c]); out[c] = upload(zero);
+  }
+  const real_t lmbda = 2.2, mu = 2.3333333333333335;
+
+  double best = 1e30;
+  for (int r = 0; r <= repeats; ++r) {
+    for (int c = 0; c < 3; ++c) clear(out[c], (size_t)lattice.nnodes);
+    const double t0 = seconds();
+    neohookean_ogden_proteus_hex8_apply_i_msoa(
+        (int)sizeof(real_t), lattice.ncells, lattice.nnodes, elements, points, lmbda, mu,
+        1, u[0], u[1], u[2], 1, h[0], h[1], h[2], 1, out[0], out[1], out[2]);
+    sync();
+    const double elapsed = seconds() - t0;
+    if (r > 0) best = std::min(best, elapsed);  // the first pass is the warm-up
+  }
+  const ptrdiff_t ndof = 3 * lattice.nnodes;
+  std::printf("%-16s neohookean proteus_hex8 apply  side %4td  elements %10td  ndof %10td"
+              "  %8.4f ms  %9.1f MDOF/s\n",
+              WHERE, side, lattice.ncells, ndof, 1e3 * best, 1e-6 * (double)ndof / best);
+  std::fflush(stdout);
+
+  if (out_path != nullptr && std::strcmp(out_path, "-") != 0) {
+    std::vector<real_t> result(lattice.nnodes);
+    char name[128];
+    for (int c = 0; c < 3; ++c) {
+      download(result, out[c]);
+      std::snprintf(name, sizeof(name), "neohookean_ogden_proteus_hex8_apply_i_msoa_%c", "xyz"[c]);
+      record(name, result);
+    }
+  }
+}
+
+static void bench_tet4_gradient(ptrdiff_t side, int repeats) {
+  reseed();
+  const Lattice lattice(side, 3);
+  idx_t **elements = upload_table(kuhn_connectivity(lattice));
+  const ptrdiff_t nelements = 6 * lattice.ncells;
+  std::vector<std::vector<geom_t>> metric = spd_metric(3, nelements);
+  std::vector<geom_t *> met(6);
+  for (int c = 0; c < 6; ++c) met[c] = upload(metric[c]);
+  real_t *u = upload(random_field(lattice.nnodes));
+  real_t *out = upload(std::vector<real_t>(lattice.nnodes, 0.0));
+
+  double best = 1e30;
+  for (int r = 0; r <= repeats; ++r) {
+    clear(out, (size_t)lattice.nnodes);
+    const double t0 = seconds();
+    laplace_tet4_gradient_a_msoa((int)sizeof(real_t), nelements, lattice.nnodes, elements,
+                                 met[0], met[1], met[2], met[3], met[4], met[5],
+                                 1.7, 1, u, 1, out);
+    sync();
+    const double elapsed = seconds() - t0;
+    if (r > 0) best = std::min(best, elapsed);
+  }
+  std::printf("%-16s laplace tet4 gradient          side %4td  elements %10td  ndof %10td"
+              "  %8.4f ms  %9.1f MDOF/s\n",
+              WHERE, side, nelements, lattice.nnodes, 1e3 * best,
+              1e-6 * (double)lattice.nnodes / best);
+  std::fflush(stdout);
+}
 
 int main(int argc, char **argv) {
   const ptrdiff_t side = argc > 1 ? std::atol(argv[1]) : 32;
   const int repeats = argc > 2 ? std::atoi(argv[2]) : 5;
-  const std::string out_path = argc > 3 ? argv[3] : "apply_out.bin";
-  Mesh m(side);
-  const ptrdiff_t ndof = 3 * m.nnodes;
+  const char *out_path = argc > 3 ? argv[3] : "-";
 
-  std::vector<real_t> u[3], h[3], out[3];
-  for (int c = 0; c < 3; ++c) {
-    u[c].resize(m.nnodes);
-    h[c].resize(m.nnodes);
-    out[c].assign(m.nnodes, 0.0);
-    for (ptrdiff_t v = 0; v < m.nnodes; ++v) {
-      const double x = m.px[0][v], y = m.px[1][v], z = m.px[2][v];
-      u[c][v] = 0.05 * std::sin((1.0 + c) * x + 2.0 * y + 0.5 * z);
-      h[c][v] = 0.03 * std::sin(0.7 * x + (1.0 + c) * y + 1.3 * z);
+  if (std::strcmp(out_path, "-") != 0) {
+    record_file = std::fopen(out_path, "w");
+    if (record_file == nullptr) {
+      std::fprintf(stderr, "cannot write %s\n", out_path);
+      return 1;
     }
-  }
-  const real_t lmbda = 2.2, mu = 2.3333333333333335;
-
-#ifdef __CUDACC__
-  const char *where = "gh200 (device)";
-  idx_t *d_ev[8]; geom_t *d_px[3]; real_t *d_u[3], *d_h[3], *d_out[3];
-  idx_t **d_elements; geom_t **d_points;
-  for (int s = 0; s < 8; ++s) {
-    CUDA_OK(cudaMalloc(&d_ev[s], m.nelements * sizeof(idx_t)));
-    CUDA_OK(cudaMemcpy(d_ev[s], m.ev[s].data(), m.nelements * sizeof(idx_t), cudaMemcpyHostToDevice));
-  }
-  for (int c = 0; c < 3; ++c) {
-    CUDA_OK(cudaMalloc(&d_px[c], m.nnodes * sizeof(geom_t)));
-    CUDA_OK(cudaMemcpy(d_px[c], m.px[c].data(), m.nnodes * sizeof(geom_t), cudaMemcpyHostToDevice));
-    CUDA_OK(cudaMalloc(&d_u[c], m.nnodes * sizeof(real_t)));
-    CUDA_OK(cudaMemcpy(d_u[c], u[c].data(), m.nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
-    CUDA_OK(cudaMalloc(&d_h[c], m.nnodes * sizeof(real_t)));
-    CUDA_OK(cudaMemcpy(d_h[c], h[c].data(), m.nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
-    CUDA_OK(cudaMalloc(&d_out[c], m.nnodes * sizeof(real_t)));
-  }
-  CUDA_OK(cudaMalloc(&d_elements, 8 * sizeof(idx_t *)));
-  CUDA_OK(cudaMemcpy(d_elements, d_ev, 8 * sizeof(idx_t *), cudaMemcpyHostToDevice));
-  CUDA_OK(cudaMalloc(&d_points, 3 * sizeof(geom_t *)));
-  CUDA_OK(cudaMemcpy(d_points, d_px, 3 * sizeof(geom_t *), cudaMemcpyHostToDevice));
-  auto run = [&] {
-    for (int c = 0; c < 3; ++c) CUDA_OK(cudaMemset(d_out[c], 0, m.nnodes * sizeof(real_t)));
-    neohookean_ogden_proteus_hex8_apply_i_msoa(
-        (int)sizeof(real_t), m.nelements, m.nnodes, d_elements,
-        (const geom_t *const *)d_points, lmbda, mu,
-        1, d_u[0], d_u[1], d_u[2], 1, d_h[0], d_h[1], d_h[2],
-        1, d_out[0], d_out[1], d_out[2]);
-    CUDA_OK(cudaDeviceSynchronize());
-  };
-#else
-  const char *where = "host (OpenMP)";
-  idx_t *h_ev[8]; const geom_t *h_px[3];
-  for (int s = 0; s < 8; ++s) h_ev[s] = m.ev[s].data();
-  for (int c = 0; c < 3; ++c) h_px[c] = m.px[c].data();
-  auto run = [&] {
-    for (int c = 0; c < 3; ++c) std::memset(out[c].data(), 0, m.nnodes * sizeof(real_t));
-    neohookean_ogden_proteus_hex8_apply_i_msoa(
-        (int)sizeof(real_t), m.nelements, m.nnodes, h_ev, h_px, lmbda, mu,
-        1, u[0].data(), u[1].data(), u[2].data(),
-        1, h[0].data(), h[1].data(), h[2].data(),
-        1, out[0].data(), out[1].data(), out[2].data());
-  };
-#endif
-
-  run();  // warm up, and this is the answer that gets written
-  double best = 1e30;
-  for (int r = 0; r < repeats; ++r) {
-    const auto t0 = std::chrono::steady_clock::now();
-    run();
-    const auto t1 = std::chrono::steady_clock::now();
-    best = std::min(best, std::chrono::duration<double>(t1 - t0).count());
+    std::fprintf(record_file, "# where %s\n", WHERE);
+    agree_simplex_metric(2);
+    agree_simplex_metric(3);
+    agree_linear_elasticity_tet4();
+    agree_mesh_order_tensor_product(2);
+    agree_mesh_order_tensor_product(3);
   }
 
-#ifdef __CUDACC__
-  for (int c = 0; c < 3; ++c)
-    CUDA_OK(cudaMemcpy(out[c].data(), d_out[c], m.nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
-#endif
+  bench_hex8_apply(side, repeats, out_path);
+  bench_tet4_gradient(side, repeats);
 
-  if (!out_path.empty() && out_path != "-") {
-    FILE *f = std::fopen(out_path.c_str(), "wb");
-    for (int c = 0; c < 3; ++c) std::fwrite(out[c].data(), sizeof(real_t), m.nnodes, f);
-    std::fclose(f);
+  if (record_file != nullptr) {
+    std::fclose(record_file);
+    std::printf("%-16s wrote %s\n", WHERE, out_path);
   }
-
-  // Norms rather than a byte compare: the device sums its contributions in a
-  // different order and through atomics, so the two answers agree to round-off
-  // and not to the bit.  Printing both lets the comparison state its tolerance.
-  double l2 = 0.0, linf = 0.0;
-  for (int c = 0; c < 3; ++c)
-    for (ptrdiff_t v = 0; v < m.nnodes; ++v) {
-      const double value = (double)out[c][v];
-      l2 += value * value;
-      linf = std::max(linf, std::fabs(value));
-    }
-  l2 = std::sqrt(l2);
-
-  std::printf("%-16s side %3ld  nelements %9ld  ndof %9ld  best %8.4f s  %9.2f MDOF/s  l2 %.17g  linf %.17g\n",
-              where, (long)side, (long)m.nelements, (long)ndof,
-              best, (double)ndof / best / 1e6, l2, linf);
   return 0;
 }
