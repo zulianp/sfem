@@ -48,6 +48,7 @@
 
 #include <cmath>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace cvfem_ss {
@@ -67,33 +68,41 @@ namespace cvfem_ss {
     // bound -- on the FDA nozzle at 893,924 dof it was 72% of the socket's cycles with 72% of
     // those stalled in the backend -- so what matters is the bytes it streams, not the FLOPs.
     // A smoother only has to reduce the error, and FGMRES around it absorbs the difference.
-    using vanka_t = float;
-    struct VankaCell {
-        vanka_t Dhat[8][24];
-        vanka_t Ghat[24][8];
-        vanka_t invdF[24];
-        vanka_t S[8][8];
-        int     piv[8];
+    //
+    // The storage type T is a setting, not a constant: SFEM_VANKA_PRECISION=single (the
+    // default, T = float) or double (T = scalar_t), read in cvfem_ss_vanka.cpp. Both are the
+    // same code; single is the default because it measured better -- identical iterations and
+    // 27% faster at 893,924 dof -- and double stays one switch away.
+    template <typename T>
+    struct VankaCellT {
+        T   Dhat[8][24];
+        T   Ghat[24][8];
+        T   invdF[24];
+        T   S[8][8];
+        int piv[8];
     };
 
-    struct VankaData {
+    template <typename T>
+    struct VankaDataT {
         // The assembled fine operator, borrowed. Needed by the multiplicative sweep, which
         // forms each patch's residual from the current iterate and therefore needs full rows,
         // not just the patch block.
         const sfem::count_t *rowptr{nullptr};
         const sfem::idx_t   *colidx{nullptr};
         const real_t        *values{nullptr};
-        // `values` in single precision, which is what the multiplicative sweep's row walk
-        // reads: that walk was half the sweep's samples, on the loads of these blocks.
-        std::unique_ptr<vanka_t[]> values_f;
+        // The values the multiplicative sweep's row walk reads, in the storage type: a narrowed
+        // copy when T is narrower than the assembled values, the assembled values themselves
+        // otherwise. That walk was half the sweep's samples, on the loads of these blocks.
+        std::unique_ptr<T[]> values_own;
+        const T             *vals{nullptr};
 
-        int                    L{0};
-        ptrdiff_t              nmacro{0};
-        ptrdiff_t              ncell{0};   // L^3 per macro-element
-        std::vector<VankaCell> cells;      // nmacro * ncell
-        std::vector<scalar_t>  weight;     // 1 / (micro-cell patches touching a node), additive form
-        std::vector<scalar_t>  ewt;        // 1 / (macro-elements touching a node), multiplicative form
-        std::vector<uint8_t>   constrained;
+        int                        L{0};
+        ptrdiff_t                  nmacro{0};
+        ptrdiff_t                  ncell{0};  // L^3 per macro-element
+        std::vector<VankaCellT<T>> cells;     // nmacro * ncell
+        std::vector<scalar_t>      weight;    // 1 / (micro-cell patches touching a node), additive form
+        std::vector<scalar_t>      ewt;       // 1 / (macro-elements touching a node), multiplicative form
+        std::vector<uint8_t>       constrained;
     };
 
     // Dense LU with partial pivoting, n = 8. Small enough that the pivoting cost is noise and
@@ -168,9 +177,10 @@ namespace cvfem_ss {
     //
     // `rowptr`, `colidx`, `values` are that matrix in BSR form with sorted columns; `elems`
     // maps a macro-element's lattice slot to a global node.
+    template <typename T>
     inline SFEM_NOINLINE void vanka_setup(const SSMeshData &d, const uint8_t *const constrained,
                                           const sfem::count_t *const rowptr, const sfem::idx_t *const colidx,
-                                          const real_t *const values, VankaData &v) {
+                                          const real_t *const values, VankaDataT<T> &v) {
         SFEM_TRACE_SCOPE("cvfem_ss::vanka_setup");
         const int L = d.level;
         int       off[8];
@@ -182,7 +192,7 @@ namespace cvfem_ss {
         v.L      = L;
         v.nmacro = d.nmacro;
         v.ncell  = (ptrdiff_t)L * L * L;
-        v.cells.assign((size_t)v.nmacro * (size_t)v.ncell, VankaCell{});
+        v.cells.assign((size_t)v.nmacro * (size_t)v.ncell, VankaCellT<T>{});
         v.constrained.assign(constrained, constrained + (size_t)d.nnodes * N_FIELDS);
 
         // Patch multiplicity: additive Vanka sums overlapping corrections, so each node's
@@ -214,7 +224,7 @@ namespace cvfem_ss {
                     for (int xi = 0; xi < L; ++xi) {
                         const int       base = sscvfem_lidx(L, xi, yi, zi);
                         const ptrdiff_t ci   = (ptrdiff_t)e * v.ncell + ((ptrdiff_t)zi * L + yi) * L + xi;
-                        VankaCell      &c    = v.cells[(size_t)ci];
+                        VankaCellT<T>  &c    = v.cells[(size_t)ci];
 
                         smesh::idx_t n[8];
                         for (int a = 0; a < 8; ++a) n[a] = d.elems[base + off[a]][e];
@@ -316,17 +326,17 @@ namespace cvfem_ss {
                                                    std::fabs(dd) > scalar_t(1e-300))
                                                           ? scalar_t(1) / dd
                                                           : scalar_t(0);
-                                c.invdF[a * 3 + t] = (vanka_t)invd[a * 3 + t];
+                                c.invdF[a * 3 + t] = (T)invd[a * 3 + t];
                             }
 
                         for (int a = 0; a < 8; ++a)
                             for (int i = 0; i < 8; ++i)
                                 for (int t = 0; t < 3; ++t)
-                                    c.Dhat[a][i * 3 + t] = (vanka_t)(A[a][i][12 + t] * invd[i * 3 + t]);
+                                    c.Dhat[a][i * 3 + t] = (T)(A[a][i][12 + t] * invd[i * 3 + t]);
                         for (int i = 0; i < 8; ++i)
                             for (int t = 0; t < 3; ++t)
                                 for (int b = 0; b < 8; ++b)
-                                    c.Ghat[i * 3 + t][b] = (vanka_t)(A[i][b][t * 4 + 3] * invd[i * 3 + t]);
+                                    c.Ghat[i * 3 + t][b] = (T)(A[i][b][t * 4 + 3] * invd[i * 3 + t]);
 
                         for (int a = 0; a < 8; ++a)
                             for (int b = 0; b < 8; ++b) {
@@ -344,17 +354,26 @@ namespace cvfem_ss {
                             }
                         }
                         for (int a = 0; a < 8; ++a)
-                            for (int b = 0; b < 8; ++b) c.S[a][b] = (vanka_t)Sd[a][b];
+                            for (int b = 0; b < 8; ++b) c.S[a][b] = (T)Sd[a][b];
                     }
         }
 
         // The row walk's copy of the values, narrowed. Uninitialised allocation and a parallel
         // fill, so its pages are first touched by the threads that sweep them and no serial
         // zero pass of nnz * 16 floats is paid per Newton step.
-        const size_t nval = (size_t)rowptr[(size_t)d.nnodes] * 16;
-        v.values_f.reset(new vanka_t[nval]);
+        if (std::is_same<T, real_t>::value) {
+            // Full precision reads the assembled values in place: a copy would be the same bytes.
+            // The cast only names the type the branch already established, and keeps the
+            // narrowed instantiation, which never takes this branch, compiling.
+            v.values_own.reset();
+            v.vals = reinterpret_cast<const T *>(values);
+        } else {
+            const size_t nval = (size_t)rowptr[(size_t)d.nnodes] * 16;
+            v.values_own.reset(new T[nval]);
 #pragma omp parallel for schedule(static)
-        for (ptrdiff_t k = 0; k < (ptrdiff_t)nval; ++k) v.values_f[(size_t)k] = (vanka_t)values[(size_t)k];
+            for (ptrdiff_t k = 0; k < (ptrdiff_t)nval; ++k) v.values_own[(size_t)k] = (T)values[(size_t)k];
+            v.vals = v.values_own.get();
+        }
     }
 
     // One additive Vanka application: z = omega * sum_k R_k^T Ahat_k^-1 R_k r, averaged over
@@ -366,7 +385,8 @@ namespace cvfem_ss {
     // overwriting apply measures correctly there and then destroys the caller's accumulator
     // inside the cycle, where the smoother diverged to 1e+24 while measuring 0.63 standalone.
     // `work` is scratch of ndof, owned by the caller so the sweep does not allocate.
-    inline SFEM_NOINLINE void vanka_apply(const SSMeshData &d, const VankaData &v, const scalar_t omega,
+    template <typename T>
+    inline SFEM_NOINLINE void vanka_apply(const SSMeshData &d, const VankaDataT<T> &v, const scalar_t omega,
                                           const scalar_t *const SFEM_RESTRICT r,
                                           scalar_t *const SFEM_RESTRICT       y,
                                           std::vector<scalar_t>              &work) {
@@ -403,7 +423,7 @@ namespace cvfem_ss {
                         for (int xi = 0; xi < L; ++xi) {
                             const int       base = sscvfem_lidx(L, xi, yi, zi);
                             const ptrdiff_t ci   = (ptrdiff_t)e * v.ncell + ((ptrdiff_t)zi * L + yi) * L + xi;
-                            const VankaCell &c   = v.cells[(size_t)ci];
+                            const VankaCellT<T> &c = v.cells[(size_t)ci];
 
                             scalar_t ru[24], rp[8];
                             for (int a = 0; a < 8; ++a) {
@@ -474,7 +494,8 @@ namespace cvfem_ss {
     // elements through the two-pass scatter. Multiplicative where the coupling is dense and
     // cheap, additive across the few shared faces -- the standard domain-decomposition
     // compromise, and it restores bitwise reproducibility.
-    inline SFEM_NOINLINE void vanka_apply_mult(const SSMeshData &d, const VankaData &v, const scalar_t omega,
+    template <typename T>
+    inline SFEM_NOINLINE void vanka_apply_mult(const SSMeshData &d, const VankaDataT<T> &v, const scalar_t omega,
                                                const scalar_t *const SFEM_RESTRICT r,
                                                scalar_t *const SFEM_RESTRICT       y,
                                                std::vector<scalar_t>              &work) {
@@ -517,7 +538,7 @@ namespace cvfem_ss {
                             for (int xi = cx; xi < L; xi += 2) {
                                 const int       base = sscvfem_lidx(L, xi, yi, zi);
                                 const ptrdiff_t ci = (ptrdiff_t)e * v.ncell + ((ptrdiff_t)zi * L + yi) * L + xi;
-                                const VankaCell &c = v.cells[(size_t)ci];
+                                const VankaCellT<T> &c = v.cells[(size_t)ci];
 
                                 scalar_t ru[24], rp[8];
                                 for (int a = 0; a < 8; ++a) {
@@ -527,7 +548,7 @@ namespace cvfem_ss {
                                     for (sfem::count_t k = v.rowptr[gn]; k < v.rowptr[gn + 1]; ++k) {
                                         const int lj = loc_of[(size_t)v.colidx[(size_t)k]];
                                         if (lj < 0) continue;  // outside this element: additive
-                                        const vanka_t *const blk = v.values_f.get() + (size_t)k * 16;
+                                        const T *const blk = v.vals + (size_t)k * 16;
                                         const scalar_t *const zz = &zl[(size_t)lj * N_FIELDS];
                                         for (int rr = 0; rr < N_FIELDS; ++rr)
                                             for (int cc = 0; cc < N_FIELDS; ++cc)
