@@ -10,6 +10,7 @@ from codegen.framework.ir.kernel_ast import (
     expr_ref,
     iteration_range,
     iterator,
+    pre_increment,
 )
 from codegen.framework.emitters.ast_printer import render_kernel_ast_lines
 from codegen.framework.emitters.tensor_product_geometry import sfem_geometry_kernels_header_source
@@ -235,6 +236,43 @@ class OpenMPEnergySoASourceBuilder:
     def effective_vector_size(self, vector_size):
         return int(vector_size)
 
+    def element_loop_lines(self, pragma_indent="", reduction=None):
+        """The scalar mesh loop: one element per iteration.
+
+        The other shape is ``mesh_loop_lines``, which walks blocks of ``VS``
+        elements and declares ``ne``.  A constant-P1 simplex takes this one --
+        its staging is the whole of its cost, so it works an element at a time
+        rather than blocking -- and, like the blocked loop, the *target* has to
+        open it.  Writing ``for (ptrdiff_t element = ...)`` here instead is what
+        left ``__global__`` kernels with a serial loop over every element.
+
+        ``pragma_indent`` exists only because the tracked tree spells the
+        pragma at column 0 in one caller and at column 2 in the other.  It is
+        a faithful reproduction of an inconsistency, not a decision; settling
+        on one column is a deliberate whitespace diff of its own.
+        """
+        element_iterator = iterator("element", "ptrdiff_t")
+        lines = render_kernel_ast_lines(
+            "openmp_element_loop",
+            (
+                LoopHeaderNode(
+                    LoopNode(
+                        LoopKind.KERNEL,
+                        element_iterator,
+                        iteration_range(
+                            expr_ref("0", "first_element"),
+                            expr_ref("nelements", "element_count"),
+                        ),
+                        pre_increment(element_iterator),
+                    )
+                ),
+            ),
+        )
+        return (
+            *("%s%s" % (pragma_indent, line) for line in self.parallel_for_lines(reduction)),
+            "  %s" % lines[0],
+        )
+
     def mesh_loop_lines(self):
         tile_iterator = iterator("evb", "ptrdiff_t")
         lines = render_kernel_ast_lines(
@@ -372,6 +410,40 @@ class CUDAEnergySoASourceBuilder:
 
     def effective_vector_size(self, vector_size):
         return 1
+
+    def element_loop_lines(self, pragma_indent="", reduction=None):
+        """The scalar mesh loop, grid-strided.
+
+        The device has no serial pass over the mesh, so the CPU's
+        ``#pragma omp for`` plus ``for (element = 0; ...)`` becomes the same
+        grid-stride loop ``mesh_loop_lines`` opens, over ``element`` rather than
+        over blocks.  ``reduction`` is accepted and ignored for the same reason
+        ``parallel_for_lines`` returns nothing: the scatter carries it.
+        """
+        element_iterator = iterator("element", "ptrdiff_t")
+        lines = render_kernel_ast_lines(
+            "cuda_element_grid_stride_loop",
+            (
+                LoopHeaderNode(
+                    LoopNode(
+                        LoopKind.KERNEL,
+                        element_iterator,
+                        iteration_range(
+                            expr_ref(
+                                "(ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x",
+                                "cuda_thread_start",
+                            ),
+                            expr_ref("nelements", "element_count"),
+                        ),
+                        add_assign_increment(
+                            element_iterator,
+                            expr_ref("(ptrdiff_t)blockDim.x * gridDim.x", "cuda_grid_stride"),
+                        ),
+                    )
+                ),
+            ),
+        )
+        return ("  %s" % lines[0],)
 
     def mesh_loop_lines(self):
         kernel_iterator = iterator("evb", "ptrdiff_t")
