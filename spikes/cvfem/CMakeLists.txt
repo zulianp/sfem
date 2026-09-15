@@ -116,6 +116,13 @@ endforeach()
 # get the same directories through cvfem_ns_op's PUBLIC includes.
 target_include_directories(cvfem_hex8_ns_steady PRIVATE ${CVFEM_SFEM_ALGEBRA_INCLUDES})
 
+# The multigrid driver's dense coarse solve factorises with LAPACK's getrf. A required
+# dependency rather than an option: the hand-written unblocked LU it replaces cost ~1 s per
+# Newton step on a 2,320-dof coarsest level, and a second, portable path would be the same
+# operation implemented twice. OpenBLAS on Alps, Accelerate on macOS.
+find_package(LAPACK REQUIRED)
+target_link_libraries(cvfem_hex8_ns_ssgmg PRIVATE LAPACK::LAPACK)
+
 # T3: the macro-local gather on a semi-structured mesh, against the flat gather on the same
 # mesh. The only target built against BLAS -- the gemm path it measures is the only place
 # it would change a number.
