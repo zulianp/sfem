@@ -541,7 +541,48 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Twenty-eight, ordered by what unblocks what. Seven are new since the last pass, and five of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Twenty-nine, ordered by what unblocks what. Eight are new since the last pass, and five of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 28</div>
+    <div class="body">
+      <div class="op-title">The residual path still assembles by probing, and the energy path next to it does not <span class="chip c-part">found &mdash; 5 of 25 assemblies, up to 30 applies per element</span></div>
+
+      <p><b>The rule.</b> An element matrix is computed directly. Assembling it by applying the operator to unit basis vectors and keeping the columns is not acceptable, whatever the form. <code>tests/test_m11_matrix_formats.py</code> enforces exactly this for the energy path, and says why in its own words: the assembly &ldquo;used to call the apply once per trial degree of freedom and keep a column, which is twenty-four applies per element for a HEX8; the apply block belongs to the apply and must not appear in an assembly again.&rdquo;</p>
+
+      <p><b>It is still there on the residual path.</b> Of the 25 element-matrix assemblies in the shipped tree, 20 call a direct element-matrix kernel and 5 set a unit direction, call the Jacobian-action block, and read off a column:</p>
+
+<pre>      for (int trial_local = 0; trial_local &lt; 12; ++trial_local) {
+        const int trial = col_tensor_stream(trial_local);
+        for (int stream = 0; stream &lt; N_STREAMS; ++stream) {
+          bdirection[stream][0] = s_t(0);
+          boutput[stream][0] = s_t(0);
+        }
+        bdirection[trial][0] = s_t(1);
+        ..._jacobian_action_block_contiguous&lt;s_t, NQ, NS, VS&gt;(1, 1, ..., bdirection, ..., boutput);
+        for (int test_local = 0; test_local &lt; 12; ++test_local) {
+          element_matrix[test_local * 12 + trial_local] = boutput[..][0];
+        }
+      }</pre>
+
+      <p><b>The sharpest part is that the counter-example is in the same material.</b> Mooney&ndash;Rivlin Kelvin&ndash;Voigt Newmark carries an elastic unit written as an energy and a viscous unit written as a residual. On the same element, the elastic assembly calls <code>..._direct_hessian_..._element_matrix</code> and the viscous one probes. Two units, one material, one element, two methods &mdash; which says the defect is the path and not the mathematics.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>MRKV viscous, by element</th><th>applies per element</th></tr>
+        <tr><td>TET10</td><td><b>30</b></td></tr>
+        <tr><td>PROTEUS_HEX8</td><td>24 &mdash; the number the energy-path test names</td></tr>
+        <tr><td>TET4</td><td>12</td></tr>
+        <tr><td>PROTEUS_QUAD4</td><td>8</td></tr>
+        <tr><td>TRI3</td><td>6</td></tr>
+      </table>
+
+      <p><b>Why it survived.</b> The energy path got a direct element-matrix emitter and a test that forbids the apply block appearing in an assembly; the residual path got neither, and nothing generalised the test. It is not caught by <code>reproducibility</code> either, which skips matrix kernels for &ldquo;values: layout not modelled&rdquo; &mdash; so the only thing that would have noticed is a reader.</p>
+
+      <p><b>What closing it needs.</b> The residual equivalent of <code>_sfem_soa_direct_hessian_element_matrix_function</code>: differentiate the weak form with respect to the trial coefficients once, and emit the entry rather than probing for it. The energy path is the worked example. The test that guards it should then be widened from naming one material's apply block to asserting the shape for every assembly, or the next path to acquire one will acquire this too.</p>
+
+      <div class="op-facts"><span><i>assemblies</i> 20 of 25 direct, 5 probing</span><span><i>worst</i> 30 applies per element, TET10</span><span><i>counter-example</i> same material, other unit</span><span><i>gate that would catch it</i> none today</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 27</div>
@@ -576,7 +617,7 @@
         <tr><td>6,440,067</td><td>210.0</td><td><b>2,347.9 &mdash; 11.2&times;</b></td></tr>
       </table>
 
-      <p><b>What is not claimed.</b> The counter covers two materials on two elements &mdash; the pair that reaches all three emitters, which is not the same as exhaustive. It is blind by construction to a work item already spelled as a literal <code>0</code>: <code>residual_codegen.py:7014</code> writes <code>bcoordinates[shape * ND + d][0]</code>, correct today and invisible to a probe that only renames <code>lane</code>; a probe that renamed the SIMT answer too would find those. And removing the lane does not make CUDA accept the residual and inexact families: <code>_validate_cuda_source_contract</code> also wants a file ending <code>_operator.cu</code> containing <code>__global__ void</code>, and those emitters write <code>_operator.cpp</code> with host <code>extern "C"</code> functions around an OpenMP mesh loop. That is the mesh-loop lowering, which the energy family already has and which is the natural next piece. Nor does anything in the library <em>call</em> the CUDA kernels yet: <code>CMakeLists.txt</code> globs no <code>.cu</code>, and the CUDA backend publishes no <code>sfem::Op</code>.</p>
+      <p><b>What is not claimed.</b> The counter covers two materials on two elements &mdash; the pair that reaches all three emitters, which is not the same as exhaustive. It is blind by construction to a work item already spelled as a literal <code>0</code>. Measured since: <b>81 such subscripts across 25 files</b> &mdash; fully-subscripted staged buffers whose declaration ends in <code>[VS]</code> and whose last index is written <code>0</code> rather than asked for. Every one is in a single-work-item kernel with <code>VS = 1</code> and no lane loop open, so all are correct today and none is a defect; they are the same spelling habit wearing a literal the probe cannot rename. And removing the lane does not make CUDA accept the residual and inexact families: <code>_validate_cuda_source_contract</code> also wants a file ending <code>_operator.cu</code> containing <code>__global__ void</code>, and those emitters write <code>_operator.cpp</code> with host <code>extern "C"</code> functions around an OpenMP mesh loop. That is the mesh-loop lowering, which the energy family already has and which is the natural next piece. Nor does anything in the library <em>call</em> the CUDA kernels yet: <code>CMakeLists.txt</code> globs no <code>.cu</code>, and the CUDA backend publishes no <code>sfem::Op</code>.</p>
 
       <div class="op-facts"><span><i>work items</i> 1,665 &rarr; 0, ratcheted per material</span><span><i>nvcc</i> 37 errors + 31 warnings &rarr; 0, six operators</span><span><i>GH200</i> 11.2&times; at 6.44e6 dof, both saturated</span><span><i>gate</i> byte-identity at every step</span></div>
     </div>
