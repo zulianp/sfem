@@ -10,8 +10,58 @@
 #include "smesh_semistructured.hpp"
 
 #include <algorithm>
+#include <memory>
+#include <vector>
 
 namespace cvfem_ss {
+
+    namespace {
+        // A level's sparsity pattern, its scatter and the block -> slot map the chunked
+        // inverse uses. All three depend on the level's connectivity alone -- gid, nc,
+        // n_coarse -- and not on the state, yet they were rebuilt every Newton step for each
+        // of the four levels the setup assembles: ~42 ms per step on the FDA nozzle at
+        // 893,924 dof, for an answer that never changed. Kept here and reused when the
+        // connectivity matches exactly. The comparison is the full gid array, so a different
+        // mesh with the same sizes misses instead of reusing a stale pattern. The row pointers
+        // and columns are shared by the matrices built on them; nothing downstream writes
+        // either -- patch_identity_rows and mask_block_columns touch values only.
+        struct GalerkinPattern {
+            ptrdiff_t                                       nmacro{-1}, n_coarse{-1};
+            int                                             nc{-1};
+            std::vector<smesh::idx_t>                       gid;
+            decltype(smesh::create_host_buffer<sfem::count_t>(0)) rp;
+            decltype(smesh::create_host_buffer<sfem::idx_t>(0))   ci;
+            std::vector<ptrdiff_t>                          pos;
+            std::vector<ptrdiff_t>                          slot;  // all -1 between uses
+        };
+
+        GalerkinPattern &galerkin_pattern(const GalerkinLevel &gl) {
+            static std::vector<std::unique_ptr<GalerkinPattern>> cache;
+            for (auto &p : cache)
+                if (p->nmacro == gl.nmacro && p->nc == gl.nc && p->n_coarse == gl.n_coarse && p->gid == gl.gid)
+                    return *p;
+
+            auto p      = std::make_unique<GalerkinPattern>();
+            p->nmacro   = gl.nmacro;
+            p->nc       = gl.nc;
+            p->n_coarse = gl.n_coarse;
+            p->gid      = gl.gid;
+            std::vector<sfem::count_t> rowptr;
+            std::vector<sfem::idx_t>   colidx;
+            galerkin_build_pattern(gl, rowptr, colidx);
+            galerkin_build_scatter(gl, rowptr, colidx, p->pos);
+            p->rp = smesh::create_host_buffer<sfem::count_t>(rowptr.size());
+            p->ci = smesh::create_host_buffer<sfem::idx_t>(colidx.size());
+            std::copy(rowptr.begin(), rowptr.end(), p->rp->data());
+            std::copy(colidx.begin(), colidx.end(), p->ci->data());
+            p->slot.assign(colidx.size(), -1);
+
+            // One process sees a handful of hierarchies at most; past eight the oldest goes.
+            if (cache.size() >= 8) cache.erase(cache.begin());
+            cache.push_back(std::move(p));
+            return *cache.back();
+        }
+    }  // namespace
 
     std::shared_ptr<CoarseBSR> assemble_coarse_operator(const sfem::CVFEMNavierStokes              &op,
                                                         const std::shared_ptr<sfem::FunctionSpace> &coarse,
@@ -30,13 +80,8 @@ namespace cvfem_ss {
         galerkin_gid_from_spaces(coarse, fine, gl);
         if (fine_constrained)
             gl.fine_constrained.assign(fine_constrained, fine_constrained + fine->n_dofs());
-        std::vector<sfem::count_t> rowptr;
-        std::vector<sfem::idx_t>   colidx;
-        galerkin_build_pattern(gl, rowptr, colidx);
-
-        std::vector<ptrdiff_t> pos;
-        galerkin_build_scatter(gl, rowptr, colidx, pos);
-        const ptrdiff_t nblocks = (ptrdiff_t)colidx.size();
+        GalerkinPattern &pat     = galerkin_pattern(gl);
+        const ptrdiff_t  nblocks = (ptrdiff_t)pat.ci->size();
 
         // Assemble and reduce a chunk of macro-elements at a time. Chunk order is fixed and
         // each block sums its own sources, so the result is the same bits on any thread count.
@@ -45,22 +90,18 @@ namespace cvfem_ss {
         // zero without a serial fill and its pages are first touched by the accumulating
         // threads; a separate zeroed accumulator and the copy out of it cost 37 + 64 ms per
         // Newton step on the FDA nozzle's fine level, 745 MB each way.
-        auto rp = smesh::create_host_buffer<sfem::count_t>(rowptr.size());
-        auto ci = smesh::create_host_buffer<sfem::idx_t>(colidx.size());
-        auto va = smesh::create_host_buffer<real_t>((size_t)nblocks * 16);
+        auto                   rp = pat.rp;
+        auto                   ci = pat.ci;
+        auto                   va = smesh::create_host_buffer<real_t>((size_t)nblocks * 16);
         std::vector<ptrdiff_t> iptr, iidx, blocks;
-        std::vector<ptrdiff_t> slot((size_t)nblocks, -1);
         const ptrdiff_t        step   = galerkin_chunk(gl);
         const size_t           stride = (size_t)gl.nc * 27;
         for (ptrdiff_t e0 = 0; e0 < gl.nmacro; e0 += step) {
             const ptrdiff_t e1 = std::min(gl.nmacro, e0 + step);
             galerkin_assemble(*ss, (scalar_t)op.rho, (scalar_t)op.mu, gl, e0, e1);
-            galerkin_build_inverse(pos, (size_t)e0 * stride, (size_t)e1 * stride, slot, blocks, iptr, iidx);
+            galerkin_build_inverse(pat.pos, (size_t)e0 * stride, (size_t)e1 * stride, pat.slot, blocks, iptr, iidx);
             galerkin_accumulate(gl, blocks, iptr, iidx, va->data());
         }
-
-        std::copy(rowptr.begin(), rowptr.end(), rp->data());
-        std::copy(colidx.begin(), colidx.end(), ci->data());
 
         if (diag_out) {
             diag_out->assign((size_t)gl.n_coarse * 16, real_t(0));
@@ -78,28 +119,17 @@ namespace cvfem_ss {
     namespace {
         // Assemble one level's element matrices into a BSR. Shared by both entry points.
         std::shared_ptr<CoarseBSR> level_to_bsr(const GalerkinLevel &gl) {
-            std::vector<sfem::count_t> rowptr;
-            std::vector<sfem::idx_t>   colidx;
-            galerkin_build_pattern(gl, rowptr, colidx);
+            GalerkinPattern       &pat     = galerkin_pattern(gl);
+            const ptrdiff_t        nblocks = (ptrdiff_t)pat.ci->size();
+            std::vector<ptrdiff_t> iptr, iidx, blocks;
+            galerkin_build_inverse(pat.pos, 0, pat.pos.size(), pat.slot, blocks, iptr, iidx);
 
-            std::vector<ptrdiff_t> pos, iptr, iidx, blocks;
-            galerkin_build_scatter(gl, rowptr, colidx, pos);
-            const ptrdiff_t        nblocks = (ptrdiff_t)colidx.size();
-            std::vector<ptrdiff_t> slot((size_t)nblocks, -1);
-            galerkin_build_inverse(pos, 0, pos.size(), slot, blocks, iptr, iidx);
-
-            std::vector<scalar_t> acc((size_t)nblocks * 16, scalar_t(0));
-            galerkin_accumulate(gl, blocks, iptr, iidx, acc.data());
-
-            auto rp = smesh::create_host_buffer<sfem::count_t>(rowptr.size());
-            auto ci = smesh::create_host_buffer<sfem::idx_t>(colidx.size());
+            // calloc'd, so accumulating straight into it is the same sums as into a zeroed copy.
             auto va = smesh::create_host_buffer<real_t>((size_t)nblocks * 16);
-            std::copy(rowptr.begin(), rowptr.end(), rp->data());
-            std::copy(colidx.begin(), colidx.end(), ci->data());
-            std::copy(acc.begin(), acc.end(), va->data());
+            galerkin_accumulate(gl, blocks, iptr, iidx, va->data());
 
             return sfem::h_bsr_spmv<sfem::count_t, sfem::idx_t, real_t, real_t>(gl.n_coarse, gl.n_coarse,
-                                                                                N_FIELDS, rp, ci, va, real_t(0));
+                                                                                N_FIELDS, pat.rp, pat.ci, va, real_t(0));
         }
         // A level's operator and block diagonal, backed by its element matrices. Constrained
         // rows act as identity, matching what patch_identity_rows leaves in an assembled level,
