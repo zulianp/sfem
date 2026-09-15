@@ -361,9 +361,43 @@ private:
                 sfem::EXECUTION_SPACE_HOST);
     }
 
+    // A timed solver stays a solver. Multigrid hints its smoothers that pre-smoothing starts
+    // from zero through MatrixFreeLinearSolver::set_initial_guess_zero, and a plain make_op
+    // wrapper would hide the smoother behind an Operator the hint cannot reach.
+    class TimedSolver final : public sfem::MatrixFreeLinearSolver<real_t> {
+    public:
+        TimedSolver(std::string name, std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> s)
+            : name_(std::move(name)), s_(std::move(s)) {}
+
+        int apply(const real_t *const x, real_t *const y) override {
+            const double t0 = smesh::time_seconds();
+            const int    ret = s_->apply(x, y);
+            phase_add(name_, smesh::time_seconds() - t0);
+            return ret;
+        }
+        ptrdiff_t            rows() const override { return s_->rows(); }
+        ptrdiff_t            cols() const override { return s_->cols(); }
+        sfem::ExecutionSpace execution_space() const override { return s_->execution_space(); }
+
+        void set_op(const std::shared_ptr<sfem::Operator<real_t>> &op) override { s_->set_op(op); }
+        void set_preconditioner_op(const std::shared_ptr<sfem::Operator<real_t>> &op) override {
+            s_->set_preconditioner_op(op);
+        }
+        void set_max_it(const int it) override { s_->set_max_it(it); }
+        void set_n_dofs(const ptrdiff_t n) override { s_->set_n_dofs(n); }
+        void set_initial_guess_zero(const bool val) override { s_->set_initial_guess_zero(val); }
+        int  iterations() const override { return s_->iterations(); }
+
+    private:
+        std::string                                             name_;
+        std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> s_;
+    };
+
     std::shared_ptr<sfem::Operator<real_t>> timed(const std::string                             &name,
                                                   const std::shared_ptr<sfem::Operator<real_t>> &op) {
         if (!op) return op;
+        if (auto s = std::dynamic_pointer_cast<sfem::MatrixFreeLinearSolver<real_t>>(op))
+            return std::make_shared<TimedSolver>(name, s);
         return sfem::make_op<real_t>(
                 op->rows(), op->cols(),
                 [op, name](const real_t *const x, real_t *const y) {
@@ -2736,6 +2770,12 @@ private:
         // new machinery.
         g.mg->set_cycle_type(smesh::Env::read<int>("SFEM_GMG_CYCLE", 1));
         g.mg->set_max_it(1);  // one cycle per preconditioner application
+        // Every caller hands the cycle a zero vector: FGMRES clears z_j before applying the
+        // preconditioner, and the SFEM_GMG_CHECK=2 probe starts from zeros. So the finest
+        // level's first pre-smoothing sweep can take the right-hand side as its residual
+        // instead of applying the fine operator to zero -- one matrix-free application saved
+        // per cycle, and the same bits.
+        g.mg->set_initial_guess_zero(true);
     }
 
 }  // namespace
