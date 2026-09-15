@@ -800,5 +800,117 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                     self.assertGreater(variant["expected_bytes_per_element"], 0)
 
 
+class NoProbingAssemblyRatchetTest(unittest.TestCase):
+    """An element matrix is computed, not discovered by probing.
+
+    Setting a unit basis vector, applying the operator and keeping the column
+    costs one apply per trial degree of freedom -- thirty per element on TET10.
+    The energy path was converted and
+    `test_generated_direct_hessian_assembly_does_not_call_the_apply_block`
+    above forbids its return, but it forbids it by naming one material's apply
+    block, so nothing stopped the residual path from keeping the pattern.
+
+    This asserts the shape instead of the name, over the whole shipped tree, so
+    a path that acquires an assembly cannot acquire this with it.  The five that
+    remain are listed rather than excused: the list is the work left, and it may
+    only shrink.
+
+    Read from the shipped tree rather than generated here on purpose.  This is a
+    property of what the build compiles, it costs nothing to check, and the tree
+    is the artifact `codegen_snapshot check-tree` already holds to be current.
+    """
+
+    #: Kernels that still build an element matrix by probing.  Only ever fewer.
+    #:
+    #: All five are the Mooney-Rivlin Kelvin-Voigt Newmark *viscous* unit, which
+    #: is written as a residual.  The same material's *elastic* unit, written as
+    #: an energy, assembles directly on the same elements -- which is what says
+    #: this is the path and not the mathematics.
+    PROBING = {
+        "mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_operator.cpp": 30,
+        "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_operator.cpp": 24,
+        "mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_operator.cpp": 12,
+        "mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_operator.cpp": 8,
+        "mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_operator.cpp": 6,
+    }
+
+    @staticmethod
+    def _shipped_tree():
+        """Asked of the tool that owns the question, not recomputed here.
+
+        `codegen_snapshot.shipped_tree()` is what `check-tree` compares against,
+        so this reads the same directory the build compiles rather than a second
+        path expression that can drift from it -- and a first attempt at one
+        promptly did, silently finding nothing.
+        """
+        from codegen.framework.tools.codegen_snapshot import shipped_tree
+
+        return Path(shipped_tree())
+
+    def _probing_assemblies(self):
+        """file -> applies per element, for every assembly built by probing."""
+        import re
+
+        unit_direction = re.compile(r"bdirection\[trial\]\[0\] = s_t\(1\);")
+        trial_loop = re.compile(
+            r"for \(int trial_local = 0; trial_local < (\d+); \+\+trial_local\)"
+        )
+        found = {}
+        for path in sorted(self._shipped_tree().rglob("*_operator.cpp")):
+            source = path.read_text()
+            if not unit_direction.search(source):
+                continue
+            bounds = [int(bound) for bound in trial_loop.findall(source)]
+            found[path.name] = max(bounds) if bounds else 0
+        return found
+
+    def test_no_assembly_probes_for_its_columns(self):
+        found = self._probing_assemblies()
+        self.assertEqual(
+            sorted(found),
+            sorted(self.PROBING),
+            "the set of assemblies built by probing changed.  An element matrix "
+            "is computed directly; if one of these was converted, remove it from "
+            "PROBING in this commit, and if a new one appeared, it must not ship",
+        )
+        for name in sorted(self.PROBING):
+            with self.subTest(kernel=name):
+                self.assertLessEqual(
+                    found[name],
+                    self.PROBING[name],
+                    "%s now costs %d applies per element, up from %d"
+                    % (name, found[name], self.PROBING[name]),
+                )
+                self.assertEqual(
+                    found[name],
+                    self.PROBING[name],
+                    "%s is down to %d applies per element and the list still "
+                    "says %d -- lower it to lock the improvement in"
+                    % (name, found[name], self.PROBING[name]),
+                )
+
+    def test_the_energy_path_assembles_directly_on_the_same_elements(self):
+        """The counter-example, pinned, because it is what makes the case.
+
+        Mooney-Rivlin Kelvin-Voigt Newmark carries both an energy unit and a
+        residual one.  If the elastic unit ever started probing too, the
+        argument that this is fixable would have quietly stopped being true.
+        """
+        import re
+
+        direct = re.compile(r"direct_hessian[a-z_]*element_matrix<")
+        for path in sorted(self._shipped_tree().rglob("*elastic*_operator.cpp")):
+            source = path.read_text()
+            if "element_matrix" not in source:
+                continue
+            with self.subTest(kernel=path.name):
+                self.assertTrue(
+                    direct.search(source),
+                    "%s assembles without calling a direct element-matrix "
+                    "kernel" % path.name,
+                )
+                self.assertNotIn("bdirection[trial][0] = s_t(1);", source)
+
+
 if __name__ == "__main__":
     unittest.main()
