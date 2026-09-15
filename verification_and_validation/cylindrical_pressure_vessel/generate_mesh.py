@@ -18,41 +18,33 @@ def write_sideset(path: Path, parent: np.ndarray, lfi: np.ndarray) -> None:
     )
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate the cylindrical pressure-vessel mesh")
-    parser.add_argument("output", type=Path)
-    parser.add_argument("--nr", type=int, default=20)
-    parser.add_argument("--ntheta", type=int, default=20)
-    parser.add_argument("--ri", type=float, default=7.0)
-    parser.add_argument("--ro", type=float, default=18.625)
-    args = parser.parse_args()
+def generate_mesh(output: Path, nr: int, ntheta: int, ri: float, ro: float) -> None:
+    if nr < 1 or ntheta < 2 or ntheta % 2:
+        raise ValueError("nr must be positive and ntheta must be a positive even number")
+    if ri <= 0 or ro <= ri:
+        raise ValueError("expected 0 < ri < ro")
 
-    if args.nr < 1 or args.ntheta < 2 or args.ntheta % 2:
-        parser.error("nr must be positive and ntheta must be a positive even number")
-    if args.ri <= 0 or args.ro <= args.ri:
-        parser.error("expected 0 < ri < ro")
-
-    output = args.output.resolve()
+    output = Path(output).resolve()
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
 
-    radii = np.linspace(args.ri, args.ro, args.nr + 1, dtype=np.float64)
-    angles = np.linspace(0.0, 0.5 * math.pi, args.ntheta + 1, dtype=np.float64)
+    radii = np.linspace(ri, ro, nr + 1, dtype=np.float64)
+    angles = np.linspace(0.0, 0.5 * math.pi, ntheta + 1, dtype=np.float64)
     x = (np.cos(angles)[:, None] * radii[None, :]).astype(np.float32).ravel()
     y = (np.sin(angles)[:, None] * radii[None, :]).astype(np.float32).ravel()
 
     it, ir = np.meshgrid(
-        np.arange(args.ntheta, dtype=np.int32),
-        np.arange(args.nr, dtype=np.int32),
+        np.arange(ntheta, dtype=np.int32),
+        np.arange(nr, dtype=np.int32),
         indexing="ij",
     )
-    n00 = ir + (args.nr + 1) * it
+    n00 = ir + (nr + 1) * it
     elements = (
         n00,
         n00 + 1,
-        n00 + args.nr + 2,
-        n00 + args.nr + 1,
+        n00 + nr + 2,
+        n00 + nr + 1,
     )
     x.tofile(output / "x.float32")
     y.tofile(output / "y.float32")
@@ -64,21 +56,36 @@ def main() -> int:
     )
 
     sidesets = output / "surface" / "sidesets"
-    angular_index = np.arange(args.ntheta, dtype=np.int32)
-    radial_index = np.arange(args.nr, dtype=np.int32)
-    inner_parent = args.nr * angular_index
-    outer_parent = args.nr * angular_index + args.nr - 1
+    angular_index = np.arange(ntheta, dtype=np.int32)
+    radial_index = np.arange(nr, dtype=np.int32)
+    inner_parent = nr * angular_index
+    outer_parent = nr * angular_index + nr - 1
     theta0_parent = radial_index
-    theta90_parent = args.nr * (args.ntheta - 1) + radial_index
-    write_sideset(sidesets / "inner", inner_parent, np.full(args.ntheta, 3, dtype=np.int16))
-    write_sideset(sidesets / "outer", outer_parent, np.full(args.ntheta, 1, dtype=np.int16))
-    write_sideset(sidesets / "theta0", theta0_parent, np.full(args.nr, 0, dtype=np.int16))
-    write_sideset(sidesets / "theta90", theta90_parent, np.full(args.nr, 2, dtype=np.int16))
+    theta90_parent = nr * (ntheta - 1) + radial_index
+    write_sideset(sidesets / "inner", inner_parent, np.full(ntheta, 3, dtype=np.int16))
+    write_sideset(sidesets / "outer", outer_parent, np.full(ntheta, 1, dtype=np.int16))
+    write_sideset(sidesets / "theta0", theta0_parent, np.full(nr, 0, dtype=np.int16))
+    write_sideset(sidesets / "theta90", theta90_parent, np.full(nr, 2, dtype=np.int16))
 
     print(
-        f"Generated {args.nr} x {args.ntheta} QUAD4 quarter-annulus mesh "
-        f"({args.nr * args.ntheta} elements, {(args.nr + 1) * (args.ntheta + 1)} nodes)"
+        f"Generated {nr} x {ntheta} QUAD4 quarter-annulus mesh "
+        f"({nr * ntheta} elements, {(nr + 1) * (ntheta + 1)} nodes)"
     )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Generate the cylindrical pressure-vessel mesh")
+    parser.add_argument("output", type=Path)
+    parser.add_argument("--nr", type=int, default=20)
+    parser.add_argument("--ntheta", type=int, default=20)
+    parser.add_argument("--ri", type=float, default=7.0)
+    parser.add_argument("--ro", type=float, default=18.625)
+    args = parser.parse_args()
+
+    try:
+        generate_mesh(args.output, args.nr, args.ntheta, args.ri, args.ro)
+    except ValueError as error:
+        parser.error(str(error))
     return 0
 
 

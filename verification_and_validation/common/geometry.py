@@ -313,3 +313,76 @@ def spherical_shell_mesh(inner_radius, outer_radius, radial_cells, surface_frequ
             )
     elements = _orient_tets(points, np.asarray(tetrahedra, dtype=np.int64))
     return Mesh(points, elements, "TET4")
+
+
+def spherical_shell_octant_mesh(inner_radius, outer_radius, radial_cells, surface_frequency, element_type="TET4"):
+    """One spherical-shell octant, triangulated or assembled from cubed-sphere patches."""
+    inner_radius = _positive_float(inner_radius, "inner_radius")
+    outer_radius = _positive_float(outer_radius, "outer_radius")
+    if outer_radius <= inner_radius:
+        raise ValueError("outer_radius must be larger than inner_radius")
+    radial_cells = _positive_int(radial_cells, "radial_cells")
+    surface_frequency = _positive_int(surface_frequency, "surface_frequency")
+    element_type = _element_type(element_type, ("TET4", "HEX8"))
+
+    if element_type == "TET4":
+        full_directions, full_triangles = _octahedron_surface(surface_frequency)
+        in_octant = np.all(full_directions >= -1.0e-13, axis=1)
+        retained = np.all(in_octant[full_triangles], axis=1)
+        triangles = full_triangles[retained]
+        used = np.unique(triangles.ravel())
+        old_to_new = np.full(len(full_directions), -1, dtype=np.int64)
+        old_to_new[used] = np.arange(len(used))
+        directions = full_directions[used]
+        triangles = old_to_new[triangles]
+        radii = np.linspace(inner_radius, outer_radius, radial_cells + 1)
+        points = np.concatenate([radius * directions for radius in radii], axis=0)
+        layer_size = len(directions)
+        lower_triangles = np.sort(triangles, axis=1)
+        tetrahedra = np.empty((radial_cells * len(triangles) * 3, 4), dtype=np.int64)
+        for layer in range(radial_cells):
+            lower = lower_triangles + layer * layer_size
+            upper = lower + layer_size
+            block = tetrahedra[layer * len(triangles) * 3:(layer + 1) * len(triangles) * 3]
+            block[0::3] = np.column_stack((lower, upper[:, 2]))
+            block[1::3] = np.column_stack((lower[:, 0], lower[:, 1], upper[:, 1], upper[:, 2]))
+            block[2::3] = np.column_stack((lower[:, 0], upper))
+        return Mesh(points, _orient_tets(points, tetrahedra), "TET4")
+
+    frequency = surface_frequency
+    direction_ids = {}
+    directions = []
+
+    def add_direction(vector):
+        direction = vector / np.linalg.norm(vector)
+        key = tuple(np.round(direction, 14))
+        if key not in direction_ids:
+            direction_ids[key] = len(directions)
+            directions.append(direction)
+        return direction_ids[key]
+
+    surface_quads = []
+    for face in range(3):
+        ids = np.empty((frequency + 1, frequency + 1), dtype=np.int64)
+        for i in range(frequency + 1):
+            for j in range(frequency + 1):
+                vector = np.asarray((i / frequency, j / frequency, 1.0))
+                vector = np.roll(vector, face + 1)
+                ids[i, j] = add_direction(vector)
+        for i in range(frequency):
+            for j in range(frequency):
+                surface_quads.append((ids[i, j], ids[i + 1, j], ids[i + 1, j + 1], ids[i, j + 1]))
+
+    directions = np.asarray(directions)
+    radii = np.linspace(inner_radius, outer_radius, radial_cells + 1)
+    points = np.concatenate([radius * directions for radius in radii], axis=0)
+    layer_size = len(directions)
+    quads = np.asarray(surface_quads, dtype=np.int64)
+    hexes = np.concatenate(
+        [
+            np.column_stack((quads + layer * layer_size, quads + (layer + 1) * layer_size))
+            for layer in range(radial_cells)
+        ],
+        axis=0,
+    )
+    return Mesh(points, hexes, "HEX8")

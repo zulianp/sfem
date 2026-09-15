@@ -66,6 +66,9 @@ struct SSMeshData {
     std::vector<scalar_t> ugrad;
     int                   conv_ho{0};
     int                   conv_limiter{0};
+    // The cell-Peclet blend, resolved once per residual and carried as data for the reason
+    // the flat MeshData carries it: the kernels that read it are SFEM_HOST_DEVICE.
+    Hex8PecletConfig<scalar_t> conv_peclet{};
     // The reconstruction's denominator: 1 / sum of |det| over the micro-elements touching a
     // node. Pure geometry, so it is built once and kept, and the sweep that uses it neither
     // allocates nor accumulates it. Keyed on the mesh it was built for; see
@@ -2450,7 +2453,11 @@ inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t r
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(gx, gy, gz, adj, &det);
                     cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
-                                                         d.upwind_eps);
+                                                         d.upwind_eps,
+                                                         (const scalar_t *)nullptr,
+                                                         (const scalar_t *)nullptr,
+                                                         (const scalar_t *)nullptr,
+                                                         (const scalar_t *)nullptr, 0, d.conv_peclet);
                     boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
                     for (int a = 0; a < 8; ++a)
                         for (int c = 0; c < N_FIELDS; ++c)
@@ -2498,6 +2505,16 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     // The limiter is the cause, not the reconstruction. Both remain reachable, because
     // a bounded scheme is still wanted and reproducing the failure is a legitimate need.
     d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 0);
+    d.conv_peclet = cvfem_hex8_peclet_config<scalar_t>();
+    if (d.conv_ho && d.conv_peclet.form) {
+        // Same refusal as the flat path, and it must be here too: this reader is independent,
+        // so a check in only one of them leaves the other running the undefined combination.
+        std::fprintf(stderr,
+                     "SFEM_PECLET_BLEND with SFEM_CONV_HO is not defined: the deferred "
+                     "correction's donor split comes from the unblended flux. Run one or the "
+                     "other.\n");
+        std::abort();
+    }
     if (d.conv_ho) sscvfem_assemble_nodal_u_grad(d);
     else d.ugrad.clear();
 
@@ -2612,7 +2629,8 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                                                              rc, d.upwind_eps,
                                                              ho ? g8 : nullptr,
                                                              ho ? x : nullptr, ho ? y : nullptr,
-                                                             ho ? z : nullptr, d.conv_limiter);
+                                                             ho ? z : nullptr, d.conv_limiter,
+                                                             d.conv_peclet);
                         boundary_scs_add_residual(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                   ux, uy, uz, p, r,
                                                   d.macro_face_mask.empty()

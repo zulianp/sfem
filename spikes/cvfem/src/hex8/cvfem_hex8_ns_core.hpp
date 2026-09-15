@@ -95,6 +95,9 @@ struct MeshData {
     std::vector<scalar_t> ugrad;
     int                   conv_ho{0};
     int                   conv_limiter{0};
+    // The cell-Peclet blend, resolved from the environment once per residual and carried as
+    // data because the kernels that read it are SFEM_HOST_DEVICE. form 0 is off.
+    Hex8PecletConfig<scalar_t> conv_peclet{};
     // The PREVIOUS step size, for variable-step BDF2. Zero -- the default -- means no step
     // has been recorded and the uniform coefficients apply, which is every existing caller.
     scalar_t              dt_prev{0};
@@ -627,7 +630,7 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
                                               d.upwind_eps, ho ? g8 : nullptr,
                                               ho ? x : nullptr, ho ? y : nullptr, ho ? z : nullptr,
-                                              d.conv_limiter);
+                                              d.conv_limiter, d.conv_peclet);
         boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
                                   d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
                                   d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
@@ -1146,7 +1149,35 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     // The limiter is the cause, not the reconstruction. Both remain reachable, because
     // a bounded scheme is still wanted and reproducing the failure is a legitimate need.
     d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 0);
-    if (d.conv_ho) {
+    // CELL-PECLET BLENDING takes the same route as the deferred correction, and for the same
+    // two reasons. It is a residual-only change -- the Jacobian keeps the full first-order
+    // upwind dissipation -- which is defect correction, the structure this file already uses
+    // and the one the literature recommends precisely because a limiter's or a blend's
+    // contribution to an implicit Jacobian cannot readily be evaluated. An upwinded Jacobian
+    // for a less-upwinded residual is also the better-conditioned pairing, not merely the
+    // cheaper one.
+    //
+    // And only the sum-factored kernel carries it, so asking for the blend forces that path
+    // exactly as SFEM_CONV_HO does. The alternative is a run where some elements are blended
+    // and others are not depending on which sweep the layout selected, which would be
+    // invisible in the output and fatal to anything measured from it.
+    d.conv_peclet = cvfem_hex8_peclet_config<scalar_t>();
+    if (d.conv_ho && d.conv_peclet.form) {
+        // Both at once is not yet defined: the deferred correction recovers its upwind split
+        // from mdot to decide which node is the donor, and with the dissipation blended away
+        // there is no donor to recover. Refused rather than run, because the combination
+        // would produce a number and not an error.
+        static bool said = false;
+        if (!said) {
+            std::fprintf(stderr,
+                         "SFEM_PECLET_BLEND with SFEM_CONV_HO is not defined: the deferred "
+                         "correction's donor split comes from the unblended flux. Run one or "
+                         "the other.\n");
+            said = true;
+        }
+        std::abort();
+    }
+    if (d.conv_ho || d.conv_peclet.form) {
         assemble_nodal_u_grad(d, geom);
         apply_residual_atomic_sumfact(d, rho, mu);
         apply_body_force(d);

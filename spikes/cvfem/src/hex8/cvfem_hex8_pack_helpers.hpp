@@ -212,6 +212,7 @@ struct Hex8RcConfig {
     scalar_t  scale{0};
 };
 
+
 inline Hex8RcConfig cvfem_hex8_rc_config(const scalar_t rhie_chow_scale, const scalar_t a0_over_dt) {
     // std::getenv rather than smesh::Env, because the benchmark shares this header and is
     // driven by flags with no Env to read through -- the same reason cvfem_env_flag exists.

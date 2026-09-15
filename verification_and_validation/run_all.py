@@ -517,6 +517,15 @@ def _resolution_variables(resolution):
     return variables
 
 
+def _case_scalar_variables(case):
+    variables = {}
+    for section in ("geometry", "loading"):
+        for key, value in case.get(section, {}).items():
+            if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+                variables[f"{section}_{key}"] = str(value)
+    return variables
+
+
 def _result_metadata(case, variant):
     return {
         "id": variant["id"],
@@ -572,6 +581,7 @@ def run_variant(case_path, case, variant, build_dir, variant_output, verbose):
         "element": variant["element"],
     }
     variables.update(_resolution_variables(variant["resolution"]))
+    variables.update(_case_scalar_variables(case))
     for physical_name, value in variant.get("material", {}).items():
         variables[f"material_{physical_name}"] = str(value)
         variables[f"material_key_{physical_name}"] = variant.get("material_parameter_map", {}).get(

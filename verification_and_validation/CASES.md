@@ -192,6 +192,10 @@ outside this material-focused catalog.
   `r(R)^3 = R^3 + c` and pressure equilibrium quadrature; for the compressible
   variant, solve radial equilibrium at high precision without calling SFEM
   kernels.
+- **Extraction:** integrate the deformed inner faces for the pressure-volume
+  history. Compare radial and hoop Cauchy stresses as volume-weighted angular
+  averages in each radial shell layer; retain local quadrature stress errors
+  in diagnostics so profile agreement is not mistaken for pointwise accuracy.
 - **Pass conditions:** inner-radius displacement error at or below `2%`,
   radial/hoop stress relative L2 errors at or below `4%`, pressure-volume curve
   relative L2 error at or below `2%`, positive Jacobian, and monotone spatial

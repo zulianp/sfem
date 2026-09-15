@@ -171,6 +171,38 @@ int test_quad4_follower_pressure() {
 }
 
 #ifdef SFEM_ENABLE_RYAML
+int test_tri3_yaml_follower_pressure() {
+    auto mesh  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 1, 1, 1);
+    auto space = sfem::FunctionSpace::create(mesh, 3);
+    auto op    = sfem::NeumannConditions::create_from_yaml(
+            space,
+            "neumann_conditions:\n"
+            "- type: pressure\n"
+            "  format: expr\n"
+            "  parent: [0]\n"
+            "  lfi: [0]\n"
+            "  value: 0.75\n");
+    SFEM_TEST_ASSERT(op != nullptr);
+    SFEM_TEST_ASSERT(op->conditions()[0].element_type == smesh::TRI3);
+    return verify_derivatives(op, space);
+}
+
+int test_quad4_yaml_follower_pressure() {
+    auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 1, 1, 1);
+    auto space = sfem::FunctionSpace::create(mesh, 3);
+    auto op    = sfem::NeumannConditions::create_from_yaml(
+            space,
+            "neumann_conditions:\n"
+            "- type: pressure\n"
+            "  format: expr\n"
+            "  parent: [0]\n"
+            "  lfi: [5]\n"
+            "  value: 0.75\n");
+    SFEM_TEST_ASSERT(op != nullptr);
+    SFEM_TEST_ASSERT(op->conditions()[0].element_type == smesh::QUAD4);
+    return verify_derivatives(op, space);
+}
+
 int test_neumann_yaml_profile() {
     auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 1, 1, 1);
     auto space = sfem::FunctionSpace::create(mesh, 3);
@@ -198,6 +230,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_tri3_follower_pressure);
     SFEM_RUN_TEST(test_quad4_follower_pressure);
 #ifdef SFEM_ENABLE_RYAML
+    SFEM_RUN_TEST(test_tri3_yaml_follower_pressure);
+    SFEM_RUN_TEST(test_quad4_yaml_follower_pressure);
     SFEM_RUN_TEST(test_neumann_yaml_profile);
 #endif
     SFEM_UNIT_TEST_FINALIZE();

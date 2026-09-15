@@ -902,6 +902,92 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_dmdotc(const s
 // none lose their upwinding rather than gaining diffusion.
 //
 // e = 0 reproduces the hard switch exactly, which is what every default call site gets.
+// --------------------------------------------------- cell-Peclet blending of the upwind term
+//
+// The convective flux this code writes is
+//
+//     m (u_i + u_j)/2  +  |m| (u_i - u_j)/2,
+//
+// a central term plus a dissipation term, and the second one is pure first-order donor cell.
+// Nalu and Nalu-Wind, on the same discretisation, do not choose between upwind and central at
+// all: they blend them by cell Peclet number, phi_ip = eta phi_upw + (1 - eta) phi_cds. In
+// this form that blend is a single factor on |m|, because
+//
+//     eta phi_upw + (1 - eta) phi_cds  =  phi_cds + eta |m| (u_i - u_j) / 2,
+//
+// so nothing about the flux's structure changes and the Jacobian keeps its shape. eta = 1 is
+// the current scheme bit for bit, which is what an unset environment gets.
+//
+// THE TRANSITION POINTS ARE NOT A TUNING CHOICE, they are the whole point. Nalu's tanh blend
+// is centred at Peclet 50,000 with width 200 for VELOCITY and at 2 with width 1 for every
+// other scalar -- so at any Peclet a real flow reaches, eta is zero for momentum and the
+// momentum equations run essentially unstabilised central, with upwinding reserved for
+// scalars. That is the production answer to "the |m| term is this scheme's subgrid model",
+// and it is a much larger lever than reconstructing that term more accurately: measured on
+// the backward-facing step, the deferred correction moves eps_num by 2.6% to 17.6%, while
+// this switches the term off.
+//
+// Whether it is STABLE here is an experiment and not a deduction. Colocated central
+// differencing is viable because Rhie-Chow supplies the pressure-velocity coupling, which
+// this code has; but Nalu is a projection scheme with an LES subgrid model carrying the
+// dissipation, and this is a monolithic Newton formulation that at present has neither. The
+// energy budget is the instrument that decides it, which is why it was built first.
+template <typename scalar_t>
+struct Hex8PecletConfig {
+    // 0 off (eta = 1 everywhere, the current scheme), 1 classic, 2 tanh.
+    int      form{0};
+    scalar_t gamma{1};   // classic: hybrid upwind factor, eta = (g Pe)^2 / (5 + (g Pe)^2)
+    scalar_t trans{0};   // tanh: transition Peclet
+    scalar_t width{1};   // tanh: transition width
+};
+
+template <typename scalar_t>
+inline Hex8PecletConfig<scalar_t> cvfem_hex8_peclet_config() {
+    // std::getenv and a function-local static, for the reason cvfem_hex8_rc_config gives:
+    // the benchmark shares this header and has no Env to read through, and the value must be
+    // read once rather than per face.
+    static const Hex8PecletConfig<scalar_t> c = [] {
+        Hex8PecletConfig<scalar_t> k;
+        const char *const f = std::getenv("SFEM_PECLET_BLEND");
+        if (!f || f[0] == '0' || f[0] == '\0') return k;            // off, eta = 1
+        if (f[0] == 'c') k.form = 1;                                 // "classic"
+        else if (f[0] == 't') k.form = 2;                            // "tanh"
+        else return k;
+        const char *const g = std::getenv("SFEM_PECLET_GAMMA");
+        const char *const t = std::getenv("SFEM_PECLET_TRANS");
+        const char *const w = std::getenv("SFEM_PECLET_WIDTH");
+        // Nalu's velocity defaults, so asking for the tanh form without saying more gives the
+        // scheme the reference implementation actually runs rather than a neutral one.
+        k.gamma = g ? (scalar_t)std::atof(g) : scalar_t(1);
+        k.trans = t ? (scalar_t)std::atof(t) : scalar_t(50000);
+        k.width = w ? (scalar_t)std::atof(w) : scalar_t(200);
+        if (k.width <= scalar_t(0)) k.width = scalar_t(1);
+        return k;
+    }();
+    return c;
+}
+
+// eta from the cell Peclet number. pe_num is 0.5 (u_i + u_j) . (x_j - x_i), the velocity
+// averaged across the face dotted with the node separation, and nu is the kinematic
+// viscosity -- Nalu's definition, formed at the call site because only it has the node
+// coordinates. Returns 1 when the blend is off, so the caller needs no branch.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_peclet_eta(const Hex8PecletConfig<scalar_t> &c,
+                                                                   const scalar_t pe_num,
+                                                                   const scalar_t nu) {
+    if (c.form == 0) return scalar_t(1);
+    // |Pe|: the blend is about the magnitude of convection against diffusion, and the sign of
+    // the flux is already carried by |m| and its derivative.
+    const scalar_t pe_raw = nu > scalar_t(0) ? pe_num / nu : pe_num;
+    const scalar_t pe     = pe_raw < scalar_t(0) ? -pe_raw : pe_raw;
+    if (c.form == 1) {
+        const scalar_t gp = c.gamma * pe;
+        const scalar_t g2 = gp * gp;
+        return g2 / (scalar_t(5) + g2);
+    }
+    return scalar_t(0.5) * (scalar_t(1) + std::tanh((pe - c.trans) / c.width));
+}
+
 template <typename scalar_t>
 // Forced inline rather than left to SFEM_INLINE, which the SFEM headers define as plain inline
 // before this file's own definition can take effect. Left to the heuristic, GCC outlined it as a
@@ -1163,13 +1249,27 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_convection(const scalar_
                                                   scalar_t      &fz,
                                                   scalar_t      &mdot,
                                                   const scalar_t mdot_rc = scalar_t(0),
-                                               const scalar_t ueps = scalar_t(0)) {
+                                               const scalar_t ueps = scalar_t(0),
+                                               // Cell-Peclet blending. The node separation and
+                                               // the kinematic viscosity, plus the blend's
+                                               // configuration; the default config has form 0,
+                                               // so eta is 1 and this kernel is what it was.
+                                               const scalar_t dx = scalar_t(0),
+                                               const scalar_t dy = scalar_t(0),
+                                               const scalar_t dz = scalar_t(0),
+                                               const scalar_t nu = scalar_t(0),
+                                               const Hex8PecletConfig<scalar_t> &pcfg = {}) {
     const scalar_t adv_x = scalar_t(0.5) * (ux_i + ux_j);
     const scalar_t adv_y = scalar_t(0.5) * (uy_i + uy_j);
     const scalar_t adv_z = scalar_t(0.5) * (uz_i + uz_j);
     mdot                 = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
     scalar_t amdot, sgn;
     cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+    // One multiplication, and it is the whole blend: the flux is central plus
+    // |m|(u_i - u_j)/2, so scaling |m| by eta interpolates between upwind at eta = 1 and pure
+    // central at eta = 0 without touching anything else. The advecting velocity is already
+    // averaged across the face above, which is exactly what the Peclet number wants.
+    amdot *= cvfem_hex8_peclet_eta(pcfg, adv_x * dx + adv_y * dy + adv_z * dz, nu);
     const scalar_t mpos  = scalar_t(0.5) * (mdot + amdot);
     const scalar_t mneg  = scalar_t(0.5) * (mdot - amdot);
     const scalar_t pmid  = scalar_t(0.5) * (p_i + p_j);
@@ -1248,7 +1348,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               const scalar_t *const SFEM_RESTRICT xe = nullptr,
                                                               const scalar_t *const SFEM_RESTRICT ye = nullptr,
                                                               const scalar_t *const SFEM_RESTRICT ze = nullptr,
-                                                              const int limiter = 0) {
+                                                              const int limiter = 0,
+                                                              // Cell-Peclet blending, passed as DATA rather than read
+                                                              // from the environment here: these kernels are
+                                                              // SFEM_HOST_DEVICE and a function-local static with a
+                                                              // lambda initialiser is not available on the device.
+                                                              // The default has form 0, so eta is 1 and the kernel is
+                                                              // bit-for-bit what it was.
+                                                              const Hex8PecletConfig<scalar_t> &pcfg = {}) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     scalar_t grad[9];
@@ -1311,7 +1418,18 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                   fz,
                                   mdot,
                                   mdot_rc,
-                                  ueps);
+                                  ueps,
+                                  // The node separation, from the Rhie-Chow block's copy of the
+                                  // element coordinates. Zero when it is absent, which makes the
+                                  // Peclet number zero and the tanh blend hand back pure central
+                                  // -- silently switching off all upwinding. The driver refuses
+                                  // the blend unless this is available rather than relying on
+                                  // that not happening.
+                                  rc.x ? rc.x[j] - rc.x[i] : scalar_t(0),
+                                  rc.y ? rc.y[j] - rc.y[i] : scalar_t(0),
+                                  rc.z ? rc.z[j] - rc.z[i] : scalar_t(0),
+                                  rho > scalar_t(0) ? mu / rho : mu,
+                                  rc.x ? pcfg : Hex8PecletConfig<scalar_t>{});
         // The deferred correction, added to the first-order flux and to nothing else. The
         // Jacobian below is untouched by design; see cvfem_hex8_scs_defcor.
         if (ugrad8) {
