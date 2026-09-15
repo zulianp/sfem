@@ -804,7 +804,7 @@ static int linear_elasticity_tri3_hessian_i_msoa_assemble_impl(
       }
     }
 
-    linear_elasticity_d2_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, lmbda, mu, element_matrix);
+    linear_elasticity_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, bdet0, lmbda, mu, element_matrix);
 
     if constexpr (FORMAT == 1) {
       linear_elasticity_tri3_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

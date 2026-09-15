@@ -91,6 +91,46 @@ static SFEM_INLINE void laplace_d2_simplex_direct_hessian_reference_element_matr
   }
 }
 
+template <typename s_t, int NQ, int NS, int VS>
+static SFEM_INLINE void laplace_d2_simplex_tri3_direct_hessian_element_matrix(
+    const s_t *const RSTR badj0,
+    const s_t *const RSTR badj1,
+    const s_t *const RSTR badj2,
+    const s_t *const RSTR badj3,
+    const s_t *const RSTR bdet0,
+    const s_t kappa,
+    s_t *const RSTR element_matrix
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static_assert(NS > 0, "NS must be positive");
+  static_assert(VS > 0, "VS must be positive");
+  const int lane = 0;
+  const ptrdiff_t goff = 0 * VS + lane;
+  const s_t adj_lane0 = badj0[goff];
+  const s_t adj_lane1 = badj1[goff];
+  const s_t adj_lane2 = badj2[goff];
+  const s_t adj_lane3 = badj3[goff];
+  const s_t det_lane0 = bdet0[goff];
+  const s_t idet = s_t(1) / det_lane0;
+  const s_t hessian_tmp0 = ((s_t(1) / s_t(2)))*idet*kappa;
+  const s_t hessian_tmp1 = hessian_tmp0*(-adj_lane0 - adj_lane2);
+  const s_t hessian_tmp2 = hessian_tmp0*(-adj_lane1 - adj_lane3);
+  const s_t hessian_tmp3 = adj_lane0*hessian_tmp1 + adj_lane1*hessian_tmp2;
+  const s_t hessian_tmp4 = adj_lane2*hessian_tmp1 + adj_lane3*hessian_tmp2;
+  const s_t hessian_tmp5 = pow_2(adj_lane0)*hessian_tmp0 + pow_2(adj_lane1)*hessian_tmp0;
+  const s_t hessian_tmp6 = adj_lane0*adj_lane2*hessian_tmp0 + adj_lane1*adj_lane3*hessian_tmp0;
+  const s_t hessian_tmp7 = pow_2(adj_lane2)*hessian_tmp0 + pow_2(adj_lane3)*hessian_tmp0;
+  element_matrix[0] = -hessian_tmp3 - hessian_tmp4;
+  element_matrix[3] = hessian_tmp3;
+  element_matrix[6] = hessian_tmp4;
+  element_matrix[1] = -hessian_tmp5 - hessian_tmp6;
+  element_matrix[4] = hessian_tmp5;
+  element_matrix[7] = hessian_tmp6;
+  element_matrix[2] = -hessian_tmp6 - hessian_tmp7;
+  element_matrix[5] = hessian_tmp6;
+  element_matrix[8] = hessian_tmp7;
+}
+
 } // namespace codegen
 } // namespace sfem
 

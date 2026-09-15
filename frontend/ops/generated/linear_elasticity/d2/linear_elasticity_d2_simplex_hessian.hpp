@@ -98,6 +98,110 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_direct_hessian_reference_el
   }
 }
 
+template <typename s_t, int NQ, int NS, int VS>
+static SFEM_INLINE void linear_elasticity_d2_simplex_tri3_direct_hessian_element_matrix(
+    const s_t *const RSTR badj0,
+    const s_t *const RSTR badj1,
+    const s_t *const RSTR badj2,
+    const s_t *const RSTR badj3,
+    const s_t *const RSTR bdet0,
+    const s_t lmbda,
+    const s_t mu,
+    s_t *const RSTR element_matrix
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static_assert(NS > 0, "NS must be positive");
+  static_assert(VS > 0, "VS must be positive");
+  const int lane = 0;
+  const ptrdiff_t goff = 0 * VS + lane;
+  const s_t adj_lane0 = badj0[goff];
+  const s_t adj_lane1 = badj1[goff];
+  const s_t adj_lane2 = badj2[goff];
+  const s_t adj_lane3 = badj3[goff];
+  const s_t det_lane0 = bdet0[goff];
+  const s_t idet = s_t(1) / det_lane0;
+  const s_t hessian_tmp0 = -adj_lane1 - adj_lane3;
+  const s_t hessian_tmp1 = idet*mu;
+  const s_t hessian_tmp2 = ((s_t(1) / s_t(2)))*hessian_tmp1;
+  const s_t hessian_tmp3 = hessian_tmp0*hessian_tmp2;
+  const s_t hessian_tmp4 = -adj_lane0 - adj_lane2;
+  const s_t hessian_tmp5 = idet*lmbda;
+  const s_t hessian_tmp6 = hessian_tmp4*hessian_tmp5;
+  const s_t hessian_tmp7 = s_t(2)*hessian_tmp1;
+  const s_t hessian_tmp8 = ((s_t(1) / s_t(2)))*hessian_tmp4*hessian_tmp7 + ((s_t(1) / s_t(2)))*hessian_tmp6;
+  const s_t hessian_tmp9 = adj_lane0*hessian_tmp8 + adj_lane1*hessian_tmp3;
+  const s_t hessian_tmp10 = adj_lane2*hessian_tmp8 + adj_lane3*hessian_tmp3;
+  const s_t hessian_tmp11 = ((s_t(1) / s_t(2)))*hessian_tmp6;
+  const s_t hessian_tmp12 = adj_lane0*hessian_tmp3 + adj_lane1*hessian_tmp11;
+  const s_t hessian_tmp13 = adj_lane2*hessian_tmp3 + adj_lane3*hessian_tmp11;
+  const s_t hessian_tmp14 = adj_lane0*hessian_tmp5;
+  const s_t hessian_tmp15 = ((s_t(1) / s_t(2)))*adj_lane0*hessian_tmp7 + ((s_t(1) / s_t(2)))*hessian_tmp14;
+  const s_t hessian_tmp16 = adj_lane0*hessian_tmp15 + pow_2(adj_lane1)*hessian_tmp2;
+  const s_t hessian_tmp17 = adj_lane1*hessian_tmp2;
+  const s_t hessian_tmp18 = adj_lane3*hessian_tmp17;
+  const s_t hessian_tmp19 = adj_lane2*hessian_tmp15 + hessian_tmp18;
+  const s_t hessian_tmp20 = ((s_t(1) / s_t(2)))*hessian_tmp14;
+  const s_t hessian_tmp21 = adj_lane0*hessian_tmp17 + adj_lane1*hessian_tmp20;
+  const s_t hessian_tmp22 = adj_lane2*hessian_tmp17 + adj_lane3*hessian_tmp20;
+  const s_t hessian_tmp23 = adj_lane2*hessian_tmp5;
+  const s_t hessian_tmp24 = ((s_t(1) / s_t(2)))*adj_lane2*hessian_tmp7 + ((s_t(1) / s_t(2)))*hessian_tmp23;
+  const s_t hessian_tmp25 = adj_lane0*hessian_tmp24 + hessian_tmp18;
+  const s_t hessian_tmp26 = adj_lane2*hessian_tmp24 + pow_2(adj_lane3)*hessian_tmp2;
+  const s_t hessian_tmp27 = adj_lane3*hessian_tmp2;
+  const s_t hessian_tmp28 = ((s_t(1) / s_t(2)))*hessian_tmp23;
+  const s_t hessian_tmp29 = adj_lane0*hessian_tmp27 + adj_lane1*hessian_tmp28;
+  const s_t hessian_tmp30 = adj_lane2*hessian_tmp27 + adj_lane3*hessian_tmp28;
+  const s_t hessian_tmp31 = hessian_tmp0*hessian_tmp20 + hessian_tmp17*hessian_tmp4;
+  const s_t hessian_tmp32 = hessian_tmp0*hessian_tmp28 + hessian_tmp27*hessian_tmp4;
+  const s_t hessian_tmp33 = hessian_tmp2*hessian_tmp4;
+  const s_t hessian_tmp34 = ((s_t(1) / s_t(2)))*hessian_tmp0*hessian_tmp5 + ((s_t(1) / s_t(2)))*hessian_tmp0*hessian_tmp7;
+  const s_t hessian_tmp35 = adj_lane0*hessian_tmp33 + adj_lane1*hessian_tmp34;
+  const s_t hessian_tmp36 = adj_lane2*hessian_tmp33 + adj_lane3*hessian_tmp34;
+  const s_t hessian_tmp37 = ((s_t(1) / s_t(2)))*adj_lane1*hessian_tmp5 + ((s_t(1) / s_t(2)))*adj_lane1*hessian_tmp7;
+  const s_t hessian_tmp38 = pow_2(adj_lane0)*hessian_tmp2 + adj_lane1*hessian_tmp37;
+  const s_t hessian_tmp39 = adj_lane0*adj_lane2*hessian_tmp2;
+  const s_t hessian_tmp40 = adj_lane3*hessian_tmp37 + hessian_tmp39;
+  const s_t hessian_tmp41 = ((s_t(1) / s_t(2)))*adj_lane3*hessian_tmp5 + ((s_t(1) / s_t(2)))*adj_lane3*hessian_tmp7;
+  const s_t hessian_tmp42 = adj_lane1*hessian_tmp41 + hessian_tmp39;
+  const s_t hessian_tmp43 = pow_2(adj_lane2)*hessian_tmp2 + adj_lane3*hessian_tmp41;
+  element_matrix[0] = -hessian_tmp10 - hessian_tmp9;
+  element_matrix[6] = hessian_tmp9;
+  element_matrix[12] = hessian_tmp10;
+  element_matrix[18] = -hessian_tmp12 - hessian_tmp13;
+  element_matrix[24] = hessian_tmp12;
+  element_matrix[30] = hessian_tmp13;
+  element_matrix[1] = -hessian_tmp16 - hessian_tmp19;
+  element_matrix[7] = hessian_tmp16;
+  element_matrix[13] = hessian_tmp19;
+  element_matrix[19] = -hessian_tmp21 - hessian_tmp22;
+  element_matrix[25] = hessian_tmp21;
+  element_matrix[31] = hessian_tmp22;
+  element_matrix[2] = -hessian_tmp25 - hessian_tmp26;
+  element_matrix[8] = hessian_tmp25;
+  element_matrix[14] = hessian_tmp26;
+  element_matrix[20] = -hessian_tmp29 - hessian_tmp30;
+  element_matrix[26] = hessian_tmp29;
+  element_matrix[32] = hessian_tmp30;
+  element_matrix[3] = -hessian_tmp31 - hessian_tmp32;
+  element_matrix[9] = hessian_tmp31;
+  element_matrix[15] = hessian_tmp32;
+  element_matrix[21] = -hessian_tmp35 - hessian_tmp36;
+  element_matrix[27] = hessian_tmp35;
+  element_matrix[33] = hessian_tmp36;
+  element_matrix[4] = -hessian_tmp21 - hessian_tmp29;
+  element_matrix[10] = hessian_tmp21;
+  element_matrix[16] = hessian_tmp29;
+  element_matrix[22] = -hessian_tmp38 - hessian_tmp40;
+  element_matrix[28] = hessian_tmp38;
+  element_matrix[34] = hessian_tmp40;
+  element_matrix[5] = -hessian_tmp22 - hessian_tmp30;
+  element_matrix[11] = hessian_tmp22;
+  element_matrix[17] = hessian_tmp30;
+  element_matrix[23] = -hessian_tmp42 - hessian_tmp43;
+  element_matrix[29] = hessian_tmp42;
+  element_matrix[35] = hessian_tmp43;
+}
+
 } // namespace codegen
 } // namespace sfem
 

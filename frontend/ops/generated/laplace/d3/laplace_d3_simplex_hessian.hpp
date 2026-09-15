@@ -107,6 +107,71 @@ static SFEM_INLINE void laplace_d3_simplex_direct_hessian_reference_element_matr
   }
 }
 
+template <typename s_t, int NQ, int NS, int VS>
+static SFEM_INLINE void laplace_d3_simplex_tet4_direct_hessian_element_matrix(
+    const s_t *const RSTR badj0,
+    const s_t *const RSTR badj1,
+    const s_t *const RSTR badj2,
+    const s_t *const RSTR badj3,
+    const s_t *const RSTR badj4,
+    const s_t *const RSTR badj5,
+    const s_t *const RSTR badj6,
+    const s_t *const RSTR badj7,
+    const s_t *const RSTR badj8,
+    const s_t *const RSTR bdet0,
+    const s_t kappa,
+    s_t *const RSTR element_matrix
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static_assert(NS > 0, "NS must be positive");
+  static_assert(VS > 0, "VS must be positive");
+  const int lane = 0;
+  const ptrdiff_t goff = 0 * VS + lane;
+  const s_t adj_lane0 = badj0[goff];
+  const s_t adj_lane1 = badj1[goff];
+  const s_t adj_lane2 = badj2[goff];
+  const s_t adj_lane3 = badj3[goff];
+  const s_t adj_lane4 = badj4[goff];
+  const s_t adj_lane5 = badj5[goff];
+  const s_t adj_lane6 = badj6[goff];
+  const s_t adj_lane7 = badj7[goff];
+  const s_t adj_lane8 = badj8[goff];
+  const s_t det_lane0 = bdet0[goff];
+  const s_t idet = s_t(1) / det_lane0;
+  const s_t hessian_tmp0 = ((s_t(1) / s_t(6)))*idet*kappa;
+  const s_t hessian_tmp1 = hessian_tmp0*(-adj_lane0 - adj_lane3 - adj_lane6);
+  const s_t hessian_tmp2 = hessian_tmp0*(-adj_lane1 - adj_lane4 - adj_lane7);
+  const s_t hessian_tmp3 = hessian_tmp0*(-adj_lane2 - adj_lane5 - adj_lane8);
+  const s_t hessian_tmp4 = adj_lane0*hessian_tmp1 + adj_lane1*hessian_tmp2 + adj_lane2*hessian_tmp3;
+  const s_t hessian_tmp5 = adj_lane3*hessian_tmp1 + adj_lane4*hessian_tmp2 + adj_lane5*hessian_tmp3;
+  const s_t hessian_tmp6 = adj_lane6*hessian_tmp1 + adj_lane7*hessian_tmp2 + adj_lane8*hessian_tmp3;
+  const s_t hessian_tmp7 = pow_2(adj_lane0)*hessian_tmp0 + pow_2(adj_lane1)*hessian_tmp0 + pow_2(adj_lane2)*hessian_tmp0;
+  const s_t hessian_tmp8 = adj_lane0*hessian_tmp0;
+  const s_t hessian_tmp9 = adj_lane1*hessian_tmp0;
+  const s_t hessian_tmp10 = adj_lane2*hessian_tmp0;
+  const s_t hessian_tmp11 = adj_lane3*hessian_tmp8 + adj_lane4*hessian_tmp9 + adj_lane5*hessian_tmp10;
+  const s_t hessian_tmp12 = adj_lane6*hessian_tmp8 + adj_lane7*hessian_tmp9 + adj_lane8*hessian_tmp10;
+  const s_t hessian_tmp13 = pow_2(adj_lane3)*hessian_tmp0 + pow_2(adj_lane4)*hessian_tmp0 + pow_2(adj_lane5)*hessian_tmp0;
+  const s_t hessian_tmp14 = adj_lane3*adj_lane6*hessian_tmp0 + adj_lane4*adj_lane7*hessian_tmp0 + adj_lane5*adj_lane8*hessian_tmp0;
+  const s_t hessian_tmp15 = pow_2(adj_lane6)*hessian_tmp0 + pow_2(adj_lane7)*hessian_tmp0 + pow_2(adj_lane8)*hessian_tmp0;
+  element_matrix[0] = -hessian_tmp4 - hessian_tmp5 - hessian_tmp6;
+  element_matrix[4] = hessian_tmp4;
+  element_matrix[8] = hessian_tmp5;
+  element_matrix[12] = hessian_tmp6;
+  element_matrix[1] = -hessian_tmp11 - hessian_tmp12 - hessian_tmp7;
+  element_matrix[5] = hessian_tmp7;
+  element_matrix[9] = hessian_tmp11;
+  element_matrix[13] = hessian_tmp12;
+  element_matrix[2] = -hessian_tmp11 - hessian_tmp13 - hessian_tmp14;
+  element_matrix[6] = hessian_tmp11;
+  element_matrix[10] = hessian_tmp13;
+  element_matrix[14] = hessian_tmp14;
+  element_matrix[3] = -hessian_tmp12 - hessian_tmp14 - hessian_tmp15;
+  element_matrix[7] = hessian_tmp12;
+  element_matrix[11] = hessian_tmp14;
+  element_matrix[15] = hessian_tmp15;
+}
+
 } // namespace codegen
 } // namespace sfem
 

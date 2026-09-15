@@ -2364,7 +2364,7 @@ static int linear_elasticity_tet4_hessian_i_msoa_assemble_impl(
       }
     }
 
-    linear_elasticity_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, element_matrix);
+    linear_elasticity_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, element_matrix);
 
     if constexpr (FORMAT == 1) {
       linear_elasticity_tet4_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

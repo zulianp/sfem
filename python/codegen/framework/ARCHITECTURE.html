@@ -592,7 +592,20 @@
 
       <p>Checked the way the residual side was: the old shape and the new one compiled side by side on the same inputs, entry by entry. Linear elasticity agrees to <b>2e-16</b> relative in 2D and 3D, neo-Hookean exactly, and the state genuinely matters &mdash; zeroing it moves the neo-Hookean matrix by 3.9%, so the state-dependent path is not passing by being unused. The reproducibility buckets corroborate on the real kernels: <code>refine=6</code> drives the HEX8 assemblies and <code>element=QUAD4</code> the 2D ones, and both baselines were recorded from the point-by-point tree.</p>
 
-      <p><b>What is left of it is the constant-P1 half.</b> A simplex header is shared by TET4 and TET10, so the closed form has to arrive as a second, specialised kernel beside the generic one &mdash; which is what the residual path does, and the pattern to follow.</p>
+      <p><b>And the constant-P1 half with it.</b> A simplex header is shared by TET4 and TET10, so the closed form arrives as a second, specialised kernel beside the generic one, reached through the constant-P1 specialisation the apply already uses &mdash; the header defines it whichever element generated the file, and only an element whose strategy is EXPANDED calls it. TET4 and TRI3 do; TET10 goes on calling the generic one, which is the bug the first attempt shipped and the element's own strategy fixed.</p>
+
+      <p><b>This is the comparison OP 28 opened with.</b> Generated TET4 linear elasticity is now 144 entries, <b>306 temporaries and zero loops</b>, taking the adjugate, the determinant and the material parameters &mdash; the same inputs and the same shape as the hand-written <code>tet4_linear_elasticity_crs_adj</code>, which does it in 178. Still 1.7&times; the temporaries, and that gap is now a question about elimination rather than about structure.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>TET4 linear elasticity, 12&times;12</th><th>hand-written</th><th>generated, before</th><th>generated, now</th></tr>
+        <tr><td>loops</td><td><b>0</b></td><td>7, one of them quadrature</td><td><b>0</b></td></tr>
+        <tr><td>reference data read</td><td>none</td><td><code>q_weight</code>, <code>grad_ref_x/y/z</code></td><td>none</td></tr>
+        <tr><td>inputs</td><td>adjugate, determinant</td><td>17 arguments</td><td>adjugate, determinant</td></tr>
+        <tr><td>entries written</td><td>144, straight line</td><td>2 sites, inside loops</td><td>144, straight line</td></tr>
+        <tr><td>temporaries shared across all entries</td><td>178</td><td>&mdash; not expressible</td><td>306</td></tr>
+      </table>
+
+      <p>Checked the same way as the factorised half: the generic kernel and the specialisation compiled side by side on the same inputs. All four materials agree in both dimensions &mdash; laplace, linear elasticity, neo-Hookean and Mooney-Rivlin &mdash; worst <b>2.3e-16</b> relative to the largest entry.</p>
 
       <div class="op-facts"><span><i>reference</i> 0 loops, 178 temporaries, 144 entries</span><span><i>viscous TET4, closed form</i> 144 entries, 612 temporaries, 0 loops</span><span><i>probing</i> 5 of 25 &rarr; <b>0</b></span><span><i>proof</i> A&middot;v = apply(v) to 4e-16, five kernels</span></div>
 </div>
