@@ -16,7 +16,7 @@ Every claim below is an identity or a fitted rate checked against a threshold, s
 | Pressure port shifts the level by p_bar - p_exact (direct) | 8 of 8 values verified | <span class="st-pass">pass</span> |
 | Pressure port shifts the level by p_bar - p_exact (mg) | 8 of 8 values verified | <span class="st-pass">pass</span> |
 | Pressure port shifts the level by p_bar - p_exact (vanka) | 8 of 8 values verified | <span class="st-pass">pass</span> |
-| Budget closes and eps_num vanishes at second order (mg) | rate 2.022, closure 1.81e-03 at the finest | <span class="st-pass">pass</span> |
+| Budget closes and eps_num vanishes at second order (mg) | rate 2.022, closure 2.84e-03 at the finest | <span class="st-pass">pass</span> |
 | Budget is the same on both solver stacks | 0.000e+00 relative to eps_visc at 75140 dof | <span class="st-pass">pass</span> |
 | Pump: the port carries what the diaphragm sweeps | 6 of 6 instant(s) verified | <span class="st-pass">pass</span> |
 | Global mass balance | 2 of 2 case(s) verified | <span class="st-pass">pass</span> |
@@ -152,14 +152,14 @@ asks for nothing unusual.
 
 | p_bar | u_linf | p_linf | predicted shift | error | status |
 |---|---|---|---|---|---|
-| -0.16 | 5.702e-13 | 2.159e-14 | 0.000e+00 | 2.159e-14 | <span class="st-pass">pass</span> |
-| -0.08 | 5.704e-13 | 8.000e-02 | 8.000e-02 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 0 | 5.701e-13 | 1.600e-01 | 1.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 0.16 | 5.712e-13 | 3.200e-01 | 3.200e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 0.5 | 5.712e-13 | 6.600e-01 | 6.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 1 | 5.710e-13 | 1.160e+00 | 1.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 1.5 | 5.715e-13 | 1.660e+00 | 1.660e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 3 | 5.745e-13 | 3.160e+00 | 3.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| -0.16 | 5.572e-13 | 2.041e-14 | 0.000e+00 | 2.041e-14 | <span class="st-pass">pass</span> |
+| -0.08 | 5.576e-13 | 8.000e-02 | 8.000e-02 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 0 | 5.576e-13 | 1.600e-01 | 1.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 0.16 | 5.572e-13 | 3.200e-01 | 3.200e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 0.5 | 5.583e-13 | 6.600e-01 | 6.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 1 | 5.600e-13 | 1.160e+00 | 1.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 1.5 | 5.600e-13 | 1.660e+00 | 1.660e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 3 | 5.737e-13 | 3.160e+00 | 3.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
 
 <svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
 <title>Pressure port linearity (direct)</title>
@@ -210,14 +210,14 @@ asks for nothing unusual.
 
 | p_bar | u_linf | p_linf | predicted shift | error | status |
 |---|---|---|---|---|---|
-| -0.16 | 1.904e-07 | 3.109e-08 | 0.000e+00 | 3.109e-08 | <span class="st-pass">pass</span> |
-| -0.08 | 1.904e-07 | 8.000e-02 | 8.000e-02 | 2.000e-08 | <span class="st-pass">pass</span> |
-| 0 | 1.904e-07 | 1.600e-01 | 1.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
+| -0.16 | 1.904e-07 | 3.832e-08 | 0.000e+00 | 3.832e-08 | <span class="st-pass">pass</span> |
+| -0.08 | 1.905e-07 | 8.000e-02 | 8.000e-02 | 3.000e-08 | <span class="st-pass">pass</span> |
+| 0 | 1.905e-07 | 1.600e-01 | 1.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
 | 0.16 | 1.904e-07 | 3.200e-01 | 3.200e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 0.5 | 1.880e-07 | 6.600e-01 | 6.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 1 | 1.880e-07 | 1.160e+00 | 1.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 1.5 | 1.904e-07 | 1.660e+00 | 1.660e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 3 | 1.685e-07 | 3.160e+00 | 3.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 0.5 | 1.905e-07 | 6.600e-01 | 6.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 1 | 1.882e-07 | 1.160e+00 | 1.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 1.5 | 1.882e-07 | 1.660e+00 | 1.660e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 3 | 1.872e-07 | 3.160e+00 | 3.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
 
 <svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
 <title>Pressure port linearity (mg)</title>
@@ -268,14 +268,14 @@ asks for nothing unusual.
 
 | p_bar | u_linf | p_linf | predicted shift | error | status |
 |---|---|---|---|---|---|
-| -0.16 | 1.904e-07 | 3.109e-08 | 0.000e+00 | 3.109e-08 | <span class="st-pass">pass</span> |
-| -0.08 | 1.904e-07 | 8.000e-02 | 8.000e-02 | 2.000e-08 | <span class="st-pass">pass</span> |
+| -0.16 | 1.904e-07 | 3.829e-08 | 0.000e+00 | 3.829e-08 | <span class="st-pass">pass</span> |
+| -0.08 | 1.904e-07 | 8.000e-02 | 8.000e-02 | 4.000e-08 | <span class="st-pass">pass</span> |
 | 0 | 1.904e-07 | 1.600e-01 | 1.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 0.16 | 1.904e-07 | 3.200e-01 | 3.200e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 0.5 | 1.880e-07 | 6.600e-01 | 6.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 1 | 1.880e-07 | 1.160e+00 | 1.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 1.5 | 1.904e-07 | 1.660e+00 | 1.660e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| 3 | 1.692e-07 | 3.160e+00 | 3.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 0.16 | 1.905e-07 | 3.200e-01 | 3.200e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 0.5 | 1.905e-07 | 6.600e-01 | 6.600e-01 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 1 | 1.882e-07 | 1.160e+00 | 1.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 1.5 | 1.882e-07 | 1.660e+00 | 1.660e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| 3 | 1.882e-07 | 3.160e+00 | 3.160e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
 
 <svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
 <title>Pressure port linearity (vanka)</title>
@@ -325,9 +325,9 @@ differenced from -- must fall with it.
 
 | ndof | E | eps_visc | eps_num | closure | div_l2 |
 |---|---|---|---|---|---|
-| 10692 | 1.066e+00 | 2.013e-01 | 8.750e-03 | 2.622e-02 | 7.294e-14 |
-| 75140 | 1.067e+00 | 2.102e-01 | 2.344e-03 | 7.000e-03 | 2.181e-13 |
-| 561924 | 1.067e+00 | 2.125e-01 | 6.055e-04 | 1.807e-03 | 1.750e-13 |
+| 10692 | 1.066e+00 | 2.013e-01 | 8.750e-03 | 4.167e-02 | 6.320e-12 |
+| 75140 | 1.067e+00 | 2.102e-01 | 2.344e-03 | 1.103e-02 | 5.573e-12 |
+| 561924 | 1.067e+00 | 2.125e-01 | 6.055e-04 | 2.841e-03 | 1.546e-11 |
 
 
 Observed order of `eps_num`: **2.022** (R^2 1.0000 over 3 levels, expect >= 1.65).
@@ -337,7 +337,7 @@ Observed order of `eps_num`: **2.022** (R^2 1.0000 over 3 levels, expect >= 1.65
 
 | ndof | E | eps_visc | eps_num | closure | div_l2 |
 |---|---|---|---|---|---|
-| 75140 | 1.067e+00 | 2.102e-01 | 2.344e-03 | 7.000e-03 | 4.470e-13 |
+| 75140 | 1.067e+00 | 2.102e-01 | 2.344e-03 | 1.103e-02 | 3.377e-11 |
 
 
 Solver independence at 75140 dof: `eps_num` 2.344e-03 (mg) against 2.344e-03 (vanka), difference 0.000e+00 of eps_visc.
@@ -365,12 +365,12 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.
 
 | run | t | v diaphragm | swept | port flux | abs(port - swept) | abs(port + diaphragm) | status |
 |---|---|---|---|---|---|---|---|
-| steady | -- | -- | +1.000000000 | +1.000000000 | 0.000e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
+| steady | -- | -- | +1.000000000 | +1.000000000 | 1.110e-16 | 1.110e-16 | <span class="st-pass">pass</span> |
 | t1 | 0.125 | +0.7071 | +0.707106781 | +0.707106781 | 0.000e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
 | t2 | 0.250 | +1.0000 | +1.000000000 | +1.000000000 | 0.000e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| t4 | 0.500 | +0.0000 | +0.000000000 | +0.000000000 | 3.303e-18 | 3.303e-18 | <span class="st-pass">pass</span> |
+| t4 | 0.500 | +0.0000 | +0.000000000 | +0.000000000 | 4.170e-18 | 4.170e-18 | <span class="st-pass">pass</span> |
 | t6 | 0.750 | -1.0000 | -1.000000000 | -1.000000000 | 0.000e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| t8 | 1.000 | -0.0000 | -0.000000000 | -0.000000000 | 2.502e-18 | 2.502e-18 | <span class="st-pass">pass</span> |
+| t8 | 1.000 | -0.0000 | -0.000000000 | -0.000000000 | 1.181e-17 | 1.181e-17 | <span class="st-pass">pass</span> |
 
 <svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
 <title>Pump: swept volume against port flux</title>
@@ -424,8 +424,8 @@ is kept because it does check the prescribed profile, against its own tolerance.
 
 | case | ndof | sum of continuity | relative to inflow | inflow | inflow err | flux imbalance (not scored) | status |
 |---|---|---|---|---|---|---|---|
-| lshape | 7060 | 4.108e-17 | 3.698e-16 | 1.111e-01 | 1.345e-02 | 5.066e-01 | <span class="st-pass">pass</span> |
-| re500 | 4540 | 9.625e-24 | 1.849e-18 | 4.226e-06 | 1.883e-01 | 1.944e-16 | <span class="st-pass">pass</span> |
+| lshape | 7060 | -1.584e-18 | 1.425e-17 | 1.111e-01 | 1.345e-02 | 5.066e-01 | <span class="st-pass">pass</span> |
+| re500 | 4540 | 5.595e-23 | 1.075e-17 | 4.226e-06 | 1.883e-01 | 1.944e-16 | <span class="st-pass">pass</span> |
 
 
 ## Solver behaviour
@@ -437,65 +437,65 @@ machine is named in Provenance.
 
 | case | ndof | converged | Newton | linear its | t_solve (s) | Re reached | gauge |
 |---|---|---|---|---|---|---|---|
-| re1_n4 | 500 | yes | 3 | 305 | 0.047 | 2 | zero mean |
-| re1_n8 | 2916 | yes | 2 | 500 | 0.136 | 2 | zero mean |
-| re1_n16 | 19652 | yes | 2 | 1956 | 1.731 | 2 | zero mean |
-| re1_n32 | 143748 | yes | 2 | 4744 | 13.108 | 2 | zero mean |
-| re100_n4 | 500 | yes | 16 | 5304 | 0.827 | 200 | zero mean |
-| re100_n8 | 2916 | yes | 8 | 4390 | 1.200 | 200 | zero mean |
-| re100_n16 | 19652 | yes | 5 | 6815 | 6.004 | 200 | zero mean |
-| re100_n32 | 143748 | yes | 4 | 10894 | 30.618 | 200 | zero mean |
-| dirichlet | 4900 | yes | 0 | 3 | 0.033 | 100 | zero mean |
-| natural | 33124 | yes | 3 | 13526 | 12.694 | 100 | determined by the do-nothing outflow |
-| traction0 | 33124 | yes | 3 | 13526 | 12.557 | 100 | determined by the traction surface |
-| direct_p-0.16 | 4900 | yes | 0 | 3 | 0.033 | 100 | determined by the prescribed pressure |
+| re1_n4 | 500 | yes | 3 | 138 | 0.043 | 2 | zero mean |
+| re1_n8 | 2916 | yes | 2 | 203 | 0.103 | 2 | zero mean |
+| re1_n16 | 19652 | yes | 2 | 453 | 0.503 | 2 | zero mean |
+| re1_n32 | 143748 | yes | 2 | 1200 | 2.144 | 2 | zero mean |
+| re100_n4 | 500 | yes | 5 | 918 | 0.317 | 200 | zero mean |
+| re100_n8 | 2916 | yes | 5 | 1333 | 0.677 | 200 | zero mean |
+| re100_n16 | 19652 | yes | 4 | 2223 | 2.506 | 200 | zero mean |
+| re100_n32 | 143748 | yes | 4 | 4681 | 8.328 | 200 | zero mean |
+| dirichlet | 4900 | yes | 0 | 3 | 0.034 | 100 | zero mean |
+| natural | 33124 | yes | 3 | 8283 | 9.071 | 100 | determined by the do-nothing outflow |
+| traction0 | 33124 | yes | 3 | 8283 | 8.912 | 100 | determined by the traction surface |
+| direct_p-0.16 | 4900 | yes | 0 | 3 | 0.034 | 100 | determined by the prescribed pressure |
 | direct_p-0.08 | 4900 | yes | 0 | 3 | 0.033 | 100 | determined by the prescribed pressure |
-| direct_p0 | 4900 | yes | 0 | 3 | 0.037 | 100 | determined by the prescribed pressure |
+| direct_p0 | 4900 | yes | 0 | 3 | 0.036 | 100 | determined by the prescribed pressure |
 | direct_p0.16 | 4900 | yes | 0 | 3 | 0.036 | 100 | determined by the prescribed pressure |
-| direct_p0.5 | 4900 | yes | 0 | 3 | 0.035 | 100 | determined by the prescribed pressure |
+| direct_p0.5 | 4900 | yes | 0 | 3 | 0.036 | 100 | determined by the prescribed pressure |
 | direct_p1.0 | 4900 | yes | 0 | 3 | 0.033 | 100 | determined by the prescribed pressure |
 | direct_p1.5 | 4900 | yes | 0 | 3 | 0.033 | 100 | determined by the prescribed pressure |
-| direct_p3.0 | 4900 | yes | 0 | 3 | 0.033 | 100 | determined by the prescribed pressure |
-| mg_p-0.16 | 33124 | yes | 1 | 183 | 0.927 | 100 | determined by the prescribed pressure |
-| mg_p-0.08 | 33124 | yes | 1 | 184 | 0.909 | 100 | determined by the prescribed pressure |
-| mg_p0 | 33124 | yes | 1 | 183 | 0.945 | 100 | determined by the prescribed pressure |
-| mg_p0.16 | 33124 | yes | 1 | 173 | 0.848 | 100 | determined by the prescribed pressure |
-| mg_p0.5 | 33124 | yes | 0 | 160 | 0.782 | 100 | determined by the prescribed pressure |
-| mg_p1.0 | 33124 | yes | 0 | 159 | 0.800 | 100 | determined by the prescribed pressure |
-| mg_p1.5 | 33124 | yes | 1 | 159 | 0.790 | 100 | determined by the prescribed pressure |
-| mg_p3.0 | 33124 | yes | 0 | 147 | 0.745 | 100 | determined by the prescribed pressure |
-| vanka_p-0.16 | 33124 | yes | 1 | 1735 | 1.187 | 100 | determined by the prescribed pressure |
-| vanka_p-0.08 | 33124 | yes | 1 | 1766 | 1.190 | 100 | determined by the prescribed pressure |
-| vanka_p0 | 33124 | yes | 1 | 1760 | 1.188 | 100 | determined by the prescribed pressure |
-| vanka_p0.16 | 33124 | yes | 1 | 1673 | 1.123 | 100 | determined by the prescribed pressure |
-| vanka_p0.5 | 33124 | yes | 0 | 1467 | 1.000 | 100 | determined by the prescribed pressure |
-| vanka_p1.0 | 33124 | yes | 0 | 1477 | 0.988 | 100 | determined by the prescribed pressure |
-| vanka_p1.5 | 33124 | yes | 1 | 1498 | 1.003 | 100 | determined by the prescribed pressure |
-| vanka_p3.0 | 33124 | yes | 0 | 1299 | 0.868 | 100 | determined by the prescribed pressure |
-| mg_n2l4 | 10692 | yes | 0 | 62 | 0.232 | 100 | zero mean |
-| mg_n2l8 | 75140 | yes | 0 | 138 | 1.756 | 100 | zero mean |
-| mg_n4l8 | 561924 | yes | 0 | 592 | 43.738 | 100 | zero mean |
-| vanka_n2l8 | 75140 | yes | 0 | 1179 | 2.816 | 100 | zero mean |
-| lshape | 7060 | yes | 3 | 17 | 0.388 | 20 | determined by the do-nothing outflow |
-| steady | 2916 | yes | 7 | 24 | 0.090 | 20 | determined by the prescribed pressure |
-| t1 | 2916 | yes | 6 | 20 | 0.076 | 20 | determined by the prescribed pressure |
-| t2 | 2916 | yes | 7 | 27 | 0.104 | 20 | determined by the prescribed pressure |
-| t4 | 2916 | yes | 9 | 43 | 0.161 | 20 | determined by the prescribed pressure |
-| t6 | 2916 | yes | 7 | 59 | 0.221 | 20 | determined by the prescribed pressure |
-| t8 | 2916 | yes | 8 | 73 | 0.275 | 20 | determined by the prescribed pressure |
-| re500 | 4540 | yes | 16 | 85 | 0.773 | 500 | determined by the do-nothing outflow |
+| direct_p3.0 | 4900 | yes | 0 | 3 | 0.034 | 100 | determined by the prescribed pressure |
+| mg_p-0.16 | 33124 | yes | 1 | 61 | 0.301 | 100 | determined by the prescribed pressure |
+| mg_p-0.08 | 33124 | yes | 1 | 62 | 0.316 | 100 | determined by the prescribed pressure |
+| mg_p0 | 33124 | yes | 1 | 62 | 0.315 | 100 | determined by the prescribed pressure |
+| mg_p0.16 | 33124 | yes | 1 | 61 | 0.302 | 100 | determined by the prescribed pressure |
+| mg_p0.5 | 33124 | yes | 1 | 55 | 0.281 | 100 | determined by the prescribed pressure |
+| mg_p1.0 | 33124 | yes | 0 | 44 | 0.220 | 100 | determined by the prescribed pressure |
+| mg_p1.5 | 33124 | yes | 0 | 41 | 0.206 | 100 | determined by the prescribed pressure |
+| mg_p3.0 | 33124 | yes | 0 | 41 | 0.204 | 100 | determined by the prescribed pressure |
+| vanka_p-0.16 | 33124 | yes | 1 | 450 | 0.350 | 100 | determined by the prescribed pressure |
+| vanka_p-0.08 | 33124 | yes | 1 | 462 | 0.357 | 100 | determined by the prescribed pressure |
+| vanka_p0 | 33124 | yes | 1 | 494 | 0.369 | 100 | determined by the prescribed pressure |
+| vanka_p0.16 | 33124 | yes | 1 | 476 | 0.362 | 100 | determined by the prescribed pressure |
+| vanka_p0.5 | 33124 | yes | 1 | 411 | 0.308 | 100 | determined by the prescribed pressure |
+| vanka_p1.0 | 33124 | yes | 0 | 387 | 0.289 | 100 | determined by the prescribed pressure |
+| vanka_p1.5 | 33124 | yes | 0 | 332 | 0.254 | 100 | determined by the prescribed pressure |
+| vanka_p3.0 | 33124 | yes | 0 | 351 | 0.266 | 100 | determined by the prescribed pressure |
+| mg_n2l4 | 10692 | yes | 0 | 20 | 0.078 | 100 | zero mean |
+| mg_n2l8 | 75140 | yes | 0 | 33 | 0.403 | 100 | zero mean |
+| mg_n4l8 | 561924 | yes | 0 | 72 | 4.824 | 100 | zero mean |
+| vanka_n2l8 | 75140 | yes | 0 | 189 | 0.370 | 100 | zero mean |
+| lshape | 7060 | yes | 3 | 16 | 0.381 | 20 | determined by the do-nothing outflow |
+| steady | 2916 | yes | 3 | 13 | 0.048 | 20 | determined by the prescribed pressure |
+| t1 | 2916 | yes | 3 | 13 | 0.052 | 20 | determined by the prescribed pressure |
+| t2 | 2916 | yes | 4 | 17 | 0.066 | 20 | determined by the prescribed pressure |
+| t4 | 2916 | yes | 6 | 27 | 0.119 | 20 | determined by the prescribed pressure |
+| t6 | 2916 | yes | 4 | 37 | 0.142 | 20 | determined by the prescribed pressure |
+| t8 | 2916 | yes | 5 | 46 | 0.175 | 20 | determined by the prescribed pressure |
+| re500 | 4540 | yes | 5 | 24 | 0.214 | 500 | determined by the do-nothing outflow |
 
 ## Provenance
 
 | field | value |
 |---|---|
-| generated | 2026-09-13 18:54:30 |
+| generated | 2026-09-15 07:56:18 |
 | machine | nid006545 |
 | threads | 72 |
 | commit | -- |
 | linear solver | direct |
 | element refine level | 1 |
-| run directory | /Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-direct-4658814 |
+| run directory | /Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-direct-4667036 |
 | runs parsed | 47 of 47 |
 
-Regenerate with `python3 python/cvfem_verify_report.py verification_runs/grace-direct-4658814`.
+Regenerate with `python3 python/cvfem_verify_report.py verification_runs/grace-direct-4667036`.
