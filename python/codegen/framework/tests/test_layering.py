@@ -26,6 +26,7 @@ import unittest
 # module may import any layer with a *lower* index than its own.
 LAYER_ORDER = (
     "symbolic",
+    "forms",
     "fem",
     "plans",
     "ir",

@@ -1038,7 +1038,7 @@ class GenApiTest(unittest.TestCase):
 
     def test_backend_rejects_coefficients_not_declared_by_form_metadata(self):
         from ..backends.openmp import _validate_coefficient_dependencies
-        from ..symbolic.residual import WeakResidualCoefficients
+        from ..forms.residual import WeakResidualCoefficients
 
         coeffs = (WeakResidualCoefficients("u", sp.Symbol("mu"), (sp.S.Zero, sp.S.Zero)),)
         with self.assertRaisesRegex(ValueError, "undeclared FormMetadata inputs: mu"):

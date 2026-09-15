@@ -49,7 +49,7 @@ def _sever_source(unit):
 
 def _action_expression_plan(unit):
     """The 2-form expression plan of a unit, if it has one."""
-    from codegen.framework.symbolic.forms import FormOrder
+    from codegen.framework.forms.forms import FormOrder
 
     for plan in getattr(unit, "expression_plans", ()):
         if getattr(plan, "form_order", None) is FormOrder.TWO:
@@ -132,7 +132,7 @@ class FormCollectionBoundaryTest(unittest.TestCase):
 
     def test_form_collection_has_no_back_pointer(self):
         """The field itself is gone; this fails if anyone reintroduces it."""
-        from codegen.framework.symbolic.forms import FormCollection
+        from codegen.framework.forms.forms import FormCollection
 
         self.assertNotIn(
             "source",

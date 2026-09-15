@@ -31,7 +31,7 @@ from codegen.framework.emitters import runtime_typed_abi
 from codegen.framework.emitters.runtime_typed_abi import RUNTIME_SCALAR_TYPES
 from codegen.framework.plans.emission import emission_plan_for_element
 from codegen.framework.plans.residual_model import residual_emission_model_from_system
-from codegen.framework.symbolic.residual import CoupledResidualSystem
+from codegen.framework.forms.residual import CoupledResidualSystem
 from codegen.framework.plans import conventions
 
 

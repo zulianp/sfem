@@ -10,11 +10,11 @@ import sympy as sp
 
 from sfem import gen
 
-from codegen.framework.symbolic.residual import CoupledResidualSystem
+from codegen.framework.forms.residual import CoupledResidualSystem
 from codegen.framework.emitters.residual_codegen import (
     generate_coupled_residual_sfem_files,
 )
-from codegen.framework.symbolic.residual import (
+from codegen.framework.forms.residual import (
     coupled_residual_weak_coefficients,
     weak_residual_coefficients,
 )

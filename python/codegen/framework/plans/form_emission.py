@@ -25,7 +25,7 @@ precondition for answering it in a table instead.
 from dataclasses import dataclass
 from enum import Enum
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 
 #: What each kernel name is, as an order.  The names come from the material's
 #: `add_energy` / `add_residual` call and are the only three the framework has.

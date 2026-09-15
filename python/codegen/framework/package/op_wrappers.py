@@ -4179,7 +4179,7 @@ namespace sfem {
 
 
 def _coupled_dependency_flags(systems_by_dim, energy_name, residual_name):
-    from codegen.framework.symbolic.forms import FormOrder
+    from codegen.framework.forms.forms import FormOrder
 
     flags = {
         "gradient_previous": False,
@@ -4238,7 +4238,7 @@ def _residual_zero_form_is_assembled_norm(form_collections):
     interchangeable and only the first is emitted.
     """
     from codegen.framework.plans.form_emission import FormReduction, form_reduction
-    from codegen.framework.symbolic.forms import FormOrder
+    from codegen.framework.forms.forms import FormOrder
 
     for collection in (form_collections or {}).values():
         for form in getattr(collection, "forms", ()):
@@ -4327,7 +4327,7 @@ def _coupled_cases(
     kernel_sources=None,
 ):
     mixed_order = _uses_mixed_field_arrays(elements)
-    from codegen.framework.symbolic.forms import FormOrder
+    from codegen.framework.forms.forms import FormOrder
 
     kernel_sources = kernel_sources or {}
     cases = {
@@ -4903,19 +4903,19 @@ def _boundary_residual_parameter_names(collection, available_parameters):
 
 
 def _form_order_zero():
-    from codegen.framework.symbolic.forms import FormOrder
+    from codegen.framework.forms.forms import FormOrder
 
     return FormOrder.ZERO
 
 
 def _form_order_one():
-    from codegen.framework.symbolic.forms import FormOrder
+    from codegen.framework.forms.forms import FormOrder
 
     return FormOrder.ONE
 
 
 def _form_order_two():
-    from codegen.framework.symbolic.forms import FormOrder
+    from codegen.framework.forms.forms import FormOrder
 
     return FormOrder.TWO
 

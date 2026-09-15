@@ -22,10 +22,10 @@ from dataclasses import dataclass
 
 import sympy as sp
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 
 from codegen.framework.symbolic.core import KernelExpressions
-from codegen.framework.symbolic.residual import (
+from codegen.framework.forms.residual import (
     CoupledResidualSystem,
     residual_dependencies_for,
 )

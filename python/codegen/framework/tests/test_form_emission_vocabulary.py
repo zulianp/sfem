@@ -22,7 +22,7 @@ from codegen.framework.plans.form_emission import (
     form_order,
     writes_per_shape,
 )
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 
 
 class Form:
@@ -47,7 +47,7 @@ class FormEmissionVocabularyTest(unittest.TestCase):
         """Whatever a material can ask for, this must be able to order."""
         import inspect
 
-        from codegen.framework.symbolic import equations
+        from codegen.framework.forms import equations
 
         source = inspect.getsource(equations)
         declared = set()

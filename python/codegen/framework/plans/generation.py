@@ -11,7 +11,7 @@ from codegen.framework.plans.matrix_formats import (
     MatrixFormatPlan,
     specialize_matrix_format_plan,
 )
-from codegen.framework.symbolic.forms import FormCollection, FormOrder, PipelineStage
+from codegen.framework.forms.forms import FormCollection, FormOrder, PipelineStage
 from codegen.framework.fem.geometry import GeometryPlanNode
 
 

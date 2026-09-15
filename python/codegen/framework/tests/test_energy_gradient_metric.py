@@ -18,7 +18,7 @@ import sympy as sp
 from codegen.framework.plans.form_transformations import (
     energy_gradient_metric_scale,
 )
-from codegen.framework.symbolic.weak_forms import sfem_soa_weak_form
+from codegen.framework.forms.weak_forms import sfem_soa_weak_form
 
 
 class EnergyGradientMetricTest(unittest.TestCase):

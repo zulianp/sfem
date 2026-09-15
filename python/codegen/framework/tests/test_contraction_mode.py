@@ -34,7 +34,7 @@ This pins the fact so the finding cannot quietly stop being true.
 import importlib
 import unittest
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 
 #: (material, whether its 1-form carries test-function symbols)
 #:

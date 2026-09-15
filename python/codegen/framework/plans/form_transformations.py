@@ -7,7 +7,7 @@ from codegen.framework.plans.loperand import (
     gradient_metric_scale,
     loperand_matrix,
 )
-from codegen.framework.symbolic.weak_forms import flux_form_from_energy
+from codegen.framework.forms.weak_forms import flux_form_from_energy
 
 
 @dataclass(frozen=True)

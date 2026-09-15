@@ -26,9 +26,11 @@ from codegen.framework.symbolic import (
     hessian_action_from_energy,
     matrix_inner,
     residual_from_energy,
+    vector_symbols,
+)
+from codegen.framework.forms.weak_forms import (
     sfem_soa_kernel_form,
     sfem_soa_weak_form,
-    vector_symbols,
 )
 from codegen.framework.emitters.kernel_codegen import (
     generate_cpp_kernel,

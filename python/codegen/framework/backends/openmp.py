@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import sympy as sp
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 from codegen.framework.plans.generation import KernelTarget, MeshPhase, LocalPhase, mesh_kernel_plan_from_context
 from codegen.framework.plans.emission import emission_plan_for_element, emission_plan_from_unit_context
 from codegen.framework.plans.kernel_signature import (
@@ -21,7 +21,7 @@ from codegen.framework.plans.residual_model import (
     diagonal_block_emission_model,
     residual_emission_model,
 )
-from codegen.framework.symbolic.residual import WeakResidualCoefficients
+from codegen.framework.forms.residual import WeakResidualCoefficients
 from codegen.framework.emitters.residual_codegen import (
     generate_coupled_residual_sfem_files,
     generate_mixed_residual_sfem_files,
