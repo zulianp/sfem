@@ -7537,11 +7537,14 @@ def _scalar_crs_precision_entry_points(
     )
     matrix_arguments.extend(("rowptr", "colidx", "values"))
 
-    def _forward(target):
-        return lambda scalar_type, arguments: [
-            "return sfem::codegen::%s<%s>(%s);"
-            % (target, scalar_type, ", ".join(arguments))
-        ]
+    def _forward(implementation):
+        #: No leading indent: `_runtime_typed_entry_point` indents what it is
+        #: given, and the launch lines carry their own.
+        return lambda scalar_type, arguments: list(
+            _target().mesh_launch_lines(
+                implementation, scalar_type, arguments, indent=""
+            )
+        )
 
     if "crs" in matrix_formats:
         lines.extend(
@@ -7935,7 +7938,7 @@ def _scalar_crs_matrix_assembly_source(
     lines.extend(
         [
             "template <typename s_t>",
-            "%s int %s(" % (_function_qualifier(), impl),
+            _target().mesh_function_line(impl),
         ]
     )
     for index, param in enumerate(params):
@@ -8170,7 +8173,7 @@ def _scalar_crs_matrix_assembly_source(
             % function_base,
             "  }",
             "",
-            "  return SFEM_SUCCESS;",
+            *_target().success_return_lines(),
             "}",
             "",
         ]

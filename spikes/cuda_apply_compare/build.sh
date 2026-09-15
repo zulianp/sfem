@@ -9,7 +9,7 @@
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$ROOT"
-MATERIALS=(laplace linear_elasticity neohookean_ogden)
+MATERIALS=(laplace linear_elasticity neohookean_ogden mooney_rivlin_kelvin_voigt_newmark neumann)
 rm -rf build && mkdir -p build
 
 # The inexact-apply operator needs SFEM's own compressed-tangent aliases at
@@ -34,7 +34,7 @@ for material in "${MATERIALS[@]}"; do
     for source in $(cu_sources "$material"); do
         object="build/device_$(echo "$source" | tr '/' '_' | sed 's/\.cu$/.o/')"
         nvcc -std=c++17 -O3 -arch=sm_90 -DNDEBUG -diag-suppress 177 \
-            -I "cuda/$material" -c "$source" -o "$object"
+            -I "cuda/$material" -I shim -c "$source" -o "$object"
         device_objects+=("$object")
     done
 done

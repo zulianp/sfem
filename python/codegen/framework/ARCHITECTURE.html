@@ -541,7 +541,40 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Thirty, ordered by what unblocks what. Nine are new since the last pass, and six of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Thirty-one, ordered by what unblocks what. Ten are new since the last pass, and seven of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 30</div>
+    <div class="body">
+      <div class="op-title">Three of the four families could not reach CUDA, and it was never about the families <span class="chip c-ok">closed &mdash; 50 of 50 operators compile, and 18 vectors agree on a GH200</span></div>
+
+      <p><b>What the refusal actually was.</b> <code>CUDASoABackend.emit</code> accepted <code>energy_soa</code> units and raised on everything else. Read as a statement about the residual, mixed-order and boundary families that is wrong: the traversal which lowers them &mdash; which plans to build, in what order, which emitter consumes each &mdash; is target-neutral from top to bottom, and it lived inside <code>OpenMPSoABackend</code>, where this backend could not name it. <code>backends/soa.py</code> holds it now and the two backends are subclasses answering six hooks.</p>
+
+      <p><b>Past the split, every remaining defect was one shape: a CPU answer written down as a literal.</b> And every one was found by compiling, never by reading.</p>
+
+      <p><b>Two of the four shared primitive headers had two spellings.</b> <code>emitters/energy.py</code> carried a 125-line hand-written copy of <code>geometry_kernels</code> for CUDA while the residual emitter called the real builder with its CPU defaults, so the two families emitted <code>geometry_kernels.cuh</code> with different contents and tripped the tree's own conflicting-source guard. <code>tensor_product_kernels</code> was the same without the copy, and its failure is the sharper one: the CPU default for the work item is a lane name, the device's answer is the literal <code>0</code>, and what came out was <code>for (int 0 = 0; 0 &lt; ne; ++0)</code>. Each has one owner now, taking a target, and the energy builders call it too &mdash; the duplicate was deleted rather than joined by a third.</p>
+
+      <p><b>The rest, in one list</b>, all onto <code>TargetPlatform</code>: header naming and guard suffix (the residual emitter spelled <code>.hpp</code> in twenty-two places, which on a device target writes files that collide <em>by path</em> with the CPU tree's); <code>restrict_definition</code>; the <code>kernel_math</code> and <code>kernel_diagnostics</code> bodies, which were taking the function's CPU defaults rather than the target's answers; seven CRS and packed scatter helper signatures; an <code>extent</code> on the launch, because the boundary family's sideset entry points count <code>nsides</code> and every grid was sized from <code>nelements</code>; an index and extent on the element loop, because that family walks sides and calls its counter <code>e</code>. The boundary emitter's templates had the loop, the signature, the scatter, the return and both launches inline; they ask now, and its own spelling is preserved exactly, because the point was the device lowering rather than a tidy-up that moves bytes in thirteen tracked files.</p>
+
+      <p><b>Two smaller findings worth keeping.</b> The OpenMP thread-scratch header is emitted <em>and included</em> only where the target has a host parallel element loop &mdash; gating one without the other is how fourteen device operators came to <code>#include</code> a file deliberately not written. And the CUDA contract's blanket ban on <code>pow(</code> rejected eleven correct calls in <code>two_phase_flow_d2_simplex_local</code>: van Genuchten's exponent is a runtime parameter, not a missed <code>pow_m1</code> specialisation. It states its intent now &mdash; a <em>literal</em> exponent.</p>
+
+      <p><b>Compiling every translation unit is not the same gate as linking one binary.</b> Both arms of the spike compiled cleanly while one of them held a host function containing <code>blockIdx</code>: the BSR assembly kernel took its loop from the target and stayed declared <code>__host__ __device__ int</code>, and the link said <code>undefined reference to __device_builtin_variable_blockIdx</code>. The boundary family's reference tables were <code>__host__</code>-only while the <code>__host__ __device__</code> element function calls them, which nvcc reports as <code>warning #20011-D</code> and not an error at all &mdash; the same defect OP 27 fixed for the quadrature tables, in the copy this family keeps.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>family</th><th>generates for CUDA</th><th>nvcc</th><th>device answers</th></tr>
+        <tr><td>energy</td><td>already did</td><td>&#10003;</td><td>12 vectors &le; 5.3e-16</td></tr>
+        <tr><td>residual</td><td><b>new</b></td><td>&#10003;</td><td>3 vectors &le; 2.8e-16</td></tr>
+        <tr><td>boundary residual</td><td><b>new</b></td><td>&#10003;</td><td>3 vectors &le; 2.3e-16</td></tr>
+        <tr><td>mixed-order residual</td><td><b>new</b></td><td>&#10003;</td><td>&mdash; not compared</td></tr>
+      </table>
+
+      <p>Seven materials over eleven element types: <b>50 of 50 operators compile</b> with nvcc 12.6 at <code>-arch=sm_90</code>. Four of those seven could not be generated for CUDA at all before. <b>386 of the 387 tracked files are byte-identical</b>; the one that moved is <code>geometry_kernels.cuh</code>, and only because its hand-written duplicate is gone &mdash; the same arithmetic, now with the offset pointers hoisted, which is the shape the rest of the tree uses.</p>
+
+      <p><b>What is not claimed.</b> The mixed-order family generates and compiles and is not compared: its driver case needs two element types, TET10 velocity over TET4 pressure, which is its own plumbing. The inexact-apply family still emits <code>_operator.cpp</code>. And nothing in the library can <em>call</em> any of this &mdash; <code>CMakeLists.txt</code> globs no <code>.cu</code> and the CUDA backend publishes no <code>sfem::Op</code>.</p>
+
+      <div class="op-facts"><span><i>families reaching CUDA</i> 1 of 4 &rarr; <b>4 of 4</b></span><span><i>nvcc</i> <b>50 of 50</b> operators</span><span><i>agreement</i> 18 vectors to 5.3e-16, three families</span><span><i>duplicate headers</i> 2 &rarr; 0</span><span><i>gate</i> byte-identical but one intended file</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 29</div>

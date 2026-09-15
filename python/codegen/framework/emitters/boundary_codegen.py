@@ -136,6 +136,12 @@ def generate_boundary_residual_sfem_files(
     )
 
 
+def _table_accessor_qualifier():
+    """`static`, plus whatever a kernel needs in order to call it here."""
+    qualifier = current_target().kernel_callable_qualifier()
+    return "static %s" % qualifier if qualifier else "static"
+
+
 def _boundary_target_lines(function, sideset_function, current_args, param_args, scatter_streams):
     """The five things about a boundary kernel that the target decides.
 
@@ -444,21 +450,21 @@ struct {function}_reference_data {{
   static constexpr int NS = {n_shape};
   static constexpr int NQ = {n_qp};
 
-  static const s_t *shape() {{
+  {table_accessor} const s_t *shape() {{
     static const s_t data[{shape_count}] = {{
 {shape_values}
     }};
     return data;
   }}
 
-  static const s_t *grad() {{
+  {table_accessor} const s_t *grad() {{
     static const s_t data[{grad_count}] = {{
 {grad_values}
     }};
     return data;
   }}
 
-  static const s_t *weight() {{
+  {table_accessor} const s_t *weight() {{
     static const s_t data[{weight_count}] = {{
 {weight_values}
     }};
@@ -633,6 +639,13 @@ extern "C" int {sideset_function}_float(
 """.format(
         restrict_prelude="\n".join(restrict_prelude()),
         math_header=current_target().header_name("kernel_math"),
+        #: The reference tables are called from `{function}_element`, which is
+        #: `__host__ __device__` on a device target.  They carried no qualifier
+        #: at all -- correct for the only target that had ever read them, and
+        #: `warning #20011-D: calling a __host__ function ... is not allowed`
+        #: on any other.  This is OP 27's fix for the quadrature tables,
+        #: applied to the copy the boundary family keeps.
+        table_accessor=_table_accessor_qualifier(),
         **_boundary_target_lines(
             function, sideset_function, current_args, param_args, scatter_streams
         ),
@@ -1098,6 +1111,13 @@ extern "C" int {sideset_function}_float(
 """.format(
         restrict_prelude="\n".join(restrict_prelude()),
         math_header=current_target().header_name("kernel_math"),
+        #: The reference tables are called from `{function}_element`, which is
+        #: `__host__ __device__` on a device target.  They carried no qualifier
+        #: at all -- correct for the only target that had ever read them, and
+        #: `warning #20011-D: calling a __host__ function ... is not allowed`
+        #: on any other.  This is OP 27's fix for the quadrature tables,
+        #: applied to the copy the boundary family keeps.
+        table_accessor=_table_accessor_qualifier(),
         **_boundary_target_lines(
             function, sideset_function, current_args, param_args, scatter_streams
         ),

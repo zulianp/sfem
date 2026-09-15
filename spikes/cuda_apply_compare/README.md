@@ -22,12 +22,18 @@ contended and `atomicAdd` is exercised rather than bypassed. Each output vector 
 by name and `compare.py` differences the two files entry by entry, relative to the largest entry
 of each vector.
 
-The kernels are the neo-Hookean Ogden matrix-free apply on a tensor-product hexahedron, which is
-the shape this framework cares most about; the two P1-simplex metric bodies (laplace TRI3 and
-TET4, gradient and apply); the constant-P1 AoS unit body (linear elasticity TET4 gradient); and
-the two mesh-order tensor-product bodies whose stream arrays were miscounted (laplace QUAD4 and
-HEX8 gradient). The last five are there because they were shipping a serial mesh loop inside
-`__global__`, or not compiling at all, until that was measured.
+The kernels cover three of the framework's four families. From the **energy** family: the
+neo-Hookean Ogden matrix-free apply on a tensor-product hexahedron, which is the shape this
+framework cares most about; the two P1-simplex metric bodies (laplace TRI3 and TET4, gradient and
+apply); the constant-P1 AoS unit body (linear elasticity TET4 gradient); and the two mesh-order
+tensor-product bodies whose stream arrays were miscounted (laplace QUAD4 and HEX8 gradient).
+Those five are there because they were shipping a serial mesh loop inside `__global__`, or not
+compiling at all, until that was measured.
+
+From the **residual** family: the viscous Mooney-Rivlin Kelvin-Voigt residual on a TET4, reading
+a current and a previous state. From the **boundary-residual** family: the Neumann traction on a
+triangle shell. Neither could be generated for CUDA at all until the mesh-kernel lowering moved
+onto the target — the backend accepted `energy_soa` units and raised on everything else.
 
 **Throughput** uses a structured lattice, because a timing on scrambled connectivity is not a
 result: hexahedra for the tensor-product apply, and the Kuhn subdivision of the same lattice —
@@ -91,7 +97,8 @@ both cases (214-221 and 516-525), and the device gains 0.1% on the hexahedral ap
 the tetrahedral gradient over the last doubling, so each ratio is between two saturated numbers
 rather than an artefact of an under-filled problem.
 
-**Every output vector agrees to at most 6e-16** relative to its largest entry, across all twelve.
+**Every output vector agrees to at most 5.3e-16** relative to its largest entry, across all
+eighteen — including the residual family's three and the boundary family's three.
 The comparison is not vacuous in either of the two ways it could be: every vector is fully
 non-zero with every entry distinct, so nothing agrees by being empty, and moving a single entry
 by 1e-9 relative makes `compare.py` report a failure at 1.2e-10.
@@ -103,15 +110,25 @@ and it was the only check the PROTEUS_HEX8 apply had.
 ## What this establishes, and what it does not
 
 **Establishes:** the framework generates CUDA that compiles with nvcc 12.6, runs on an H100, and
-computes the same answer as its own OpenMP kernel — entry by entry — for both the tensor-product
-and the constant-P1 simplex lowerings, at throughputs measured on saturated problems.
+computes the same answer as its own OpenMP kernel — entry by entry — for the energy, residual and
+boundary-residual families, across the tensor-product, constant-P1 simplex and mesh-order
+lowerings, at throughputs measured on saturated problems.
 
-**Does not establish** anything about the other two kernel families. `residual_codegen` and
-`inexact_apply_codegen` emit `_operator.cpp` with host `extern "C"` functions around an OpenMP
-mesh loop, and `_validate_cuda_source_contract` wants a file ending `_operator.cu` containing
-`__global__ void`. Nor does it establish that anything in the SFEM library can *call* these
-kernels: `CMakeLists.txt` globs only `*.cpp`/`*.hpp`, so no `.cu` reaches the build, and the CUDA
-backend publishes no `sfem::Op`.
+**Does not establish** anything about the **mixed-order** residual family, which generates and
+compiles for CUDA but is not compared here: its driver case needs two element types (TET10
+velocity over TET4 pressure) and that is its own piece of plumbing. Nor anything about
+`inexact_apply_codegen`, which still emits `_operator.cpp` with host `extern "C"` functions around
+an OpenMP mesh loop. Nor that anything in the SFEM library can *call* any of these kernels:
+`CMakeLists.txt` globs only `*.cpp`/`*.hpp`, so no `.cu` reaches the build, and the CUDA backend
+publishes no `sfem::Op`.
+
+**Two defects only the link stage found.** Both binaries compiled cleanly with a host function
+containing `blockIdx` in it — `mooney_rivlin..._hessian_bsr_i_msoa` got a grid-stride loop while
+still declared `__host__ __device__ int`, and the failure was
+`undefined reference to __device_builtin_variable_blockIdx`. And the boundary family's reference
+tables were `__host__`-only while the `__host__ __device__` element function calls them, which is
+`warning #20011-D` and not an error. Compiling every translation unit is not the same gate as
+linking one binary out of them.
 
 **A gap this measurement walked past:** the generated launcher returns `SFEM_SUCCESS` immediately
 after an asynchronous `<<<>>>` launch, so it cannot report a launch failure. This driver calls
