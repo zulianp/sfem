@@ -106,7 +106,11 @@ from codegen.framework.plans.residual_structure import (
     residual_local_phase_plans,
     residual_mesh_phase_plans,
 )
-from codegen.framework.plans.direct_assembly import trial_direction_substitution
+from codegen.framework.plans.direct_assembly import (
+    assembles_in_closed_form,
+    closed_form_assembly_admits,
+    trial_direction_substitution,
+)
 from codegen.framework.plans.geometry_variants import packed_kernel_forms
 from codegen.framework.plans.streams import field_stream_layout
 from codegen.framework.plans.geometry_quantities import (
@@ -118,6 +122,7 @@ from codegen.framework.plans.geometry_quantities import (
 )
 from codegen.framework.plans.streams import (
     STATE_FIELD_ROLES,
+    element_matrix_stream_plan,
     live_field_roles,
     local_kernel_stream_plans,
     mesh_kernel_stream_plans,
@@ -1802,6 +1807,7 @@ def generate_coupled_residual_sfem_files(
         residual_coeffs,
         action_coeffs,
         basis_family=family,
+        matrix_format_plan=matrix_format_plan,
     )
     operator_source = _operator_source(
         system,
@@ -1967,6 +1973,115 @@ def generate_mixed_residual_sfem_files(
     )
 
 
+@dataclass(frozen=True)
+class _ClosedFormElementMatrixKernel:
+    """The closed-form element-matrix kernel of one local header.
+
+    Asked for by both the header that defines it and the operator source that
+    calls it, so the two cannot disagree about whether there is one, what it is
+    called, or which element it was built for.
+    """
+
+    name: str
+    specialization: object
+    reference_gradients: tuple
+    row_streams: tuple
+    column_streams: tuple
+
+
+def _closed_form_element_matrix_kernel(
+    system,
+    local_prefix,
+    specialization,
+    action_coeffs,
+    action_dependencies,
+    matrix_format_plan,
+    basis_family=None,
+    mixed=False,
+):
+    """The closed-form element-matrix kernel for this local header, or None.
+
+    It is the constant-P1 specialisation of a simplex header -- the same
+    specialisation the apply already has, reached the same way -- so a TET4 and
+    a TET10 operator sharing one header both name the TET4 kernel and the file
+    comes out identical for either.  Whether a given *operator* may call it is a
+    second question, and `plans.direct_assembly.assembles_in_closed_form` of its
+    own element answers that at the call site.
+
+    Whether there is one at all is `plans.direct_assembly`'s answer, asked once
+    and read here.  This spells the kernel; it does not decide it.
+    """
+    specialized = (
+        None
+        if mixed
+        else _constant_p1_affine_specialized_local(local_prefix, specialization)
+    )
+    if specialized is None:
+        return None
+    specialized_prefix, specialized_specialization = specialized
+    rule = specialized_specialization.quadrature_rule
+    reference_gradients = constant_p1_simplex_reference_gradients(rule)
+    n_fields = len(system.fields)
+    streams = _compatible_matrix_stream_indices(
+        tuple(range(n_fields)), int(rule.n_shape), n_fields
+    )
+    admitted = closed_form_assembly_admits(
+        element_type=rule.element_type,
+        tensor_product=is_tensor_product_family(basis_family),
+        matrix_formats=published_matrix_formats(matrix_format_plan),
+        coefficients=action_coeffs,
+        dependencies=action_dependencies,
+        field_names=tuple(field.name for field in system.fields),
+        dim=system.dim,
+        reference_gradients=reference_gradients,
+        n_entries=len(streams) * len(streams),
+    )
+    if not admitted:
+        return None
+    return _ClosedFormElementMatrixKernel(
+        name="%s_hessian_block" % specialized_prefix,
+        specialization=specialized_specialization,
+        reference_gradients=reference_gradients,
+        row_streams=streams,
+        column_streams=streams,
+    )
+
+
+def _closed_form_element_matrix_function(
+    system,
+    local_prefix,
+    specialization,
+    action_coeffs,
+    action_dependencies,
+    matrix_format_plan,
+    basis_family=None,
+    mixed=False,
+):
+    """The lines defining that kernel, or none if there is no such kernel."""
+    kernel = _closed_form_element_matrix_kernel(
+        system,
+        local_prefix,
+        specialization,
+        action_coeffs,
+        action_dependencies,
+        matrix_format_plan,
+        basis_family=basis_family,
+        mixed=mixed,
+    )
+    if kernel is None:
+        return []
+    return ["", *_element_matrix_function(
+        system,
+        kernel.name,
+        kernel.specialization,
+        action_coeffs,
+        action_dependencies,
+        kernel.reference_gradients,
+        kernel.row_streams,
+        kernel.column_streams,
+    )]
+
+
 def _local_header(
     system,
     local_prefix,
@@ -1975,6 +2090,7 @@ def _local_header(
     action_coeffs,
     basis_family=None,
     field_element_types=None,
+    matrix_format_plan=None,
 ):
     """The element-local header for one kernel.
 
@@ -2169,6 +2285,18 @@ def _local_header(
                 stream_layout="contiguous",
             )
         )
+    lines.extend(
+        _closed_form_element_matrix_function(
+            system,
+            local_prefix,
+            specialization,
+            action_coeffs,
+            action_dependencies,
+            matrix_format_plan,
+            basis_family=basis_family,
+            mixed=mixed,
+        )
+    )
     lines.extend(
         ["", "} // namespace codegen", "} // namespace sfem", "", "#endif", ""]
     )
@@ -2840,6 +2968,22 @@ def _stream_call_arguments(streams, spell):
     return [spell(stream) for stream in streams]
 
 
+#: Layouts that settle a declaration on their own, before the role is
+#: consulted.  A table rather than a chain of `if stream.layout is ...`: which
+#: layouts exist is the plan's business, and each new one was another branch in
+#: emission choosing what to print.
+#:
+#:   AOS    a contiguous tile, indexed `[item][lane]` directly
+#:   DENSE  one flat array the kernel addresses itself, with nothing per degree
+#:          of freedom at the boundary to describe
+_LAYOUT_DECLARATIONS = {
+    DataStreamLayout.AOS: lambda qualifier, stream: "%s %s[%d * NS][VS]"
+    % (qualifier, stream.name, stream.components),
+    DataStreamLayout.DENSE: lambda qualifier, stream: "%s *const RSTR %s"
+    % (qualifier, stream.name),
+}
+
+
 def _declare_stream(stream):
     """Spell one ``DataStreamPlan`` as a C parameter declaration.
 
@@ -2850,13 +2994,9 @@ def _declare_stream(stream):
     mutable = stream.role is DataStreamRole.OUTPUT
     qualifier = "s_t" if mutable else "const s_t"
 
-    if stream.layout is DataStreamLayout.AOS:
-        # A contiguous tile: the kernel indexes [item][lane] directly.
-        return "%s %s[%d * NS][VS]" % (
-            qualifier,
-            stream.name,
-            stream.components,
-        )
+    spelling = _LAYOUT_DECLARATIONS.get(stream.layout)
+    if spelling is not None:
+        return spelling(qualifier, stream)
     if stream.role in (DataStreamRole.FIELD, DataStreamRole.DIRECTION, DataStreamRole.OUTPUT):
         return "%s *const RSTR %s[%d * NS]" % (
             qualifier,
@@ -2960,6 +3100,174 @@ def _local_function(
     )
 
 
+def _closed_form_element_matrix_nodes(
+    system,
+    rule,
+    coefficients,
+    dependencies,
+    reference_gradients,
+    row_streams,
+    column_streams,
+):
+    """Every entry of the element matrix, eliminated together, with no loops.
+
+    The shape is SFEM's own `tet4_linear_elasticity_crs_adj`: 144 entries, 178
+    temporaries shared across all of them, and not one loop.  That sharing is
+    the reason for the shape.  A loop over trial functions can only eliminate
+    within one column, so it re-derives for every column what the columns have
+    in common -- and on a constant-basis element they have almost everything in
+    common, because the geometry and the state are the same for the whole
+    element.
+
+    Each column is the flux with the direction taken to be that trial basis
+    function.  That substitution is `plans.direct_assembly`, and it is why this
+    needs no probing: the column is known at generation time, not discovered at
+    run time by applying the operator to a unit vector.
+    """
+    dim = system.dim
+    n_fields = len(system.fields)
+    n_shape = int(rule.n_shape)
+    assembled = assembled_matrix_dependencies(dependencies)
+    directions = tuple(live_gradient_directions(dependencies, dim))
+
+    body = list(_geometry_value_nodes(assembled, dim))
+    body.extend(
+        _constant_p1_state_gradient_nodes(system, assembled, reference_gradients)
+    )
+    # Test and trial run over the same space, so one gradient per shape serves
+    # both -- the hand-written kernel does the same.
+    for shape in range(n_shape):
+        body.extend(
+            _basis_gradient_nodes(
+                "basis%d_grad" % shape,
+                shape,
+                dim,
+                reference_gradients=reference_gradients,
+                directions=directions,
+            )
+        )
+
+    weight = sp.nsimplify(rule.weights[0])
+    measure = weight * sp.Symbol("det")
+    entries = []
+    targets = []
+    for trial_local, trial_stream in enumerate(column_streams):
+        trial_shape, trial_component = divmod(int(trial_stream), n_fields)
+        column = _trial_substituted_coefficients(
+            system,
+            coefficients,
+            trial_component,
+            [sp.Symbol("basis%d_grad%d" % (trial_shape, d)) for d in range(dim)],
+        )
+        for test_local, test_stream in enumerate(row_streams):
+            test_shape, row = divmod(int(test_stream), n_fields)
+            entry = sum(
+                (
+                    column[row].gradient[d]
+                    * sp.Symbol("basis%d_grad%d" % (test_shape, d))
+                    for d in directions
+                    if dependencies.gradient_coefficients[row][d]
+                ),
+                sp.S.Zero,
+            )
+            entries.append(measure * entry)
+            targets.append(test_local * len(column_streams) + trial_local)
+
+    # One elimination over the whole matrix.  Doing it per column would give
+    # each column its own temporaries and share nothing between them, which is
+    # the loop shape written out flat rather than the closed form.
+    temporaries, reduced = sp.cse(
+        entries, symbols=sp.numbered_symbols("element_matrix_tmp")
+    )
+    temporaries = _prune_dead_cse_intermediates(temporaries, reduced)
+    body.extend(
+        BufferDeclNode("const s_t", str(symbol), (), expr_ref(_sfem_ccode(expression)))
+        for symbol, expression in temporaries
+    )
+    body.extend(
+        ScatterNode(
+            expr_ref("element_matrix[%d]" % target),
+            expr_ref(_sfem_ccode(expression)),
+            "=",
+        )
+        for target, expression in zip(targets, reduced)
+    )
+
+    return (
+        # `plans.evaluation_strategy` says this element evaluates in closed
+        # form, so there is no quadrature loop for the geometry offset to be
+        # indexed by -- only the point itself.
+        BufferDeclNode("const int", "q", (), expr_ref("0")),
+        _work_item_loop_node(tuple(body)),
+    )
+
+
+def _element_matrix_function(
+    system,
+    function_name,
+    specialization,
+    coefficients,
+    dependencies,
+    reference_gradients,
+    row_streams,
+    column_streams,
+):
+    """The closed-form element-matrix kernel, signature and body.
+
+    Built the way `_local_function` builds an apply, and for the same reason:
+    the streams that cross the boundary are `local_kernel_stream_plans`'s
+    answer, so the call site and the signature read one plan.  Two things
+    differ, and the plan states both -- the output is the element matrix rather
+    than a stream per degree of freedom, and the kernel is handed no reference
+    basis, because a closed-form element has its basis gradients folded into
+    the arithmetic.
+    """
+    rule = specialization.quadrature_rule
+    dim = system.dim
+    n_fields = len(system.fields)
+    assembled = assembled_matrix_dependencies(dependencies)
+    params = ["const int ne", "const ptrdiff_t geometry_stride"]
+    params.extend(
+        _declare_stream(stream)
+        for stream in local_kernel_stream_plans(
+            assembled,
+            dim=dim,
+            n_fields=n_fields,
+            tensor_product=False,
+            uses_gradient_metric=False,
+            metric_components=symmetric_metric_component_count(dim),
+            stream_layout="contiguous",
+            grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
+            needs_reference_basis=False,
+            output=element_matrix_stream_plan(),
+        )
+    )
+    body = [
+        BufferDeclNode("static constexpr int", "ND", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "NC", (), expr_ref(str(n_fields))),
+    ]
+    body.extend(
+        _closed_form_element_matrix_nodes(
+            system,
+            rule,
+            coefficients,
+            dependencies,
+            reference_gradients,
+            row_streams,
+            column_streams,
+        )
+    )
+    return _print_kernel_function(
+        FunctionDefNode(
+            function_name,
+            params=tuple(params),
+            body=tuple(body),
+            qualifier=_function_qualifier(),
+            template_params=("typename s_t", "int NQ", "int NS", "int VS"),
+        )
+    )
+
+
 def _print_kernel_function(node):
     """Render one ``FunctionDefNode``, with the target's vectorize pragma."""
     target = _target()
@@ -2974,69 +3282,48 @@ def _print_kernel_function(node):
     )
 
 
-def _simplex_local_body(
-    system,
-    rule,
-    coefficients,
-    dependencies,
-    gradient_metric=None,
-    allow_gradient_metric=True,
-    constant_p1_gradient_expansion=True,
-):
-    if gradient_metric is None and allow_gradient_metric:
-        gradient_metric = simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
-    if gradient_metric is not None:
-        return (_simplex_gradient_metric_body(system, rule, dependencies, gradient_metric),)
-    reference_gradients = constant_p1_simplex_reference_gradients(rule)
-    if constant_p1_gradient_expansion and _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
-        return (
-            _constant_p1_gradient_expanded_body(
-                system,
-                coefficients,
-                dependencies,
-                reference_gradients,
-            ),
-        )
+def _simplex_field_usage(system, dependencies):
+    """What each field contributes to each live role.
 
-    dim = system.dim
-    groups = _dependency_stream_groups(dependencies)
-
-    # Staging buffers, one per quantity accumulated across trial functions.
-    staging = []
-    # What each field contributes to each role, rather than what the system
-    # does.  See `plans.streams.field_stream_usage`: asking the system-wide
-    # question here staged, interpolated and transformed quantities the form
-    # never reads.
-    usage = {
+    See `plans.streams.field_stream_usage`: asking the system-wide question
+    instead staged, interpolated and transformed quantities the form never
+    reads.
+    """
+    return {
         (field.name, group.name): field_stream_usage(dependencies, field, group.name)
         for field in system.fields
-        for group in groups
+        for group in _dependency_stream_groups(dependencies)
     }
+
+
+def _simplex_state_staging_nodes(system, dependencies, usage):
+    """Staging buffers, one per quantity accumulated across trial functions."""
+    dim = system.dim
+    nodes = []
     for field in system.fields:
-        for group in groups:
+        for group in _dependency_stream_groups(dependencies):
             stem = field.name + group.symbol_suffix
             read = usage[(field.name, group.name)]
             if read.uses_value:
-                staging.append(
+                nodes.append(
                     BufferDeclNode("s_t", "%s_values" % stem, ("VS",))
                 )
             if read.uses_gradient:
-                staging.extend(
+                nodes.extend(
                     BufferDeclNode(
                         "s_t", "%s_grad_%d_ref_values" % (stem, d), ("VS",)
                     )
                     for d in range(dim)
                 )
-    staging.extend(
-        BufferDeclNode("s_t", "%s_values" % name, ("VS",))
-        for row in range(len(system.fields))
-        for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
-    )
+    return nodes
 
-    # Zero the staging buffers, then accumulate over trial functions.
-    gather = []
+
+def _simplex_state_gather_nodes(system, dependencies, usage):
+    """Zero the staging buffers, then accumulate over trial functions."""
+    dim = system.dim
+    nodes = []
     for field_index, field in enumerate(system.fields):
-        for group in groups:
+        for group in _dependency_stream_groups(dependencies):
             stem = field.name + group.symbol_suffix
             read = usage[(field.name, group.name)]
             if not read.is_read:
@@ -3052,7 +3339,7 @@ def _simplex_local_body(
                 zeroed.extend(
                     ('%s_grad_%d_ref_values' + _wi()) % (stem, d) for d in range(dim)
                 )
-            gather.append(
+            nodes.append(
                 _work_item_loop_node(
                     [
                         AssignmentNode(expr_ref(target), expr_ref("s_t(0)"))
@@ -3091,15 +3378,18 @@ def _simplex_local_body(
                     )
                     for d in range(dim)
                 )
-            gather.append(
+            nodes.append(
                 _shape_loop_node("trial", [_work_item_loop_node(trial_body)])
             )
+    return nodes
 
-    # TRANSFORM_REFERENCE: read the staged values back and take them to the
-    # physical element.
+
+def _simplex_state_transform_nodes(system, dependencies, usage):
+    """Read the staged values back and take them to the physical element."""
+    dim = system.dim
     transform_values = []
     for field in system.fields:
-        for group in groups:
+        for group in _dependency_stream_groups(dependencies):
             stem = field.name + group.symbol_suffix
             read = usage[(field.name, group.name)]
             if read.uses_value:
@@ -3118,16 +3408,55 @@ def _simplex_local_body(
                     )
                     for d in range(dim)
                 )
-                transform_values.extend(_physical_gradient_nodes(stem, dim, read.gradient_components))
+                transform_values.extend(
+                    _physical_gradient_nodes(stem, dim, read.gradient_components)
+                )
 
     # The geometry is prepended only when something reads it, and the phase
     # is dropped entirely when it has no content: an empty lane scope holding
     # nothing but an offset and a determinant is a scope for nothing.
-    transform = (
+    return (
         tuple(_geometry_value_nodes(dependencies, dim)) + tuple(transform_values)
         if transform_values
         else ()
     )
+
+
+def _simplex_local_body(
+    system,
+    rule,
+    coefficients,
+    dependencies,
+    gradient_metric=None,
+    allow_gradient_metric=True,
+    constant_p1_gradient_expansion=True,
+):
+    if gradient_metric is None and allow_gradient_metric:
+        gradient_metric = simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
+    if gradient_metric is not None:
+        return (_simplex_gradient_metric_body(system, rule, dependencies, gradient_metric),)
+    reference_gradients = constant_p1_simplex_reference_gradients(rule)
+    if constant_p1_gradient_expansion and _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
+        return (
+            _constant_p1_gradient_expanded_body(
+                system,
+                coefficients,
+                dependencies,
+                reference_gradients,
+            ),
+        )
+
+    dim = system.dim
+    usage = _simplex_field_usage(system, dependencies)
+
+    staging = list(_simplex_state_staging_nodes(system, dependencies, usage))
+    staging.extend(
+        BufferDeclNode("s_t", "%s_values" % name, ("VS",))
+        for row in range(len(system.fields))
+        for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
+    )
+    gather = _simplex_state_gather_nodes(system, dependencies, usage)
+    transform = _simplex_state_transform_nodes(system, dependencies, usage)
 
     # EVALUATE_MATERIAL: the constitutive evaluation, staged for the contraction.
     material = []
@@ -3235,23 +3564,43 @@ def _trial_substituted_coefficients(system, coefficients, trial_component, trial
     )
 
 
-def _basis_gradient_nodes(name, shape_index, dim, reference_gradients=None):
-    """One basis function's physical gradient at this quadrature point.
+def _basis_gradient_nodes(
+    name, shape_index, dim, reference_gradients=None, directions=None
+):
+    """One basis function's physical gradient, in whichever of its two forms.
 
     The same push-forward the test functions get, with the shape index left as
     whatever loop variable the caller is standing in -- `test` for the
     contraction, `trial` for the column being built.
+
+    `reference_gradients` decides the spelling, and it is the element's answer
+    rather than this function's: when they are constants, which is
+    `plans.evaluation_strategy`'s EXPANDED family, the reference gradient is
+    folded into the arithmetic and no table is read; otherwise it is looked up
+    at the quadrature point.  Same object, two spellings, one owner -- the
+    constant one used to be written out again inside
+    `_constant_p1_gradient_expanded_body`, where nothing held the two to the
+    same chain rule.
     """
     nodes = []
-    for d in range(dim):
-        terms = " + ".join(
-            "%s[q * NS + %s] * adj%d"
-            % (sfem_simplex_grad_ref_name("grad_ref", k), shape_index, k * dim + d)
-            for k in range(dim)
-        )
+    for d in range(dim) if directions is None else directions:
+        if reference_gradients is None:
+            gradient = " + ".join(
+                "%s[q * NS + %s] * adj%d"
+                % (sfem_simplex_grad_ref_name("grad_ref", k), shape_index, k * dim + d)
+                for k in range(dim)
+            )
+        else:
+            terms = []
+            for k in range(dim):
+                factor = _reference_gradient_expr(reference_gradients, shape_index, k)
+                if factor == 0:
+                    continue
+                terms.append(_scaled_cpp_term(factor, "adj%d" % (k * dim + d)))
+            gradient = _sum_cpp_terms(terms)
         nodes.append(
             BufferDeclNode(
-                "const s_t", "%s%d" % (name, d), (), expr_ref("(%s) / det" % terms)
+                "const s_t", "%s%d" % (name, d), (), expr_ref("(%s) / det" % gradient)
             )
         )
     return nodes
@@ -3285,21 +3634,21 @@ def _constant_reference_gradient_sum(reference_gradients, n_shape, dim, expr_for
     return _sum_cpp_terms(terms)
 
 
-def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, reference_gradients):
-    """The expanded constant-P1 gradient kernel, built as IR.
+def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients):
+    """The element's state gradients, on an element whose basis is constant.
 
-    The second kernel whose body is a tree rather than a list of strings, and
-    the one that shows the first generalises.  It is the same quadrature-over-
-    lane nest, but fed by five statement sources instead of two -- the geometry
-    loads, the reference-gradient contraction, the chain rule, the CSE'd
-    coefficients and the test-function gradients -- each of which now hands
-    back nodes.
+    Every live role of every field, contracted against the constant reference
+    gradients and pushed forward: `u0_grad_0`, `u0_old_grad_0` and the rest,
+    named exactly as the lowered form's symbols are, which is what lets a
+    coefficient expression be printed against them without translation.
+
+    Shared by the expanded apply and the closed-form element matrix.  They
+    stand in different scopes and write different outputs, but the state is the
+    same state and is read the same way, so it is read in one place.
     """
     dim = system.dim
     n_fields = len(system.fields)
     groups = _dependency_stream_groups(dependencies)
-
-    body = list(_geometry_value_nodes(dependencies, dim))
 
     # Asked once, up front, rather than inside the loop: the answer is a
     # property of the plan and the field, not of where emission happens to be.
@@ -3312,6 +3661,7 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
         for field in system.fields
         for group in groups
     }
+    nodes = []
     for field_index, field in enumerate(system.fields):
         for group in groups:
             read = field_reads[(field.name, group.name)]
@@ -3326,7 +3676,7 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
                     lambda shape, group=group, field_index=field_index: ('%s[%d]' + _wi())
                     % (group.name, shape * n_fields + field_index),
                 )
-                body.append(
+                nodes.append(
                     BufferDeclNode(
                         "const s_t",
                         "%s_grad_%d_ref" % (stem, d),
@@ -3334,8 +3684,27 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
                         expr_ref(value),
                     )
                 )
-            body.extend(_physical_gradient_nodes(stem, dim, read.gradient_components))
+            nodes.extend(_physical_gradient_nodes(stem, dim, read.gradient_components))
+    return nodes
 
+
+def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, reference_gradients):
+    """The expanded constant-P1 gradient kernel, built as IR.
+
+    The second kernel whose body is a tree rather than a list of strings, and
+    the one that shows the first generalises.  It is the same quadrature-over-
+    lane nest, but fed by five statement sources instead of two -- the geometry
+    loads, the reference-gradient contraction, the chain rule, the CSE'd
+    coefficients and the test-function gradients -- each of which now hands
+    back nodes.
+    """
+    dim = system.dim
+    n_fields = len(system.fields)
+
+    body = list(_geometry_value_nodes(dependencies, dim))
+    body.extend(
+        _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients)
+    )
     body.extend(_coefficient_evaluation_nodes(system, coefficients, dependencies))
 
     for row in range(n_fields):
@@ -3350,25 +3719,22 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
                     )
                 )
 
-    test_grad_names = {}
+    directions = tuple(live_gradient_directions(dependencies, dim))
+    test_grad_names = {
+        (test, d): "test%d_grad%d" % (test, d)
+        for test in range(dim + 1)
+        for d in directions
+    }
     for test in range(dim + 1):
-        for d in live_gradient_directions(dependencies, dim):
-            test_name = "test%d_grad%d" % (test, d)
-            test_grad_names[(test, d)] = test_name
-            terms = []
-            for k in range(dim):
-                factor = _reference_gradient_expr(reference_gradients, test, k)
-                if factor == 0:
-                    continue
-                terms.append(_scaled_cpp_term(factor, "adj%d" % (k * dim + d)))
-            body.append(
-                BufferDeclNode(
-                    "const s_t",
-                    test_name,
-                    (),
-                    expr_ref("(%s) / det" % _sum_cpp_terms(terms)),
-                )
+        body.extend(
+            _basis_gradient_nodes(
+                "test%d_grad" % test,
+                test,
+                dim,
+                reference_gradients=reference_gradients,
+                directions=directions,
             )
+        )
 
     for test in range(dim + 1):
         for row in range(n_fields):
@@ -4510,6 +4876,7 @@ def _operator_source(
             local_prefix,
             specialization,
             form_dependencies["jacobian_action"],
+            action_coeffs,
             basis_family,
             geometry_family,
             matrix_format_plan,
@@ -6529,12 +6896,89 @@ def _scalar_crs_precision_entry_points(
         )
 
 
+def _element_matrix_fill_lines(
+    indent,
+    row_streams,
+    column_streams,
+    row_tensor_streams,
+    column_tensor_streams,
+    block_function,
+    call_args,
+    element_matrix_kernel=None,
+    element_matrix_args=(),
+):
+    """Fill `element_matrix` with this element's entries.
+
+    Two shapes, and which of them applies is the element's answer rather than
+    this site's.  A closed-form element gets one call to a kernel that writes
+    every entry; everything else still recovers the matrix one column at a time
+    by applying the operator to a unit basis vector.
+
+    That second shape is probing.  It costs one apply per trial degree of
+    freedom -- thirty per element on TET10 -- and each of those applies repeats
+    all of the geometry and state work for the column it keeps.  It is what
+    `plans.direct_assembly` exists to retire, and it is written here once rather
+    than in both the unpacked and the packed pass so that retiring it for the
+    remaining elements is one change rather than two that can disagree.
+    """
+    if element_matrix_kernel is not None:
+        return [
+            "%s%s<s_t, NQ, NS, VS>(%s);"
+            % (indent, element_matrix_kernel, ", ".join(element_matrix_args))
+        ]
+    lines = list(
+        _local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, indent)
+    )
+    lines.extend(
+        _local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, indent)
+    )
+    lines.extend(
+        [
+            "%sfor (int entry = 0; entry < %d; ++entry) {"
+            % (indent, len(row_streams) * len(column_streams)),
+            "%s  element_matrix[entry] = s_t(0);" % indent,
+            "%s}" % indent,
+            "%sfor (int trial_local = 0; trial_local < %d; ++trial_local) {"
+            % (indent, len(column_streams)),
+            "%s  const int trial = %s;"
+            % (
+                indent,
+                _local_index_mapping_expr(
+                    "col_tensor_stream", column_tensor_streams, "trial_local"
+                ),
+            ),
+            "%s  for (int stream = 0; stream < N_STREAMS; ++stream) {" % indent,
+            "%s    bdirection[stream][0] = s_t(0);" % indent,
+            "%s    boutput[stream][0] = s_t(0);" % indent,
+            "%s  }" % indent,
+            "%s  bdirection[trial][0] = s_t(1);" % indent,
+            "%s  %s<s_t, NQ, NS, VS>(%s);"
+            % (indent, block_function, ", ".join(call_args)),
+            "%s  for (int test_local = 0; test_local < %d; ++test_local) {"
+            % (indent, len(row_streams)),
+            "%s    const int test = %s;"
+            % (
+                indent,
+                _local_index_mapping_expr(
+                    "row_tensor_stream", row_tensor_streams, "test_local"
+                ),
+            ),
+            "%s    element_matrix[test_local * %d + trial_local] = boutput[test][0];"
+            % (indent, len(column_streams)),
+            "%s  }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    return lines
+
+
 def _scalar_crs_matrix_assembly_source(
     system,
     prefix,
     local_prefix,
     specialization,
     dependencies,
+    coefficients,
     basis_family,
     geometry_family,
     matrix_format_plan,
@@ -6573,6 +7017,73 @@ def _scalar_crs_matrix_assembly_source(
     field_streams_in_tensor_order = _stream_to_tensor_order(field_stream_order)
     row_tensor_streams = tuple(field_streams_in_tensor_order[stream] for stream in row_streams)
     column_tensor_streams = tuple(field_streams_in_tensor_order[stream] for stream in column_streams)
+    # Whether this element's matrix is built in closed form is the element's
+    # answer -- `plans.direct_assembly` asks `plans.evaluation_strategy`, the
+    # same table the apply reads -- and the kernel that does it belongs to the
+    # local header.  Both sides name it from one plan so they cannot disagree.
+    #
+    # The order check is not redundant with that.  The closed-form kernel writes
+    # its entries at fixed offsets, so it can only serve an operator whose rows
+    # and columns sit where it puts them: a permuted stream order, or a single
+    # Jacobian block of a coupled system, is a different matrix and falls back
+    # rather than being filled wrongly.
+    element_assembles_directly = assembles_in_closed_form(rule.element_type)
+    entries_sit_where_the_kernel_writes_them = (
+        row_tensor_streams == row_streams
+        and column_tensor_streams == column_streams
+    )
+    element_matrix_kernel = (
+        _closed_form_element_matrix_kernel(
+            system,
+            local_prefix,
+            specialization,
+            coefficients,
+            dependencies,
+            matrix_format_plan,
+            basis_family=basis_family,
+        )
+        if element_assembles_directly and entries_sit_where_the_kernel_writes_them
+        else None
+    )
+    serves_this_matrix = element_matrix_kernel is not None and (
+        element_matrix_kernel.row_streams == row_streams
+        and element_matrix_kernel.column_streams == column_streams
+    )
+    if not serves_this_matrix:
+        element_matrix_kernel = None
+    element_matrix_call = (
+        element_matrix_kernel.name if serves_this_matrix else None
+    )
+    # A closed-form assembly still builds its Jacobian from the reference
+    # gradients, and reads nothing else: the kernel it calls takes no reference
+    # data, so the shape values and the quadrature weights have no reader.
+    kept_reference_tables = (
+        tuple(sfem_simplex_grad_ref_name("grad_ref", d) for d in range(dim))
+        if serves_this_matrix and not tensor_product_geometry
+        else None
+    )
+    element_matrix_call_args = (
+        ["1", "1"]
+        + _stream_call_arguments(
+            local_kernel_stream_plans(
+                assembled_matrix_dependencies(dependencies),
+                dim=dim,
+                n_fields=n_fields,
+                tensor_product=False,
+                uses_gradient_metric=False,
+                metric_components=symmetric_metric_component_count(dim),
+                stream_layout="contiguous",
+                grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
+                needs_reference_basis=False,
+                output=element_matrix_stream_plan(),
+            ),
+            lambda stream: _block_call_argument(
+                stream, ISOPARAMETRIC_MODE, {"element_matrix": "element_matrix"}
+            ),
+        )
+        if serves_this_matrix
+        else []
+    )
     field_element_lines, field_element_array = _single_field_element_alias_lines(
         n_shape,
         field_shape_order,
@@ -6661,7 +7172,14 @@ def _scalar_crs_matrix_assembly_source(
             discard_unused("nnodes", indent="  "),
         ]
     )
-    lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
+    lines.extend(
+        _mesh_reference_alias_lines(
+            prefix,
+            rule,
+            ISOPARAMETRIC_MODE,
+            keep=kept_reference_tables,
+        )
+    )
     lines.extend(field_element_lines)
     lines.extend(coordinate_element_lines)
     lines.extend(
@@ -6682,10 +7200,17 @@ def _scalar_crs_matrix_assembly_source(
         lines.append(
             "    s_t b%s[N_STREAMS][VS];" % role.name
         )
+    if not serves_this_matrix:
+        # The direction and the answer to applying the operator to it exist
+        # only for probing.  A closed-form element applies nothing.
+        lines.extend(
+            [
+                "    s_t bdirection[N_STREAMS][VS];",
+                "    s_t boutput[N_STREAMS][VS];",
+            ]
+        )
     lines.extend(
         [
-            "    s_t bdirection[N_STREAMS][VS];",
-            "    s_t boutput[N_STREAMS][VS];",
             "    const geom_t *const coordinate_components[ND] = {%s};"
             % ", ".join("points[%d]" % d for d in range(dim)),
             "",
@@ -6844,33 +7369,21 @@ def _scalar_crs_matrix_assembly_source(
         )
     )
     lines.extend([""])
-    lines.extend(_local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, "    "))
-    lines.extend(_local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, "    "))
+    lines.extend(
+        _element_matrix_fill_lines(
+            "    ",
+            row_streams,
+            column_streams,
+            row_tensor_streams,
+            column_tensor_streams,
+            block_function,
+            call_args,
+            element_matrix_kernel=element_matrix_call,
+            element_matrix_args=element_matrix_call_args,
+        )
+    )
     lines.extend(
         [
-            "    for (int entry = 0; entry < %d; ++entry) {"
-            % (len(row_streams) * len(column_streams)),
-            "      element_matrix[entry] = s_t(0);",
-            "    }",
-            "    for (int trial_local = 0; trial_local < %d; ++trial_local) {"
-            % len(column_streams),
-            "      const int trial = %s;"
-            % _local_index_mapping_expr("col_tensor_stream", column_tensor_streams, "trial_local"),
-            "      for (int stream = 0; stream < N_STREAMS; ++stream) {",
-            "        bdirection[stream][0] = s_t(0);",
-            "        boutput[stream][0] = s_t(0);",
-            "      }",
-            "      bdirection[trial][0] = s_t(1);",
-            "      %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
-            "      for (int test_local = 0; test_local < %d; ++test_local) {"
-            % len(row_streams),
-            "        const int test = %s;"
-            % _local_index_mapping_expr("row_tensor_stream", row_tensor_streams, "test_local"),
-            "        element_matrix[test_local * %d + trial_local] = boutput[test][0];"
-            % len(column_streams),
-            "      }",
-            "    }",
             "",
             "    %s_scatter_crs(ev, element_matrix, rowptr, colidx, values);"
             % function_base,
@@ -6967,7 +7480,14 @@ def _scalar_crs_matrix_assembly_source(
                 discard_unused("n_shared_nodes", indent="  "),
             ]
         )
-        lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
+        lines.extend(
+            _mesh_reference_alias_lines(
+                prefix,
+                rule,
+                ISOPARAMETRIC_MODE,
+                keep=kept_reference_tables,
+            )
+        )
         packed_coordinate_element_lines, packed_coordinate_element_array = (
             _coordinate_element_alias_lines(
                 dim,
@@ -7060,10 +7580,15 @@ def _scalar_crs_matrix_assembly_source(
                 "        s_t b%s[N_STREAMS][VS];"
                 % role.name
             )
+        if not serves_this_matrix:
+            lines.extend(
+                [
+                    "        s_t bdirection[N_STREAMS][VS];",
+                    "        s_t boutput[N_STREAMS][VS];",
+                ]
+            )
         lines.extend(
             [
-                "        s_t bdirection[N_STREAMS][VS];",
-                "        s_t boutput[N_STREAMS][VS];",
                 "",
                 "        for (int shape = 0; shape < NS; ++shape) {",
                 "          const uint16_t packed_node = elements[shape][element];",
@@ -7194,33 +7719,21 @@ def _scalar_crs_matrix_assembly_source(
         packed_call_args = list(call_args)
         packed_call_args[-1] = output_arg
         lines.extend([""])
-        lines.extend(_local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, "      "))
-        lines.extend(_local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, "      "))
+        lines.extend(
+            _element_matrix_fill_lines(
+                "      ",
+                row_streams,
+                column_streams,
+                row_tensor_streams,
+                column_tensor_streams,
+                block_function,
+                packed_call_args,
+                element_matrix_kernel=element_matrix_call,
+                element_matrix_args=element_matrix_call_args,
+            )
+        )
         lines.extend(
             [
-                "      for (int entry = 0; entry < %d; ++entry) {"
-                % (len(row_streams) * len(column_streams)),
-                "        element_matrix[entry] = s_t(0);",
-                "      }",
-                "      for (int trial_local = 0; trial_local < %d; ++trial_local) {"
-                % len(column_streams),
-                "        const int trial = %s;"
-                % _local_index_mapping_expr("col_tensor_stream", column_tensor_streams, "trial_local"),
-                "        for (int stream = 0; stream < N_STREAMS; ++stream) {",
-                "          bdirection[stream][0] = s_t(0);",
-                "          boutput[stream][0] = s_t(0);",
-                "        }",
-                "        bdirection[trial][0] = s_t(1);",
-                "        %s<s_t, NQ, NS, VS>(%s);"
-                % (block_function, ", ".join(packed_call_args)),
-                "        for (int test_local = 0; test_local < %d; ++test_local) {"
-                % len(row_streams),
-                "          const int test = %s;"
-                % _local_index_mapping_expr("row_tensor_stream", row_tensor_streams, "test_local"),
-                "          element_matrix[test_local * %d + trial_local] = boutput[test][0];"
-                % len(column_streams),
-                "        }",
-                "      }",
                 "",
                 "      const count_t *const entries = &packed_element_entries[element * NS * NS];",
                 "      %s_scatter_packed_crs_entries(element_matrix, entries, values);" % function_base,
@@ -8292,11 +8805,26 @@ def _isoparametric_geometry_assignment_lines(dim, indent):
     )
 
 
-def _mesh_reference_alias_lines(prefix, rule, geometry_mode, emit_reference_basis=True):
+def _mesh_reference_alias_lines(
+    prefix, rule, geometry_mode, emit_reference_basis=True, keep=None
+):
+    """The reference tables this mesh loop reads, aliased once at the top.
+
+    `keep` names them outright, for a loop that reads some and not others: a
+    closed-form assembly builds its Jacobian from the reference gradients and
+    then calls a kernel that takes no reference data at all, so the shape values
+    and the quadrature weights would be two aliases nothing reads -- and an
+    unused `const s_t *const` is a warning, not merely untidy.
+    """
     references = tuple(sfem_mesh_reference_data(rule))
     if not emit_reference_basis:
         references = tuple(
             reference for reference in references if reference.name.startswith("q_weight")
+        )
+    if keep is not None:
+        wanted = set(keep)
+        references = tuple(
+            reference for reference in references if reference.name in wanted
         )
     return [
         "  const s_t *const %s = %s;"
