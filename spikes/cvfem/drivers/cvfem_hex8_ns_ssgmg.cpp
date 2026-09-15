@@ -4791,7 +4791,13 @@ int main(int argc, char **argv) {
     // Reynolds number and the walk reappears for exactly the step that needed it. Each step
     // gets its own retry budget and step factor, because a step is where the difficulty is
     // -- one hard instant in a cycle should not spend the budget of the ones after it.
-    const bool have_guess = dt_step > real_t(0) && tstep > 0;
+    //
+    // A resumed segment has that guess on its first step too: the checkpoint IS the previous
+    // step's converged state. Without `resumed` the segment walked the whole ramp again on its
+    // first step, so a run cut in two took a different Newton path from the run that was not
+    // cut and landed on a state ~1e-9 away -- which cvfem_restart only caught once a change
+    // moved the round-off in the port identity it compares.
+    const bool have_guess = dt_step > real_t(0) && (tstep > 0 || resumed);
     if (have_guess) {
         rho_schedule.assign(1, rho);
         rho_solved = 0;  // no stage of THIS step has converged yet
