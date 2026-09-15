@@ -10,10 +10,20 @@ answer.
 
 That distinction is the whole point.  Probing costs one apply per trial degree
 of freedom -- thirty per element on TET10 -- and each of those applies repeats
-all of the state work.  Substituting instead lets the state work happen once per
-quadrature point, with only the trial-dependent part inside the trial loop,
-which is the shape the energy path already uses in
-`emitters/energy_codegen._sfem_soa_direct_hessian_matrix_assembly_lines`.
+all of the state work.
+
+What this gives is one *entry*, not a loop shape.  SFEM's own
+`tet4_linear_elasticity_crs_adj` is the reference for what to do with the
+entries once you have them: 144 of them, no loops, no quadrature, and 178
+temporaries shared across every one -- sharing that exists only because the
+entries are eliminated together, and that a loop over trial functions cannot
+reach across.  So on a lowest-order simplex the caller builds every entry and
+eliminates once; quadrature belongs where the element actually wants it.
+
+`emitters/energy_codegen._sfem_soa_direct_hessian_matrix_assembly_lines` is not
+the worked example.  It assembles without probing, which is better than the
+residual path does, but it does so with a quadrature loop on an element whose
+gradients are constant.  OP 28 records the comparison.
 
 Here rather than in the emitter because it is a statement about the form, not
 about how the form is spelled: the emitters ask for the substituted flux and
