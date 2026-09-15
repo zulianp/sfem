@@ -245,7 +245,7 @@ private:
                      "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
                      "  SFEM_GMG             1: V-cycle preconditioner (needs a refine level > 1)\n"
                      "                       2: cost-matched control -- fine-level smoother, no hierarchy\n"
-                     "  SFEM_GMG_SMOOTH      block-Jacobi smoothing steps (default 3)\n"
+                     "  SFEM_GMG_SMOOTH      block-Jacobi smoothing steps (default 2)\n"
                      "  SFEM_ELEMENT_REFINE_LEVEL  >1: semi-structured macro-elements at that\n"
                      "                       internal level (default 1 = flat)\n"
                      "  SFEM_PGRAD_CACHE     1: reuse the nodal pressure gradient across a\n"
@@ -1787,7 +1787,7 @@ private:
         // surviving fraction is zero by construction if the transfers are sound. Comparing
         // the two separates a wrong rediscretisation from wrong transfers, which nothing
         // measured so far has been able to do.
-        const bool use_galerkin = smesh::Env::read<int>("SFEM_GMG_GALERKIN", 0) != 0;
+        const bool use_galerkin = smesh::Env::read<int>("SFEM_GMG_GALERKIN", 2) != 0;
         auto       coarse_op    = g.ops[1];
         if (use_galerkin) {
             auto Pop = g.data->prolongations[1];
@@ -2112,7 +2112,19 @@ private:
         const real_t pscale   = smesh::Env::read<real_t>("SFEM_GMG_PSCALE", real_t(1));
         // 0 rediscretised, 1 Galerkin composed matrix-free (diagnostic), 2 Galerkin
         // assembled once per Newton step (the usable form).
-        const int  galerkin_mode = smesh::Env::read<int>("SFEM_GMG_GALERKIN", 0);
+        //
+        // Default 2. The rediscretised levels have no matrix, so the dense coarsest solve
+        // recovered one by probing -- 2,320 operator applications per Newton step on the FDA
+        // nozzle, ~570 ms of a ~600 ms factorisation whose getrf is 24 ms -- and they are also
+        // the weaker coarse space. Warped nozzle, Re 500, FGMRES + multigrid, Grace 72 threads,
+        // same 28 Newton steps and identical flux and stations either way:
+        //
+        //     dof        coarse ops       linear its   coarse_factor   run
+        //     116,212    rediscretised      1,171         16.1 s       32.4 s
+        //     116,212    Galerkin (2)         491          0.7 s        8.1 s
+        //     893,924    rediscretised      2,031         16.3 s      256.8 s
+        //     893,924    Galerkin (2)       1,023          0.8 s      134.6 s
+        const int  galerkin_mode = smesh::Env::read<int>("SFEM_GMG_GALERKIN", 2);
         const bool galerkin      = galerkin_mode == 1;
         std::shared_ptr<sfem::Operator<real_t>> level_op_below;
         std::vector<real_t>                     galerkin_diag;
@@ -2994,7 +3006,18 @@ int main(int argc, char **argv) {
     // of point block-Jacobi. Needs a semi-structured mesh with more than one level, so it
     // is ignored on a flat one.
     const int         use_gmg     = smesh::Env::read<int>("SFEM_GMG", 0);
-    const int         gmg_smooth  = smesh::Env::read<int>("SFEM_GMG_SMOOTH", 3);
+    // Two sweeps, pre and post. The fine-level Vanka sweep is ~70% of a large run, so a third
+    // one costs more than the iterations it saves once the problem is big. Warped FDA nozzle,
+    // Re 500, FGMRES + Galerkin multigrid, Grace 72 threads, same Newton steps and results:
+    //
+    //     dof        sweeps   linear its   run
+    //     116,212      3          491       8.1 s
+    //     116,212      2          617       8.2 s
+    //     116,212      1        1,007       9.9 s   (one more Newton step)
+    //     893,924      3        1,023     134.9 s
+    //     893,924      2        1,153     111.6 s
+    //     893,924      1        1,832     104.4 s
+    const int         gmg_smooth  = smesh::Env::read<int>("SFEM_GMG_SMOOTH", 2);
     // Compares J_mf v against J_asm v once, on the first Jacobian. The two paths must
     // agree before any timing comparison between them means anything.
     const int         check_jv    = smesh::Env::read<int>("SFEM_CHECK_JV", 0);
