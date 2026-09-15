@@ -546,42 +546,33 @@
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 28</div>
     <div class="body">
-      <div class="op-title">The residual path still assembles by probing, and the energy path next to it does not <span class="chip c-part">found &mdash; 5 of 25 assemblies, up to 30 applies per element</span></div>
+      <div class="op-title">Matrix assembly does not follow the element, and one path still probes <span class="chip c-part">revisited &mdash; the hand-written kernel is the reference, and it is closed form</span></div>
 
-      <p><b>The rule.</b> An element matrix is computed directly. Assembling it by applying the operator to unit basis vectors and keeping the columns is not acceptable, whatever the form. <code>tests/test_m11_matrix_formats.py</code> enforces exactly this for the energy path, and says why in its own words: the assembly &ldquo;used to call the apply once per trial degree of freedom and keep a column, which is twenty-four applies per element for a HEX8; the apply block belongs to the apply and must not appear in an assembly again.&rdquo;</p>
+      <p><b>Corrected after reading SFEM's own kernel.</b> This started as &ldquo;the residual path probes&rdquo;, which is true and is the worst instance. Reading <code>tet4_linear_elasticity_crs_adj</code> in <code>operators/tet4/tet4_linear_elasticity_inline_cpu.hpp</code> shows the defect is larger and includes the path that was thought to be fixed.</p>
 
-      <p><b>It is still there on the residual path.</b> Of the 25 element-matrix assemblies in the shipped tree, 20 call a direct element-matrix kernel and 5 set a unit direction, call the Jacobian-action block, and read off a column:</p>
+      <p><b>What the hand-written kernel does.</b> 328 lines, <b>zero loops</b>, <b>zero quadrature points</b>. It takes the adjugate and the determinant and writes all 144 entries of the 12&times;12 element matrix as straight-line expressions over <b>178 temporaries shared across every entry</b>. That sharing is the whole point and it is only available when the entries are eliminated together; a loop over trial functions can share within a column and structurally cannot share across them.</p>
 
-<pre>      for (int trial_local = 0; trial_local &lt; 12; ++trial_local) {
-        const int trial = col_tensor_stream(trial_local);
-        for (int stream = 0; stream &lt; N_STREAMS; ++stream) {
-          bdirection[stream][0] = s_t(0);
-          boutput[stream][0] = s_t(0);
-        }
-        bdirection[trial][0] = s_t(1);
-        ..._jacobian_action_block_contiguous&lt;s_t, NQ, NS, VS&gt;(1, 1, ..., bdirection, ..., boutput);
-        for (int test_local = 0; test_local &lt; 12; ++test_local) {
-          element_matrix[test_local * 12 + trial_local] = boutput[..][0];
-        }
-      }</pre>
-
-      <p><b>The sharpest part is that the counter-example is in the same material.</b> Mooney&ndash;Rivlin Kelvin&ndash;Voigt Newmark carries an elastic unit written as an energy and a viscous unit written as a residual. On the same element, the elastic assembly calls <code>..._direct_hessian_..._element_matrix</code> and the viscous one probes. Two units, one material, one element, two methods &mdash; which says the defect is the path and not the mathematics.</p>
+      <p><b>What the generator emits for the same material on the same element.</b> <code>linear_elasticity_d3_simplex_direct_hessian_reference_element_matrix</code> assembles directly &mdash; it does not probe &mdash; but it does it with seven loops including a quadrature loop, seventeen arguments, and eleven references to <code>q_weight</code> and the <code>grad_ref_*</code> tables, on an element whose gradients are constant. It zeroes 144 entries and accumulates into them.</p>
 
       <table class="measures" style="margin:8px 0 12px">
-        <tr><th>MRKV viscous, by element</th><th>applies per element</th></tr>
-        <tr><td>TET10</td><td><b>30</b></td></tr>
-        <tr><td>PROTEUS_HEX8</td><td>24 &mdash; the number the energy-path test names</td></tr>
-        <tr><td>TET4</td><td>12</td></tr>
-        <tr><td>PROTEUS_QUAD4</td><td>8</td></tr>
-        <tr><td>TRI3</td><td>6</td></tr>
+        <tr><th>TET4 linear elasticity, 12&times;12 element matrix</th><th>hand-written</th><th>generated</th></tr>
+        <tr><td>loops</td><td><b>0</b></td><td>7, one of them quadrature</td></tr>
+        <tr><td>quadrature data</td><td>none</td><td><code>q_weight</code>, <code>grad_ref_x/y/z</code></td></tr>
+        <tr><td>inputs</td><td>adjugate, determinant</td><td>17 arguments</td></tr>
+        <tr><td>entries written</td><td>144, straight line</td><td>2 sites, inside loops</td></tr>
+        <tr><td>temporaries shared across all entries</td><td>178</td><td>&mdash; not expressible</td></tr>
       </table>
 
-      <p><b>Why it survived.</b> The energy path got a direct element-matrix emitter and a test that forbids the apply block appearing in an assembly; the residual path got neither, and nothing generalised the test. It is not caught by <code>reproducibility</code> either, which skips matrix kernels for &ldquo;values: layout not modelled&rdquo; &mdash; so the only thing that would have noticed is a reader.</p>
+      <p><b>So the rule this breaks is the general one.</b> Evaluation strategy follows the element: tensor-product gets sum factorization, a lowest-order simplex gets closed form with no quadrature loop and no per-point data. Every other kernel family obeys it &mdash; the inexact-apply headers expand and eliminate, the tensor-product applies factorise. Matrix assembly is the family that does not, on both paths, and probing is what that looks like at its worst.</p>
 
-      <p><b>What closing it needs.</b> The residual equivalent of <code>_sfem_soa_direct_hessian_element_matrix_function</code>: differentiate the weak form with respect to the trial coefficients once, and emit the entry rather than probing for it. The energy path is the worked example. The test that guards it should then be widened from naming one material's apply block to asserting the shape for every assembly, or the next path to acquire one will acquire this too.</p>
+      <p><b>The residual path additionally probes.</b> Of the 25 element-matrix assemblies in the shipped tree, 20 call a direct element-matrix kernel and 5 set a unit basis vector, call the Jacobian-action block and read off a column &mdash; at 30 applies per element on TET10, 24 on PROTEUS_HEX8, 12 on TET4, 8 on PROTEUS_QUAD4, 6 on TRI3. All five are the Mooney-Rivlin Kelvin-Voigt Newmark viscous unit, written as a residual; the same material's elastic unit, written as an energy, assembles directly on the same elements. Held by a shrink-only list in <code>tests/test_m11_matrix_formats.py</code> so none can be added or quietly dropped.</p>
 
-      <div class="op-facts"><span><i>assemblies</i> 20 of 25 direct, 5 probing</span><span><i>worst</i> 30 applies per element, TET10</span><span><i>counter-example</i> same material, other unit</span><span><i>gate that would catch it</i> none today</span></div>
-    </div>
+      <p><b>Measured, for the shape the fix should take.</b> The substitution in <code>plans/direct_assembly.py</code> gives an entry symbolically: a Jacobian-action flux is linear in its direction, so replacing the direction with a trial basis function <em>is</em> that column, matching probing to 3.55e-15. Building every entry of the viscous TET4 matrix that way and eliminating once gives <b>483 temporaries and 2,980 operations for all 144 entries</b> &mdash; 2.7&times; the hand-written linear-elasticity kernel's 178, for a far heavier material, and comfortably inside what this tree already carries (the HEX8 inexact header holds 1,549 declarations).</p>
+
+      <p><b>What closing it needs.</b> Assembly asks the element's evaluation strategy like every other family. For a lowest-order simplex that means the whole matrix built symbolically, eliminated once, emitted straight-line &mdash; the hand-written kernel's shape, which is kept precisely to measure generated ones against. Quadrature stays where quadrature is warranted. The energy path's current emitter is not the worked example for this: it is loop-shaped on an element that wants closed form, so it needs the same revisit.</p>
+
+      <div class="op-facts"><span><i>reference</i> 0 loops, 178 temporaries, 144 entries</span><span><i>generated</i> 7 loops, quadrature on a constant-P1 element</span><span><i>probing</i> 5 of 25, up to 30 applies/element</span><span><i>closed form, viscous TET4</i> 483 temporaries, 2,980 ops</span></div>
+</div>
   </div>
 
   <div class="op ready">
