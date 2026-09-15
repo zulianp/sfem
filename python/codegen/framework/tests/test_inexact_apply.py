@@ -645,7 +645,7 @@ class AgainstTheExactActionTest(unittest.TestCase):
             sys.path.insert(0, materials)
         import importlib
 
-        from codegen.framework.symbolic.weak_forms import (
+        from codegen.framework.forms.weak_forms import (
             flux_form_from_energy,
             sfem_soa_weak_form,
         )

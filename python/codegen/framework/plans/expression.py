@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 
 
 @dataclass(frozen=True)

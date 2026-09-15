@@ -1135,7 +1135,7 @@ def flux_form_for_collection(collection, dim):
     about the lowered form, and an emitter that answered it would be choosing
     what to emit rather than printing it.
     """
-    from codegen.framework.symbolic.weak_forms import (
+    from codegen.framework.forms.weak_forms import (
         flux_form_from_energy,
         flux_form_from_residual,
         sfem_soa_weak_form,

@@ -68,10 +68,10 @@ from .plans.scheduling import (
 )
 from .emitters.artifacts import GeneratedKernelCode
 from .emitters.artifacts import GeneratedKernelFile
-from .symbolic.weak_forms import SfemSoAKernelForm
-from .symbolic.weak_forms import SfemSoAWeakForm
-from .symbolic.weak_forms import sfem_soa_kernel_form
-from .symbolic.weak_forms import sfem_soa_weak_form
+from .forms.weak_forms import SfemSoAKernelForm
+from .forms.weak_forms import SfemSoAWeakForm
+from .forms.weak_forms import sfem_soa_kernel_form
+from .forms.weak_forms import sfem_soa_weak_form
 from .fem import (
     sfem_soa_adjugate_geometry_inputs,
     SfemCompatibleElement,
@@ -134,7 +134,7 @@ from .fem.tensor_product import (
     tensor_product_sum_factorization_plan,
     tensor_product_test_contraction_plan,
 )
-from .symbolic.forms import (
+from .forms.forms import (
     FormBlock,
     FormDependencies,
     FormEvaluation,
@@ -221,7 +221,7 @@ from .fem.geometry import (
     geometry_plans_for_fem_policy,
     isoparametric_geometry_plan,
 )
-from .symbolic.equations import (
+from .forms.equations import (
     Equation,
     EquationField,
     EquationForm,

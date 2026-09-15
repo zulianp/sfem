@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import re
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 from codegen.framework.emitters.energy import CUDAEnergySoAEmitter
 from codegen.framework.plans.generation import KernelTarget, MeshPhase

@@ -3003,7 +3003,7 @@ def tensor_product_sum_factor_ir_from_user_input_stage(user_input):
 
 
 def _validate_laplace_form_source(material, dim):
-    from codegen.framework.symbolic.forms import FormKind, StandardFormName
+    from codegen.framework.forms.forms import FormKind, StandardFormName
 
     if getattr(material, "name", None) != "laplace":
         raise ValueError("tensor-product sum-factorization IR currently supports the laplace form only")

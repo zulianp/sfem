@@ -15,7 +15,7 @@ structure available to everything that should be subordinate to it, the
 driver included.
 """
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 from codegen.framework.plans.generation import (
     BlockPlan,
     LocalPhase,

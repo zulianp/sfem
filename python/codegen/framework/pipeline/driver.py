@@ -90,7 +90,7 @@ from codegen.framework.symbolic.core import (
     KernelExpressions,
     matrix_inner,
 )
-from codegen.framework.symbolic.equations import (
+from codegen.framework.forms.equations import (
     EquationForm,
     EquationSystem,
     EquationSystemBuilder,
@@ -126,7 +126,7 @@ from codegen.framework.symbolic.fields import (
     trial_function,
     vector_field,
 )
-from codegen.framework.symbolic.forms import (
+from codegen.framework.forms.forms import (
     FormBlock,
     FormCollection,
     FormDependencies,
@@ -170,7 +170,7 @@ from codegen.framework.symbolic.qualifiers import (
     qualify,
     variable,
 )
-from codegen.framework.symbolic.weak_forms import (
+from codegen.framework.forms.weak_forms import (
     sfem_soa_kernel_form,
     sfem_soa_weak_form,
 )

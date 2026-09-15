@@ -50,7 +50,7 @@ from codegen.framework.emitters.kernel_codegen import (
     generate_cpp_kernel,
     generate_cuda_kernel,
 )
-from codegen.framework.symbolic.forms import (
+from codegen.framework.forms.forms import (
     FormKind,
     FormOrder,
     PipelineStage,

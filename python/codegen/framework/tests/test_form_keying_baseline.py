@@ -34,7 +34,7 @@ import os
 import pkgutil
 import unittest
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 
 BASELINE_PATH = os.path.join(os.path.dirname(__file__), "form_keying_baseline.json")
 

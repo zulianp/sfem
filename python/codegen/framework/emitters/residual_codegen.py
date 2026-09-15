@@ -122,7 +122,7 @@ from codegen.framework.plans.streams import (
     mesh_kernel_stream_plans,
 )
 from codegen.framework.plans.streams import field_stream_groups, field_stream_usage
-from codegen.framework.symbolic.residual import (
+from codegen.framework.forms.residual import (
     coupled_residual_weak_coefficients,
 )
 from codegen.framework.emitters.tensor_product_geometry import (

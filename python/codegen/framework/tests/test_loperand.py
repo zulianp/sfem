@@ -25,7 +25,7 @@ from codegen.framework.plans.loperand import (
     gradient_metric_scale,
     loperand_matrix,
 )
-from codegen.framework.symbolic.weak_forms import (
+from codegen.framework.forms.weak_forms import (
     SfemSoAFluxForm,
     flux_form_from_energy,
     flux_form_from_residual,

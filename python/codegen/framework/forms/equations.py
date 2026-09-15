@@ -4,7 +4,7 @@ import math
 
 import sympy as sp
 
-from codegen.framework.symbolic.forms import (
+from codegen.framework.forms.forms import (
     FormBlock,
     FormCollection,
     FormDependencies,
@@ -15,7 +15,7 @@ from codegen.framework.symbolic.forms import (
     residual_form_pipeline,
 )
 from codegen.framework.symbolic.boundary_forms import BoundaryIntegral, integral_integrand, integral_measure
-from codegen.framework.symbolic.residual import (
+from codegen.framework.forms.residual import (
     CoupledResidualSystem,
     coupled_residual_weak_coefficients,
     weak_residual_coefficients,
