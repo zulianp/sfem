@@ -3,6 +3,9 @@
 \usepackage[margin=2.3cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
+\usepackage{array}
+% Ragged-right paragraph columns: justified text in narrow table cells spreads words apart.
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \usepackage{xcolor}
 \usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!55!black]{hyperref}
 \usepackage{tcolorbox}
@@ -496,7 +499,7 @@ or linearise it exactly because the application demands an exact Jacobian.
 
 \begin{center}
 \small
-\begin{tabular}{@{}p{3.2cm}p{3.5cm}p{4.2cm}p{4.2cm}@{}}
+\begin{tabular}{@{}L{3.2cm}L{3.5cm}L{4.2cm}L{4.2cm}@{}}
 \toprule
 Work & Discretisation & The two-ring term & In the linear system \\
 \midrule
@@ -681,7 +684,7 @@ solver's steady continuation it was not: with the same residual, the frozen Jaco
 The distinction that decides the design is \emph{where} the compact operator is used.
 \begin{center}
 \small
-\begin{tabular}{@{}p{3.6cm}p{4.2cm}p{3.8cm}p{3.4cm}@{}}
+\begin{tabular}{@{}L{3.6cm}L{4.2cm}L{3.8cm}L{3.4cm}@{}}
 \toprule
 Treatment & Newton map & Matrix stored & Who pays \\
 \midrule
@@ -733,6 +736,168 @@ to be a sparse product over global node ids, $(P^{\mathsf T}K)\,W^{-1}(G P)$.
 \item The fine-level smoother does not need it. Vanka is an approximation of the operator by
 construction, and reading the wider rows would cost the memory-bound sweep that dominates a run.
 \end{itemize}
+
+\FloatBarrier
+\section{Smoothers that can use the exact operator}
+\label{sec:smoothers}
+
+The solver already keeps the exact operator where Newton needs it: FGMRES applies
+$J_{\text{exact}}$, and the multigrid fine level is the same matrix-free operator, so every
+fine-level residual inside the cycle --- including the one the stationary smoother forms between
+sweeps --- is exact. The frozen $\cv{A_{\text{frozen}}}$ enters only through the Vanka patch solves
+and the Galerkin coarse levels. ``Exact'' for a smoother can therefore mean two things: (a) it is
+driven by the exact residual, which every smoother below is; or (b) its local solves are built from
+the exact operator, which is what the third column records.
+
+\begin{center}
+\small
+\begin{tabular}{@{}L{2.8cm}L{3.2cm}L{1.3cm}L{3.0cm}L{3.9cm}@{}}
+\toprule
+Smoother & Local solve built from & Exact (b) & Cost per smoothing step & Known here / risk \\
+\midrule
+\textbf{Vanka, frozen patches} (current) &
+$\cv{A_{\text{frozen}}}$ restricted to each element, $8\times8$ Schur complement &
+no &
+row walk over 27-block rows, memory bound &
+multiplicative 0.63, additive 0.883 standalone at $\mathrm{Re}=1$; the default \\[3pt]
+\textbf{Krylov-accelerated Vanka}: GMRES($k$) on $J_{\text{exact}}$, preconditioned by frozen Vanka &
+frozen patches as preconditioner; the Krylov polynomial is built on $J_{\text{exact}}$ &
+through the polynomial &
+$k$ exact applies $+\ k$ Vanka sweeps; nonlinear cycle, absorbed by FGMRES &
+hook exists (\code{SFEM\_GMG\_KSMOOTH}) but uses BiCGStab, which should become GMRES/FGMRES;
+cheapest to try \\[3pt]
+\textbf{Vanka, exact patches} &
+$R_k J_{\text{exact}} R_k^{\mathsf T}$: $\cf{K}\,\cg{W^{-1}G}$ entries among the corners as local
+path sums &
+yes &
+set-up reads one more ring of geometry; the multiplicative sweep needs 81-point rows, or an exact
+matrix-free residual per colour ($\approx 8$ applies per sweep) &
+more memory or more applies; local assembly of the two-ring entries is new code \\[3pt]
+\textbf{Block smoothers} (Braess--Sarazin, inexact Uzawa) &
+exact matrix-free blocks $B$, $B^{\mathsf T}$, $C$ (\code{blocks\_exact\_rc}), approximate
+$F^{-1}$ and pressure Schur complement &
+yes (blocks) &
+a few block applies plus inner Schur solves &
+SIMPLE, the closest relative, measured 0.990; the velocity-column continuity block drops a term
+when the state pressure is non-zero and must be fixed first \\[3pt]
+\textbf{Additive Schwarz on vertex stars} (PCPATCH-like) &
+$J_{\text{exact}}$ assembled on each star patch &
+yes &
+heavy set-up; one local factorisation per patch &
+robust in the literature; exact patch assembly needs neighbour data \\[3pt]
+Chebyshev / polynomial &
+matvecs of $J_{\text{exact}}$ only &
+yes &
+degree $\times$ exact applies &
+needs eigenvalue bounds, unreliable for a non-symmetric indefinite saddle point \\[3pt]
+Point block-Jacobi &
+$4\times4$ nodal blocks &
+possible &
+cheap &
+0.981 at $\mathrm{Re}=1$, divergent for $\omega\ge0.5$: not a smoother here \\[3pt]
+ILU on assembled $J_{\text{exact}}$ &
+the 81-point BSR matrix &
+yes &
+memory of the wide pattern; essentially sequential &
+reference only, not a many-core smoother \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{What the semi-structured discretisation adds}
+
+The rows above are written for a general sparse operator. On the semi-structured mesh two facts
+change which of them are affordable.
+
+\emph{The current smoother is already macro-element-local.} The multiplicative Vanka sweeps the
+elements of one macro-element in eight colours, on a private vector, and skips every column that
+lies outside that macro-element (\code{vanka\_apply\_mult}: ``outside this element: additive'');
+corrections are then combined across macro-elements through the two-pass scatter. It never reads a
+coupling between two macro-elements.
+
+\emph{The exact term's unstorable entries are exactly those couplings.} Section~3 showed that the
+entries of $\cf{K}\,\cg{W^{-1}G}$ a macro-element matrix cannot hold (red in
+Figure~\ref{fig:exact}) couple a row to a node outside every macro-element containing it. Every
+entry a macro-element-local sweep reads --- row and column inside the same macro-element --- is
+blue: storable, with $\cg{W_n}$ taken from the global mesh as data. So a macro-element-local
+smoother can be exact in the sense (b) \emph{on everything it reads}, and what it gives up is what
+the current smoother already treats additively.
+
+On the lattice those entries also have a fixed shape. Inside a macro-element the exact row of a
+node is the edge-neighbour star of $\cf{K}$ widened by the element box of $\cg{G}$ --- 21 lattice
+offsets in 2D, 81 in 3D (the regular-lattice counts of the Summary table), truncated at the
+macro-element's faces --- so it can be stored in fixed slots per lattice node, exactly as
+the Galerkin assembly stores 27 slots, with no indirection and no global pattern.
+
+That storage is no longer hypothetical. The fine-level Vanka smoother now reads both its patch
+blocks and its multiplicative row walk from 27-slot macro-element stencils rather than from a
+global BSR, which was measured against the matrix form at identical iteration counts and is
+described in the companion note on the smoother. The first row of the table below therefore widens
+a path that exists, from 27 slots to 81, rather than introducing a new one.
+
+\begin{center}
+\small
+\begin{tabular}{@{}L{3.0cm}L{3.9cm}L{1.3cm}L{2.8cm}L{3.2cm}@{}}
+\toprule
+Option on the lattice & What it uses & Exact (b) & Cost & Rests on \\
+\midrule
+\textbf{Macro-element exact Vanka} &
+patch operators and the multiplicative row walk from the exact operator restricted to each
+macro-element, 81 fixed slots per lattice node (3D) &
+yes, for every entry read &
+$1.5\times$ the values the row walk streams today, not $81/27$: the exact term differentiates
+through the pressure alone, so each of the 54 added offsets carries a column of four rather
+than a block of sixteen, giving $27\times16 + 54\times4 = 648$ against 432, in a sweep that is
+memory bound &
+the additive-between-macro-elements structure already in use \\[3pt]
+\textbf{Macro-element Schwarz} (block smoother, macro-elements as subdomains) &
+a local solve of the exact macro-element operator: inner Vanka sweeps or a direct solve on
+$(L+1)^3$ nodes &
+yes, inside each subdomain &
+one local solve per macro-element per smoothing step; parallel over macro-elements &
+the two-pass scatter for the additive combination \\[3pt]
+\textbf{Line / plane smoothers along lattice axes} &
+block solves along lattice lines (or planes) inside each macro-element; the exact operator along a
+line is pentadiagonal in $4\times4$ blocks &
+along the line &
+one block-banded solve per line; lines are free on the lattice &
+the classical remedy for convection dominance and anisotropy, cheap only because lines exist \\[3pt]
+\textbf{Flow-aligned colour ordering} &
+the eight lattice colours of each macro-element visited in the downstream direction of its mean
+velocity &
+as before &
+none &
+downstream ordering for convection-dominated flow; orthogonal to the other rows \\[3pt]
+\textbf{Exact lattice stencils on coarse levels} &
+Galerkin levels with the same fixed-slot storage, 81 slots instead of 27, built from
+$(P^{\mathsf T}\cf{K})\,\cg{W^{-1}}(\cg{G}P)$ &
+yes, locally &
+$3\times$ coarse storage; the cross-macro-element red entries at level~1 still need a global
+product &
+makes the coarse space consistent, which no smoother does \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Of these, the macro-element exact Vanka is the one that keeps every structure the solver has ---
+lattice slots, eight colours, the deterministic scatter --- and changes only what the patches and
+the row walk are built from. It was measured before being built, and the measurement argues
+against it. Scaling the patch's pressure couplings, which are exactly the entries it would
+correct, by $1\pm0.05$ moves the linear iteration count by one to two per cent, and by $1.10$ under
+four per cent, with no consistent sign in either direction. The exact term is 2--7\,\% of the
+operator, so the most such a patch could recover is that couple of per cent, set against
+$1.5\times$ the bytes a memory-bound sweep streams and a fold map for the widened offsets that the
+27-point pattern cannot key. The figures are in the companion note on the smoother.
+
+Two remarks bound what any row can deliver. An exact smoother does not make the coarse space
+consistent: the Galerkin levels are still $P^{\mathsf T}\cv{A_{\text{frozen}}}P$, which differs from
+the exact operator at level~1 by 2--7\,\% on the cases measured. And \code{SFEM\_RC\_EXACT\_JAC=0}
+does \emph{not} isolate the smoother's share of that, though it looks as though it should: it
+replaces the Krylov operator with one that is not the Jacobian, so Newton itself degrades rather
+than the preconditioner. On the nozzle at 116\,212 dof it took 469 Newton steps over twelve
+continuation stages and still failed to converge, against 28 over six stages with the exact
+operator. Separating smoother mismatch from coarse-space mismatch requires the smoother to be
+varied while the operator is held exact, which is what the perturbation sweep above does.
 
 \begin{thebibliography}{99}
 \small

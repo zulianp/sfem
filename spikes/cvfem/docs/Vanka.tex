@@ -547,6 +547,224 @@ lower bound for the sweeps alone. It is close to the factor of two in bytes stre
 further evidence that the sweep is memory bound. A smoother only has to reduce the error, and FGMRES
 absorbs the difference.
 
+\section{Assembling the patches without the global BSR}
+\label{sec:nobsr}
+
+\subsection{What the BSR is used for today}
+
+The fine-level smoother builds a global operator only to read it back in pieces. The pipeline is:
+\begin{sloppypar}
+\begin{enumerate}[leftmargin=*, itemsep=1pt]
+\item element matrices of every micro-cell, at ratio $q=1$ of the element-wise Galerkin assembly,
+  accumulated into 27 fixed stencil slots per lattice node of each macro-element;
+\item those slots accumulated into a global BSR through the cached pattern, in
+  \code{assemble\_coarse\_operator};
+\item set-up: 64 binary searches per patch to find its blocks in the BSR (Algorithm~\ref{alg:setup});
+\item the multiplicative sweep: a walk over each patch corner's BSR row, through the column index
+  array, through the map $\lambda$ that drops every column outside the current macro-element
+  (Algorithm~\ref{alg:mult}).
+\end{enumerate}
+\end{sloppypar}
+\begin{sloppypar}
+The double-precision BSR is kept alive by the smoother, and at single precision a float copy of its
+values is kept beside it for the row walk. Two observations make the BSR avoidable. The sweep
+never reads a column outside the macro-element it is sweeping. And the Galerkin element-matrix path
+already holds and applies an operator as per-macro-element 27-slot stencils, summing shared nodes
+with the deterministic two-pass reduction (\code{galerkin\_apply}, \code{galerkin\_block\_diag},
+\code{GalerkinReduce}).
+\end{sloppypar}
+
+\subsection{The options on the lattice}
+
+Estimates for the FDA nozzle at 893\,924 dof (223\,481 nodes, 420 macro-elements, $L=8$, so
+306\,180 macro-local lattice nodes); row lengths are taken at their interior maximum of 27 blocks,
+so the BSR figures are upper bounds. Table~\ref{tab:nobsr} lists the options.
+
+\begin{table}[tbp]
+\centering
+\caption{Ways to build the Vanka patches and the multiplicative row walk on the semi-structured
+mesh, with and without the global BSR.}
+\label{tab:nobsr}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{3.1cm}@{}}
+\toprule
+Option & Patch blocks from & Row walk from & Operator storage & Cost / risk \\
+\midrule
+\textbf{A. Global BSR} (coarse levels) &
+binary search in the BSR &
+BSR rows through column indices and $\lambda$ &
+double BSR $\le 736$\,MiB plus float copy $\le 368$\,MiB &
+works and is verified; indirection, searches, two copies of the values \\[3pt]
+\textbf{B. Macro-local operator stencils} (fine level) &
+direct slot lookup: block $(a,b)$ of a cell is slot $s(a,b)$ of node $a$ &
+27 contiguous blocks per node, implicit column $a+\text{step}[s]$, exactly the loop of
+\code{galerkin\_apply} &
+$306\,180\times27\times16$ scalars: $\approx 505$\,MiB in float, one copy &
+contributions of neighbouring macro-elements to pairs on a shared face or edge must be folded in
+once per mesh, through a pair map built from global ids \\[3pt]
+\textbf{C. Patch assembly by scattering element matrices} &
+each cell's $8\times8$ element matrix added to the patches of the cells that share its node pairs,
+chunked like the Galerkin assembly &
+B or A &
+transient only: $32\times32$ per cell in a chunk, discarded after the Schur factorisation &
+PCPATCH-style local assembly; needs neighbour cells across macro-element skins \\[3pt]
+\textbf{D. Only what diagonal Vanka needs} &
+per corner pair: $D_{ab}$ (3), $G_{ab}$ (3), $A^{pp}_{ab}$ (1); per node: $\operatorname{diag}F$ (3) &
+B, or recomputed element actions &
+7 scalars per pair instead of 16 &
+smallest set-up memory; the multiplicative sweep still needs full blocks for its residual \\[3pt]
+\textbf{E. Matrix-free residual update} &
+B, C or D &
+no stored rows: after each colour, re-evaluate the residual of the macro-element with the element
+kernels &
+none beyond the patches &
+about one macro-local operator application per colour, 8 per sweep; trades memory traffic for
+kernel work \\[3pt]
+\textbf{F. Exact patches} &
+B with 81 slots: adds the $K\,W^{-1}G$ entries between nodes of one macro-element &
+81 contiguous blocks per node &
+$\approx 3\times$ B &
+consistent with the exact Jacobian on every entry the sweep reads; see the operator-locality
+note \\[3pt]
+Excluded: probing &
+applying the operator to unit vectors &
+--- &
+--- &
+not an assembly method this code uses \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Option B is the closest to the current code: it removes step~2 of the pipeline, the binary
+searches, the column indices and one of the two copies of the values, and it keeps the element
+assembly, the colouring and the deterministic scatter unchanged. It is also where option F would
+live. What it adds is the fold of cross-macro-element contributions for pairs on shared skins,
+which is the same kind of once-per-mesh map the Galerkin pattern cache already builds.
+
+\subsection{What other codes do}
+
+\begin{center}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.5cm}>{\raggedright\arraybackslash}p{5.1cm}>{\raggedright\arraybackslash}p{6.4cm}@{}}
+\toprule
+Work & Patch operators from & Notes \\
+\midrule
+PETSc \code{PCPATCH} (Farrell, Knepley, Mitchell, Wechsung, ACM TOMS 47(3), 2021) &
+a user callback that assembles the Jacobian (and residual) on the cells of each patch &
+no global matrix is required; construction types \emph{star}, \emph{vanka} (closure of the star)
+and \emph{pardecomp}, line and plane patches through a callback; the Taylor--Hood example uses
+Chebyshev-accelerated Vanka relaxation inside multigrid preconditioning GMRES \\[3pt]
+PETSc \code{PCASM}, NGSolve (as described in the PCPATCH paper) &
+submatrices extracted from the assembled global matrix &
+the PCPATCH authors note this rules out matrix-free implementations and efficient nonlinear
+relaxation, since each local nonlinear update would need the global Jacobian \\[3pt]
+Anselmann \& Bause, space-time FEM for Navier--Stokes (arXiv:2210.02690, 2022) &
+the global Jacobian restricted to the cell's degrees of freedom, $(J_K)_{\nu\mu} = J_{\mathrm{dof}(K,\nu),\mathrm{dof}(K,\mu)}$ &
+local inverses by LAPACK \\[3pt]
+Saberi, Meschke \& Vogel, restricted additive Vanka (arXiv:2103.10127, 2021) &
+the system assembled on all grids &
+subdomain inverses can be precomputed; the restricted additive form then stores only certain
+rows \\[3pt]
+Margenberg \& Mehlmann, $p$-Navier--Stokes (arXiv:2603.28706, 2026) &
+finest level: patches reassembled locally with state-dependent coefficients frozen at one
+representative time; coarse levels: extracted from the Petrov--Galerkin operators &
+the global defect, the matrix-free operator action and the coarse operators stay exact --- the same
+split as this solver \\[3pt]
+Witte, Arndt \& Kanschat, tensor-product Schwarz smoothers (CMAM 21(3), 2021) &
+matrix-free: local inverses by fast diagonalisation of the separable operator on cells and vertex
+patches &
+cost $O(dk^{d+1})$ instead of $O(k^{3d})$; relies on separability, which a non-symmetric
+Navier--Stokes patch does not have \\[3pt]
+Kohl \& R\"ude, HHG/HyTeG Stokes (arXiv:2010.13513, 2020) &
+no patches; node-centred stencil updates on uniformly refined macro-tetrahedra &
+identical stencils inside a refined macro-cell make matrix-free point smoothers such as
+Gauss--Seidel possible --- the structured analogue of option B \\[3pt]
+Jodlbauer, Langer, Wick \& Zulehner, deal.II (arXiv:2205.15770, 2022) &
+none: Chebyshev--Jacobi smoothers need only the diagonal &
+fully matrix-free monolithic multigrid for Stokes \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two lines of practice emerge. Codes built on an assembled global matrix extract patches from it,
+which is what this solver does today. Codes built for matrix-free operators assemble patches locally
+--- through callbacks, or, in the case closest to this solver, by reassembling fine-level patches
+with frozen coefficients while keeping the operator itself exact. On a semi-structured mesh the
+structured codes add a third ingredient: fixed per-macro-element stencils, which is option B.
+
+\subsection{What was implemented, and what it measured}
+
+Option B is implemented and is the only path the fine level takes. The global BSR stays where it is
+not redundant, on the coarse levels, which read their patches from the matrix their own Galerkin
+assembly already produces. The two forms were measured against each other on the FDA nozzle at
+116\,212 and 893\,924 dof on 72 Grace cores, FGMRES preconditioned by the V-cycle, each
+configuration repeated and the runs interleaved so that run-order effects cancel.
+
+They are the same operator rather than merely close ones: the linear iteration counts are identical
+at both sizes --- 617 and 1153 over 28 Newton steps --- and the two smoothers applied to one vector
+on one state agree to $2.4\times10^{-8}$, which is the round-off of float storage and not a
+difference between operators.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+& \multicolumn{2}{c}{116\,212 dof} & \multicolumn{2}{c}{893\,924 dof} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+& A (BSR) & B (stencils) & A (BSR) & B (stencils) \\
+\midrule
+Assembly, 28 builds  & 0.594\,s  & 0.406\,s  & 4.04\,s   & 2.83\,s \\
+Patch set-up         & 0.143\,s  & 0.112\,s  & 1.13\,s   & 0.99\,s \\
+Multiplicative apply & 1.574\,s  & 1.852\,s  & 37.55\,s  & 36.58\,s \\
+End to end           & 7.00\,s   & 7.20\,s   & 64.98\,s  & 62.44\,s \\
+Peak resident set    & 8.71\,GiB & 8.78\,GiB & 10.70\,GiB & 10.39\,GiB \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Assembling the stencils is about 30\% cheaper than assembling the BSR at both sizes, and setting up
+the patches from them 12 to 22\% cheaper, because neither pays for the pattern, the binary searches
+or the narrowing copy. The apply is the one place the stencils cost more: they store a shared face
+once per macro-element, $1.81\times$ the mesh nodes at $L=4$ and $1.37\times$ at $L=8$, so the sweep
+moves more bytes than a BSR row walk does. That is why the balance turns with the internal level ---
+$+2.7\%$ end to end at $L=4$ against $-3.9\%$ and 331\,MB less memory at $L=8$ --- and why the
+advantage grows as the lattice deepens, which is the direction this solver runs in.
+
+One micro-optimisation was tried and rejected. Hoisting the lattice bounds into the loop ranges, so
+that the sweep visits only the slots a node can actually reach, measured $-1.9\%$ on the apply at
+$L=4$ but $+1.6\%$ at $L=8$, where the apply is 37\,s of a 63\,s run; the fixed 27-slot loop with
+the test inside it was kept. The branch was never the bottleneck --- the bytes are.
+
+Options C to E remain in reserve for the case where memory, not time, becomes the constraint.
+
+Option F, exact patches on 81 slots, is now a change of stencil width rather than of storage ---
+and it was measured instead of built. The entries such a patch would correct are the patch's
+pressure couplings: the $G$ block and the pressure--pressure entry. Scaling exactly those by
+$1+\varepsilon$ and solving the nozzle gives
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+$\varepsilon$ & $0$ & $+0.02$ & $-0.02$ & $+0.05$ & $-0.05$ & $+0.10$ \\
+\midrule
+linear its, 116\,212 dof & 617 & 621 & 612 & 628 & 631 & 640 \\
+linear its, 893\,924 dof & 1153 & --- & --- & 1178 & 1143 & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A five per cent error in those entries costs one to two per cent of the iteration count, ten per
+cent costs under four, and the sign is not consistent --- $-5$ per cent is worse than $+5$ at
+116\,212 dof and better at 893\,924 --- so the frozen entries are not biased in a direction an
+exact patch would repair. The exact term is two to seven per cent of the operator, so the most
+such a patch could recover is that couple of per cent, set against $1.5\times$ the bytes the
+sweep streams. The sweep is memory bound and is 37\,s of a 63\,s solve at 893\,924 dof, so the
+widened rows would cost more time than the saved iterations return, before counting the fold map
+the widened offsets need --- roughly 16.5 million $(\text{row},\text{column})$ pairs to sort and
+group once per mesh, because the fold is keyed on BSR block positions that exist only for the
+27-point pattern. Exact patches are therefore not worth building here.
+
 \section{Is Vanka a Navier--Stokes smoother, or only a Stokes one?}
 
 It is a Navier--Stokes smoother by origin: Vanka's 1986 papers solve the primitive-variable
